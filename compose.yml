@@ -1,0 +1,168 @@
+name: ${ORBISOPS_COMPOSE_PROJECT_NAME:-orbisops}
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${ORBISOPS_MYSQL_DATABASE:-orbisops}
+      MYSQL_USER: ${ORBISOPS_MYSQL_USERNAME:-orbisops}
+      MYSQL_PASSWORD: ${ORBISOPS_MYSQL_PASSWORD:?set ORBISOPS_MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${ORBISOPS_MYSQL_ROOT_PASSWORD:?set ORBISOPS_MYSQL_ROOT_PASSWORD}
+    ports:
+      - "${ORBISOPS_MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
+  pgvector:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${ORBISOPS_PGVECTOR_DATABASE:-orbisops}
+      POSTGRES_USER: ${ORBISOPS_PGVECTOR_USERNAME:-orbisops}
+      POSTGRES_PASSWORD: ${ORBISOPS_PGVECTOR_PASSWORD:?set ORBISOPS_PGVECTOR_PASSWORD}
+    ports:
+      - "${ORBISOPS_PGVECTOR_PORT:-5432}:5432"
+    volumes:
+      - pgvector-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 10s
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
+    environment:
+      REDIS_PASSWORD: ${ORBISOPS_REDIS_PASSWORD:?set ORBISOPS_REDIS_PASSWORD}
+    ports:
+      - "${ORBISOPS_REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 5s
+
+  migrate:
+    image: orbisops/server:${ORBISOPS_VERSION:-2.0.0}
+    build:
+      context: ./server
+      dockerfile: orbisops-app/Dockerfile
+    entrypoint: ["bash", "/opt/orbisops/scripts/db-migrate.sh"]
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_DATABASE: ${ORBISOPS_MYSQL_DATABASE:-orbisops}
+      MYSQL_USERNAME: ${ORBISOPS_MYSQL_USERNAME:-orbisops}
+      MYSQL_PWD: ${ORBISOPS_MYSQL_PASSWORD:?set ORBISOPS_MYSQL_PASSWORD}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: "no"
+
+  backend:
+    image: orbisops/server:${ORBISOPS_VERSION:-2.0.0}
+    build:
+      context: ./server
+      dockerfile: orbisops-app/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: ./deploy/orbisops.runtime-secrets.env
+        required: false
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      ORBISOPS_SERVER_PORT: "8099"
+      ORBISOPS_MYSQL_URL: jdbc:mysql://mysql:3306/${ORBISOPS_MYSQL_DATABASE:-orbisops}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true
+      ORBISOPS_MYSQL_USERNAME: ${ORBISOPS_MYSQL_USERNAME:-orbisops}
+      ORBISOPS_MYSQL_PASSWORD: ${ORBISOPS_MYSQL_PASSWORD:?set ORBISOPS_MYSQL_PASSWORD}
+      ORBISOPS_PGVECTOR_URL: jdbc:postgresql://pgvector:5432/${ORBISOPS_PGVECTOR_DATABASE:-orbisops}
+      ORBISOPS_PGVECTOR_USERNAME: ${ORBISOPS_PGVECTOR_USERNAME:-orbisops}
+      ORBISOPS_PGVECTOR_PASSWORD: ${ORBISOPS_PGVECTOR_PASSWORD:?set ORBISOPS_PGVECTOR_PASSWORD}
+      ORBISOPS_REDIS_HOST: redis
+      ORBISOPS_REDIS_PORT: "6379"
+      ORBISOPS_REDIS_PASSWORD: ${ORBISOPS_REDIS_PASSWORD:?set ORBISOPS_REDIS_PASSWORD}
+      ORBISOPS_MODEL_BASE_URL: ${ORBISOPS_MODEL_BASE_URL:-https://model-provider.invalid}
+      ORBISOPS_MODEL_API_KEY: ${ORBISOPS_MODEL_API_KEY:-placeholder}
+      ORBISOPS_CHAT_MODEL: ${ORBISOPS_CHAT_MODEL:-unconfigured}
+      ORBISOPS_EMBEDDING_BASE_URL: ${ORBISOPS_EMBEDDING_BASE_URL:-https://embedding-provider.invalid}
+      ORBISOPS_EMBEDDING_API_KEY: ${ORBISOPS_EMBEDDING_API_KEY:-placeholder}
+      ORBISOPS_EMBEDDING_MODEL: ${ORBISOPS_EMBEDDING_MODEL:-unconfigured}
+      ORBISOPS_EMBEDDING_DIMENSIONS: ${ORBISOPS_EMBEDDING_DIMENSIONS:-1536}
+      ORBISOPS_ADMIN_JWT_SECRET: ${ORBISOPS_ADMIN_JWT_SECRET:?set ORBISOPS_ADMIN_JWT_SECRET}
+      ORBISOPS_ADMIN_SERVICE_TOKEN: ${ORBISOPS_ADMIN_SERVICE_TOKEN:-}
+      ORBISOPS_AI_MODEL_CALLS_ENABLED: ${ORBISOPS_AI_MODEL_CALLS_ENABLED:-true}
+      ORBISOPS_BOOTSTRAP_ADMIN_ENABLED: ${ORBISOPS_BOOTSTRAP_ADMIN_ENABLED:-false}
+      ORBISOPS_BOOTSTRAP_ADMIN_USER_ID: ${ORBISOPS_BOOTSTRAP_ADMIN_USER_ID:-}
+      ORBISOPS_BOOTSTRAP_ADMIN_USERNAME: ${ORBISOPS_BOOTSTRAP_ADMIN_USERNAME:-}
+      ORBISOPS_BOOTSTRAP_ADMIN_PASSWORD: ${ORBISOPS_BOOTSTRAP_ADMIN_PASSWORD:-}
+      ORBISOPS_RAG_VECTOR_TABLE_NAME: orbisops_vector_store
+      ORBISOPS_RAG_QUERY_REWRITE_LLM_ENABLED: "false"
+      ORBISOPS_RAG_MULTIMODAL_ENABLED: "false"
+      ORBISOPS_RAG_VISUAL_ENABLED: "false"
+      ORBISOPS_RERANK_ENABLED: ${ORBISOPS_RERANK_ENABLED:-false}
+      ORBISOPS_RERANK_PROVIDER: ${ORBISOPS_RERANK_PROVIDER:-}
+      ORBISOPS_RERANK_BASE_URL: ${ORBISOPS_RERANK_BASE_URL:-}
+      ORBISOPS_RERANK_API_KEY: ${ORBISOPS_RERANK_API_KEY:-}
+      ORBISOPS_RERANK_MODEL: ${ORBISOPS_RERANK_MODEL:-}
+      ORBISOPS_ES_URL: ${ORBISOPS_ELASTICSEARCH_URL:-https://elasticsearch.invalid}
+      ORBISOPS_PROMETHEUS_URL: ${ORBISOPS_PROMETHEUS_URL:-https://prometheus.invalid}
+      ORBISOPS_ALLOWED_ORIGIN_PATTERNS: http://localhost:${ORBISOPS_WEB_PORT:-3002},http://127.0.0.1:${ORBISOPS_WEB_PORT:-3002}
+    ports:
+      - "${ORBISOPS_SERVER_PORT:-8099}:8099"
+    volumes:
+      - repair-data:/var/lib/orbisops/repair
+      - app-data:/opt/orbisops/data
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      pgvector:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8099/actuator/health/liveness"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  web:
+    image: orbisops/web:${ORBISOPS_VERSION:-2.0.0}
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      args:
+        ORBISOPS_API_BASE_URL: ""
+    restart: unless-stopped
+    environment:
+      ORBISOPS_BACKEND_UPSTREAM: http://backend:8099
+    ports:
+      - "${ORBISOPS_WEB_PORT:-3002}:3002"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3002/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  mysql-data:
+  pgvector-data:
+  redis-data:
+  repair-data:
+  app-data:

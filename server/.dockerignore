@@ -1,0 +1,14 @@
+**/target/
+**/src/test/
+**/.idea/
+**/.vscode/
+**/.DS_Store
+**/*.iml
+**/logs/
+**/log/
+**/data/
+**/*.log
+**/.ops-repair/
+**/.ai-bridge/
+README.md
+docs/

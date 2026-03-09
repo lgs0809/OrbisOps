@@ -1,0 +1,44 @@
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+!*.env.example
+deploy/orbisops.env
+deploy/orbisops.runtime-secrets.env
+deploy/.acceptance-private/
+
+# Java / Maven
+**/target/
+*.class
+
+# Node
+**/node_modules/
+**/dist/
+**/.rsbuild/
+**/coverage/
+
+# Runtime data
+**/logs/
+**/log/
+**/*.log
+**/data/
+
+# OrbisOps repair/runtime workspaces
+**/.ops-repair/
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+
+# Local AI handoff state
+.ai-bridge/
+**/.ai-bridge/

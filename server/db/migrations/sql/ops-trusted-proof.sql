@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS `ai_ops_trusted_proof` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `proof_id` VARCHAR(100) NOT NULL,
+  `project_id` VARCHAR(128) NOT NULL,
+  `package_id` VARCHAR(100) NOT NULL,
+  `package_version` INT NOT NULL,
+  `package_hash` VARCHAR(128) NOT NULL,
+  `proof_type` VARCHAR(64) NOT NULL,
+  `source` VARCHAR(64) NOT NULL,
+  `external_run_id` VARCHAR(120) NULL,
+  `command_hash` VARCHAR(64) NULL,
+  `script_hash` VARCHAR(64) NULL,
+  `result_status` VARCHAR(32) NOT NULL,
+  `risk_level` VARCHAR(20) NOT NULL,
+  `metadata_json` MEDIUMTEXT NULL,
+  `created_by` VARCHAR(128) NOT NULL DEFAULT '',
+  `create_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_ops_trusted_proof` (`proof_id`),
+  KEY `idx_ops_trusted_proof_pkg` (`package_id`, `package_version`, `package_hash`),
+  KEY `idx_ops_trusted_proof_project` (`project_id`, `create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='运维 Agent 可信 proof 记录';

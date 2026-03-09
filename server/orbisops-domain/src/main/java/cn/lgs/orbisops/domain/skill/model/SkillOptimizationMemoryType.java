@@ -1,0 +1,15 @@
+package cn.lgs.orbisops.domain.skill.model;
+
+public enum SkillOptimizationMemoryType {
+    REPEATED_FAILURE,
+    ROUTING_FALSE_POSITIVE,
+    ROUTING_FALSE_NEGATIVE,
+    MISSING_STEP,
+    TOOL_CALL_WASTE,
+    EVIDENCE_TOO_STRICT,
+    EVIDENCE_TOO_LOOSE,
+    FAILED_PATCH,
+    EFFECTIVE_PATCH,
+    MODEL_COMPATIBILITY,
+    ENVIRONMENT_COMPATIBILITY
+}

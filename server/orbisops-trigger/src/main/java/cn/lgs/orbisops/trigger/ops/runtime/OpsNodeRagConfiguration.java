@@ -1,0 +1,96 @@
+package cn.lgs.orbisops.trigger.ops.runtime;
+
+import cn.lgs.orbisops.domain.agent.adapter.repository.IRagKnowledgeRepository;
+import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.trigger.ops.rag.RagMultimodalEmbeddingService;
+import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+
+@Configuration
+public class OpsNodeRagConfiguration {
+
+    @Bean
+    public OpsNodeRagSettings opsNodeRagSettings(Environment environment) {
+        return new OpsNodeRagSettings(
+                new OpsNodeRagSettings.Rerank(
+                        bool(environment, "ops.rag.rerank.enabled", true),
+                        text(environment, "ops.rag.rerank.provider", "cohere"),
+                        text(environment, "ops.rag.rerank.base-url", "http://127.0.0.1:8110"),
+                        text(environment, "ops.rag.rerank.api-key", "local-rag-models"),
+                        text(environment, "ops.rag.rerank.path", "v1/rerank"),
+                        text(environment, "ops.rag.rerank.model", "Qwen/Qwen3-VL-Reranker-2B"),
+                        integer(environment, "ops.rag.rerank.candidate-top-k", 20),
+                        integer(environment, "ops.rag.rerank.top-n", 6),
+                        integer(environment, "ops.rag.rerank.max-doc-chars", 1200)),
+                new OpsNodeRagSettings.Ttft(
+                        bool(environment, "ops.rag.ttft.optimize-streaming", true),
+                        bool(environment, "ops.rag.ttft.disable-rerank-on-stream", true),
+                        integer(environment, "ops.rag.ttft.vector-top-k", 4),
+                        integer(environment, "ops.rag.ttft.bm25-top-k", 6),
+                        integer(environment, "ops.rag.ttft.final-top-k", 4),
+                        bool(environment, "ops.rag.ttft.query-rewrite-enabled", true)),
+                new OpsNodeRagSettings.QueryRewrite(
+                        text(environment, "ops.rag.query-rewrite.mode", "hybrid"),
+                        bool(environment, "ops.rag.query-rewrite.llm-enabled", true),
+                        fallbackText(environment,
+                                "ops.rag.query-rewrite.base-url",
+                                "spring.ai.openai.base-url", ""),
+                        fallbackText(environment,
+                                "ops.rag.query-rewrite.api-key",
+                                "spring.ai.openai.api-key", ""),
+                        text(environment, "ops.rag.query-rewrite.path", "v1/chat/completions"),
+                        fallbackText(environment,
+                                "ops.rag.query-rewrite.model",
+                                "spring.ai.openai.chat.options.model", "gpt-5.4-mini"),
+                        integer(environment, "ops.rag.query-rewrite.max-queries", 4),
+                        integer(environment, "ops.rag.query-rewrite.timeout-seconds", 2),
+                        integer(environment, "ops.rag.query-rewrite.min-chars", 18),
+                        bool(environment, "ops.rag.query-rewrite.on-low-recall", true),
+                        integer(environment,
+                                "ops.rag.query-rewrite.low-recall-min-candidates", 2)),
+                bool(environment, "ops.multi-agent.fail-on-llm-degradation", false));
+    }
+
+    @Bean
+    public OpsNodeRagAdvisorFactory opsNodeRagAdvisorFactory(
+            ObjectProvider<VectorStore> vectorStoreProvider,
+            ObjectProvider<RagMultimodalEmbeddingService> multimodalProvider,
+            @Qualifier("ragEmbeddingModel") ObjectProvider<EmbeddingModel> embeddingProvider,
+            AiModelAvailability aiModelAvailability,
+            IRagKnowledgeRepository ragKnowledgeRepository) {
+        return new OpsNodeRagAdvisorFactory(
+                vectorStoreProvider::getIfAvailable,
+                multimodalProvider::getIfAvailable,
+                embeddingProvider::getIfAvailable,
+                aiModelAvailability,
+                ragKnowledgeRepository);
+    }
+
+    private String fallbackText(
+            Environment environment,
+            String key,
+            String fallbackKey,
+            String fallback) {
+        String value = environment.getProperty(key);
+        return value == null
+                ? text(environment, fallbackKey, fallback)
+                : value;
+    }
+
+    private String text(Environment environment, String key, String fallback) {
+        return environment.getProperty(key, fallback);
+    }
+
+    private boolean bool(Environment environment, String key, boolean fallback) {
+        return environment.getProperty(key, Boolean.class, fallback);
+    }
+
+    private int integer(Environment environment, String key, int fallback) {
+        return environment.getProperty(key, Integer.class, fallback);
+    }
+}

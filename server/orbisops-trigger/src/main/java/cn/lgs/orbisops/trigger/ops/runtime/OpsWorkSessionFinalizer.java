@@ -1,0 +1,141 @@
+package cn.lgs.orbisops.trigger.ops.runtime;
+
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Map;
+
+@Service
+public class OpsWorkSessionFinalizer {
+
+    public OpsAgentChatResponse success(Context context, String output, Hooks hooks) {
+        hooks.record(OpsRuntimeEvent.builder()
+                .eventType("FINAL_OUTPUT")
+                .status("SUCCEEDED")
+                .content(output)
+                .summary("Agent 输出完成。")
+                .build());
+        hooks.record(OpsRuntimeEvent.of("DONE", "SUCCEEDED", "Agent 任务执行完成。"));
+        if (!context.analysisRequest()) {
+            hooks.appendAssistant(output, Map.of(
+                    "agentId", context.definition().getAgentId(),
+                    "engine", context.engine()));
+        }
+        hooks.telemetrySucceeded(elapsedMs(context.startedNanos()));
+        hooks.finishTaskContext("SUCCEEDED", output);
+        hooks.recordSkillUsage("SUCCEEDED");
+        OpsAgentChatResponse response = response(context, "SUCCEEDED", output);
+        hooks.finishDurable("SUCCEEDED", null, response);
+        hooks.markFinished();
+        return response;
+    }
+
+    public OpsAgentChatResponse canceled(Context context, String reason, Hooks hooks) {
+        String message = value(reason);
+        hooks.record(OpsRuntimeEvent.builder()
+                .eventType("RUN_CANCELED")
+                .status("CANCELED")
+                .summary(message)
+                .payload(Map.of("runId", value(context.request().getRunId()),
+                        "elapsedMs", elapsedMs(context.startedNanos())))
+                .build());
+        hooks.record(OpsRuntimeEvent.of("DONE", "CANCELED", "Agent 任务已取消。"));
+        hooks.finishTaskContext("CANCELED", message);
+        if (!context.analysisRequest()) {
+            hooks.appendAssistant("Agent run canceled: " + message, Map.of(
+                    "agentId", context.definition().getAgentId(),
+                    "engine", context.engine(),
+                    "status", "CANCELED",
+                    "runId", value(context.request().getRunId())));
+        }
+        hooks.recordSkillUsage("CANCELED");
+        OpsAgentChatResponse response = response(context, "CANCELED", message);
+        hooks.finishDurable("CANCELED", message, response);
+        hooks.markFinished();
+        return response;
+    }
+
+    public void failed(Context context, RuntimeException error, Hooks hooks) {
+        String message = value(error == null ? null : error.getMessage());
+        hooks.telemetryFailed(elapsedMs(context.startedNanos()));
+        hooks.finishTaskContext("FAILED", message);
+        if (!context.analysisRequest()) {
+            hooks.appendAssistant("Agent run failed: " + message, Map.of(
+                    "agentId", context.definition().getAgentId(),
+                    "engine", context.engine(),
+                    "status", "FAILED",
+                    "error", message));
+        }
+        hooks.recordSkillUsage("FAILED");
+        hooks.finishDurable("FAILED", message, null);
+        hooks.markFinished();
+    }
+
+    private OpsAgentChatResponse response(Context context, String status, String content) {
+        Map<String, Object> metadata = "SUCCEEDED".equals(status)
+                ? Map.of("eventCount", context.events().size(),
+                "agentVersion", context.definition().getVersion(),
+                "runId", value(context.request().getRunId()))
+                : Map.of("eventCount", context.events().size(),
+                "agentVersion", context.definition().getVersion(),
+                "runId", value(context.request().getRunId()),
+                "status", status);
+        return OpsAgentChatResponse.builder()
+                .sessionId(context.request().getSessionId())
+                .userId(context.request().getUserId())
+                .agentId(context.definition().getAgentId())
+                .agentVersion(context.definition().getVersion())
+                .mode(context.mode())
+                .engine(context.engine())
+                .content(content)
+                .events(context.events())
+                .metadata(metadata)
+                .build();
+    }
+
+    private long elapsedMs(long startedNanos) {
+        return (System.nanoTime() - startedNanos) / 1_000_000;
+    }
+
+    private String value(String value) {
+        return value == null ? "" : value;
+    }
+
+    public record Context(OpsAgentChatRequest request,
+                          OpsAgentDefinition definition,
+                          String mode,
+                          String engine,
+                          List<OpsRuntimeEvent> events,
+                          long startedNanos,
+                          boolean analysisRequest) {
+        public Context {
+            if (request == null) throw new IllegalArgumentException("WORK_SESSION_REQUEST_REQUIRED");
+            if (definition == null) throw new IllegalArgumentException("WORK_SESSION_DEFINITION_REQUIRED");
+            mode = valueOf(mode);
+            engine = valueOf(engine);
+            events = events == null ? List.of() : events;
+        }
+
+        private static String valueOf(String value) {
+            return value == null ? "" : value;
+        }
+    }
+
+    public interface Hooks {
+        void record(OpsRuntimeEvent event);
+
+        void appendAssistant(String content, Map<String, Object> metadata);
+
+        void telemetrySucceeded(long durationMs);
+
+        void telemetryFailed(long durationMs);
+
+        void finishTaskContext(String status, String summary);
+
+        void recordSkillUsage(String status);
+
+        void finishDurable(String status, String error, OpsAgentChatResponse response);
+
+        void markFinished();
+    }
+}

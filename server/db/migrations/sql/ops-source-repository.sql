@@ -1,0 +1,121 @@
+CREATE TABLE IF NOT EXISTS `ai_ops_source_repository` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `repository_id` VARCHAR(100) NOT NULL COMMENT '仓库ID',
+  `project_id` VARCHAR(80) NOT NULL COMMENT '项目ID',
+  `name` VARCHAR(200) NOT NULL COMMENT '仓库名称',
+  `local_path` VARCHAR(1000) NOT NULL COMMENT '受控本地Git工作区路径',
+  `default_revision` VARCHAR(200) NOT NULL COMMENT '默认Revision',
+  `default_commit_sha` CHAR(40) NOT NULL COMMENT '默认Commit SHA',
+  `status` VARCHAR(32) NOT NULL COMMENT '状态',
+  `created_by` VARCHAR(120) NOT NULL COMMENT '创建人',
+  `create_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_repository_id` (`repository_id`),
+  KEY `idx_project_status` (`project_id`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='项目只读代码仓库';
+
+CREATE TABLE IF NOT EXISTS `ai_ops_deployment_revision` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `deployment_id` VARCHAR(260) NOT NULL COMMENT '项目环境服务唯一键',
+  `project_id` VARCHAR(80) NOT NULL COMMENT '项目ID',
+  `repository_id` VARCHAR(100) NOT NULL COMMENT '仓库ID',
+  `environment` VARCHAR(32) NOT NULL COMMENT '部署环境',
+  `service_name` VARCHAR(100) NOT NULL COMMENT '服务名',
+  `commit_sha` CHAR(40) NOT NULL COMMENT '实际部署Commit SHA',
+  `image_ref` VARCHAR(500) NULL COMMENT '部署镜像引用',
+  `recorded_by` VARCHAR(120) NOT NULL COMMENT '记录人',
+  `deployed_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '部署时间',
+  `update_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_deployment_id` (`deployment_id`),
+  KEY `idx_project_env` (`project_id`, `environment`),
+  KEY `idx_repository_commit` (`repository_id`, `commit_sha`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='生产部署与Git Commit映射';
+
+CREATE TABLE IF NOT EXISTS `ai_ops_project_service` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `service_id` VARCHAR(100) NOT NULL,
+  `project_id` VARCHAR(80) NOT NULL,
+  `name` VARCHAR(128) NOT NULL,
+  `repository_id` VARCHAR(100) NOT NULL,
+  `module_path` VARCHAR(512) NOT NULL,
+  `build_profile` VARCHAR(40) NOT NULL,
+  `artifact_path` VARCHAR(512) NULL,
+  `deployment_resource_id` VARCHAR(128) NULL,
+  `health_url` VARCHAR(1000) NULL,
+  `smoke_urls_json` TEXT NULL,
+  `status` VARCHAR(20) NOT NULL DEFAULT 'READY',
+  `create_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_project_service` (`project_id`, `service_id`),
+  KEY `idx_service_repository` (`project_id`, `repository_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='项目运维服务目录';
+
+CREATE TABLE IF NOT EXISTS `ai_ops_execution_resource` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `resource_id` VARCHAR(120) NOT NULL,
+  `project_id` VARCHAR(80) NOT NULL,
+  `name` VARCHAR(128) NOT NULL,
+  `worker_id` VARCHAR(120) NOT NULL,
+  `adapter` VARCHAR(40) NOT NULL,
+  `adapter_template_id` VARCHAR(120) NOT NULL DEFAULT '',
+  `environments_json` TEXT NOT NULL,
+  `configuration_json` LONGTEXT NOT NULL,
+  `status` VARCHAR(20) NOT NULL DEFAULT 'ENABLED',
+  `create_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_execution_resource` (`project_id`, `resource_id`),
+  UNIQUE KEY `uk_worker_resource` (`worker_id`, `resource_id`),
+  KEY `idx_execution_worker` (`worker_id`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='项目变更执行资源';
+
+CREATE TABLE IF NOT EXISTS `ai_ops_repair_workspace` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `workspace_id` VARCHAR(80) NOT NULL,
+  `project_id` VARCHAR(80) NOT NULL,
+  `service_id` VARCHAR(100) NOT NULL,
+  `repository_id` VARCHAR(100) NOT NULL,
+  `environment` VARCHAR(32) NOT NULL,
+  `base_commit` VARCHAR(40) NOT NULL,
+  `verified_commit` VARCHAR(40) NULL,
+  `status` VARCHAR(32) NOT NULL,
+  `summary` VARCHAR(1000) NOT NULL,
+  `unified_diff` MEDIUMTEXT NOT NULL,
+  `changed_files_json` TEXT NULL,
+  `test_profile` VARCHAR(40) NOT NULL,
+  `test_command` VARCHAR(1000) NULL,
+  `test_exit_code` INT NULL,
+  `test_log` MEDIUMTEXT NULL,
+  `artifact_path` VARCHAR(1000) NULL,
+  `artifact_sha256` VARCHAR(64) NULL,
+  `artifact_size` BIGINT NULL,
+  `created_by` VARCHAR(120) NOT NULL,
+  `create_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_repair_workspace` (`workspace_id`),
+  KEY `idx_repair_project` (`project_id`, `create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='隔离代码修复工作区';
+
+CREATE TABLE IF NOT EXISTS `ai_ops_code_delivery` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `delivery_id` VARCHAR(80) NOT NULL,
+  `workspace_id` VARCHAR(80) NOT NULL,
+  `project_id` VARCHAR(80) NOT NULL,
+  `service_id` VARCHAR(100) NOT NULL,
+  `delivery_mode` VARCHAR(32) NOT NULL,
+  `branch_name` VARCHAR(160) NOT NULL,
+  `commit_sha` VARCHAR(40) NOT NULL,
+  `pull_request_url` VARCHAR(1000) NULL,
+  `ci_status` VARCHAR(40) NOT NULL,
+  `ci_url` VARCHAR(1000) NULL,
+  `created_by` VARCHAR(120) NOT NULL,
+  `create_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_code_delivery` (`delivery_id`),
+  KEY `idx_delivery_workspace` (`workspace_id`, `create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='代码修复分支、PR与CI状态';

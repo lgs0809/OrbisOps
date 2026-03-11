@@ -1,7 +1,7 @@
 package cn.lgs.orbisops.trigger.application.rag;
 
+import cn.lgs.orbisops.application.rag.RagOrderCatalogPort;
 import cn.lgs.orbisops.application.rag.RagOrderCatalogUseCase;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientRagOrderConfigRepository;
 import cn.lgs.orbisops.trigger.ops.OpsConfigAuditService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,14 +13,12 @@ public class OpsRagOrderCatalogConfiguration {
 
     @Bean
     public RagOrderCatalogUseCase ragOrderCatalogUseCase(
-            IAiClientRagOrderConfigRepository repository,
+            RagOrderCatalogPort catalogPort,
             OpsConfigAuditService auditService) {
-        OpsRagOrderCatalogAdapter adapter = new OpsRagOrderCatalogAdapter(
-                repository,
-                auditService);
+        OpsRagOrderCatalogAdapter auditAdapter = new OpsRagOrderCatalogAdapter(auditService);
         return new RagOrderCatalogUseCase(
-                adapter,
-                adapter,
+                catalogPort,
+                auditAdapter,
                 Clock.systemDefaultZone());
     }
 }

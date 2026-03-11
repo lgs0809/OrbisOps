@@ -1,9 +1,9 @@
 package cn.lgs.orbisops.application.rag;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IRagKnowledgeRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.RagDocument;
-import cn.lgs.orbisops.domain.agent.model.entity.RagFileResource;
-import cn.lgs.orbisops.domain.agent.service.rag.RagParsePolicy;
+import cn.lgs.orbisops.domain.knowledge.rag.repository.IRagKnowledgeRepository;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagDocument;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagFileResource;
+import cn.lgs.orbisops.domain.knowledge.rag.service.RagParsePolicy;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;

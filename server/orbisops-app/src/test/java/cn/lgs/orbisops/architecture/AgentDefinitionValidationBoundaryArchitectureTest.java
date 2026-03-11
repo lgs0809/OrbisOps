@@ -170,11 +170,14 @@ class AgentDefinitionValidationBoundaryArchitectureTest {
 
         assertAll(
                 () -> assertTrue(configuration.contains(
-                        "ObjectProvider<IAiClientToolMcpConfigRepository>")),
+                        "ObjectProvider<McpClientCatalogPort>")),
+                () -> assertFalse(configuration.contains("IAiClientToolMcpConfigRepository")),
                 () -> assertTrue(configuration.contains(
-                        "ObjectProvider<IAiClientModelConfigRepository>")),
+                        "ObjectProvider<AiClientModelCatalogPort>")),
+                () -> assertFalse(configuration.contains("IAiClientModelConfigRepository")),
                 () -> assertTrue(configuration.contains(
-                        "ObjectProvider<IAiClientRagOrderConfigRepository>")),
+                        "ObjectProvider<RagOrderCatalogPort>")),
+                () -> assertFalse(configuration.contains("IAiClientRagOrderConfigRepository")),
                 () -> assertTrue(configuration.contains(
                         "ObjectProvider<ProjectMcpAuthorizationApplicationService>")),
                 () -> assertTrue(configuration.contains(

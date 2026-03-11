@@ -2,7 +2,7 @@ package cn.lgs.orbisops.application.rag;
 
 import java.time.LocalDateTime;
 
-/** Immutable application model for one legacy RAG order configuration. */
+/** Immutable application model for one knowledge-base catalog entry. */
 public record RagOrderDefinition(
         Long id,
         String ragId,

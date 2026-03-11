@@ -4,8 +4,6 @@ import cn.lgs.orbisops.api.dto.OpsAgentRunRequestDTO;
 import cn.lgs.orbisops.api.dto.OpsAnalysisResponseDTO;
 import cn.lgs.orbisops.application.schedule.ScheduledTaskExecutionCommand;
 import cn.lgs.orbisops.application.schedule.ScheduledTaskExecutionUseCase;
-import cn.lgs.orbisops.domain.agent.model.entity.TaskScheduleRecord;
-import cn.lgs.orbisops.domain.agent.model.valobj.AiAgentTaskScheduleVO;
 import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Service;
 
@@ -28,21 +26,8 @@ public class AgentTaskExecutionService {
         executionUseCase.ensureStorage();
     }
 
-    public Long submitExecution(TaskScheduleRecord schedule, String triggerType) {
-        return executionUseCase.submit(new ScheduledTaskExecutionCommand(
-                schedule.getId(),
-                schedule.getTaskName(),
-                schedule.getAgentId(),
-                triggerType,
-                schedule.getTaskParam()));
+    public Long submitExecution(ScheduledTaskExecutionCommand command) {
+        return executionUseCase.submit(command);
     }
 
-    public Long submitExecution(AiAgentTaskScheduleVO schedule, String triggerType) {
-        return executionUseCase.submit(new ScheduledTaskExecutionCommand(
-                schedule.getId(),
-                schedule.getDescription(),
-                schedule.getAgentId(),
-                triggerType,
-                schedule.getTaskParam()));
-    }
 }

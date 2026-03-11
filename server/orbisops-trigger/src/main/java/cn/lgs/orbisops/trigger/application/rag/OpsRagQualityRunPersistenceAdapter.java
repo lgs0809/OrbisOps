@@ -2,7 +2,7 @@ package cn.lgs.orbisops.trigger.application.rag;
 
 import cn.lgs.orbisops.application.rag.RagQualityRunPersistencePort;
 import cn.lgs.orbisops.application.rag.RagQualityRunResult;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IRagEvalRepository;
+import cn.lgs.orbisops.domain.knowledge.rag.repository.IRagEvalRepository;
 
 import java.util.Map;
 

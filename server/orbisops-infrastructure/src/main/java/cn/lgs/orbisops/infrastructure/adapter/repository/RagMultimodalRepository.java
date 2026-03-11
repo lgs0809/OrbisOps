@@ -1,7 +1,7 @@
 package cn.lgs.orbisops.infrastructure.adapter.repository;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IRagMultimodalRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.RagDocument;
+import cn.lgs.orbisops.domain.knowledge.rag.repository.IRagMultimodalRepository;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagDocument;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import lombok.extern.slf4j.Slf4j;

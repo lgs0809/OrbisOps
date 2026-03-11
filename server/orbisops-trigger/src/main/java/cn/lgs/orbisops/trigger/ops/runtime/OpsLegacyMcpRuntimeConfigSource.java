@@ -1,8 +1,8 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
+import cn.lgs.orbisops.application.config.McpClientCatalogPort;
+import cn.lgs.orbisops.application.config.McpClientDefinition;
 import cn.lgs.orbisops.application.project.ProjectMcpAuthorizationApplicationService;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientToolMcpConfigRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.AiClientConfigRecord;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
@@ -12,12 +12,12 @@ public final class OpsLegacyMcpRuntimeConfigSource implements OpsMcpRuntimeConfi
     public static final String SOURCE_ID = "LEGACY_MCP_CATALOG";
     public static final int ORDER = 200;
 
-    private final ObjectProvider<IAiClientToolMcpConfigRepository> repositories;
+    private final ObjectProvider<McpClientCatalogPort> repositories;
     private final ObjectProvider<ProjectMcpAuthorizationApplicationService> authorizations;
     private final OpsLegacyMcpConfigMapper mapper;
 
     public OpsLegacyMcpRuntimeConfigSource(
-            ObjectProvider<IAiClientToolMcpConfigRepository> repositories,
+            ObjectProvider<McpClientCatalogPort> repositories,
             ObjectProvider<ProjectMcpAuthorizationApplicationService> authorizations,
             OpsLegacyMcpConfigMapper mapper) {
         if (mapper == null) throw new IllegalArgumentException("LEGACY_MCP_CONFIG_MAPPER_REQUIRED");
@@ -40,14 +40,14 @@ public final class OpsLegacyMcpRuntimeConfigSource implements OpsMcpRuntimeConfi
     public OpsMcpRuntimeConfigSourceResult resolve(
             OpsMcpRuntimeConfigRequest request) {
         if (request == null) throw new IllegalArgumentException("MCP_CONFIG_REQUEST_REQUIRED");
-        IAiClientToolMcpConfigRepository repository =
+        McpClientCatalogPort repository =
                 repositories == null ? null : repositories.getIfAvailable();
         if (repository == null) {
             return OpsMcpRuntimeConfigSourceResult.unavailable(
                     "LEGACY_MCP_REPOSITORY_UNAVAILABLE");
         }
-        AiClientConfigRecord record = repository.queryByMcpId(request.mcpId());
-        if (record == null || !Integer.valueOf(1).equals(record.getStatus())) {
+        McpClientDefinition record = repository.findByMcpId(request.mcpId());
+        if (record == null || !Integer.valueOf(1).equals(record.status())) {
             return OpsMcpRuntimeConfigSourceResult.miss("LEGACY_MCP_NOT_ACTIVE");
         }
         if (!request.projectId().isBlank()) {

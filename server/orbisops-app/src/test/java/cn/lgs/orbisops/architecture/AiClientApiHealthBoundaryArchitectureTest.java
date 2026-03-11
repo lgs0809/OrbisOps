@@ -16,6 +16,8 @@ class AiClientApiHealthBoundaryArchitectureTest {
             "orbisops-application/src/main/java/cn/lgs/orbisops/application/config/";
     private static final String TRIGGER_CONFIG =
             "orbisops-trigger/src/main/java/cn/lgs/orbisops/trigger/application/config/";
+    private static final String INFRASTRUCTURE_REPOSITORY =
+            "orbisops-infrastructure/src/main/java/cn/lgs/orbisops/infrastructure/adapter/repository/";
 
     @Test
     void healthWorkflowProtocolOperatorPersistenceAndAuditMustRemainSeparated() throws IOException {
@@ -28,6 +30,7 @@ class AiClientApiHealthBoundaryArchitectureTest {
         String targetAdapter = read(TRIGGER_CONFIG + "OpsAiClientApiHealthTargetAdapter.java");
         String probeAdapter = read(TRIGGER_CONFIG + "OpsAiClientApiHealthHttpProbeAdapter.java");
         String operatorAdapter = read(TRIGGER_CONFIG + "OpsAiClientApiHealthOperatorAdapter.java");
+        String recordRepository = read(INFRASTRUCTURE_REPOSITORY + "AiClientApiHealthCheckRepository.java");
         String resultAdapter = read(TRIGGER_CONFIG + "OpsAiClientApiHealthResultAdapter.java");
         String configuration = read(TRIGGER_CONFIG + "AiClientApiHealthConfiguration.java");
         String facade = read(TRIGGER_CONFIG + "AiClientApiApplicationService.java");
@@ -57,10 +60,16 @@ class AiClientApiHealthBoundaryArchitectureTest {
                 () -> assertTrue(probeAdapter.contains("Authorization")),
                 () -> assertTrue(probeAdapter.contains("/models")),
                 () -> assertTrue(operatorAdapter.contains("RequestContextHolder.getRequestAttributes()")),
-                () -> assertTrue(resultAdapter.contains("implements AiClientApiHealthRecordPort, AiClientApiHealthAuditPort")),
-                () -> assertTrue(resultAdapter.contains("IAiClientApiHealthCheckRepository")),
+                () -> assertTrue(recordRepository.contains("implements AiClientApiHealthRecordPort")),
+                () -> assertTrue(recordRepository.contains("AiClientApiHealthCheckResult")),
+                () -> assertFalse(recordRepository.contains("domain.agent")),
+                () -> assertFalse(recordRepository.contains("AiClientApiHealthCheckRecord")),
+                () -> assertTrue(resultAdapter.contains("implements AiClientApiHealthAuditPort")),
+                () -> assertFalse(resultAdapter.contains("AiClientApiHealthRecordPort")),
+                () -> assertFalse(resultAdapter.contains("Repository")),
                 () -> assertTrue(resultAdapter.contains("OpsConfigAuditService")),
                 () -> assertTrue(configuration.contains("AiClientApiHealthCheckUseCase aiClientApiHealthCheckUseCase")),
+                () -> assertTrue(configuration.contains("AiClientApiHealthRecordPort healthRecordPort")),
                 () -> assertTrue(configuration.contains("new OpsAiClientApiHealthHttpProbeAdapter")),
                 () -> assertTrue(facade.contains("private final AiClientApiHealthCheckUseCase healthCheckUseCase")),
                 () -> assertTrue(facade.contains("healthCheckUseCase.check(apiId)")),

@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.trigger.ops.rag.advisor;
 
-import cn.lgs.orbisops.domain.agent.model.valobj.AiClientAdvisorVO;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagRetrievalSettings;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import lombok.extern.slf4j.Slf4j;
@@ -31,16 +31,16 @@ public final class RagRerankProtocol {
     private static final int REQUEST_TIMEOUT_SECONDS = 45;
     private static final int ERROR_BODY_LIMIT = 180;
 
-    private final AiClientAdvisorVO.RagAnswer settings;
+    private final RagRetrievalSettings settings;
     private final HttpTransport httpTransport;
 
-    public RagRerankProtocol(AiClientAdvisorVO.RagAnswer settings) {
+    public RagRerankProtocol(RagRetrievalSettings settings) {
         this(settings, defaultTransport());
     }
 
-    RagRerankProtocol(AiClientAdvisorVO.RagAnswer settings,
+    RagRerankProtocol(RagRetrievalSettings settings,
                       HttpTransport httpTransport) {
-        this.settings = settings == null ? new AiClientAdvisorVO.RagAnswer() : settings;
+        this.settings = settings == null ? new RagRetrievalSettings() : settings;
         this.httpTransport = httpTransport;
     }
 

@@ -1,7 +1,7 @@
 package cn.lgs.orbisops.trigger.application.security;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IJwtRevocationRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.AdminUserRecord;
+import cn.lgs.orbisops.application.security.JwtRevocationPort;
+import cn.lgs.orbisops.domain.security.AdminUserAccount;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.JWTVerifier;
 import com.auth0.jwt.algorithms.Algorithm;
@@ -39,11 +39,11 @@ public class AdminAuthService {
 
     private final AdminAuthSettings settings;
 
-    private final IJwtRevocationRepository jwtRevocationRepository;
+    private final JwtRevocationPort jwtRevocationRepository;
 
     @Autowired
     public AdminAuthService(
-            IJwtRevocationRepository jwtRevocationRepository,
+            JwtRevocationPort jwtRevocationRepository,
             AdminAuthSettings settings) {
         this.jwtRevocationRepository = jwtRevocationRepository;
         this.settings = settings == null
@@ -63,14 +63,14 @@ public class AdminAuthService {
         }
     }
 
-    public String issueToken(AdminUserRecord adminUser) {
+    public String issueToken(AdminUserAccount adminUser) {
         Instant now = Instant.now();
-        String scope = normalizeScope(adminUser.getUserRole());
+        String scope = normalizeScope(adminUser.role() == null ? null : adminUser.role().value());
         return JWT.create()
                 .withIssuer(ISSUER)
                 .withJWTId(UUID.randomUUID().toString())
-                .withSubject(adminUser.getUsername())
-                .withClaim("userId", adminUser.getUserId())
+                .withSubject(adminUser.username())
+                .withClaim("userId", adminUser.userId())
                 .withClaim("scope", scope)
                 .withIssuedAt(Date.from(now))
                 .withExpiresAt(Date.from(now.plusSeconds(settings.jwtTtlHours() * 3600)))

@@ -8,8 +8,6 @@ import cn.lgs.orbisops.application.schedule.TaskScheduleCatalogUseCase;
 import cn.lgs.orbisops.application.schedule.TaskScheduleCronValidationPort;
 import cn.lgs.orbisops.application.schedule.TaskScheduleExecutionPort;
 import cn.lgs.orbisops.application.schedule.TaskScheduleExecutionUseCase;
-import cn.lgs.orbisops.domain.agent.adapter.repository.ITaskExecutionRepository;
-import cn.lgs.orbisops.domain.agent.adapter.repository.ITaskScheduleRepository;
 import cn.lgs.orbisops.trigger.application.agentdefinition.OpsAgentDefinitionQueryGateway;
 import cn.lgs.orbisops.trigger.job.AgentTaskExecutionService;
 import cn.lgs.orbisops.trigger.ops.OpsConfigAuditService;
@@ -23,13 +21,6 @@ public class TaskScheduleConfiguration {
     @Bean
     public OpsTaskScheduleRuntimeConfigurationCodec opsTaskScheduleRuntimeConfigurationCodec() {
         return new OpsTaskScheduleRuntimeConfigurationCodec();
-    }
-
-    @Bean
-    public TaskScheduleCatalogPort taskScheduleCatalogPort(
-            ITaskScheduleRepository repository,
-            OpsTaskScheduleRuntimeConfigurationCodec codec) {
-        return new OpsTaskScheduleCatalogAdapter(repository, codec);
     }
 
     @Bean
@@ -53,11 +44,6 @@ public class TaskScheduleConfiguration {
             AgentTaskExecutionService executionService,
             OpsTaskScheduleRuntimeConfigurationCodec codec) {
         return new OpsTaskScheduleExecutionAdapter(executionService, codec);
-    }
-
-    @Bean
-    public TaskExecutionCatalogPort taskExecutionCatalogPort(ITaskExecutionRepository repository) {
-        return new OpsTaskExecutionCatalogAdapter(repository);
     }
 
     @Bean

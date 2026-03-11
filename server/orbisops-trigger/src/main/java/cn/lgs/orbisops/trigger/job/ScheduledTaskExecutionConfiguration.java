@@ -5,8 +5,8 @@ import cn.lgs.orbisops.api.dto.OpsAnalysisResponseDTO;
 import cn.lgs.orbisops.application.incident.IncidentCommandApplicationService;
 import cn.lgs.orbisops.application.project.ProjectDefinitionApplicationService;
 import cn.lgs.orbisops.application.resourcehealth.ResourceHealthApplicationService;
+import cn.lgs.orbisops.application.schedule.ScheduledTaskExecutionCatalogPort;
 import cn.lgs.orbisops.application.schedule.ScheduledTaskExecutionUseCase;
-import cn.lgs.orbisops.domain.agent.adapter.repository.ITaskExecutionRepository;
 import cn.lgs.orbisops.trigger.application.config.OpsTaskScheduleRuntimeConfigurationCodec;
 import cn.lgs.orbisops.trigger.application.ops.OpsAnalysisApplicationService;
 import cn.lgs.orbisops.trigger.ops.OpsScheduledPrometheusScreeningService;
@@ -23,7 +23,7 @@ public class ScheduledTaskExecutionConfiguration {
     @Bean
     public ScheduledTaskExecutionUseCase<OpsAgentRunRequestDTO, OpsAnalysisResponseDTO>
     scheduledTaskExecutionUseCase(
-            ITaskExecutionRepository repository,
+            ScheduledTaskExecutionCatalogPort catalogPort,
             @Qualifier("opsRunExecutor") ThreadPoolExecutor executor,
             OpsAnalysisApplicationService analysisService,
             OpsTaskScheduleRuntimeConfigurationCodec runtimeCodec,
@@ -32,7 +32,7 @@ public class ScheduledTaskExecutionConfiguration {
             OpsScheduledPrometheusScreeningService prometheusScreening,
             IncidentCommandApplicationService incidents) {
         return new ScheduledTaskExecutionUseCase<>(
-                new OpsScheduledTaskExecutionCatalogAdapter(repository),
+                catalogPort,
                 new OpsScheduledTaskExecutionExecutorAdapter(executor),
                 new OpsScheduledTaskAnalysisAdapter(analysisService, runtimeCodec, projects),
                 new OpsScheduledTaskResourceHealthScreeningAdapter(resourceHealth, runtimeCodec, prometheusScreening),

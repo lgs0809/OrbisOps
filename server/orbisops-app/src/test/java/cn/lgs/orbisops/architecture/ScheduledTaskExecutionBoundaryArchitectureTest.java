@@ -16,6 +16,8 @@ class ScheduledTaskExecutionBoundaryArchitectureTest {
             "orbisops-application/src/main/java/cn/lgs/orbisops/application/schedule/";
     private static final String TRIGGER_JOB =
             "orbisops-trigger/src/main/java/cn/lgs/orbisops/trigger/job/";
+    private static final String INFRASTRUCTURE_REPOSITORY =
+            "orbisops-infrastructure/src/main/java/cn/lgs/orbisops/infrastructure/adapter/repository/";
 
     @Test
     void scheduledTaskExecutionMustRemainAHexagonalApplicationProcessManager() throws IOException {
@@ -24,7 +26,7 @@ class ScheduledTaskExecutionBoundaryArchitectureTest {
         String executorPort = read(APPLICATION + "ScheduledTaskExecutionExecutorPort.java");
         String analysisPort = read(APPLICATION + "ScheduledTaskAnalysisPort.java");
         String facade = read(TRIGGER_JOB + "AgentTaskExecutionService.java");
-        String catalogAdapter = read(TRIGGER_JOB + "OpsScheduledTaskExecutionCatalogAdapter.java");
+        String catalogRepository = read(INFRASTRUCTURE_REPOSITORY + "TaskExecutionRepository.java");
         String executorAdapter = read(TRIGGER_JOB + "OpsScheduledTaskExecutionExecutorAdapter.java");
         String analysisAdapter = read(TRIGGER_JOB + "OpsScheduledTaskAnalysisAdapter.java");
         String configuration = read(TRIGGER_JOB + "ScheduledTaskExecutionConfiguration.java");
@@ -44,8 +46,10 @@ class ScheduledTaskExecutionBoundaryArchitectureTest {
                 () -> assertFalse(useCase.contains("ThreadPoolExecutor")),
                 () -> assertFalse(useCase.contains("OpsAgentRunRequestDTO")),
                 () -> assertFalse(useCase.contains("fastjson")),
-                () -> assertTrue(catalogAdapter.contains("ITaskExecutionRepository")),
-                () -> assertFalse(catalogAdapter.contains("ThreadPoolExecutor")),
+                () -> assertTrue(catalogRepository.contains("implements ScheduledTaskExecutionCatalogPort, TaskExecutionCatalogPort")),
+                () -> assertFalse(catalogRepository.contains("domain.agent")),
+                () -> assertFalse(catalogRepository.contains("TaskExecutionRecord")),
+                () -> assertFalse(catalogRepository.contains("ThreadPoolExecutor")),
                 () -> assertTrue(executorAdapter.contains("ThreadPoolExecutor")),
                 () -> assertFalse(executorAdapter.contains("ITaskExecutionRepository")),
                 () -> assertTrue(analysisAdapter.contains("OpsAnalysisApplicationService")),
@@ -53,7 +57,9 @@ class ScheduledTaskExecutionBoundaryArchitectureTest {
                 () -> assertTrue(analysisAdapter.contains("com.alibaba.fastjson.JSON")),
                 () -> assertFalse(analysisAdapter.contains("ITaskExecutionRepository")),
                 () -> assertTrue(configuration.contains("ScheduledTaskExecutionUseCase<OpsAgentRunRequestDTO, OpsAnalysisResponseDTO>")),
-                () -> assertTrue(configuration.contains("new OpsScheduledTaskExecutionCatalogAdapter")),
+                () -> assertTrue(configuration.contains("ScheduledTaskExecutionCatalogPort catalogPort")),
+                () -> assertFalse(configuration.contains("OpsScheduledTaskExecutionCatalogAdapter")),
+                () -> assertFalse(configuration.contains("ITaskExecutionRepository")),
                 () -> assertTrue(configuration.contains("new OpsScheduledTaskExecutionExecutorAdapter")),
                 () -> assertTrue(configuration.contains("new OpsScheduledTaskAnalysisAdapter")),
                 () -> assertTrue(facade.contains("private final ScheduledTaskExecutionUseCase<OpsAgentRunRequestDTO, OpsAnalysisResponseDTO> executionUseCase")),

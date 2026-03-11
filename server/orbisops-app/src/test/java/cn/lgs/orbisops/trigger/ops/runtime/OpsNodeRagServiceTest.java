@@ -1,8 +1,8 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IRagKnowledgeRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.RagDocument;
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.domain.knowledge.rag.repository.IRagKnowledgeRepository;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagDocument;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.embedding.EmbeddingModel;
@@ -31,7 +31,7 @@ class OpsNodeRagServiceTest {
         VectorStore vectorStore = mock(VectorStore.class);
         EmbeddingModel embeddingModel = mock(EmbeddingModel.class);
         IRagKnowledgeRepository repository = mock(IRagKnowledgeRepository.class);
-        AiModelAvailability availability = mock(AiModelAvailability.class);
+        ModelAvailabilityPort availability = mock(ModelAvailabilityPort.class);
 
         when(availability.isEmbeddingAvailable()).thenReturn(true);
         when(availability.isRerankAvailable(anyString())).thenReturn(false);
@@ -93,7 +93,7 @@ class OpsNodeRagServiceTest {
             VectorStore vectorStore = mock(VectorStore.class);
             EmbeddingModel embeddingModel = mock(EmbeddingModel.class);
             IRagKnowledgeRepository repository = mock(IRagKnowledgeRepository.class);
-            AiModelAvailability availability = mock(AiModelAvailability.class);
+            ModelAvailabilityPort availability = mock(ModelAvailabilityPort.class);
 
             when(availability.isEmbeddingAvailable()).thenReturn(true);
             when(availability.isRerankAvailable(anyString())).thenReturn(true);
@@ -157,7 +157,7 @@ class OpsNodeRagServiceTest {
     private OpsNodeRagService service(
             VectorStore vectorStore,
             EmbeddingModel embeddingModel,
-            AiModelAvailability availability,
+            ModelAvailabilityPort availability,
             IRagKnowledgeRepository repository,
             OpsNodeRagSettings settings) {
         OpsNodeRagAdvisorFactory advisorFactory = new OpsNodeRagAdvisorFactory(

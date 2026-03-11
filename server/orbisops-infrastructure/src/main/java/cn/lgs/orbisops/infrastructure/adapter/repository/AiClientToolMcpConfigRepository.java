@@ -1,92 +1,130 @@
 package cn.lgs.orbisops.infrastructure.adapter.repository;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientToolMcpConfigRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.AiClientConfigRecord;
+import cn.lgs.orbisops.application.config.McpClientCatalogPort;
+import cn.lgs.orbisops.application.config.McpClientDefinition;
 import cn.lgs.orbisops.infrastructure.dao.IAiClientToolMcpDao;
 import cn.lgs.orbisops.infrastructure.dao.po.AiClientToolMcp;
-import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Repository;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import java.util.List;
 
+/** MyBatis adapter for the typed MCP client catalog. */
 @Repository
-public class AiClientToolMcpConfigRepository implements IAiClientToolMcpConfigRepository {
+public class AiClientToolMcpConfigRepository implements McpClientCatalogPort {
 
-    @Autowired(required = false)
-    private IAiClientToolMcpDao dao;
+    private final ObjectProvider<IAiClientToolMcpDao> daoProvider;
 
-    @Override
-    public int insert(AiClientConfigRecord record) {
-        return dao == null ? 0 : dao.insert(toPo(record));
+    public AiClientToolMcpConfigRepository(ObjectProvider<IAiClientToolMcpDao> daoProvider) {
+        this.daoProvider = daoProvider;
     }
 
     @Override
-    public int updateById(AiClientConfigRecord record) {
-        return dao == null ? 0 : dao.updateById(toPo(record));
+    public boolean insert(McpClientDefinition definition) {
+        IAiClientToolMcpDao dao = dao();
+        return dao != null && dao.insert(toPo(definition)) > 0;
     }
 
     @Override
-    public int updateByMcpId(AiClientConfigRecord record) {
-        return dao == null ? 0 : dao.updateByMcpId(toPo(record));
+    public boolean updateById(McpClientDefinition definition) {
+        IAiClientToolMcpDao dao = dao();
+        return dao != null && dao.updateById(toPo(definition)) > 0;
     }
 
     @Override
-    public int deleteById(Long id) {
-        return dao == null ? 0 : dao.deleteById(id);
+    public boolean updateByMcpId(McpClientDefinition definition) {
+        IAiClientToolMcpDao dao = dao();
+        return dao != null && dao.updateByMcpId(toPo(definition)) > 0;
     }
 
     @Override
-    public int deleteByMcpId(String mcpId) {
-        return dao == null ? 0 : dao.deleteByMcpId(mcpId);
+    public boolean deleteById(Long id) {
+        IAiClientToolMcpDao dao = dao();
+        return dao != null && dao.deleteById(id) > 0;
     }
 
     @Override
-    public AiClientConfigRecord queryById(Long id) {
-        return dao == null ? null : toRecord(dao.queryById(id));
+    public boolean deleteByMcpId(String mcpId) {
+        IAiClientToolMcpDao dao = dao();
+        return dao != null && dao.deleteByMcpId(mcpId) > 0;
     }
 
     @Override
-    public AiClientConfigRecord queryByMcpId(String mcpId) {
-        return dao == null ? null : toRecord(dao.queryByMcpId(mcpId));
+    public McpClientDefinition findById(Long id) {
+        IAiClientToolMcpDao dao = dao();
+        return dao == null ? null : toDefinition(dao.queryById(id));
     }
 
     @Override
-    public List<AiClientConfigRecord> queryAll() {
-        return dao == null ? List.of() : toRecords(dao.queryAll());
+    public McpClientDefinition findByMcpId(String mcpId) {
+        IAiClientToolMcpDao dao = dao();
+        return dao == null ? null : toDefinition(dao.queryByMcpId(mcpId));
     }
 
     @Override
-    public List<AiClientConfigRecord> queryByStatus(Integer status) {
-        return dao == null ? List.of() : toRecords(dao.queryByStatus(status));
+    public List<McpClientDefinition> listAll() {
+        IAiClientToolMcpDao dao = dao();
+        return dao == null ? List.of() : definitions(dao.queryAll());
     }
 
     @Override
-    public List<AiClientConfigRecord> queryByTransportType(String transportType) {
-        return dao == null ? List.of() : toRecords(dao.queryByTransportType(transportType));
+    public List<McpClientDefinition> listByStatus(Integer status) {
+        IAiClientToolMcpDao dao = dao();
+        return dao == null ? List.of() : definitions(dao.queryByStatus(status));
     }
 
     @Override
-    public List<AiClientConfigRecord> queryEnabledMcps() {
-        return dao == null ? List.of() : toRecords(dao.queryEnabledMcps());
+    public List<McpClientDefinition> listByTransportType(String transportType) {
+        IAiClientToolMcpDao dao = dao();
+        return dao == null ? List.of() : definitions(dao.queryByTransportType(transportType));
     }
 
-    private AiClientToolMcp toPo(AiClientConfigRecord record) {
-        AiClientToolMcp po = new AiClientToolMcp();
-        BeanUtils.copyProperties(record, po);
-        return po;
+    @Override
+    public List<McpClientDefinition> listEnabled() {
+        IAiClientToolMcpDao dao = dao();
+        return dao == null ? List.of() : definitions(dao.queryEnabledMcps());
     }
 
-    private AiClientConfigRecord toRecord(AiClientToolMcp po) {
+    private IAiClientToolMcpDao dao() {
+        return daoProvider == null ? null : daoProvider.getIfAvailable();
+    }
+
+    private AiClientToolMcp toPo(McpClientDefinition definition) {
+        if (definition == null) {
+            throw new IllegalArgumentException("MCP_CLIENT_DEFINITION_REQUIRED");
+        }
+        return AiClientToolMcp.builder()
+                .id(definition.id())
+                .mcpId(definition.mcpId())
+                .mcpName(definition.mcpName())
+                .transportType(definition.transportType())
+                .transportConfig(definition.transportConfig())
+                .requestTimeout(definition.requestTimeout())
+                .status(definition.status())
+                .createTime(definition.createTime())
+                .updateTime(definition.updateTime())
+                .build();
+    }
+
+    private McpClientDefinition toDefinition(AiClientToolMcp po) {
         if (po == null) {
             return null;
         }
-        AiClientConfigRecord record = new AiClientConfigRecord();
-        BeanUtils.copyProperties(po, record);
-        return record;
+        return new McpClientDefinition(
+                po.getId(),
+                po.getMcpId(),
+                po.getMcpName(),
+                po.getTransportType(),
+                po.getTransportConfig(),
+                po.getRequestTimeout(),
+                po.getStatus(),
+                po.getCreateTime(),
+                po.getUpdateTime());
     }
 
-    private List<AiClientConfigRecord> toRecords(List<AiClientToolMcp> rows) {
-        return rows == null ? List.of() : rows.stream().map(this::toRecord).toList();
+    private List<McpClientDefinition> definitions(List<AiClientToolMcp> rows) {
+        return rows == null || rows.isEmpty()
+                ? List.of()
+                : rows.stream().map(this::toDefinition).toList();
     }
 }

@@ -1,7 +1,7 @@
 package cn.lgs.orbisops.trigger.application.memory;
 
 import cn.lgs.orbisops.application.memory.MemoryModelExtractionPort;
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
 import cn.lgs.orbisops.domain.memory.model.ColdMemoryMessageSnapshot;
 import cn.lgs.orbisops.domain.memory.model.MemoryExtractionDraft;
 import com.alibaba.fastjson.JSON;
@@ -34,7 +34,7 @@ public class OpsMemoryModelExtractionAdapter implements MemoryModelExtractionPor
     public OpsMemoryModelExtractionAdapter(
             ApplicationContext applicationContext,
             ObjectProvider<ChatModel> chatModelProvider,
-            ObjectProvider<AiModelAvailability> aiModelAvailabilityProvider) {
+            ObjectProvider<ModelAvailabilityPort> aiModelAvailabilityProvider) {
         this(new OpsMemoryChatModelResolver(
                 applicationContext,
                 chatModelProvider,

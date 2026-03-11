@@ -61,7 +61,7 @@ class MemoryExtractionApplicationArchitectureTest {
 
         assertAll(
                 () -> assertTrue(modelAdapter.contains("implements MemoryModelExtractionPort")),
-                () -> assertTrue(modelAdapter.contains("AiModelAvailability")),
+                () -> assertTrue(modelAdapter.contains("ModelAvailabilityPort")),
                 () -> assertTrue(modelAdapter.contains("ChatClient.builder(chatModel)")),
                 () -> assertTrue(modelAdapter.contains("modelResolver.resolve()")),
                 () -> assertTrue(modelAdapter.contains("modelResolver.chatAvailable()")),
@@ -93,7 +93,7 @@ class MemoryExtractionApplicationArchitectureTest {
                 () -> assertFalse(extractor.contains("MemoryModelExtractionPort")),
                 () -> assertFalse(extractor.contains("ChatClient")),
                 () -> assertFalse(extractor.contains("ChatModel")),
-                () -> assertFalse(extractor.contains("AiModelAvailability")),
+                () -> assertFalse(extractor.contains("ModelAvailabilityPort")),
                 () -> assertFalse(extractor.contains("com.alibaba.fastjson")),
                 () -> assertFalse(extractor.contains("@Slf4j")),
                 () -> assertTrue(configuration.contains("memoryExtractionApplicationService(")),

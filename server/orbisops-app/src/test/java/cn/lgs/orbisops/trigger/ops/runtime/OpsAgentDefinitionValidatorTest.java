@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientToolMcpConfigRepository;
+import cn.lgs.orbisops.application.config.McpClientCatalogPort;
 import cn.lgs.orbisops.testsupport.OpsAgentDefinitionValidatorTestFactory;
 import org.junit.jupiter.api.Test;
 
@@ -302,8 +302,8 @@ class OpsAgentDefinitionValidatorTest {
 
     @Test
     void shouldRejectMissingMcpReferenceWhenRegistryAvailable() {
-        IAiClientToolMcpConfigRepository mcpDao = mock(IAiClientToolMcpConfigRepository.class);
-        when(mcpDao.queryByMcpId("missing-mcp")).thenReturn(null);
+        McpClientCatalogPort mcpDao = mock(McpClientCatalogPort.class);
+        when(mcpDao.findByMcpId("missing-mcp")).thenReturn(null);
         OpsAgentDefinitionValidator validatorWithMcpRepository =
                 OpsAgentDefinitionValidatorTestFactory.create(mcpDao);
 

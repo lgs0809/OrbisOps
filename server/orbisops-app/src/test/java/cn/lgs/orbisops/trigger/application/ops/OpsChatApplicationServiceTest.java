@@ -4,7 +4,8 @@ import cn.lgs.orbisops.application.agent.OpsMainAgentActionHandler;
 import cn.lgs.orbisops.application.agent.OpsMainAgentCoordinator;
 import cn.lgs.orbisops.application.project.ProjectDefinitionApplicationService;
 import cn.lgs.orbisops.application.worksession.ExecuteWorkSessionUseCase;
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
+import cn.lgs.orbisops.application.model.ModelAvailabilitySnapshot;
 import cn.lgs.orbisops.trigger.application.security.AdminAuthService;
 import cn.lgs.orbisops.trigger.application.security.OpsTrustedRequestMetadata;
 import cn.lgs.orbisops.trigger.ops.OpsAgentLlmClient;
@@ -179,7 +180,7 @@ class OpsChatApplicationServiceTest {
                 workSession();
         OpsChatSessionService sessionService = mock(OpsChatSessionService.class);
         ProjectDefinitionApplicationService workspace = mock(ProjectDefinitionApplicationService.class);
-        AiModelAvailability availability = mock(AiModelAvailability.class);
+        ModelAvailabilityPort availability = mock(ModelAvailabilityPort.class);
         doThrow(new IllegalStateException("model unavailable"))
                 .when(availability).assertChatAvailable(anyString());
         when(workspace.exists("demo-project")).thenReturn(true);
@@ -229,7 +230,7 @@ class OpsChatApplicationServiceTest {
         OpsChatApplicationService service = new OpsChatApplicationService(
                 workSession,
                 sessionService,
-                mock(AiModelAvailability.class),
+                mock(ModelAvailabilityPort.class),
                 mock(OpsAgentLlmClient.class),
                 workspace,
                 graphEventService,
@@ -272,7 +273,7 @@ class OpsChatApplicationServiceTest {
         OpsChatApplicationService service = new OpsChatApplicationService(
                 workSession,
                 sessionService,
-                mock(AiModelAvailability.class),
+                mock(ModelAvailabilityPort.class),
                 mock(OpsAgentLlmClient.class),
                 workspace,
                 events,
@@ -338,7 +339,7 @@ class OpsChatApplicationServiceTest {
         OpsChatApplicationService service = new OpsChatApplicationService(
                 workSession,
                 mock(OpsChatSessionService.class),
-                mock(AiModelAvailability.class),
+                mock(ModelAvailabilityPort.class),
                 mock(OpsAgentLlmClient.class),
                 workspace,
                 events,
@@ -370,7 +371,7 @@ class OpsChatApplicationServiceTest {
         OpsChatApplicationService service = new OpsChatApplicationService(
                 workSession,
                 mock(OpsChatSessionService.class),
-                mock(AiModelAvailability.class),
+                mock(ModelAvailabilityPort.class),
                 mock(OpsAgentLlmClient.class),
                 workspace,
                 events,
@@ -403,7 +404,7 @@ class OpsChatApplicationServiceTest {
         OpsChatApplicationService service = new OpsChatApplicationService(
                 workSession,
                 mock(OpsChatSessionService.class),
-                mock(AiModelAvailability.class),
+                mock(ModelAvailabilityPort.class),
                 mock(OpsAgentLlmClient.class),
                 workspace,
                 events,
@@ -439,7 +440,7 @@ class OpsChatApplicationServiceTest {
         OpsChatApplicationService service = new OpsChatApplicationService(
                 workSession,
                 mock(OpsChatSessionService.class),
-                mock(AiModelAvailability.class),
+                mock(ModelAvailabilityPort.class),
                 mock(OpsAgentLlmClient.class),
                 workspace,
                 events,
@@ -482,7 +483,7 @@ class OpsChatApplicationServiceTest {
         OpsChatApplicationService service = new OpsChatApplicationService(
                 workSession,
                 mock(OpsChatSessionService.class),
-                mock(AiModelAvailability.class),
+                mock(ModelAvailabilityPort.class),
                 mock(OpsAgentLlmClient.class),
                 workspace,
                 graphEvents,
@@ -523,7 +524,7 @@ class OpsChatApplicationServiceTest {
         OpsChatApplicationService service = new OpsChatApplicationService(
                 workSession,
                 sessionService,
-                mock(AiModelAvailability.class),
+                mock(ModelAvailabilityPort.class),
                 mock(OpsAgentLlmClient.class),
                 workspace,
                 events,
@@ -548,11 +549,11 @@ class OpsChatApplicationServiceTest {
     @Test
     @SuppressWarnings({"rawtypes", "unchecked"})
     void modelStatusMustTreatUsableDatabaseManagedModelAsChatAvailable() {
-        AiModelAvailability availability = mock(AiModelAvailability.class);
-        when(availability.status()).thenReturn(Map.of(
-                "chatAvailable", false,
-                "openAiApiKeyUsable", false,
-                "message", "fallback unavailable"));
+        ModelAvailabilityPort availability = mock(ModelAvailabilityPort.class);
+        when(availability.snapshot()).thenReturn(new ModelAvailabilitySnapshot(
+                false, "", "", "", "", "", "", "",
+                false, false, false, false, false, false, false, false,
+                false, false, false, "fallback unavailable"));
         OpsConfiguredChatModelAvailabilityService configured = mock(OpsConfiguredChatModelAvailabilityService.class);
         when(configured.status()).thenReturn(Map.of(
                 "enabledConfiguredModelCount", 1,
@@ -580,7 +581,7 @@ class OpsChatApplicationServiceTest {
         return new OpsChatApplicationService(
                 workSession,
                 sessionService,
-                mock(AiModelAvailability.class),
+                mock(ModelAvailabilityPort.class),
                 mock(OpsAgentLlmClient.class),
                 workspace,
                 events,
@@ -598,7 +599,7 @@ class OpsChatApplicationServiceTest {
         return new OpsChatApplicationService(
                 workSession,
                 sessionService,
-                mock(AiModelAvailability.class),
+                mock(ModelAvailabilityPort.class),
                 mock(OpsAgentLlmClient.class),
                 workspace,
                 events,
@@ -611,7 +612,7 @@ class OpsChatApplicationServiceTest {
             ExecuteWorkSessionUseCase<OpsAgentChatRequest, OpsAgentChatResponse, OpsRuntimeEvent> workSession,
             OpsChatSessionService sessionService,
             ProjectDefinitionApplicationService workspace,
-            AiModelAvailability availability) {
+            ModelAvailabilityPort availability) {
         GraphEventApplicationService events = mock(GraphEventApplicationService.class);
         return new OpsChatApplicationService(
                 workSession,

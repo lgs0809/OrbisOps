@@ -27,7 +27,7 @@ class OpsLlmModelAccessBoundaryArchitectureTest {
                 () -> assertTrue(client.contains("modelAccessService.resolveAvailable(settings.enabled())")),
                 () -> assertFalse(client.contains("private final ApplicationContext")),
                 () -> assertFalse(client.contains("private final ObjectProvider<ChatModel>")),
-                () -> assertFalse(client.contains("private final AiModelAvailability")),
+                () -> assertFalse(client.contains("private final ModelAvailabilityPort")),
                 () -> assertFalse(client.contains("private ChatModel resolveChatModel(")),
                 () -> assertFalse(client.contains("getBean(\"openAiChatModel\"")),
                 () -> assertFalse(client.contains("isChatAvailable()")),

@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.trigger.ops;
 
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.ObjectProvider;
@@ -26,7 +26,7 @@ class OpsLlmModelAccessServiceTest {
         ApplicationContext context = mock(ApplicationContext.class);
         @SuppressWarnings("unchecked")
         ObjectProvider<ChatModel> provider = mock(ObjectProvider.class);
-        AiModelAvailability availability = mock(AiModelAvailability.class);
+        ModelAvailabilityPort availability = mock(ModelAvailabilityPort.class);
         ChatModel named = mock(ChatModel.class);
         when(availability.isChatAvailable()).thenReturn(true);
         when(context.getBean("openAiChatModel", ChatModel.class)).thenReturn(named);
@@ -45,7 +45,7 @@ class OpsLlmModelAccessServiceTest {
         ApplicationContext context = mock(ApplicationContext.class);
         @SuppressWarnings("unchecked")
         ObjectProvider<ChatModel> provider = mock(ObjectProvider.class);
-        AiModelAvailability availability = mock(AiModelAvailability.class);
+        ModelAvailabilityPort availability = mock(ModelAvailabilityPort.class);
         ChatModel fallback = mock(ChatModel.class);
         when(availability.isChatAvailable()).thenReturn(true);
         when(context.getBean("openAiChatModel", ChatModel.class))
@@ -64,7 +64,7 @@ class OpsLlmModelAccessServiceTest {
         ApplicationContext context = mock(ApplicationContext.class);
         @SuppressWarnings("unchecked")
         ObjectProvider<ChatModel> provider = mock(ObjectProvider.class);
-        AiModelAvailability availability = mock(AiModelAvailability.class);
+        ModelAvailabilityPort availability = mock(ModelAvailabilityPort.class);
         OpsLlmModelAccessService service = new OpsLlmModelAccessService(
                 context,
                 provider,
@@ -80,7 +80,7 @@ class OpsLlmModelAccessServiceTest {
         ApplicationContext context = mock(ApplicationContext.class);
         @SuppressWarnings("unchecked")
         ObjectProvider<ChatModel> provider = mock(ObjectProvider.class);
-        AiModelAvailability availability = mock(AiModelAvailability.class);
+        ModelAvailabilityPort availability = mock(ModelAvailabilityPort.class);
         when(availability.isChatAvailable()).thenReturn(false);
         OpsLlmModelAccessService service = new OpsLlmModelAccessService(
                 context,
@@ -96,7 +96,7 @@ class OpsLlmModelAccessServiceTest {
         ApplicationContext context = mock(ApplicationContext.class);
         @SuppressWarnings("unchecked")
         ObjectProvider<ChatModel> provider = mock(ObjectProvider.class);
-        AiModelAvailability availability = mock(AiModelAvailability.class);
+        ModelAvailabilityPort availability = mock(ModelAvailabilityPort.class);
         ChatModel model = mock(ChatModel.class);
         when(context.getBean("openAiChatModel", ChatModel.class)).thenReturn(model);
         when(availability.isChatAvailable()).thenReturn(true);

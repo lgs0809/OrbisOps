@@ -1,7 +1,7 @@
 package cn.lgs.orbisops.trigger.ops.rag;
 
-import cn.lgs.orbisops.domain.agent.model.entity.RagFileResource;
-import cn.lgs.orbisops.domain.agent.service.rag.RagParsePolicy;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagFileResource;
+import cn.lgs.orbisops.domain.knowledge.rag.service.RagParsePolicy;
 import org.springframework.util.StringUtils;
 
 import java.util.HashMap;

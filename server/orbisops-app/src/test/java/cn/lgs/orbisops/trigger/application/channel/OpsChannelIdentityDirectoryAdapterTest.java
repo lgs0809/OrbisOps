@@ -2,10 +2,11 @@ package cn.lgs.orbisops.trigger.application.channel;
 
 import cn.lgs.orbisops.application.channel.ChannelIdentityDirectoryPort;
 import cn.lgs.orbisops.application.project.AuthorizeProjectAccessUseCase;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAdminUserRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.AdminUserRecord;
+import cn.lgs.orbisops.application.security.AdminUserCatalogPort;
 import cn.lgs.orbisops.domain.channel.model.ChannelIdentityRecord;
 import cn.lgs.orbisops.domain.channel.model.ChannelStatus;
+import cn.lgs.orbisops.domain.security.AdminUserAccount;
+import cn.lgs.orbisops.domain.security.AdminUserRole;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -20,20 +21,20 @@ import static org.mockito.Mockito.when;
 
 class OpsChannelIdentityDirectoryAdapterTest {
 
-    private IAdminUserRepository users;
+    private AdminUserCatalogPort users;
     private AuthorizeProjectAccessUseCase projectAccess;
     private OpsChannelIdentityDirectoryAdapter adapter;
 
     @BeforeEach
     void setUp() {
-        users = mock(IAdminUserRepository.class);
+        users = mock(AdminUserCatalogPort.class);
         projectAccess = mock(AuthorizeProjectAccessUseCase.class);
         adapter = new OpsChannelIdentityDirectoryAdapter(users, projectAccess);
     }
 
     @Test
     void resolveActiveRejectsUsernameThatDoesNotMatchAuthoritativeUserStore() {
-        when(users.queryByUserId("user-1")).thenReturn(user("user-1", "alice", 1));
+        when(users.findByUserId("user-1")).thenReturn(user("user-1", "alice", 1));
 
         IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
                 () -> adapter.resolveActive("user-1", "mallory"));
@@ -43,7 +44,7 @@ class OpsChannelIdentityDirectoryAdapterTest {
 
     @Test
     void resolveActiveRejectsDisabledPlatformUser() {
-        when(users.queryByUserId("user-1")).thenReturn(user("user-1", "alice", 0));
+        when(users.findByUserId("user-1")).thenReturn(user("user-1", "alice", 0));
 
         SecurityException failure = assertThrows(SecurityException.class,
                 () -> adapter.resolveActive("user-1", "alice"));
@@ -59,7 +60,7 @@ class OpsChannelIdentityDirectoryAdapterTest {
         ChannelIdentityRecord identity = new ChannelIdentityRecord(
                 "mapping-1", "channel-1", "project-1", "sender-1", "user-1", "alice",
                 ChannelStatus.ACTIVE, 1, "admin", null, null);
-        when(users.queryByUserId("user-1"))
+        when(users.findByUserId("user-1"))
                 .thenReturn(user("user-1", "alice", 0), user("user-1", "alice", 1), user("user-1", "alice", 1));
         when(projectAccess.canAccess("project-1", "alice", "user-1", false))
                 .thenReturn(false, true);
@@ -71,7 +72,7 @@ class OpsChannelIdentityDirectoryAdapterTest {
 
     @Test
     void activeResolutionReturnsAuthoritativeIdentity() {
-        when(users.queryByUsername("alice")).thenReturn(user("user-1", "alice", 1));
+        when(users.findByUsername("alice")).thenReturn(user("user-1", "alice", 1));
 
         ChannelIdentityDirectoryPort.PlatformIdentity identity = adapter.resolveActive("", "alice");
 
@@ -79,7 +80,7 @@ class OpsChannelIdentityDirectoryAdapterTest {
         assertEquals("alice", identity.username());
     }
 
-    private AdminUserRecord user(String userId, String username, int status) {
-        return AdminUserRecord.builder().userId(userId).username(username).status(status).build();
+    private AdminUserAccount user(String userId, String username, int status) {
+        return new AdminUserAccount(null, userId, username, null, AdminUserRole.USER, status, null, null);
     }
 }

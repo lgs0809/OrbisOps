@@ -1,8 +1,8 @@
 package cn.lgs.orbisops.infrastructure.adapter.repository;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IRagIngestionJobRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.RagIngestionJob;
-import cn.lgs.orbisops.domain.agent.model.valobj.RagIngestionJobStatus;
+import cn.lgs.orbisops.domain.knowledge.rag.repository.IRagIngestionJobRepository;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagIngestionJob;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagIngestionJobStatus;
 import com.alibaba.fastjson.JSON;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;

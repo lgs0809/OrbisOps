@@ -25,7 +25,7 @@ class StrategicDddContextMapArchitectureTest {
                 "## 5. 聚合与一致性边界",
                 "## 6. 跨上下文集成规则",
                 "### 6.3 可执行 Context Map 基线",
-                "## 8. 当前受保护兼容例外");
+                "## 8. Security 技术边界");
         List<String> requiredPackages = List.of(
                 "domain.project",
                 "domain.agentdefinition",

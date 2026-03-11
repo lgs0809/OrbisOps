@@ -1,10 +1,11 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
 import cn.lgs.orbisops.application.agentdefinition.AgentModelKnowledgeReferenceValidationPort;
+import cn.lgs.orbisops.application.config.AiClientModelCatalogPort;
+import cn.lgs.orbisops.application.config.AiClientModelDefinition;
 import cn.lgs.orbisops.application.project.ProjectKnowledgeAuthorizationApplicationService;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientModelConfigRepository;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientRagOrderConfigRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.AiClientConfigRecord;
+import cn.lgs.orbisops.application.rag.RagOrderCatalogPort;
+import cn.lgs.orbisops.application.rag.RagOrderDefinition;
 import cn.lgs.orbisops.domain.agentdefinition.service.AgentReferenceSyntaxPolicy;
 import org.springframework.util.StringUtils;
 
@@ -16,13 +17,13 @@ public final class OpsAgentModelKnowledgeReferenceValidator
 
     private final AgentReferenceSyntaxPolicy referenceSyntaxPolicy =
             new AgentReferenceSyntaxPolicy();
-    private final Supplier<IAiClientModelConfigRepository> modelRepositorySupplier;
-    private final Supplier<IAiClientRagOrderConfigRepository> ragRepositorySupplier;
+    private final Supplier<AiClientModelCatalogPort> modelRepositorySupplier;
+    private final Supplier<RagOrderCatalogPort> ragRepositorySupplier;
     private final Supplier<ProjectKnowledgeAuthorizationApplicationService> authorizationSupplier;
 
     public OpsAgentModelKnowledgeReferenceValidator(
-            Supplier<IAiClientModelConfigRepository> modelRepositorySupplier,
-            Supplier<IAiClientRagOrderConfigRepository> ragRepositorySupplier,
+            Supplier<AiClientModelCatalogPort> modelRepositorySupplier,
+            Supplier<RagOrderCatalogPort> ragRepositorySupplier,
             Supplier<ProjectKnowledgeAuthorizationApplicationService> authorizationSupplier) {
         this.modelRepositorySupplier = required(
                 modelRepositorySupplier, "MODEL_REPOSITORY_SUPPLIER_REQUIRED");
@@ -34,12 +35,12 @@ public final class OpsAgentModelKnowledgeReferenceValidator
 
     public void validateModel(String id, String owner) {
         validateReference(id, owner);
-        IAiClientModelConfigRepository repository = modelRepositorySupplier.get();
+        AiClientModelCatalogPort repository = modelRepositorySupplier.get();
         if (!StringUtils.hasText(id) || repository == null) {
             return;
         }
-        AiClientConfigRecord model = repository.queryByModelId(id);
-        if (model == null || !enabled(model.getStatus())) {
+        AiClientModelDefinition model = repository.findByModelId(id);
+        if (model == null || !enabled(model.status())) {
             throw new IllegalArgumentException(
                     owner + " 引用了不存在或未启用的 Model：" + id);
         }
@@ -60,15 +61,15 @@ public final class OpsAgentModelKnowledgeReferenceValidator
                     owner + " 引用了未授权给项目 " + projectId
                             + " 的知识库：" + id);
         }
-        IAiClientRagOrderConfigRepository repository = ragRepositorySupplier.get();
+        RagOrderCatalogPort repository = ragRepositorySupplier.get();
         if (!StringUtils.hasText(id) || repository == null) {
             return;
         }
-        AiClientConfigRecord order = repository.queryByRagId(id);
-        boolean found = order != null && enabled(order.getStatus());
+        RagOrderDefinition order = repository.queryByRagId(id);
+        boolean found = order != null && enabled(order.status());
         if (!found) {
             found = repository.queryByKnowledgeTag(id).stream()
-                    .anyMatch(item -> enabled(item.getStatus()));
+                    .anyMatch(item -> enabled(item.status()));
         }
         if (!found) {
             throw new IllegalArgumentException(

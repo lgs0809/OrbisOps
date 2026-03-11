@@ -3,7 +3,8 @@ package cn.lgs.orbisops.trigger.application.ops;
 import cn.lgs.orbisops.application.agent.OpsMainAgentCoordinator;
 import cn.lgs.orbisops.application.project.ProjectDefinitionApplicationService;
 import cn.lgs.orbisops.application.worksession.ExecuteWorkSessionUseCase;
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
+import cn.lgs.orbisops.application.model.ModelAvailabilitySnapshot;
 import cn.lgs.orbisops.trigger.application.chat.OpsChatRequestPreparationFacade;
 import cn.lgs.orbisops.trigger.application.chat.OpsPreparedChatRequest;
 import cn.lgs.orbisops.trigger.application.chatsession.OpsChatSessionApplicationFacade;
@@ -34,7 +35,7 @@ public class OpsChatApplicationService {
 
     private final ExecuteWorkSessionUseCase<OpsAgentChatRequest, OpsAgentChatResponse, OpsRuntimeEvent> executeWorkSession;
     private final OpsChatSessionApplicationFacade chatSessionFacade;
-    private final AiModelAvailability aiModelAvailability;
+    private final ModelAvailabilityPort aiModelAvailability;
     private final OpsAgentLlmClient opsAgentLlmClient;
     private final OpsChatRequestPreparationFacade requestPreparationFacade;
     private final OpsWorkSessionRunApplicationFacade workSessionRunFacade;
@@ -52,7 +53,7 @@ public class OpsChatApplicationService {
     public OpsChatApplicationService(
                                      ExecuteWorkSessionUseCase<OpsAgentChatRequest, OpsAgentChatResponse, OpsRuntimeEvent> executeWorkSession,
                                      OpsChatSessionService chatSessionService,
-                                     AiModelAvailability aiModelAvailability,
+                                     ModelAvailabilityPort aiModelAvailability,
                                      OpsAgentLlmClient opsAgentLlmClient,
                                      ProjectDefinitionApplicationService projectDefinitionService,
                                      GraphEventApplicationService graphEventService,
@@ -68,7 +69,7 @@ public class OpsChatApplicationService {
     public OpsChatApplicationService(
                                      ExecuteWorkSessionUseCase<OpsAgentChatRequest, OpsAgentChatResponse, OpsRuntimeEvent> executeWorkSession,
                                      OpsChatSessionService chatSessionService,
-                                     AiModelAvailability aiModelAvailability,
+                                     ModelAvailabilityPort aiModelAvailability,
                                      OpsAgentLlmClient opsAgentLlmClient,
                                      ProjectDefinitionApplicationService projectDefinitionService,
                                      GraphEventApplicationService graphEventService,
@@ -302,8 +303,9 @@ public class OpsChatApplicationService {
     }
 
     public Map<String, Object> modelStatus() {
-        Map<String, Object> data = new LinkedHashMap<>(aiModelAvailability.status());
-        boolean fallbackChatAvailable = Boolean.TRUE.equals(data.get("chatAvailable"));
+        ModelAvailabilitySnapshot snapshot = aiModelAvailability.snapshot();
+        Map<String, Object> data = modelAvailabilityView(snapshot);
+        boolean fallbackChatAvailable = snapshot != null && snapshot.chatAvailable();
         Map<String, Object> configuredStatus = configuredChatModelAvailability == null
                 ? Map.of("enabledConfiguredModelCount", 0,
                         "usableConfiguredModelCount", 0,
@@ -317,6 +319,34 @@ public class OpsChatApplicationService {
             data.put("message", "模型管理中存在可用的已启用 Chat 模型，Agent Runtime 将按 modelId 使用该配置。");
         }
         data.put("opsAgentLlm", opsAgentLlmClient.status());
+        return data;
+    }
+
+    private Map<String, Object> modelAvailabilityView(ModelAvailabilitySnapshot snapshot) {
+        if (snapshot == null) {
+            return new LinkedHashMap<>();
+        }
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("modelCallsEnabled", snapshot.modelCallsEnabled());
+        data.put("openAiBaseUrl", snapshot.openAiBaseUrl());
+        data.put("embeddingBaseUrl", snapshot.embeddingBaseUrl());
+        data.put("chatModel", snapshot.chatModel());
+        data.put("embeddingModel", snapshot.embeddingModel());
+        data.put("rerankProvider", snapshot.rerankProvider());
+        data.put("rerankBaseUrl", snapshot.rerankBaseUrl());
+        data.put("rerankModel", snapshot.rerankModel());
+        data.put("openAiApiKeyConfigured", snapshot.openAiApiKeyConfigured());
+        data.put("openAiApiKeyUsable", snapshot.openAiApiKeyUsable());
+        data.put("embeddingApiKeyConfigured", snapshot.embeddingApiKeyConfigured());
+        data.put("embeddingApiKeyUsable", snapshot.embeddingApiKeyUsable());
+        data.put("embeddingLocalEndpointReady", snapshot.embeddingLocalEndpointReady());
+        data.put("rerankApiKeyConfigured", snapshot.rerankApiKeyConfigured());
+        data.put("rerankApiKeyUsable", snapshot.rerankApiKeyUsable());
+        data.put("rerankLocalEndpointReady", snapshot.rerankLocalEndpointReady());
+        data.put("chatAvailable", snapshot.chatAvailable());
+        data.put("embeddingAvailable", snapshot.embeddingAvailable());
+        data.put("rerankAvailable", snapshot.rerankAvailable());
+        data.put("message", snapshot.message());
         return data;
     }
 

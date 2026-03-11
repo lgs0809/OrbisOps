@@ -1,8 +1,8 @@
 package cn.lgs.orbisops.trigger.application.rag;
 
 import cn.lgs.orbisops.application.rag.RagMultimodalWriterPort;
-import cn.lgs.orbisops.domain.agent.model.entity.RagDocument;
-import cn.lgs.orbisops.domain.agent.model.entity.RagFileResource;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagDocument;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagFileResource;
 import cn.lgs.orbisops.trigger.ops.rag.RagMultimodalEmbeddingService;
 import org.springframework.ai.document.Document;
 import org.springframework.beans.factory.ObjectProvider;

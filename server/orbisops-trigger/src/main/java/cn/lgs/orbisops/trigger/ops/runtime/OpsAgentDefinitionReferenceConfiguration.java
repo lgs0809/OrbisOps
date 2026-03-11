@@ -1,13 +1,13 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
+import cn.lgs.orbisops.application.config.AiClientModelCatalogPort;
+import cn.lgs.orbisops.application.config.McpClientCatalogPort;
+import cn.lgs.orbisops.application.rag.RagOrderCatalogPort;
 import cn.lgs.orbisops.application.project.ProjectDefinitionApplicationService;
 import cn.lgs.orbisops.application.project.ProjectKnowledgeAuthorizationApplicationService;
 import cn.lgs.orbisops.application.project.ProjectMcpAuthorizationApplicationService;
 import cn.lgs.orbisops.application.project.ProjectMcpRuntimeDescriptorApplicationService;
 import cn.lgs.orbisops.application.project.ProjectSkillAuthorizationApplicationService;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientModelConfigRepository;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientRagOrderConfigRepository;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientToolMcpConfigRepository;
 import cn.lgs.orbisops.trigger.ops.skill.SkillRuntimeToolProvider;
 import cn.lgs.orbisops.trigger.ops.source.OpsSourceRepositoryService;
 import org.springframework.beans.factory.ObjectProvider;
@@ -20,7 +20,7 @@ public class OpsAgentDefinitionReferenceConfiguration {
     @Bean
     public OpsAgentProjectCapabilityReferenceValidator
     opsAgentProjectCapabilityReferenceValidator(
-            ObjectProvider<IAiClientToolMcpConfigRepository> mcpRepositoryProvider,
+            ObjectProvider<McpClientCatalogPort> mcpRepositoryProvider,
             ObjectProvider<SkillRuntimeToolProvider> skillToolProvider,
             ObjectProvider<ProjectDefinitionApplicationService> projectDefinitionProvider,
             ObjectProvider<ProjectMcpAuthorizationApplicationService> mcpAuthorizationProvider,
@@ -40,8 +40,8 @@ public class OpsAgentDefinitionReferenceConfiguration {
     @Bean
     public OpsAgentModelKnowledgeReferenceValidator
     opsAgentModelKnowledgeReferenceValidator(
-            ObjectProvider<IAiClientModelConfigRepository> modelRepositoryProvider,
-            ObjectProvider<IAiClientRagOrderConfigRepository> ragRepositoryProvider,
+            ObjectProvider<AiClientModelCatalogPort> modelRepositoryProvider,
+            ObjectProvider<RagOrderCatalogPort> ragRepositoryProvider,
             ObjectProvider<ProjectKnowledgeAuthorizationApplicationService>
                     knowledgeAuthorizationProvider) {
         return new OpsAgentModelKnowledgeReferenceValidator(

@@ -1,7 +1,7 @@
 package cn.lgs.orbisops.trigger.ops.rag;
 
-import cn.lgs.orbisops.domain.agent.model.valobj.RagChunkDraft;
-import cn.lgs.orbisops.domain.agent.service.rag.RagChunkMaterializer;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagChunkDraft;
+import cn.lgs.orbisops.domain.knowledge.rag.service.RagChunkMaterializer;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;

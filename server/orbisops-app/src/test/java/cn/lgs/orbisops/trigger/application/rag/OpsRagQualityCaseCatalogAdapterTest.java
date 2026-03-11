@@ -2,7 +2,7 @@ package cn.lgs.orbisops.trigger.application.rag;
 
 import cn.lgs.orbisops.application.rag.RagQualityCaseRecord;
 import cn.lgs.orbisops.application.rag.RagQualityCaseSaveCommand;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IRagEvalRepository;
+import cn.lgs.orbisops.domain.knowledge.rag.repository.IRagEvalRepository;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;

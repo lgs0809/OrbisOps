@@ -1,9 +1,9 @@
 package cn.lgs.orbisops.trigger.ops.rag;
 
 import cn.lgs.orbisops.application.rag.RagBinaryAssetPort;
-import cn.lgs.orbisops.domain.agent.model.entity.RagFileResource;
-import cn.lgs.orbisops.domain.agent.service.rag.RagChunkMaterializer;
-import cn.lgs.orbisops.domain.agent.service.rag.RagParsePolicy;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagFileResource;
+import cn.lgs.orbisops.domain.knowledge.rag.service.RagChunkMaterializer;
+import cn.lgs.orbisops.domain.knowledge.rag.service.RagParsePolicy;
 import com.alibaba.fastjson.JSONObject;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -454,14 +454,14 @@ class RagDocumentParserTest {
     void shouldGateVisualAnalyzerByEnabledApiKeyAndHighValue() {
         RagVisualDocumentAnalyzer analyzer = new RagVisualDocumentAnalyzer(
                 visualSettings(true, true, "openai", "https://api.openai.com", "sk-test"),
-                (cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability) null);
+                (cn.lgs.orbisops.application.model.ModelAvailabilityPort) null);
 
         assertTrue(analyzer.shouldAnalyze(Map.of("high_value_candidate", true)));
         assertFalse(analyzer.shouldAnalyze(Map.of("high_value_candidate", false)));
 
         RagVisualDocumentAnalyzer disabled = new RagVisualDocumentAnalyzer(
                 visualSettings(false, true, "openai", "https://api.openai.com", "sk-test"),
-                (cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability) null);
+                (cn.lgs.orbisops.application.model.ModelAvailabilityPort) null);
         assertFalse(disabled.shouldAnalyze(Map.of("high_value_candidate", true)));
     }
 

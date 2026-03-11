@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.infrastructure.adapter.repository;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IJwtRevocationRepository;
+import cn.lgs.orbisops.application.security.JwtRevocationPort;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -14,7 +14,7 @@ import java.util.Date;
 
 @Slf4j
 @Repository
-public class JwtRevocationRepository implements IJwtRevocationRepository {
+public class JwtRevocationRepository implements JwtRevocationPort {
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 

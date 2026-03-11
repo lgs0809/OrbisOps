@@ -1,8 +1,8 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IRagKnowledgeRepository;
-import cn.lgs.orbisops.domain.agent.model.valobj.AiClientAdvisorVO;
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.domain.knowledge.rag.repository.IRagKnowledgeRepository;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagRetrievalSettings;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
 import cn.lgs.orbisops.trigger.ops.rag.RagMultimodalEmbeddingService;
 import cn.lgs.orbisops.trigger.ops.rag.advisor.RagAnswerAdvisor;
 import org.springframework.ai.document.Document;
@@ -20,14 +20,14 @@ public final class OpsNodeRagAdvisorFactory {
     private final Supplier<VectorStore> vectorStoreSupplier;
     private final Supplier<RagMultimodalEmbeddingService> multimodalSupplier;
     private final Supplier<EmbeddingModel> embeddingModelSupplier;
-    private final AiModelAvailability aiModelAvailability;
+    private final ModelAvailabilityPort aiModelAvailability;
     private final IRagKnowledgeRepository ragKnowledgeRepository;
 
     public OpsNodeRagAdvisorFactory(
             Supplier<VectorStore> vectorStoreSupplier,
             Supplier<RagMultimodalEmbeddingService> multimodalSupplier,
             Supplier<EmbeddingModel> embeddingModelSupplier,
-            AiModelAvailability aiModelAvailability,
+            ModelAvailabilityPort aiModelAvailability,
             IRagKnowledgeRepository ragKnowledgeRepository) {
         this.vectorStoreSupplier = required(
                 vectorStoreSupplier, "VECTOR_STORE_SUPPLIER_REQUIRED");
@@ -79,11 +79,11 @@ public final class OpsNodeRagAdvisorFactory {
         return aiModelAvailability.unavailableMessage("节点级 RAG 向量检索");
     }
 
-    private AiClientAdvisorVO.RagAnswer advisorSettings(
+    private RagRetrievalSettings advisorSettings(
             OpsNodeRagSettings settings) {
         OpsNodeRagSettings.QueryRewrite rewrite = settings.queryRewrite();
         OpsNodeRagSettings.Rerank rerank = settings.rerank();
-        AiClientAdvisorVO.RagAnswer answer = new AiClientAdvisorVO.RagAnswer();
+        RagRetrievalSettings answer = new RagRetrievalSettings();
         answer.setRetrievalMode("auto");
         answer.setDynamicSearch(true);
         answer.setVectorTopK(8);

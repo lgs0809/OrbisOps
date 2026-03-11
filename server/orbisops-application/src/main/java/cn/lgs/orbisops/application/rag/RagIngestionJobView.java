@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.application.rag;
 
-import cn.lgs.orbisops.domain.agent.model.entity.RagIngestionJob;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagIngestionJob;
 
 import java.util.List;
 import java.util.Map;

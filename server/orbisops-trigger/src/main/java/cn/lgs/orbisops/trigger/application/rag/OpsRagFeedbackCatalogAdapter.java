@@ -4,7 +4,7 @@ import cn.lgs.orbisops.application.rag.RagFeedbackCatalogPort;
 import cn.lgs.orbisops.application.rag.RagFeedbackEntry;
 import cn.lgs.orbisops.application.rag.RagFeedbackSubmitCommand;
 import cn.lgs.orbisops.application.rag.RagKnowledgeGap;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IRagFeedbackRepository;
+import cn.lgs.orbisops.domain.knowledge.rag.repository.IRagFeedbackRepository;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 

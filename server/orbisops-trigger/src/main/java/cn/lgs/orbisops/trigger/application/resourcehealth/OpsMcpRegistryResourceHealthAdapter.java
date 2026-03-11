@@ -1,8 +1,8 @@
 package cn.lgs.orbisops.trigger.application.resourcehealth;
 
+import cn.lgs.orbisops.application.config.McpClientCatalogPort;
 import cn.lgs.orbisops.application.resourcehealth.McpRegistryResourceHealthProbePort;
 import cn.lgs.orbisops.application.resourcehealth.ResourceHealthCheck;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientToolMcpConfigRepository;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
@@ -13,10 +13,10 @@ import java.util.Map;
 public class OpsMcpRegistryResourceHealthAdapter
         implements McpRegistryResourceHealthProbePort {
 
-    private final IAiClientToolMcpConfigRepository repository;
+    private final McpClientCatalogPort repository;
 
     public OpsMcpRegistryResourceHealthAdapter(
-            ObjectProvider<IAiClientToolMcpConfigRepository> repositoryProvider) {
+            ObjectProvider<McpClientCatalogPort> repositoryProvider) {
         this.repository = repositoryProvider.getIfAvailable();
     }
 
@@ -30,7 +30,7 @@ public class OpsMcpRegistryResourceHealthAdapter
                     "MCP DAO 未初始化");
         }
         try {
-            int enabled = repository.queryEnabledMcps().size();
+            int enabled = repository.listEnabled().size();
             return new ResourceHealthCheck(
                     "mcp",
                     "MCP 配置库",

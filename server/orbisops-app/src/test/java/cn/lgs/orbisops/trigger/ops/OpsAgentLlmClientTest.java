@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.trigger.ops;
 
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
 import cn.lgs.orbisops.trigger.ops.skill.SkillRuntimeToolProvider;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -31,7 +31,7 @@ class OpsAgentLlmClientTest {
         ObjectProvider<ChatModel> chatModelProvider = mock(ObjectProvider.class);
         @SuppressWarnings("unchecked")
         ObjectProvider<SkillRuntimeToolProvider> skillProvider = mock(ObjectProvider.class);
-        AiModelAvailability availability = mock(AiModelAvailability.class);
+        ModelAvailabilityPort availability = mock(ModelAvailabilityPort.class);
         ExecutorService executor = Executors.newSingleThreadExecutor();
 
         when(applicationContext.getBean("openAiChatModel", ChatModel.class)).thenReturn(chatModel);
@@ -99,7 +99,7 @@ class OpsAgentLlmClientTest {
         ObjectProvider<ChatModel> chatModelProvider = mock(ObjectProvider.class);
         @SuppressWarnings("unchecked")
         ObjectProvider<SkillRuntimeToolProvider> skillProvider = mock(ObjectProvider.class);
-        AiModelAvailability availability = mock(AiModelAvailability.class);
+        ModelAvailabilityPort availability = mock(ModelAvailabilityPort.class);
         ExecutorService executor = Executors.newSingleThreadExecutor(runnable -> {
             Thread thread = new Thread(runnable);
             thread.setDaemon(true);

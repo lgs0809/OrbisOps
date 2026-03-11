@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.trigger.ops.rag.advisor;
 
-import cn.lgs.orbisops.domain.agent.model.valobj.AiClientAdvisorVO;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagRetrievalSettings;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.util.StringUtils;
@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public final class RagRetrievalOrchestrator {
 
-    private final AiClientAdvisorVO.RagAnswer settings;
+    private final RagRetrievalSettings settings;
     private final RagRecallCoordinator recallCoordinator;
     private final RagReciprocalRankFusion reciprocalRankFusion;
     private final RagMmrDiversitySelector mmrDiversitySelector;
@@ -25,7 +25,7 @@ public final class RagRetrievalOrchestrator {
     private final RagQueryRewritePolicy queryRewritePolicy;
     private final RagLlmQueryRewriteProtocol llmQueryRewriteProtocol;
 
-    public RagRetrievalOrchestrator(AiClientAdvisorVO.RagAnswer settings,
+    public RagRetrievalOrchestrator(RagRetrievalSettings settings,
                                     RagRecallCoordinator recallCoordinator) {
         this(settings,
                 recallCoordinator,
@@ -36,14 +36,14 @@ public final class RagRetrievalOrchestrator {
                 new RagLlmQueryRewriteProtocol());
     }
 
-    RagRetrievalOrchestrator(AiClientAdvisorVO.RagAnswer settings,
+    RagRetrievalOrchestrator(RagRetrievalSettings settings,
                              RagRecallCoordinator recallCoordinator,
                              RagReciprocalRankFusion reciprocalRankFusion,
                              RagMmrDiversitySelector mmrDiversitySelector,
                              RagRerankProtocol rerankProtocol,
                              RagQueryRewritePolicy queryRewritePolicy,
                              RagLlmQueryRewriteProtocol llmQueryRewriteProtocol) {
-        this.settings = settings == null ? new AiClientAdvisorVO.RagAnswer() : settings;
+        this.settings = settings == null ? new RagRetrievalSettings() : settings;
         this.recallCoordinator = recallCoordinator;
         this.reciprocalRankFusion = reciprocalRankFusion;
         this.mmrDiversitySelector = mmrDiversitySelector;

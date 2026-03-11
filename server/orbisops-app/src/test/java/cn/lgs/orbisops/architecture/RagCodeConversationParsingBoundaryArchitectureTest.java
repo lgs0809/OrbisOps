@@ -21,7 +21,7 @@ class RagCodeConversationParsingBoundaryArchitectureTest {
     private static final String CONVERSATION_EXTRACTOR = "orbisops-trigger/src/main/java/"
             + "cn/lgs/orbisops/trigger/ops/rag/RagConversationChunkExtractor.java";
     private static final String MATERIALIZER = "orbisops-domain/src/main/java/"
-            + "cn/lgs/orbisops/domain/agent/service/rag/RagChunkMaterializer.java";
+            + "cn/lgs/orbisops/domain/knowledge/rag/service/RagChunkMaterializer.java";
 
     @Test
     void codeProtocolMustRemainInsideDedicatedExtractor() throws IOException {

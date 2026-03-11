@@ -1,9 +1,10 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientApiConfigRepository;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientModelConfigRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.AiClientConfigRecord;
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.application.config.AiClientApiCatalogPort;
+import cn.lgs.orbisops.application.config.AiClientApiDefinition;
+import cn.lgs.orbisops.application.config.AiClientModelCatalogPort;
+import cn.lgs.orbisops.application.config.AiClientModelDefinition;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
@@ -26,7 +27,7 @@ class OpsRuntimeModelResolverTest {
     @Test
     void blankModelMustUseNamedDefaultAndAssertAvailability() {
         ChatModel namedDefault = mock(ChatModel.class);
-        AiModelAvailability availability = mock(AiModelAvailability.class);
+        ModelAvailabilityPort availability = mock(ModelAvailabilityPort.class);
         OpsRuntimeModelResolver resolver = resolver(
                 () -> namedDefault,
                 () -> mock(ChatModel.class),
@@ -51,7 +52,7 @@ class OpsRuntimeModelResolverTest {
                 () -> fallback,
                 () -> null,
                 () -> null,
-                mock(AiModelAvailability.class),
+                mock(ModelAvailabilityPort.class),
                 secretResolver(null));
 
         assertSame(fallback, resolver.resolve(context(null, new ArrayList<>())));
@@ -60,16 +61,16 @@ class OpsRuntimeModelResolverTest {
     @Test
     void missingConfiguredModelMustRecordCompatibilityWarningAndFallback() {
         ChatModel fallback = mock(ChatModel.class);
-        IAiClientModelConfigRepository modelRepository = mock(IAiClientModelConfigRepository.class);
-        IAiClientApiConfigRepository apiRepository = mock(IAiClientApiConfigRepository.class);
-        when(modelRepository.queryByModelId("missing-model")).thenReturn(null);
+        AiClientModelCatalogPort modelRepository = mock(AiClientModelCatalogPort.class);
+        AiClientApiCatalogPort apiRepository = mock(AiClientApiCatalogPort.class);
+        when(modelRepository.findByModelId("missing-model")).thenReturn(null);
         List<OpsRuntimeEvent> events = new ArrayList<>();
         OpsRuntimeModelResolver resolver = resolver(
                 () -> fallback,
                 () -> fallback,
                 () -> modelRepository,
                 () -> apiRepository,
-                mock(AiModelAvailability.class),
+                mock(ModelAvailabilityPort.class),
                 secretResolver(null));
 
         ChatModel resolved = resolver.resolve(context("missing-model", events));
@@ -90,7 +91,7 @@ class OpsRuntimeModelResolverTest {
                 () -> fallback,
                 () -> null,
                 () -> null,
-                mock(AiModelAvailability.class),
+                mock(ModelAvailabilityPort.class),
                 secretResolver(null));
 
         assertSame(fallback, resolver.resolve(context("model-1", events)));
@@ -100,31 +101,31 @@ class OpsRuntimeModelResolverTest {
 
     @Test
     void activeConfiguredModelMustBuildTypedOpenAiModelAndAttachMetadata() {
-        IAiClientModelConfigRepository modelRepository = mock(IAiClientModelConfigRepository.class);
-        IAiClientApiConfigRepository apiRepository = mock(IAiClientApiConfigRepository.class);
-        AiClientConfigRecord model = AiClientConfigRecord.builder()
-                .modelId("model-1")
-                .modelName("gpt-test")
-                .apiId("api-1")
-                .status(1)
-                .build();
-        AiClientConfigRecord api = AiClientConfigRecord.builder()
-                .apiId("api-1")
-                .baseUrl("https://example.invalid")
-                .apiKey("${env:OPS_TEST_KEY:fallback-key}")
-                .completionsPath("/v1/chat/completions")
-                .embeddingsPath("/v1/embeddings")
-                .status(1)
-                .build();
-        when(modelRepository.queryByModelId("model-1")).thenReturn(model);
-        when(apiRepository.queryByApiId("api-1")).thenReturn(api);
+        AiClientModelCatalogPort modelRepository = mock(AiClientModelCatalogPort.class);
+        AiClientApiCatalogPort apiRepository = mock(AiClientApiCatalogPort.class);
+        AiClientModelDefinition model = new AiClientModelDefinition(
+                null, "model-1", "api-1", "gpt-test", null, null, null, 1, null, null);
+        AiClientApiDefinition api = new AiClientApiDefinition(
+                null,
+                "api-1",
+                null,
+                null,
+                "https://example.invalid",
+                "${env:OPS_TEST_KEY:fallback-key}",
+                "/v1/chat/completions",
+                "/v1/embeddings",
+                1,
+                null,
+                null);
+        when(modelRepository.findByModelId("model-1")).thenReturn(model);
+        when(apiRepository.findByApiId("api-1")).thenReturn(api);
         OpsRuntimeResourceContext context = context("model-1", new ArrayList<>());
         OpsRuntimeModelResolver resolver = resolver(
                 () -> mock(ChatModel.class),
                 () -> mock(ChatModel.class),
                 () -> modelRepository,
                 () -> apiRepository,
-                mock(AiModelAvailability.class),
+                mock(ModelAvailabilityPort.class),
                 secretResolver("resolved-key"));
 
         ChatModel resolved = resolver.resolve(context);
@@ -141,7 +142,7 @@ class OpsRuntimeModelResolverTest {
                 () -> null,
                 () -> null,
                 () -> null,
-                mock(AiModelAvailability.class),
+                mock(ModelAvailabilityPort.class),
                 secretResolver(null));
 
         IllegalStateException error = assertThrows(IllegalStateException.class,
@@ -161,9 +162,9 @@ class OpsRuntimeModelResolverTest {
     private OpsRuntimeModelResolver resolver(
             java.util.function.Supplier<ChatModel> namedDefault,
             java.util.function.Supplier<ChatModel> fallback,
-            java.util.function.Supplier<IAiClientModelConfigRepository> modelRepository,
-            java.util.function.Supplier<IAiClientApiConfigRepository> apiRepository,
-            AiModelAvailability availability,
+            java.util.function.Supplier<AiClientModelCatalogPort> modelRepository,
+            java.util.function.Supplier<AiClientApiCatalogPort> apiRepository,
+            ModelAvailabilityPort availability,
             OpsSecretResolver secretResolver) {
         return new OpsRuntimeModelResolver(
                 namedDefault,

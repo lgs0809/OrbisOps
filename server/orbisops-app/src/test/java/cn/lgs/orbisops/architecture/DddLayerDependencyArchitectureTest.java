@@ -17,8 +17,6 @@ class DddLayerDependencyArchitectureTest {
     private static final String DOMAIN = "orbisops-domain/src/main/java";
     private static final String APPLICATION = "orbisops-application/src/main/java";
     private static final String TRIGGER = "orbisops-trigger/src/main/java";
-    private static final String PROTECTED_AUTH =
-            "cn/lgs/orbisops/trigger/application/security/AdminAuthService.java";
 
     @Test
     void domainMustRemainFrameworkAndOuterLayerIndependent() throws IOException {
@@ -72,7 +70,7 @@ class DddLayerDependencyArchitectureTest {
                         .filter(line -> line.startsWith("import "))
                         .anyMatch(line -> line.contains(".adapter.repository.")
                                 || line.matches(".*Repository;$"));
-                if (repositoryImport && !PROTECTED_AUTH.equals(relative)) {
+                if (repositoryImport) {
                     repositoryViolations.add(relative);
                 }
             }

@@ -16,6 +16,10 @@ class TaskScheduleApplicationBoundaryArchitectureTest {
             "orbisops-application/src/main/java/cn/lgs/orbisops/application/schedule/";
     private static final String TRIGGER_CONFIG =
             "orbisops-trigger/src/main/java/cn/lgs/orbisops/trigger/application/config/";
+    private static final String TRIGGER_JOB =
+            "orbisops-trigger/src/main/java/cn/lgs/orbisops/trigger/job/";
+    private static final String INFRASTRUCTURE_REPOSITORY =
+            "orbisops-infrastructure/src/main/java/cn/lgs/orbisops/infrastructure/adapter/repository/";
 
     @Test
     void scheduledAgentTasksMustRemainHexagonalApplicationProcessManagers() throws IOException {
@@ -24,12 +28,14 @@ class TaskScheduleApplicationBoundaryArchitectureTest {
         String catalogPort = read(APPLICATION_SCHEDULE + "TaskScheduleCatalogPort.java");
         String executionPort = read(APPLICATION_SCHEDULE + "TaskScheduleExecutionPort.java");
         String codec = read(TRIGGER_CONFIG + "OpsTaskScheduleRuntimeConfigurationCodec.java");
-        String catalogAdapter = read(TRIGGER_CONFIG + "OpsTaskScheduleCatalogAdapter.java");
+        String catalogRepository = read(INFRASTRUCTURE_REPOSITORY + "TaskScheduleRepository.java");
+        String persistenceCodec = read(INFRASTRUCTURE_REPOSITORY + "TaskSchedulePersistenceCodec.java");
         String auditAdapter = read(TRIGGER_CONFIG + "OpsTaskScheduleAuditAdapter.java");
         String agentAdapter = read(TRIGGER_CONFIG + "OpsTaskScheduleAgentSnapshotAdapter.java");
         String cronAdapter = read(TRIGGER_CONFIG + "OpsTaskScheduleCronValidationAdapter.java");
         String executionAdapter = read(TRIGGER_CONFIG + "OpsTaskScheduleExecutionAdapter.java");
-        String executionCatalogAdapter = read(TRIGGER_CONFIG + "OpsTaskExecutionCatalogAdapter.java");
+        String executionRepository = read(INFRASTRUCTURE_REPOSITORY + "TaskExecutionRepository.java");
+        String schedulerAdapter = read(TRIGGER_JOB + "AgentTaskJob.java");
         String configuration = read(TRIGGER_CONFIG + "TaskScheduleConfiguration.java");
         String facade = read(TRIGGER_CONFIG + "TaskScheduleApplicationService.java");
 
@@ -49,10 +55,15 @@ class TaskScheduleApplicationBoundaryArchitectureTest {
                 () -> assertTrue(codec.contains("com.alibaba.fastjson.JSONObject")),
                 () -> assertFalse(codec.contains("Repository")),
                 () -> assertFalse(codec.contains("AgentTaskExecutionService")),
-                () -> assertTrue(catalogAdapter.contains("ITaskScheduleRepository")),
-                () -> assertTrue(catalogAdapter.contains("OpsTaskScheduleRuntimeConfigurationCodec")),
-                () -> assertFalse(catalogAdapter.contains("OpsConfigAuditService")),
-                () -> assertFalse(catalogAdapter.contains("org.springframework.scheduling.support.CronExpression")),
+                () -> assertTrue(catalogRepository.contains("implements TaskScheduleCatalogPort")),
+                () -> assertTrue(catalogRepository.contains("TaskScheduleDefinition")),
+                () -> assertFalse(catalogRepository.contains("domain.agent")),
+                () -> assertFalse(catalogRepository.contains("TaskScheduleRecord")),
+                () -> assertTrue(persistenceCodec.contains("com.fasterxml.jackson.databind.ObjectMapper")),
+                () -> assertFalse(persistenceCodec.contains("com.alibaba.fastjson")),
+                () -> assertFalse(persistenceCodec.contains("domain.agent")),
+                () -> assertFalse(catalogRepository.contains("OpsConfigAuditService")),
+                () -> assertFalse(catalogRepository.contains("org.springframework.scheduling.support.CronExpression")),
                 () -> assertTrue(auditAdapter.contains("OpsConfigAuditService")),
                 () -> assertFalse(auditAdapter.contains("ITaskScheduleRepository")),
                 () -> assertTrue(agentAdapter.contains("OpsAgentDefinitionQueryGateway")),
@@ -60,10 +71,22 @@ class TaskScheduleApplicationBoundaryArchitectureTest {
                 () -> assertTrue(cronAdapter.contains("CronExpression")),
                 () -> assertFalse(cronAdapter.contains("ITaskScheduleRepository")),
                 () -> assertTrue(executionAdapter.contains("AgentTaskExecutionService")),
+                () -> assertTrue(executionAdapter.contains("ScheduledTaskExecutionCommand")),
+                () -> assertFalse(executionAdapter.contains("TaskScheduleRecord")),
                 () -> assertFalse(executionAdapter.contains("ITaskExecutionRepository")),
-                () -> assertTrue(executionCatalogAdapter.contains("ITaskExecutionRepository")),
-                () -> assertFalse(executionCatalogAdapter.contains("AgentTaskExecutionService")),
+                () -> assertTrue(executionRepository.contains("implements ScheduledTaskExecutionCatalogPort, TaskExecutionCatalogPort")),
+                () -> assertFalse(executionRepository.contains("domain.agent")),
+                () -> assertFalse(executionRepository.contains("TaskExecutionRecord")),
+                () -> assertTrue(schedulerAdapter.contains("ScheduledTaskRegistryPort")),
+                () -> assertTrue(schedulerAdapter.contains("TaskScheduleExecutionUseCase")),
+                () -> assertTrue(schedulerAdapter.contains("runScheduled(schedule.id())")),
+                () -> assertFalse(schedulerAdapter.contains("domain.agent")),
+                () -> assertFalse(schedulerAdapter.contains("taskParam")),
                 () -> assertTrue(configuration.contains("TaskScheduleCatalogUseCase taskScheduleCatalogUseCase")),
+                () -> assertFalse(configuration.contains("OpsTaskScheduleCatalogAdapter")),
+                () -> assertFalse(configuration.contains("ITaskScheduleRepository")),
+                () -> assertFalse(configuration.contains("OpsTaskExecutionCatalogAdapter")),
+                () -> assertFalse(configuration.contains("ITaskExecutionRepository")),
                 () -> assertTrue(configuration.contains("TaskScheduleExecutionUseCase taskScheduleExecutionUseCase")),
                 () -> assertTrue(facade.contains("private final TaskScheduleCatalogUseCase catalogUseCase")),
                 () -> assertTrue(facade.contains("private final TaskScheduleExecutionUseCase executionUseCase")),

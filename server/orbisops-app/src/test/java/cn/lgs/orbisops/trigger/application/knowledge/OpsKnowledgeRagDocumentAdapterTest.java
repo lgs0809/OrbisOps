@@ -3,8 +3,8 @@ package cn.lgs.orbisops.trigger.application.knowledge;
 import cn.lgs.orbisops.application.knowledge.KnowledgeChunkDeletionOutcome;
 import cn.lgs.orbisops.application.knowledge.KnowledgeDocumentStatistics;
 import cn.lgs.orbisops.application.knowledge.KnowledgeRagChunk;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IRagKnowledgeRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.RagKnowledgeDocumentRecord;
+import cn.lgs.orbisops.domain.knowledge.rag.repository.IRagKnowledgeRepository;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagKnowledgeDocumentRecord;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

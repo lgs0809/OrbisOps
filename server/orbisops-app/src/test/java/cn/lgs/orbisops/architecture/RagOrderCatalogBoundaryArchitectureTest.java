@@ -16,6 +16,8 @@ class RagOrderCatalogBoundaryArchitectureTest {
             "orbisops-application/src/main/java/cn/lgs/orbisops/application/rag/";
     private static final String TRIGGER =
             "orbisops-trigger/src/main/java/cn/lgs/orbisops/trigger/application/rag/";
+    private static final String INFRASTRUCTURE_REPOSITORY =
+            "orbisops-infrastructure/src/main/java/cn/lgs/orbisops/infrastructure/adapter/repository/";
 
     @Test
     void catalogCrudFilteringTimeAndAuditMustBelongToTypedApplicationBoundary() throws IOException {
@@ -24,6 +26,7 @@ class RagOrderCatalogBoundaryArchitectureTest {
         String port = read(APPLICATION + "RagOrderCatalogPort.java");
         String auditPort = read(APPLICATION + "RagOrderAuditPort.java");
         String useCase = read(APPLICATION + "RagOrderCatalogUseCase.java");
+        String repository = read(INFRASTRUCTURE_REPOSITORY + "AiClientRagOrderConfigRepository.java");
         String adapter = read(TRIGGER + "OpsRagOrderCatalogAdapter.java");
         String configuration = read(TRIGGER + "OpsRagOrderCatalogConfiguration.java");
         String facade = read(TRIGGER + "AiClientRagOrderApplicationService.java");
@@ -48,12 +51,17 @@ class RagOrderCatalogBoundaryArchitectureTest {
                 () -> assertFalse(useCase.contains("org.springframework")),
                 () -> assertFalse(useCase.contains("cn.lgs.orbisops.trigger")),
                 () -> assertFalse(useCase.contains("Map<String, Object>")),
-                () -> assertTrue(adapter.contains("implements RagOrderCatalogPort, RagOrderAuditPort")),
-                () -> assertTrue(adapter.contains("IAiClientRagOrderConfigRepository repository")),
+                () -> assertTrue(repository.contains("implements RagOrderCatalogPort")),
+                () -> assertTrue(repository.contains("RagOrderDefinition")),
+                () -> assertFalse(repository.contains("domain.agent")),
+                () -> assertFalse(repository.contains("AiClientConfigRecord")),
+                () -> assertTrue(adapter.contains("implements RagOrderAuditPort")),
+                () -> assertFalse(adapter.contains("RagOrderCatalogPort")),
+                () -> assertFalse(adapter.contains("Repository")),
                 () -> assertTrue(adapter.contains("OpsConfigAuditService auditService")),
-                () -> assertTrue(adapter.contains("AiClientConfigRecord.builder()")),
                 () -> assertTrue(adapter.contains("auditService.record")),
                 () -> assertTrue(configuration.contains("RagOrderCatalogUseCase ragOrderCatalogUseCase")),
+                () -> assertTrue(configuration.contains("RagOrderCatalogPort catalogPort")),
                 () -> assertTrue(configuration.contains("new OpsRagOrderCatalogAdapter")),
                 () -> assertTrue(configuration.contains("Clock.systemDefaultZone()")),
                 () -> assertTrue(facade.contains("private final RagOrderCatalogUseCase ragOrderCatalog")),

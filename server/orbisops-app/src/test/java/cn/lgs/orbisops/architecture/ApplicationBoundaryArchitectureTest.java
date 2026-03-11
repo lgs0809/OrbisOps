@@ -83,17 +83,8 @@ class ApplicationBoundaryArchitectureTest {
                     "org.springaicommunity.agent.utils..");
 
     @ArchTest
-    static final ArchRule channel_domain_types_must_not_be_owned_by_agent_context = noClasses()
-            .that().haveSimpleNameContaining("Channel")
-            .should().resideInAPackage("cn.lgs.orbisops.domain.agent..");
-
-    @ArchTest
     static final ArchRule rag_neutral_boundaries_must_not_expose_framework_types = noClasses()
-            .that().resideInAnyPackage(
-                    "cn.lgs.orbisops.application.rag..",
-                    "cn.lgs.orbisops.domain.agent.adapter.repository..",
-                    "cn.lgs.orbisops.domain.agent.model.entity..",
-                    "cn.lgs.orbisops.domain.agent.service..")
+            .that().resideInAPackage("cn.lgs.orbisops.application.rag..")
             .should().dependOnClassesThat().resideInAnyPackage(
                     "org.springframework.ai..",
                     "org.springframework.web.multipart..");
@@ -103,7 +94,6 @@ class ApplicationBoundaryArchitectureTest {
             .that().haveFullyQualifiedName(
                     "cn.lgs.orbisops.trigger.application.rag.RagIngestionJobService")
             .should().dependOnClassesThat().resideInAnyPackage(
-                    "cn.lgs.orbisops.domain.agent.adapter.repository..",
                     "java.util.concurrent..",
                     "org.springframework.beans.factory.annotation..");
 

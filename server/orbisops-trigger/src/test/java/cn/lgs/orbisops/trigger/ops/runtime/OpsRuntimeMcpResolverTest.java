@@ -1,8 +1,8 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
+import cn.lgs.orbisops.application.config.McpClientCatalogPort;
+import cn.lgs.orbisops.application.config.McpClientDefinition;
 import cn.lgs.orbisops.application.project.ProjectMcpAuthorizationApplicationService;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientToolMcpConfigRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.AiClientConfigRecord;
 import cn.lgs.orbisops.domain.worksession.runtime.model.TriggerSource;
 import cn.lgs.orbisops.trigger.ops.source.OpsSourceRepositoryService;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -202,7 +202,7 @@ class OpsRuntimeMcpResolverTest {
     void projectRuntimeDescriptorMustWinBeforeLegacyAndSourceFallbacks() {
         OpsMcpToolProvider toolProvider = emptyToolProvider();
         OpsProjectMcpRuntimeConfigService runtimeConfig = mock(OpsProjectMcpRuntimeConfigService.class);
-        IAiClientToolMcpConfigRepository legacyRepository = mock(IAiClientToolMcpConfigRepository.class);
+        McpClientCatalogPort legacyRepository = mock(McpClientCatalogPort.class);
         OpsSourceRepositoryService sourceRepository = mock(OpsSourceRepositoryService.class);
         OpsMcpServerConfig configured = governedServer(
                 "project-runtime", "prod", true, "INVESTIGATE");
@@ -214,7 +214,7 @@ class OpsRuntimeMcpResolverTest {
         resolver.resolve(context);
 
         assertEquals(List.of(configured), context.getMcpServers());
-        verify(legacyRepository, never()).queryByMcpId("mcp-1");
+        verify(legacyRepository, never()).findByMcpId("mcp-1");
         verify(sourceRepository, never()).resolveMcpServer("project-1", "mcp-1");
         assertResolution(context, OpsProjectMcpRuntimeConfigSource.SOURCE_ID, false);
     }
@@ -222,9 +222,9 @@ class OpsRuntimeMcpResolverTest {
     @Test
     void legacyConfigMustFailClosedWhenProjectAuthorizationIsUnavailable() {
         OpsMcpToolProvider toolProvider = emptyToolProvider();
-        IAiClientToolMcpConfigRepository legacyRepository = mock(IAiClientToolMcpConfigRepository.class);
+        McpClientCatalogPort legacyRepository = mock(McpClientCatalogPort.class);
         OpsSourceRepositoryService sourceRepository = mock(OpsSourceRepositoryService.class);
-        when(legacyRepository.queryByMcpId("legacy-1")).thenReturn(legacyRecord("legacy-1"));
+        when(legacyRepository.findByMcpId("legacy-1")).thenReturn(legacyRecord("legacy-1"));
         OpsRuntimeMcpResolver resolver = resolver(
                 toolProvider, null, legacyRepository, null, sourceRepository);
         OpsRuntimeResourceContext context = context("project-1", "legacy-1");
@@ -242,13 +242,13 @@ class OpsRuntimeMcpResolverTest {
     @Test
     void sourceRepositoryMustRemainLastCompatibilityFallback() {
         OpsMcpToolProvider toolProvider = emptyToolProvider();
-        IAiClientToolMcpConfigRepository legacyRepository = mock(IAiClientToolMcpConfigRepository.class);
+        McpClientCatalogPort legacyRepository = mock(McpClientCatalogPort.class);
         OpsSourceRepositoryService sourceRepository = mock(OpsSourceRepositoryService.class);
         OpsMcpServerConfig sourceConfig = governedServer(
                 "source-mcp", "external", true, "INVESTIGATE");
         sourceConfig.setTransport("streamable-http");
         sourceConfig.setUrl("https://example.invalid/mcp");
-        when(legacyRepository.queryByMcpId("source-1")).thenReturn(null);
+        when(legacyRepository.findByMcpId("source-1")).thenReturn(null);
         when(sourceRepository.resolveMcpServer("project-1", "source-1"))
                 .thenReturn(Optional.of(sourceConfig));
         OpsRuntimeMcpResolver resolver = resolver(
@@ -269,10 +269,10 @@ class OpsRuntimeMcpResolverTest {
 
     @Test
     void legacyMatchMustBeObservableForRuntimeMigration() {
-        IAiClientToolMcpConfigRepository legacyRepository = mock(IAiClientToolMcpConfigRepository.class);
+        McpClientCatalogPort legacyRepository = mock(McpClientCatalogPort.class);
         ProjectMcpAuthorizationApplicationService authorization =
                 mock(ProjectMcpAuthorizationApplicationService.class);
-        when(legacyRepository.queryByMcpId("legacy-1")).thenReturn(legacyRecord("legacy-1"));
+        when(legacyRepository.findByMcpId("legacy-1")).thenReturn(legacyRecord("legacy-1"));
         when(authorization.allows("project-1", "legacy-1")).thenReturn(true);
         OpsMcpRuntimeConfigResolutionTelemetry telemetry =
                 new OpsMcpRuntimeConfigResolutionTelemetry((MeterRegistry) null);
@@ -301,11 +301,12 @@ class OpsRuntimeMcpResolverTest {
     @Test
     void legacyMapperMustPreserveStdioAndHttpTransportContracts() {
         OpsLegacyMcpConfigMapper mapper = new OpsLegacyMcpConfigMapper();
-        OpsMcpServerConfig stdio = mapper.map(AiClientConfigRecord.builder()
-                .mcpId("legacy-stdio")
-                .mcpName("legacy")
-                .transportType("stdio")
-                .transportConfig("""
+        OpsMcpServerConfig stdio = mapper.map(new McpClientDefinition(
+                null,
+                "legacy-stdio",
+                "legacy",
+                "stdio",
+                """
                         {
                           "legacy": {
                             "command": "npx",
@@ -314,23 +315,27 @@ class OpsRuntimeMcpResolverTest {
                           },
                           "allowedTools": ["query"]
                         }
-                        """)
-                .requestTimeout(12)
-                .status(1)
-                .build());
-        OpsMcpServerConfig http = mapper.map(AiClientConfigRecord.builder()
-                .mcpId("legacy-http")
-                .mcpName("http")
-                .transportType("streamable-http")
-                .transportConfig("""
+                        """,
+                12,
+                1,
+                null,
+                null));
+        OpsMcpServerConfig http = mapper.map(new McpClientDefinition(
+                null,
+                "legacy-http",
+                "http",
+                "streamable-http",
+                """
                         {
                           "baseUri": "https://example.invalid/",
                           "endpoint": "mcp",
                           "headers": {"Authorization": "secret-ref"}
                         }
-                        """)
-                .status(1)
-                .build());
+                        """,
+                null,
+                1,
+                null,
+                null));
 
         assertEquals("npx", stdio.getCommand());
         assertEquals(List.of("-y", "server"), stdio.getArgs());
@@ -341,14 +346,17 @@ class OpsRuntimeMcpResolverTest {
         assertEquals("secret-ref", http.getHeaders().get("Authorization"));
     }
 
-    private AiClientConfigRecord legacyRecord(String mcpId) {
-        return AiClientConfigRecord.builder()
-                .mcpId(mcpId)
-                .mcpName("legacy")
-                .transportType("stdio")
-                .transportConfig("{\"legacy\":{\"command\":\"npx\"}}")
-                .status(1)
-                .build();
+    private McpClientDefinition legacyRecord(String mcpId) {
+        return new McpClientDefinition(
+                null,
+                mcpId,
+                "legacy",
+                "stdio",
+                "{\"legacy\":{\"command\":\"npx\"}}",
+                null,
+                1,
+                null,
+                null);
     }
 
     private void assertResolution(
@@ -458,7 +466,7 @@ class OpsRuntimeMcpResolverTest {
     private OpsRuntimeMcpResolver resolver(
             OpsMcpToolProvider toolProvider,
             OpsProjectMcpRuntimeConfigService runtimeConfig,
-            IAiClientToolMcpConfigRepository legacyRepository,
+            McpClientCatalogPort legacyRepository,
             ProjectMcpAuthorizationApplicationService authorization,
             OpsSourceRepositoryService sourceRepository) {
         return resolver(
@@ -469,7 +477,7 @@ class OpsRuntimeMcpResolverTest {
     private OpsRuntimeMcpResolver resolver(
             OpsMcpToolProvider toolProvider,
             OpsProjectMcpRuntimeConfigService runtimeConfig,
-            IAiClientToolMcpConfigRepository legacyRepository,
+            McpClientCatalogPort legacyRepository,
             ProjectMcpAuthorizationApplicationService authorization,
             OpsSourceRepositoryService sourceRepository,
             OpsMcpRuntimeConfigResolutionObserver observer) {

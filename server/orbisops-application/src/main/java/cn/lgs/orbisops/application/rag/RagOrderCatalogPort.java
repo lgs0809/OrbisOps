@@ -2,7 +2,7 @@ package cn.lgs.orbisops.application.rag;
 
 import java.util.List;
 
-/** Persistence boundary for legacy RAG order configuration records. */
+/** Persistence boundary for the typed knowledge-base catalog. */
 public interface RagOrderCatalogPort {
 
     boolean insert(RagOrderDefinition definition);

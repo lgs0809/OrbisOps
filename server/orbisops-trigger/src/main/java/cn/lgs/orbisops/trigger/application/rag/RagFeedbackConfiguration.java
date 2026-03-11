@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.trigger.application.rag;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IRagFeedbackRepository;
+import cn.lgs.orbisops.domain.knowledge.rag.repository.IRagFeedbackRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

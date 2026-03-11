@@ -1,22 +1,23 @@
 package cn.lgs.orbisops.infrastructure.adapter.repository;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAdminUserRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.AdminUserRecord;
+import cn.lgs.orbisops.application.security.AdminUserCatalogPort;
+import cn.lgs.orbisops.domain.security.AdminUserAccount;
+import cn.lgs.orbisops.domain.security.AdminUserRole;
 import cn.lgs.orbisops.infrastructure.dao.IAdminUserDao;
 import cn.lgs.orbisops.infrastructure.dao.po.AdminUser;
-import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
 /**
- * JDBC/MyBatis-backed administrator repository.
+ * JDBC/MyBatis-backed adapter for the Security Identity account catalog.
  *
- * <p>The repository deliberately fails closed when persistence is unavailable. OrbisOps never
- * synthesizes a built-in administrator or a default password in application code.</p>
+ * <p>Persistence records remain inside Infrastructure; the Application boundary exposes only the
+ * Security Identity aggregate. OrbisOps never synthesizes a built-in administrator or a default
+ * password when persistence is unavailable.</p>
  */
 @Repository
-public class AdminUserRepository implements IAdminUserRepository {
+public class AdminUserRepository implements AdminUserCatalogPort {
 
     private final IAdminUserDao dao;
 
@@ -25,76 +26,94 @@ public class AdminUserRepository implements IAdminUserRepository {
     }
 
     @Override
-    public int insert(AdminUserRecord record) {
-        return dao.insert(toPo(record));
+    public boolean insert(AdminUserAccount account) {
+        return dao.insert(toPo(account)) > 0;
     }
 
     @Override
-    public int updateById(AdminUserRecord record) {
-        return dao.updateById(toPo(record));
+    public boolean updateById(AdminUserAccount account) {
+        return dao.updateById(toPo(account)) > 0;
     }
 
     @Override
-    public int updateByUserId(AdminUserRecord record) {
-        return dao.updateByUserId(toPo(record));
+    public boolean updateByUserId(AdminUserAccount account) {
+        return dao.updateByUserId(toPo(account)) > 0;
     }
 
     @Override
-    public int deleteById(Long id) {
-        return dao.deleteById(id);
+    public boolean deleteById(Long id) {
+        return dao.deleteById(id) > 0;
     }
 
     @Override
-    public int deleteByUserId(String userId) {
-        return dao.deleteByUserId(userId);
+    public boolean deleteByUserId(String userId) {
+        return dao.deleteByUserId(userId) > 0;
     }
 
     @Override
-    public AdminUserRecord queryById(Long id) {
-        return toRecord(dao.queryById(id));
+    public AdminUserAccount findById(Long id) {
+        return toAccount(dao.queryById(id));
     }
 
     @Override
-    public AdminUserRecord queryByUserId(String userId) {
-        return toRecord(dao.queryByUserId(userId));
+    public AdminUserAccount findByUserId(String userId) {
+        return toAccount(dao.queryByUserId(userId));
     }
 
     @Override
-    public AdminUserRecord queryByUsername(String username) {
-        return toRecord(dao.queryByUsername(username));
+    public AdminUserAccount findByUsername(String username) {
+        return toAccount(dao.queryByUsername(username));
     }
 
     @Override
-    public List<AdminUserRecord> queryEnabledUsers() {
-        return toRecords(dao.queryEnabledUsers());
+    public List<AdminUserAccount> listEnabled() {
+        return toAccounts(dao.queryEnabledUsers());
     }
 
     @Override
-    public List<AdminUserRecord> queryByStatus(Integer status) {
-        return toRecords(dao.queryByStatus(status));
+    public List<AdminUserAccount> listByStatus(Integer status) {
+        return toAccounts(dao.queryByStatus(status));
     }
 
     @Override
-    public List<AdminUserRecord> queryAll() {
-        return toRecords(dao.queryAll());
+    public List<AdminUserAccount> listAll() {
+        return toAccounts(dao.queryAll());
     }
 
-    private AdminUser toPo(AdminUserRecord record) {
-        AdminUser po = new AdminUser();
-        BeanUtils.copyProperties(record, po);
-        return po;
+    private AdminUser toPo(AdminUserAccount account) {
+        if (account == null) {
+            throw new IllegalArgumentException("ADMIN_USER_ACCOUNT_REQUIRED");
+        }
+        return AdminUser.builder()
+                .id(account.id())
+                .userId(account.userId())
+                .username(account.username())
+                .password(account.credential())
+                .userRole(account.role() == null ? null : account.role().value())
+                .status(account.status())
+                .createTime(account.createTime())
+                .updateTime(account.updateTime())
+                .build();
     }
 
-    private AdminUserRecord toRecord(AdminUser po) {
+    private AdminUserAccount toAccount(AdminUser po) {
         if (po == null) {
             return null;
         }
-        AdminUserRecord record = new AdminUserRecord();
-        BeanUtils.copyProperties(po, record);
-        return record;
+        return new AdminUserAccount(
+                po.getId(),
+                po.getUserId(),
+                po.getUsername(),
+                po.getPassword(),
+                AdminUserRole.parse(po.getUserRole(), AdminUserRole.ADMIN),
+                po.getStatus(),
+                po.getCreateTime(),
+                po.getUpdateTime());
     }
 
-    private List<AdminUserRecord> toRecords(List<AdminUser> rows) {
-        return rows == null ? List.of() : rows.stream().map(this::toRecord).toList();
+    private List<AdminUserAccount> toAccounts(List<AdminUser> rows) {
+        return rows == null || rows.isEmpty()
+                ? List.of()
+                : rows.stream().map(this::toAccount).toList();
     }
 }

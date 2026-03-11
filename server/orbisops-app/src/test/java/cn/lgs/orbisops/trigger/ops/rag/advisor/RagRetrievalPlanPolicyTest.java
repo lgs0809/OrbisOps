@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.trigger.ops.rag.advisor;
 
-import cn.lgs.orbisops.domain.agent.model.valobj.AiClientAdvisorVO;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagRetrievalSettings;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -15,7 +15,7 @@ class RagRetrievalPlanPolicyTest {
 
     @Test
     void shouldPreserveDefaultSettingsAndRerankRecallExpansion() {
-        AiClientAdvisorVO.RagAnswer settings = new AiClientAdvisorVO.RagAnswer();
+        RagRetrievalSettings settings = new RagRetrievalSettings();
 
         RagRetrievalPlan plan = policy.resolve("普通知识查询", Map.of(), settings, 4);
 
@@ -36,7 +36,7 @@ class RagRetrievalPlanPolicyTest {
 
     @Test
     void shouldUseFrameworkTopKWhenBuilderSettingsAreNonPositive() {
-        AiClientAdvisorVO.RagAnswer settings = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings settings = RagRetrievalSettings.builder()
                 .topK(0)
                 .vectorTopK(0)
                 .bm25TopK(0)
@@ -64,7 +64,7 @@ class RagRetrievalPlanPolicyTest {
 
     @Test
     void shouldApplyContextOverridesAndClampEveryNumericBoundary() {
-        AiClientAdvisorVO.RagAnswer settings = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings settings = RagRetrievalSettings.builder()
                 .retrievalMode("hybrid")
                 .vectorTopK(8)
                 .bm25TopK(8)
@@ -111,7 +111,7 @@ class RagRetrievalPlanPolicyTest {
 
     @Test
     void shouldPreserveDynamicAutoModeInferencePriority() {
-        AiClientAdvisorVO.RagAnswer settings = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings settings = RagRetrievalSettings.builder()
                 .retrievalMode("auto")
                 .dynamicSearch(true)
                 .vectorTopK(4)
@@ -128,7 +128,7 @@ class RagRetrievalPlanPolicyTest {
 
     @Test
     void shouldFallbackAutoToVectorWhenDynamicSearchIsDisabled() {
-        AiClientAdvisorVO.RagAnswer settings = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings settings = RagRetrievalSettings.builder()
                 .retrievalMode("auto")
                 .dynamicSearch(false)
                 .rerankEnabled(false)
@@ -147,7 +147,7 @@ class RagRetrievalPlanPolicyTest {
 
     @Test
     void shouldExpandRecallCandidatesWhenRerankIsEnabled() {
-        AiClientAdvisorVO.RagAnswer settings = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings settings = RagRetrievalSettings.builder()
                 .retrievalMode("HYBRID")
                 .vectorTopK(2)
                 .bm25TopK(3)
@@ -175,7 +175,7 @@ class RagRetrievalPlanPolicyTest {
 
     @Test
     void shouldFallbackMalformedContextValuesToConfiguredDefaults() {
-        AiClientAdvisorVO.RagAnswer settings = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings settings = RagRetrievalSettings.builder()
                 .retrievalMode("bm25")
                 .vectorTopK(9)
                 .bm25TopK(11)
@@ -209,7 +209,7 @@ class RagRetrievalPlanPolicyTest {
 
     @Test
     void shouldTreatUnicodeWhitespaceModeAndProviderAsBlank() {
-        AiClientAdvisorVO.RagAnswer settings = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings settings = RagRetrievalSettings.builder()
                 .retrievalMode("hybrid")
                 .rerankEnabled(false)
                 .rerankProvider("cohere")

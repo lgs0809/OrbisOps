@@ -49,7 +49,7 @@
 |---|---|---|---|
 | Project Workspace | `domain.project`、`domain.source` | Project 定义、成员、资源、项目 MCP/能力授权与源码目录 | ProjectDefinition、ProjectResource、ProjectMcp、ProjectMember、SourceRepository |
 | Agent Definition & Capability | `domain.agentdefinition`、`domain.agent` | Agent 定义、版本、Graph、能力绑定、兼容配置和任务计划 | AgentDefinition Current/Version、DefinitionGraph、CapabilityBinding、TaskSchedule |
-| Work Session & Investigation | `domain.worksession`、`domain.runtime`、`domain.analysis`、`domain.investigation`、`domain.intent`、`domain.chatsession` | Work Session、Run、Graph、调查计划、分析任务、会话参与者和运行态快照 | WorkSessionRun、ChatSession、AnalysisRun、TaskContext、RuntimeContextBundle |
+| Work Session & Investigation | `domain.worksession`、`domain.runtime`、`domain.analysis`、`domain.investigation`、`domain.chatsession` | Work Session、Run、Graph、调查计划、分析任务、会话参与者和运行态快照 | WorkSessionRun、ChatSession、AnalysisRun、TaskContext、RuntimeContextBundle |
 | Controlled Change | `domain.changepackage` | 变更包版本、审批、校验、Landing 计划、操作日志和状态跃迁 | ChangePackage、ChangePackageVersion、Approval Ledger、Landing Operation |
 | Execution Governance | `domain.execution`、`domain.toolexecution`、`domain.mcpexecution`、`domain.mcp`、`domain.toolset` | 解析共享执行选择、执行资源、工具集、MCP 策略/快照/激活、远端调用和执行记录 | ExecutionResource、ExecutionAdapterTemplate、McpPolicy、McpSnapshot、ToolExecution |
 | Evidence & Trust | `domain.evidence`、`domain.audit` | 证据、工具结果、可信 Proof、配置/分析审计事实 | ToolResult、Evidence、TrustedProof、ConfigAudit、AnalysisAudit |
@@ -202,14 +202,15 @@ Application 包按同一限界上下文分组；同组可以内部协作，跨�
 4. Domain Policy 不得散落读取不受控字符串 key；Application 不得从已登记协议 Map 反解析稳定字段推进状态机；
 5. Skill authoring、similarity、effect metrics 和 publication 已证明会驱动候选准入、晋级或回滚，因此必须使用 typed Published Language，不属于动态协议例外。
 
-## 8. 当前受保护兼容例外
+## 8. Security 技术边界
 
-`trigger.application.security.AdminAuthService` 仍是受 Secret/DLP 约束的兼容技术边界：
+`trigger.application.security.AdminAuthService` 仍负责 JWT/BCrypt 等认证协议实现并受 Secret/DLP 约束，但它不再拥有 Domain Repository 例外：
 
-- 本体不得通过普通 DDD 清理绕过或弱化 Secret 校验；
-- 全局门禁只允许该精确类直接引用 JWT Revocation Repository；
-- 新认证能力不得继续堆入该类，应优先进入 typed Settings、Application Port 或独立 Adapter；
-- 该例外不代表 Security Identity 上下文允许依赖外层框架。
+- 账号领域语言统一使用 `domain.security.AdminUserAccount`；
+- 账号持久化通过 `application.security.AdminUserCatalogPort` 进入 Infrastructure；
+- JWT revocation 通过 `application.security.JwtRevocationPort` 进入 Infrastructure；
+- 全局 DDD 门禁不再为 `AdminAuthService` 特赦直接 Repository 依赖；
+- Secret 校验和传输安全仍必须保持 fail-closed，DDD 清理不得弱化安全规则。
 
 ## 9. 新功能落位决策
 

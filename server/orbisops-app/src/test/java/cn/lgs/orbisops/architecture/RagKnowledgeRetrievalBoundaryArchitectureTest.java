@@ -118,7 +118,8 @@ class RagKnowledgeRetrievalBoundaryArchitectureTest {
                 () -> assertTrue(retrieval.contains("interface CancellationCheck")),
                 () -> assertTrue(retrieval.contains("RagAnswerAdvisor")),
                 () -> assertTrue(retrieval.contains("SearchRequest.builder()")),
-                () -> assertTrue(retrieval.contains("AiClientAdvisorVO.RagAnswer")),
+                () -> assertTrue(retrieval.contains("RagRetrievalSettings")),
+                () -> assertFalse(retrieval.contains("domain.agent.model.valobj")),
                 () -> assertTrue(retrieval.contains("context.put(\"qa_retrieval_mode\"")),
                 () -> assertTrue(retrieval.contains("context.put(\"qa_rerank_enabled\"")),
                 () -> assertTrue(retrieval.contains("cancellationCheck.check()")),
@@ -131,7 +132,7 @@ class RagKnowledgeRetrievalBoundaryArchitectureTest {
                 () -> assertFalse(retrieval.contains("OpsQuestionContext")),
                 () -> assertFalse(retrieval.contains("OpsSubAgentDecision")),
                 () -> assertFalse(retrieval.contains("ProjectDefinitionApplicationService")),
-                () -> assertFalse(retrieval.contains("AiModelAvailability")),
+                () -> assertFalse(retrieval.contains("ModelAvailabilityPort")),
                 () -> assertTrue(retrieval.lines().count() <= 220));
     }
 

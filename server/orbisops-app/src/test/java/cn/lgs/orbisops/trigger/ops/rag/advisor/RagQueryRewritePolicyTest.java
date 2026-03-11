@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.trigger.ops.rag.advisor;
 
-import cn.lgs.orbisops.domain.agent.model.valobj.AiClientAdvisorVO;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagRetrievalSettings;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -17,7 +17,7 @@ class RagQueryRewritePolicyTest {
     @Test
     void shouldPreserveRuleExpansionOrderAndVocabulary() {
         String query = "慢SQL 错误 Prometheus 指标 架构图";
-        AiClientAdvisorVO.RagAnswer settings = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings settings = RagRetrievalSettings.builder()
                 .queryRewriteMode("rule")
                 .llmQueryRewriteEnabled(false)
                 .llmQueryRewriteMaxQueries(8)
@@ -41,7 +41,7 @@ class RagQueryRewritePolicyTest {
 
     @Test
     void shouldPreserveRewriteDisableAndBlankQueryDecision() {
-        AiClientAdvisorVO.RagAnswer settings = new AiClientAdvisorVO.RagAnswer();
+        RagRetrievalSettings settings = new RagRetrievalSettings();
 
         RagQueryRewriteDecision disabled = policy.initialDecision(
                 "慢SQL",
@@ -59,7 +59,7 @@ class RagQueryRewritePolicyTest {
 
     @Test
     void shouldClampRuleQueryCountAndFallbackMalformedValue() {
-        AiClientAdvisorVO.RagAnswer settings = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings settings = RagRetrievalSettings.builder()
                 .queryRewriteMode("rule")
                 .llmQueryRewriteEnabled(false)
                 .llmQueryRewriteMaxQueries(3)
@@ -86,7 +86,7 @@ class RagQueryRewritePolicyTest {
 
     @Test
     void shouldUseLlmModeOnlyWhenLlmRewriteIsEnabled() {
-        AiClientAdvisorVO.RagAnswer settings = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings settings = RagRetrievalSettings.builder()
                 .queryRewriteMode("llm")
                 .llmQueryRewriteEnabled(false)
                 .build();
@@ -101,7 +101,7 @@ class RagQueryRewritePolicyTest {
                 Map.of(
                         "qa_llm_query_rewrite_enabled", true,
                         "qa_query_rewrite_mode", "LLM"),
-                new AiClientAdvisorVO.RagAnswer());
+                new RagRetrievalSettings());
 
         assertFalse(configuredDisabled.llmEligible());
         assertTrue(contextEnabled.llmEligible());
@@ -110,7 +110,7 @@ class RagQueryRewritePolicyTest {
 
     @Test
     void shouldPreserveHybridComplexityRulesAndMinimumLength() {
-        AiClientAdvisorVO.RagAnswer settings = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings settings = RagRetrievalSettings.builder()
                 .queryRewriteMode("hybrid")
                 .llmQueryRewriteEnabled(true)
                 .llmQueryRewriteMinChars(18)
@@ -131,7 +131,7 @@ class RagQueryRewritePolicyTest {
 
     @Test
     void shouldTreatBlankModeAsRuleAndUnsupportedModeAsNonLlm() {
-        AiClientAdvisorVO.RagAnswer settings = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings settings = RagRetrievalSettings.builder()
                 .queryRewriteMode("hybrid")
                 .llmQueryRewriteEnabled(true)
                 .build();
@@ -151,7 +151,7 @@ class RagQueryRewritePolicyTest {
 
     @Test
     void shouldPreserveLowRecallRetryEligibilityGates() {
-        AiClientAdvisorVO.RagAnswer settings = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings settings = RagRetrievalSettings.builder()
                 .queryRewriteMode("hybrid")
                 .llmQueryRewriteEnabled(true)
                 .llmQueryRewriteOnLowRecall(true)
@@ -184,7 +184,7 @@ class RagQueryRewritePolicyTest {
 
     @Test
     void shouldClampLowRecallMinimumToAtLeastOneAndFallbackMalformedValue() {
-        AiClientAdvisorVO.RagAnswer settings = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings settings = RagRetrievalSettings.builder()
                 .queryRewriteMode("llm")
                 .llmQueryRewriteEnabled(true)
                 .llmQueryRewriteOnLowRecall(true)

@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.infrastructure.adapter.repository;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IRagEvalRepository;
+import cn.lgs.orbisops.domain.knowledge.rag.repository.IRagEvalRepository;
 import com.alibaba.fastjson.JSON;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;

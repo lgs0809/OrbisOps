@@ -1,7 +1,7 @@
 package cn.lgs.orbisops.trigger.application.rag;
 
 import cn.lgs.orbisops.application.rag.RagFeedbackUseCase;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IRagFeedbackRepository;
+import cn.lgs.orbisops.domain.knowledge.rag.repository.IRagFeedbackRepository;
 
 /** Immutable composition root result for RAG feedback and knowledge-gap management. */
 public record OpsRagFeedbackManagementAssembly(

@@ -72,7 +72,7 @@ class MemoryCompressionDomainArchitectureTest {
                 () -> assertFalse(compressor.contains("MemoryContentHashPolicy")),
                 () -> assertFalse(compressor.contains("ChatClient")),
                 () -> assertFalse(compressor.contains("ChatModel")),
-                () -> assertFalse(compressor.contains("AiModelAvailability")),
+                () -> assertFalse(compressor.contains("ModelAvailabilityPort")),
                 () -> assertFalse(compressor.contains("OpsHotMemoryStore")),
                 () -> assertFalse(compressor.contains("ColdMemoryStoreApplicationService")),
                 () -> assertFalse(compressor.contains("recentMessages.size() < Math.max(4")),

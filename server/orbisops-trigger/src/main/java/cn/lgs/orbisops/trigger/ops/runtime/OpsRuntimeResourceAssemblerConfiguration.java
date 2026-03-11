@@ -1,8 +1,8 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientApiConfigRepository;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientModelConfigRepository;
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.application.config.AiClientApiCatalogPort;
+import cn.lgs.orbisops.application.config.AiClientModelCatalogPort;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -16,9 +16,9 @@ public class OpsRuntimeResourceAssemblerConfiguration {
     public OpsRuntimeModelResolver opsRuntimeModelResolver(
             @Qualifier("openAiChatModel") ObjectProvider<ChatModel> namedDefaultModelProvider,
             ObjectProvider<ChatModel> fallbackModelProvider,
-            ObjectProvider<IAiClientModelConfigRepository> modelRepositoryProvider,
-            ObjectProvider<IAiClientApiConfigRepository> apiRepositoryProvider,
-            AiModelAvailability aiModelAvailability,
+            ObjectProvider<AiClientModelCatalogPort> modelRepositoryProvider,
+            ObjectProvider<AiClientApiCatalogPort> apiRepositoryProvider,
+            ModelAvailabilityPort aiModelAvailability,
             OpsSecretResolver secretResolver,
             OpsRuntimeModelSettings settings) {
         return new OpsRuntimeModelResolver(

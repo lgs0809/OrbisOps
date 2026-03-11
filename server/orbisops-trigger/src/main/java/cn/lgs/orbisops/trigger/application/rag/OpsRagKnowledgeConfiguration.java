@@ -1,7 +1,7 @@
 package cn.lgs.orbisops.trigger.application.rag;
 
 import cn.lgs.orbisops.application.project.ProjectKnowledgeAuthorizationApplicationService;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IRagKnowledgeRepository;
+import cn.lgs.orbisops.domain.knowledge.rag.repository.IRagKnowledgeRepository;
 import cn.lgs.orbisops.trigger.ops.OpsProjectKnowledgeScopeResolver;
 import cn.lgs.orbisops.trigger.ops.OpsRagKnowledgeRetrievalService;
 import cn.lgs.orbisops.trigger.ops.OpsRagKnowledgeRuntimeResources;

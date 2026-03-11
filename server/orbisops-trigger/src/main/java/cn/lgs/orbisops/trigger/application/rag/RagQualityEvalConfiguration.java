@@ -1,7 +1,7 @@
 package cn.lgs.orbisops.trigger.application.rag;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IRagEvalRepository;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IRagKnowledgeRepository;
+import cn.lgs.orbisops.domain.knowledge.rag.repository.IRagEvalRepository;
+import cn.lgs.orbisops.domain.knowledge.rag.repository.IRagKnowledgeRepository;
 import cn.lgs.orbisops.trigger.ops.rag.RagMultimodalEmbeddingService;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.vectorstore.VectorStore;

@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.trigger.application.memory;
 
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.ObjectProvider;
@@ -21,7 +21,7 @@ class OpsMemoryChatModelResolverTest {
         ChatModel fallback = mock(ChatModel.class);
         @SuppressWarnings("unchecked")
         ObjectProvider<ChatModel> provider = mock(ObjectProvider.class);
-        AiModelAvailability availability = mock(AiModelAvailability.class);
+        ModelAvailabilityPort availability = mock(ModelAvailabilityPort.class);
         when(context.getBean("openAiChatModel", ChatModel.class)).thenReturn(named);
         when(provider.getIfUnique()).thenReturn(fallback);
         when(availability.isChatAvailable()).thenReturn(true);

@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
 import cn.lgs.orbisops.trigger.ops.OpsNodeDeadlineContext;
 import org.springframework.ai.chat.client.ChatClient;
 
@@ -22,16 +22,16 @@ final class OpsRuntimeLlmInvoker {
 
     private static final int DEFAULT_MODEL_CALL_TIMEOUT_SECONDS = 240;
 
-    private final AiModelAvailability aiModelAvailability;
+    private final ModelAvailabilityPort aiModelAvailability;
     private final ExecutorService modelCallExecutor;
     private final int modelCallTimeoutSeconds;
 
-    OpsRuntimeLlmInvoker(AiModelAvailability aiModelAvailability) {
+    OpsRuntimeLlmInvoker(ModelAvailabilityPort aiModelAvailability) {
         this(aiModelAvailability, null, DEFAULT_MODEL_CALL_TIMEOUT_SECONDS);
     }
 
     OpsRuntimeLlmInvoker(
-            AiModelAvailability aiModelAvailability,
+            ModelAvailabilityPort aiModelAvailability,
             ExecutorService modelCallExecutor,
             int modelCallTimeoutSeconds) {
         this.aiModelAvailability = aiModelAvailability;
@@ -192,7 +192,7 @@ final class OpsRuntimeLlmInvoker {
                                  long requestStartedNanos) {
         if (aiModelAvailability != null && aiModelAvailability.isChatAvailable()) return;
         String message = aiModelAvailability == null
-                ? "Agent 模型调用被阻断：AiModelAvailability 未初始化，禁止启动模型调用。"
+                ? "Agent 模型调用被阻断：模型可用性服务未初始化，禁止启动模型调用。"
                 : aiModelAvailability.unavailableMessage("Agent 模型调用");
         record(events, eventSink, OpsRuntimeEvent.builder()
                 .eventType("MODEL_CALL_BLOCKED")

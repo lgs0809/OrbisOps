@@ -1,12 +1,12 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
 import cn.lgs.orbisops.application.agentdefinition.AgentCapabilityReferenceValidationPort;
+import cn.lgs.orbisops.application.config.McpClientCatalogPort;
+import cn.lgs.orbisops.application.config.McpClientDefinition;
 import cn.lgs.orbisops.application.project.ProjectDefinitionApplicationService;
 import cn.lgs.orbisops.application.project.ProjectMcpAuthorizationApplicationService;
 import cn.lgs.orbisops.application.project.ProjectMcpRuntimeDescriptorApplicationService;
 import cn.lgs.orbisops.application.project.ProjectSkillAuthorizationApplicationService;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientToolMcpConfigRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.AiClientConfigRecord;
 import cn.lgs.orbisops.domain.agentdefinition.service.AgentReferenceSyntaxPolicy;
 import cn.lgs.orbisops.trigger.ops.skill.SkillRuntimeToolProvider;
 import cn.lgs.orbisops.trigger.ops.source.OpsSourceRepositoryService;
@@ -21,7 +21,7 @@ public final class OpsAgentProjectCapabilityReferenceValidator
 
     private final AgentReferenceSyntaxPolicy referenceSyntaxPolicy =
             new AgentReferenceSyntaxPolicy();
-    private final Supplier<IAiClientToolMcpConfigRepository> mcpRepositorySupplier;
+    private final Supplier<McpClientCatalogPort> mcpRepositorySupplier;
     private final Supplier<SkillRuntimeToolProvider> skillToolProviderSupplier;
     private final Supplier<ProjectDefinitionApplicationService> projectDefinitionSupplier;
     private final Supplier<ProjectMcpAuthorizationApplicationService> mcpAuthorizationSupplier;
@@ -30,7 +30,7 @@ public final class OpsAgentProjectCapabilityReferenceValidator
     private final Supplier<OpsSourceRepositoryService> sourceRepositorySupplier;
 
     public OpsAgentProjectCapabilityReferenceValidator(
-            Supplier<IAiClientToolMcpConfigRepository> mcpRepositorySupplier,
+            Supplier<McpClientCatalogPort> mcpRepositorySupplier,
             Supplier<SkillRuntimeToolProvider> skillToolProviderSupplier,
             Supplier<ProjectDefinitionApplicationService> projectDefinitionSupplier,
             Supplier<ProjectMcpAuthorizationApplicationService> mcpAuthorizationSupplier,
@@ -105,17 +105,17 @@ public final class OpsAgentProjectCapabilityReferenceValidator
             String id,
             String owner,
             String projectId) {
-        IAiClientToolMcpConfigRepository mcpRepository = mcpRepositorySupplier.get();
+        McpClientCatalogPort mcpRepository = mcpRepositorySupplier.get();
         ProjectMcpAuthorizationApplicationService authorization =
                 mcpAuthorizationSupplier.get();
         ProjectMcpRuntimeDescriptorApplicationService descriptor =
                 mcpDescriptorSupplier.get();
         OpsSourceRepositoryService sourceRepository = sourceRepositorySupplier.get();
 
-        AiClientConfigRecord mcp = mcpRepository == null
+        McpClientDefinition mcp = mcpRepository == null
                 ? null
-                : mcpRepository.queryByMcpId(id);
-        boolean genericMcpEnabled = mcp != null && enabled(mcp.getStatus());
+                : mcpRepository.findByMcpId(id);
+        boolean genericMcpEnabled = mcp != null && enabled(mcp.status());
         boolean projectMcpEnabled = authorization != null
                 && authorization.allows(projectId, id);
         if (genericMcpEnabled

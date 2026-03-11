@@ -2,20 +2,20 @@ package cn.lgs.orbisops.trigger.application.channel;
 
 import cn.lgs.orbisops.application.channel.ChannelIdentityDirectoryPort;
 import cn.lgs.orbisops.application.project.AuthorizeProjectAccessUseCase;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAdminUserRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.AdminUserRecord;
+import cn.lgs.orbisops.application.security.AdminUserCatalogPort;
 import cn.lgs.orbisops.domain.channel.model.ChannelIdentityRecord;
+import cn.lgs.orbisops.domain.security.AdminUserAccount;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 @Component
 public final class OpsChannelIdentityDirectoryAdapter implements ChannelIdentityDirectoryPort {
 
-    private final IAdminUserRepository users;
+    private final AdminUserCatalogPort users;
     private final AuthorizeProjectAccessUseCase projectAccess;
 
-    public OpsChannelIdentityDirectoryAdapter(IAdminUserRepository users,
-                                              AuthorizeProjectAccessUseCase projectAccess) {
+    public OpsChannelIdentityDirectoryAdapter(AdminUserCatalogPort users,
+                                               AuthorizeProjectAccessUseCase projectAccess) {
         if (users == null) throw new IllegalArgumentException("CHANNEL_USER_DIRECTORY_REQUIRED");
         if (projectAccess == null) throw new IllegalArgumentException("CHANNEL_PROJECT_ACCESS_REQUIRED");
         this.users = users;
@@ -31,22 +31,22 @@ public final class OpsChannelIdentityDirectoryAdapter implements ChannelIdentity
         }
         if (safeUserId.length() > 128) throw new IllegalArgumentException("CHANNEL_PLATFORM_USER_ID_TOO_LONG");
         if (safeUsername.length() > 128) throw new IllegalArgumentException("CHANNEL_USERNAME_TOO_LONG");
-        AdminUserRecord user = !safeUserId.isBlank()
-                ? users.queryByUserId(safeUserId)
-                : users.queryByUsername(safeUsername);
-        if (user == null || !StringUtils.hasText(user.getUserId()) || !StringUtils.hasText(user.getUsername())) {
+        AdminUserAccount user = !safeUserId.isBlank()
+                ? users.findByUserId(safeUserId)
+                : users.findByUsername(safeUsername);
+        if (user == null || !StringUtils.hasText(user.userId()) || !StringUtils.hasText(user.username())) {
             throw new IllegalArgumentException("CHANNEL_IDENTITY_PLATFORM_USER_NOT_FOUND");
         }
-        if (!safeUserId.isBlank() && !safeUserId.equals(user.getUserId())) {
+        if (!safeUserId.isBlank() && !safeUserId.equals(user.userId())) {
             throw new IllegalArgumentException("CHANNEL_IDENTITY_PLATFORM_USER_MISMATCH");
         }
-        if (!safeUsername.isBlank() && !safeUsername.equals(user.getUsername())) {
+        if (!safeUsername.isBlank() && !safeUsername.equals(user.username())) {
             throw new IllegalArgumentException("CHANNEL_IDENTITY_PLATFORM_USER_MISMATCH");
         }
-        if (!Integer.valueOf(1).equals(user.getStatus())) {
+        if (!Integer.valueOf(1).equals(user.status())) {
             throw new SecurityException("CHANNEL_IDENTITY_PLATFORM_USER_DISABLED");
         }
-        return new PlatformIdentity(user.getUserId(), user.getUsername());
+        return new PlatformIdentity(user.userId(), user.username());
     }
 
     @Override
@@ -57,12 +57,12 @@ public final class OpsChannelIdentityDirectoryAdapter implements ChannelIdentity
     @Override
     public boolean isTrusted(String projectId, ChannelIdentityRecord identity) {
         if (identity == null) return false;
-        AdminUserRecord user = users.queryByUserId(identity.platformUserId());
+        AdminUserAccount user = users.findByUserId(identity.platformUserId());
         return user != null
-                && Integer.valueOf(1).equals(user.getStatus())
-                && identity.platformUserId().equals(user.getUserId())
-                && identity.username().equals(user.getUsername())
-                && projectAccess.canAccess(projectId, user.getUsername(), user.getUserId(), false);
+                && Integer.valueOf(1).equals(user.status())
+                && identity.platformUserId().equals(user.userId())
+                && identity.username().equals(user.username())
+                && projectAccess.canAccess(projectId, user.username(), user.userId(), false);
     }
 
     private String value(String input) {

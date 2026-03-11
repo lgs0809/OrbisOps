@@ -13,9 +13,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class RagChunkMaterializationBoundaryArchitectureTest {
 
     private static final String DRAFT = "orbisops-domain/src/main/java/"
-            + "cn/lgs/orbisops/domain/agent/model/valobj/RagChunkDraft.java";
+            + "cn/lgs/orbisops/domain/knowledge/rag/model/RagChunkDraft.java";
     private static final String MATERIALIZER = "orbisops-domain/src/main/java/"
-            + "cn/lgs/orbisops/domain/agent/service/rag/RagChunkMaterializer.java";
+            + "cn/lgs/orbisops/domain/knowledge/rag/service/RagChunkMaterializer.java";
     private static final String PARSER = "orbisops-trigger/src/main/java/"
             + "cn/lgs/orbisops/trigger/ops/rag/RagDocumentParser.java";
     private static final String PROJECTOR = "orbisops-trigger/src/main/java/"

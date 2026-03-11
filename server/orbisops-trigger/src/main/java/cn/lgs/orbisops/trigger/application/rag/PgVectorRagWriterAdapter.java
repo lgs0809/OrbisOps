@@ -1,7 +1,7 @@
 package cn.lgs.orbisops.trigger.application.rag;
 
 import cn.lgs.orbisops.application.rag.RagVectorWriterPort;
-import cn.lgs.orbisops.domain.agent.model.entity.RagDocument;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagDocument;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.pgvector.PgVectorStore;
 import org.springframework.beans.factory.ObjectProvider;

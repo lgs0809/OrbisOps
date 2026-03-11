@@ -25,7 +25,7 @@ class RagTikaVisualFallbackBoundaryArchitectureTest {
     private static final String POLICY = "orbisops-trigger/src/main/java/"
             + "cn/lgs/orbisops/trigger/ops/rag/RagVisualFallbackPolicy.java";
     private static final String MATERIALIZER = "orbisops-domain/src/main/java/"
-            + "cn/lgs/orbisops/domain/agent/service/rag/RagChunkMaterializer.java";
+            + "cn/lgs/orbisops/domain/knowledge/rag/service/RagChunkMaterializer.java";
 
     @Test
     void tikaProtocolMustRemainInsideDedicatedExtractor() throws IOException {

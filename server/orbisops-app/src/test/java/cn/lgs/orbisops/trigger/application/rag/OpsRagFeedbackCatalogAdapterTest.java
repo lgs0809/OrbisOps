@@ -3,7 +3,7 @@ package cn.lgs.orbisops.trigger.application.rag;
 import cn.lgs.orbisops.application.rag.RagFeedbackEntry;
 import cn.lgs.orbisops.application.rag.RagFeedbackSubmitCommand;
 import cn.lgs.orbisops.application.rag.RagKnowledgeGap;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IRagFeedbackRepository;
+import cn.lgs.orbisops.domain.knowledge.rag.repository.IRagFeedbackRepository;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

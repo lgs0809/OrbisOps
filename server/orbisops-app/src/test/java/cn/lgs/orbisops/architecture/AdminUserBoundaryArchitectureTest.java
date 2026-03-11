@@ -18,6 +18,8 @@ class AdminUserBoundaryArchitectureTest {
             "orbisops-domain/src/main/java/cn/lgs/orbisops/domain/security/";
     private static final String TRIGGER_SECURITY =
             "orbisops-trigger/src/main/java/cn/lgs/orbisops/trigger/application/security/";
+    private static final String INFRASTRUCTURE_REPOSITORY =
+            "orbisops-infrastructure/src/main/java/cn/lgs/orbisops/infrastructure/adapter/repository/";
 
     @Test
     void accountCatalogAndAuthenticationMustRemainSeparatedHexagonalFlows() throws IOException {
@@ -28,7 +30,7 @@ class AdminUserBoundaryArchitectureTest {
         String role = read(DOMAIN_SECURITY + "AdminUserRole.java");
         String status = read(DOMAIN_SECURITY + "AdminUserStatus.java");
         String credentialRules = read(DOMAIN_SECURITY + "AdminCredentialRules.java");
-        String catalogAdapter = read(TRIGGER_SECURITY + "OpsAdminUserCatalogAdapter.java");
+        String catalogRepository = read(INFRASTRUCTURE_REPOSITORY + "AdminUserRepository.java");
         String authenticationAdapter = read(TRIGGER_SECURITY + "OpsAdminUserAuthenticationAdapter.java");
         String configuration = read(TRIGGER_SECURITY + "AdminSecurityConfiguration.java");
         String facade = read(TRIGGER_SECURITY + "AdminUserApplicationService.java");
@@ -48,14 +50,17 @@ class AdminUserBoundaryArchitectureTest {
                 () -> assertTrue(authenticationUseCase.contains("catalogPort.updateById(migrated)")),
                 () -> assertApplicationPure(catalogUseCase),
                 () -> assertApplicationPure(authenticationUseCase),
-                () -> assertTrue(catalogAdapter.contains("IAdminUserRepository")),
-                () -> assertTrue(catalogAdapter.contains("AdminUserRecord")),
-                () -> assertFalse(catalogAdapter.contains("AdminAuthService")),
+                () -> assertTrue(catalogRepository.contains("implements AdminUserCatalogPort")),
+                () -> assertTrue(catalogRepository.contains("AdminUserAccount")),
+                () -> assertFalse(catalogRepository.contains("domain.agent")),
+                () -> assertFalse(catalogRepository.contains("AdminUserRecord")),
                 () -> assertTrue(authenticationAdapter.contains("AdminAuthService")),
                 () -> assertFalse(authenticationAdapter.contains("IAdminUserRepository")),
                 () -> assertTrue(configuration.contains("AdminCredentialRules adminCredentialRules")),
                 () -> assertTrue(configuration.contains("AdminUserCatalogUseCase adminUserCatalogUseCase")),
                 () -> assertTrue(configuration.contains("AdminUserAuthenticationUseCase adminUserAuthenticationUseCase")),
+                () -> assertFalse(configuration.contains("IAdminUserRepository")),
+                () -> assertFalse(configuration.contains("new OpsAdminUserCatalogAdapter")),
                 () -> assertTrue(facade.contains("private final AdminUserCatalogUseCase catalogUseCase")),
                 () -> assertTrue(facade.contains("private final AdminUserAuthenticationUseCase authenticationUseCase")),
                 () -> assertFalse(facade.contains("IAdminUserRepository")),

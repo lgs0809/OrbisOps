@@ -1,8 +1,8 @@
 package cn.lgs.orbisops.trigger.ops.rag;
 
-import cn.lgs.orbisops.domain.agent.model.entity.RagFileResource;
-import cn.lgs.orbisops.domain.agent.model.valobj.RagChunkDraft;
-import cn.lgs.orbisops.domain.agent.service.rag.RagChunkMaterializer;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagFileResource;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagChunkDraft;
+import cn.lgs.orbisops.domain.knowledge.rag.service.RagChunkMaterializer;
 import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.FormulaEvaluator;
 import org.apache.poi.ss.usermodel.Row;

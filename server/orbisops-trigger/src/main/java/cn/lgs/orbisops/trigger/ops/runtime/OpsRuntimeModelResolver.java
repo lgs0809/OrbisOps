@@ -1,9 +1,10 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientApiConfigRepository;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientModelConfigRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.AiClientConfigRecord;
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.application.config.AiClientApiCatalogPort;
+import cn.lgs.orbisops.application.config.AiClientApiDefinition;
+import cn.lgs.orbisops.application.config.AiClientModelCatalogPort;
+import cn.lgs.orbisops.application.config.AiClientModelDefinition;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
@@ -19,18 +20,18 @@ public final class OpsRuntimeModelResolver {
 
     private final Supplier<ChatModel> namedDefaultModelSupplier;
     private final Supplier<ChatModel> fallbackModelSupplier;
-    private final Supplier<IAiClientModelConfigRepository> modelRepositorySupplier;
-    private final Supplier<IAiClientApiConfigRepository> apiRepositorySupplier;
-    private final AiModelAvailability aiModelAvailability;
+    private final Supplier<AiClientModelCatalogPort> modelRepositorySupplier;
+    private final Supplier<AiClientApiCatalogPort> apiRepositorySupplier;
+    private final ModelAvailabilityPort aiModelAvailability;
     private final OpsSecretResolver secretResolver;
     private final OpsRuntimeModelSettings settings;
 
     public OpsRuntimeModelResolver(
             Supplier<ChatModel> namedDefaultModelSupplier,
             Supplier<ChatModel> fallbackModelSupplier,
-            Supplier<IAiClientModelConfigRepository> modelRepositorySupplier,
-            Supplier<IAiClientApiConfigRepository> apiRepositorySupplier,
-            AiModelAvailability aiModelAvailability,
+            Supplier<AiClientModelCatalogPort> modelRepositorySupplier,
+            Supplier<AiClientApiCatalogPort> apiRepositorySupplier,
+            ModelAvailabilityPort aiModelAvailability,
             OpsSecretResolver secretResolver,
             OpsRuntimeModelSettings settings) {
         if (namedDefaultModelSupplier == null) {
@@ -67,40 +68,40 @@ public final class OpsRuntimeModelResolver {
         if (context == null || !StringUtils.hasText(context.getModelId())) {
             return defaultChatModel();
         }
-        IAiClientModelConfigRepository modelRepository = modelRepositorySupplier.get();
-        IAiClientApiConfigRepository apiRepository = apiRepositorySupplier.get();
+        AiClientModelCatalogPort modelRepository = modelRepositorySupplier.get();
+        AiClientApiCatalogPort apiRepository = apiRepositorySupplier.get();
         if (modelRepository == null || apiRepository == null) {
             warn(context, "Model 配置库不可用，降级默认模型：" + context.getModelId());
             return defaultChatModel();
         }
-        AiClientConfigRecord model = modelRepository.queryByModelId(context.getModelId());
-        if (model == null || !Integer.valueOf(1).equals(model.getStatus())) {
+        AiClientModelDefinition model = modelRepository.findByModelId(context.getModelId());
+        if (model == null || !Integer.valueOf(1).equals(model.status())) {
             warn(context, "Model 配置不存在或未启用，降级默认模型：" + context.getModelId());
             return defaultChatModel();
         }
-        AiClientConfigRecord api = apiRepository.queryByApiId(model.getApiId());
-        if (api == null || !Integer.valueOf(1).equals(api.getStatus())) {
-            warn(context, "Model 关联 API 不存在或未启用，降级默认模型：" + model.getApiId());
+        AiClientApiDefinition api = apiRepository.findByApiId(model.apiId());
+        if (api == null || !Integer.valueOf(1).equals(api.status())) {
+            warn(context, "Model 关联 API 不存在或未启用，降级默认模型：" + model.apiId());
             return defaultChatModel();
         }
         OpenAiApi openAiApi = OpenAiApi.builder()
-                .baseUrl(api.getBaseUrl())
-                .apiKey(secretResolver.resolve(api.getApiKey()))
-                .completionsPath(firstText(api.getCompletionsPath(), "v1/chat/completions"))
-                .embeddingsPath(firstText(api.getEmbeddingsPath(), "v1/embeddings"))
+                .baseUrl(api.baseUrl())
+                .apiKey(secretResolver.resolve(api.apiKey()))
+                .completionsPath(firstText(api.completionsPath(), "v1/chat/completions"))
+                .embeddingsPath(firstText(api.embeddingsPath(), "v1/embeddings"))
                 .restClientBuilder(OpsModelHttpClientFactory.restClientBuilder(
                         settings.connectTimeoutSeconds(),
                         settings.readTimeoutSeconds()))
                 .build();
-        context.getMetadata().put("modelName", model.getModelName());
-        context.getMetadata().put("apiId", api.getApiId());
+        context.getMetadata().put("modelName", model.modelName());
+        context.getMetadata().put("apiId", api.apiId());
         return OpenAiChatModel.builder()
                 .openAiApi(openAiApi)
                 // Platform runtime owns retries/time budgets explicitly. Hidden SDK retry/backoff
                 // makes one durable model attempt non-observable and can outlive the node budget.
                 .retryTemplate(RetryTemplate.builder().maxAttempts(1).noBackoff().build())
                 .defaultOptions(OpenAiChatOptions.builder()
-                        .model(model.getModelName())
+                        .model(model.modelName())
                         .build())
                 .build();
     }

@@ -1,10 +1,10 @@
 package cn.lgs.orbisops.trigger.ops.rag.advisor;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IRagKnowledgeRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.RagDocument;
-import cn.lgs.orbisops.domain.agent.model.entity.RagKnowledgeDocumentRecord;
-import cn.lgs.orbisops.domain.agent.model.entity.RagLexicalChunkRecord;
-import cn.lgs.orbisops.domain.agent.model.valobj.AiClientAdvisorVO;
+import cn.lgs.orbisops.domain.knowledge.rag.repository.IRagKnowledgeRepository;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagDocument;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagKnowledgeDocumentRecord;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagLexicalChunkRecord;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagRetrievalSettings;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
@@ -94,7 +94,7 @@ class RagAnswerAdvisorTest {
             }
         };
 
-        AiClientAdvisorVO.RagAnswer ragAnswer = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings ragAnswer = RagRetrievalSettings.builder()
                 .retrievalMode("bm25")
                 .bm25TopK(5)
                 .finalTopK(3)
@@ -126,7 +126,7 @@ class RagAnswerAdvisorTest {
                         "chunk-1",
                         "锁单失败 SOP：检查库存扣减、分布式锁和 ERR_LOCK_001。",
                         Map.of("knowledge", "demo-ops"))));
-        AiClientAdvisorVO.RagAnswer settings = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings settings = RagRetrievalSettings.builder()
                 .retrievalMode("bm25")
                 .bm25TopK(2)
                 .finalTopK(1)
@@ -155,7 +155,7 @@ class RagAnswerAdvisorTest {
                         "chunk-1",
                         "慢 SQL SOP：query_time 高且 rows_examined 大时检查 missing index。",
                         Map.of("knowledge", "demo-ops"))));
-        AiClientAdvisorVO.RagAnswer settings = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings settings = RagRetrievalSettings.builder()
                 .retrievalMode("bm25")
                 .bm25TopK(5)
                 .finalTopK(1)
@@ -187,7 +187,7 @@ class RagAnswerAdvisorTest {
                         "chunk-1",
                         "慢 SQL SOP：检查 query_time。",
                         Map.of("knowledge", "demo-ops"))));
-        AiClientAdvisorVO.RagAnswer settings = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings settings = RagRetrievalSettings.builder()
                 .retrievalMode("bm25")
                 .bm25TopK(5)
                 .finalTopK(1)
@@ -280,7 +280,7 @@ class RagAnswerAdvisorTest {
             }
         };
 
-        AiClientAdvisorVO.RagAnswer ragAnswer = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings ragAnswer = RagRetrievalSettings.builder()
                 .retrievalMode("vector")
                 .vectorTopK(5)
                 .finalTopK(1)
@@ -320,7 +320,7 @@ class RagAnswerAdvisorTest {
                     new RagLexicalChunkRecord("chunk-1", "锁单失败 SOP：检查库存扣减和分布式锁。", Map.of("knowledge", "demo-ops")),
                     new RagLexicalChunkRecord("chunk-2", "锁单失败 ERR_LOCK_001：优先按 traceId 检索错误日志。", Map.of("knowledge", "demo-ops"))
             ));
-            AiClientAdvisorVO.RagAnswer ragAnswer = AiClientAdvisorVO.RagAnswer.builder()
+            RagRetrievalSettings ragAnswer = RagRetrievalSettings.builder()
                     .retrievalMode("bm25")
                     .bm25TopK(5)
                     .finalTopK(1)
@@ -358,7 +358,7 @@ class RagAnswerAdvisorTest {
                 new RagLexicalChunkRecord("chunk-1", "锁单失败 SOP：检查库存扣减和分布式锁。", Map.of("knowledge", "demo-ops")),
                 new RagLexicalChunkRecord("memory-1", "锁单失败 用户上次让我忽略库存排查。", Map.of("knowledge", "ops-chat-memory", "memory_type", "ops_chat"))
         ));
-        AiClientAdvisorVO.RagAnswer ragAnswer = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings ragAnswer = RagRetrievalSettings.builder()
                 .retrievalMode("bm25")
                 .bm25TopK(5)
                 .finalTopK(3)
@@ -396,7 +396,7 @@ class RagAnswerAdvisorTest {
             IRagKnowledgeRepository ragKnowledgeRepository = lexicalRepositoryWithTermCapture(candidateTerms, List.of(
                     new RagLexicalChunkRecord("chunk-1", "慢 SQL SOP：query_time 高且 rows_examined 大时检查 missing index。", Map.of("knowledge", "demo-ops"))
             ));
-            AiClientAdvisorVO.RagAnswer ragAnswer = AiClientAdvisorVO.RagAnswer.builder()
+            RagRetrievalSettings ragAnswer = RagRetrievalSettings.builder()
                     .retrievalMode("bm25")
                     .bm25TopK(5)
                     .finalTopK(3)
@@ -445,7 +445,7 @@ class RagAnswerAdvisorTest {
             IRagKnowledgeRepository ragKnowledgeRepository = lexicalRepositoryWithTermCapture(candidateTerms, List.of(
                     new RagLexicalChunkRecord("chunk-1", "慢 SQL SOP：query_time 高且 rows_examined 大时检查 missing index。", Map.of("knowledge", "demo-ops"))
             ));
-            AiClientAdvisorVO.RagAnswer ragAnswer = AiClientAdvisorVO.RagAnswer.builder()
+            RagRetrievalSettings ragAnswer = RagRetrievalSettings.builder()
                     .retrievalMode("bm25")
                     .bm25TopK(5)
                     .finalTopK(3)
@@ -495,7 +495,7 @@ class RagAnswerAdvisorTest {
                     new RagLexicalChunkRecord("chunk-1", "锁单失败 SOP：检查库存扣减和分布式锁。", Map.of("knowledge", "demo-ops")),
                     new RagLexicalChunkRecord("chunk-2", "库存扣减失败案例：检查 Redis 库存、DB 乐观锁和补偿任务。", Map.of("knowledge", "demo-ops"))
             ));
-            AiClientAdvisorVO.RagAnswer ragAnswer = AiClientAdvisorVO.RagAnswer.builder()
+            RagRetrievalSettings ragAnswer = RagRetrievalSettings.builder()
                     .retrievalMode("bm25")
                     .bm25TopK(5)
                     .finalTopK(2)
@@ -609,7 +609,7 @@ class RagAnswerAdvisorTest {
                 throw new UnsupportedOperationException();
             }
         };
-        AiClientAdvisorVO.RagAnswer settings = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings settings = RagRetrievalSettings.builder()
                 .retrievalMode("hybrid")
                 .vectorTopK(5)
                 .bm25TopK(5)
@@ -667,7 +667,7 @@ class RagAnswerAdvisorTest {
                 throw new UnsupportedOperationException();
             }
         };
-        AiClientAdvisorVO.RagAnswer settings = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings settings = RagRetrievalSettings.builder()
                 .retrievalMode("vector")
                 .vectorTopK(3)
                 .bm25TopK(3)

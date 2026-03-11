@@ -1,8 +1,8 @@
 package cn.lgs.orbisops.trigger.application.config;
 
+import cn.lgs.orbisops.application.schedule.ScheduledTaskExecutionCommand;
 import cn.lgs.orbisops.application.schedule.TaskScheduleDefinition;
 import cn.lgs.orbisops.application.schedule.TaskScheduleExecutionPort;
-import cn.lgs.orbisops.domain.agent.model.entity.TaskScheduleRecord;
 import cn.lgs.orbisops.trigger.job.AgentTaskExecutionService;
 
 /** Scheduler runtime submission adapter for manual task execution. */
@@ -26,18 +26,14 @@ public final class OpsTaskScheduleExecutionAdapter implements TaskScheduleExecut
 
     @Override
     public Long submit(TaskScheduleDefinition schedule, String triggerType) {
-        TaskScheduleRecord record = TaskScheduleRecord.builder()
-                .id(schedule.id())
-                .projectId(schedule.projectId())
-                .agentId(schedule.agentId())
-                .taskName(schedule.taskName())
-                .description(schedule.description())
-                .cronExpression(schedule.cronExpression())
-                .taskParam(codec.encode(schedule.runtimeConfiguration()))
-                .status(schedule.status())
-                .createTime(schedule.createTime())
-                .updateTime(schedule.updateTime())
-                .build();
-        return executionService.submitExecution(record, triggerType);
+        if (schedule == null) {
+            throw new IllegalArgumentException("TASK_SCHEDULE_DEFINITION_REQUIRED");
+        }
+        return executionService.submitExecution(new ScheduledTaskExecutionCommand(
+                schedule.id(),
+                schedule.taskName(),
+                schedule.agentId(),
+                triggerType,
+                codec.encode(schedule.runtimeConfiguration())));
     }
 }

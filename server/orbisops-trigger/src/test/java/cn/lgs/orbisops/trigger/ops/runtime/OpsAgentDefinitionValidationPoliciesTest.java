@@ -1,12 +1,13 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
+import cn.lgs.orbisops.application.config.AiClientModelCatalogPort;
+import cn.lgs.orbisops.application.config.AiClientModelDefinition;
+import cn.lgs.orbisops.application.config.McpClientCatalogPort;
 import cn.lgs.orbisops.application.project.ProjectKnowledgeAuthorizationApplicationService;
 import cn.lgs.orbisops.application.project.ProjectMcpAuthorizationApplicationService;
 import cn.lgs.orbisops.application.project.ProjectMcpRuntimeDescriptorApplicationService;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientModelConfigRepository;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientRagOrderConfigRepository;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientToolMcpConfigRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.AiClientConfigRecord;
+import cn.lgs.orbisops.application.rag.RagOrderCatalogPort;
+import cn.lgs.orbisops.application.rag.RagOrderDefinition;
 import cn.lgs.orbisops.trigger.ops.source.OpsSourceRepositoryService;
 import org.junit.jupiter.api.Test;
 
@@ -22,15 +23,15 @@ class OpsAgentDefinitionValidationPoliciesTest {
 
     @Test
     void projectCapabilityValidatorMustAcceptSourceBackedMcp() {
-        IAiClientToolMcpConfigRepository mcpRepository =
-                mock(IAiClientToolMcpConfigRepository.class);
+        McpClientCatalogPort mcpRepository =
+                mock(McpClientCatalogPort.class);
         ProjectMcpAuthorizationApplicationService authorization =
                 mock(ProjectMcpAuthorizationApplicationService.class);
         ProjectMcpRuntimeDescriptorApplicationService descriptor =
                 mock(ProjectMcpRuntimeDescriptorApplicationService.class);
         OpsSourceRepositoryService sourceRepository =
                 mock(OpsSourceRepositoryService.class);
-        when(mcpRepository.queryByMcpId("source-mcp")).thenReturn(null);
+        when(mcpRepository.findByMcpId("source-mcp")).thenReturn(null);
         when(authorization.allows("project-a", "source-mcp")).thenReturn(false);
         when(descriptor.existsEnabledAny("source-mcp")).thenReturn(false);
         when(sourceRepository.resolveMcpServer("project-a", "source-mcp"))
@@ -79,21 +80,20 @@ class OpsAgentDefinitionValidationPoliciesTest {
 
     @Test
     void modelKnowledgeValidatorMustUseKnowledgeTagFallback() {
-        IAiClientModelConfigRepository modelRepository =
-                mock(IAiClientModelConfigRepository.class);
-        IAiClientRagOrderConfigRepository ragRepository =
-                mock(IAiClientRagOrderConfigRepository.class);
+        AiClientModelCatalogPort modelRepository =
+                mock(AiClientModelCatalogPort.class);
+        RagOrderCatalogPort ragRepository =
+                mock(RagOrderCatalogPort.class);
         ProjectKnowledgeAuthorizationApplicationService authorization =
                 mock(ProjectKnowledgeAuthorizationApplicationService.class);
-        when(modelRepository.queryByModelId("model-a")).thenReturn(
-                AiClientConfigRecord.builder().modelId("model-a").status(1).build());
+        when(modelRepository.findByModelId("model-a")).thenReturn(
+                new AiClientModelDefinition(
+                        null, "model-a", null, "model-a", null, null, null, 1, null, null));
         when(authorization.allows("project-a", "knowledge-a")).thenReturn(true);
         when(ragRepository.queryByRagId("knowledge-a")).thenReturn(null);
         when(ragRepository.queryByKnowledgeTag("knowledge-a")).thenReturn(List.of(
-                AiClientConfigRecord.builder()
-                        .knowledgeTag("knowledge-a")
-                        .status(1)
-                        .build()));
+                new RagOrderDefinition(
+                        null, "knowledge-a", "Knowledge A", "knowledge-a", 1, null, null)));
         OpsAgentModelKnowledgeReferenceValidator validator =
                 new OpsAgentModelKnowledgeReferenceValidator(
                         () -> modelRepository,

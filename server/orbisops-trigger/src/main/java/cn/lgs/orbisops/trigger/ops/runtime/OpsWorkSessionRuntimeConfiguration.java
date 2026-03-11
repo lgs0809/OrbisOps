@@ -3,7 +3,7 @@ package cn.lgs.orbisops.trigger.ops.runtime;
 import cn.lgs.orbisops.application.runtime.graph.GraphEventApplicationService;
 import cn.lgs.orbisops.api.dto.OpsAnalysisResponseDTO;
 import cn.lgs.orbisops.application.worksession.ToolLoopCoordinator;
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
 import cn.lgs.orbisops.trigger.application.agentdefinition.OpsAgentDefinitionQueryGateway;
 import cn.lgs.orbisops.trigger.application.ops.OpsChatApplicationService;
 import cn.lgs.orbisops.trigger.application.runtime.OpsRuntimeContextBundleAdapter;
@@ -61,7 +61,7 @@ public class OpsWorkSessionRuntimeConfiguration {
             OpsTelemetryService telemetryService,
             GraphEventApplicationService graphEventService,
             ObjectProvider<SkillRuntimeToolProvider> skillToolProvider,
-            AiModelAvailability aiModelAvailability,
+            ModelAvailabilityPort aiModelAvailability,
             OpsMainAgentPlanner planner,
             OpsInvestigationExecutor investigationExecutor,
             OpsAnalysisReportComposer analysisReportComposer,

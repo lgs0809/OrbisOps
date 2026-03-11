@@ -1,7 +1,7 @@
 package cn.lgs.orbisops.trigger.application.memory;
 
 import cn.lgs.orbisops.application.memory.MemoryModelSummaryPort;
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
 import cn.lgs.orbisops.domain.memory.model.ColdMemoryMessageSnapshot;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
@@ -26,7 +26,7 @@ public class OpsMemoryModelSummaryAdapter implements MemoryModelSummaryPort {
     public OpsMemoryModelSummaryAdapter(
             ApplicationContext applicationContext,
             ObjectProvider<ChatModel> chatModelProvider,
-            ObjectProvider<AiModelAvailability> aiModelAvailabilityProvider) {
+            ObjectProvider<ModelAvailabilityPort> aiModelAvailabilityProvider) {
         this(new OpsMemoryChatModelResolver(
                 applicationContext,
                 chatModelProvider,

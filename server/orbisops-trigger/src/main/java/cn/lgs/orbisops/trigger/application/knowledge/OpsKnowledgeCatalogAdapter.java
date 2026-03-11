@@ -3,7 +3,7 @@ package cn.lgs.orbisops.trigger.application.knowledge;
 import cn.lgs.orbisops.application.knowledge.KnowledgeCatalogPort;
 import cn.lgs.orbisops.application.knowledge.KnowledgeDocumentIngestionApplicationService;
 import cn.lgs.orbisops.application.rag.RagIngestionJobView;
-import cn.lgs.orbisops.domain.agent.model.entity.RagFileResource;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagFileResource;
 import cn.lgs.orbisops.trigger.application.rag.MultipartRagFileResource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;

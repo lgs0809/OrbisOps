@@ -21,7 +21,7 @@ import cn.lgs.orbisops.trigger.application.memory.OpsMemoryRetrievalMapper;
 import cn.lgs.orbisops.trigger.application.memory.OpsSemanticRetrievalFailureAdapter;
 import cn.lgs.orbisops.trigger.application.memory.OpsSemanticVectorRecallAdapter;
 import cn.lgs.orbisops.trigger.application.memory.OpsSemanticVectorWriteAdapter;
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
 import cn.lgs.orbisops.domain.memory.adapter.repository.IColdMemoryRepository;
 import cn.lgs.orbisops.domain.memory.model.ColdMemoryItemSnapshot;
 import cn.lgs.orbisops.domain.memory.model.ColdMemoryMessageSnapshot;
@@ -223,7 +223,7 @@ class OpsMemoryRuntimeTest {
         ObjectProvider<JdbcTemplate> jdbcTemplateProvider = mock(ObjectProvider.class);
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
         when(jdbcTemplateProvider.getIfAvailable()).thenReturn(jdbcTemplate);
-        AiModelAvailability availability = mock(AiModelAvailability.class);
+        ModelAvailabilityPort availability = mock(ModelAvailabilityPort.class);
         when(availability.isEmbeddingAvailable()).thenReturn(false);
         OpsSemanticRetrievalFailureAdapter failureAdapter =
                 new OpsSemanticRetrievalFailureAdapter();

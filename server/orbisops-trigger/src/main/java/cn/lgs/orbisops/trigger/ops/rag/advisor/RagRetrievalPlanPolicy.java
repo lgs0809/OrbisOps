@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.trigger.ops.rag.advisor;
 
-import cn.lgs.orbisops.domain.agent.model.valobj.AiClientAdvisorVO;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagRetrievalSettings;
 
 import java.util.Locale;
 import java.util.Map;
@@ -20,11 +20,11 @@ public final class RagRetrievalPlanPolicy {
 
     public RagRetrievalPlan resolve(String userText,
                                     Map<String, Object> context,
-                                    AiClientAdvisorVO.RagAnswer configured,
+                                    RagRetrievalSettings configured,
                                     int frameworkDefaultTopK) {
         Map<String, Object> safeContext = context == null ? Map.of() : context;
-        AiClientAdvisorVO.RagAnswer settings = configured == null
-                ? new AiClientAdvisorVO.RagAnswer()
+        RagRetrievalSettings settings = configured == null
+                ? new RagRetrievalSettings()
                 : configured;
 
         String mode = valueFromContext(safeContext, "qa_retrieval_mode", settings.getRetrievalMode());
@@ -97,11 +97,15 @@ public final class RagRetrievalPlanPolicy {
         finalTopK = clamp(finalTopK, 1, 20);
         maxContextChars = clamp(maxContextChars, 1000, 50000);
 
-        rerankProvider = hasText(rerankProvider)
-                ? rerankProvider.toLowerCase(Locale.ROOT)
-                : "none";
-        if (!RERANK_PROVIDERS.contains(rerankProvider)) {
+        if (!rerankEnabled) {
             rerankProvider = "none";
+        } else {
+            rerankProvider = hasText(rerankProvider)
+                    ? rerankProvider.toLowerCase(Locale.ROOT)
+                    : "none";
+            if (!RERANK_PROVIDERS.contains(rerankProvider)) {
+                rerankProvider = "none";
+            }
         }
 
         rerankCandidateTopK = clamp(rerankCandidateTopK, finalTopK, 50);

@@ -1,82 +1,122 @@
 package cn.lgs.orbisops.infrastructure.adapter.repository;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientApiConfigRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.AiClientConfigRecord;
+import cn.lgs.orbisops.application.config.AiClientApiCatalogPort;
+import cn.lgs.orbisops.application.config.AiClientApiDefinition;
 import cn.lgs.orbisops.infrastructure.dao.IAiClientApiDao;
 import cn.lgs.orbisops.infrastructure.dao.po.AiClientApi;
-import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Repository;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import java.util.List;
 
+/** MyBatis adapter for the typed AI provider API catalog. */
 @Repository
-public class AiClientApiConfigRepository implements IAiClientApiConfigRepository {
+public class AiClientApiConfigRepository implements AiClientApiCatalogPort {
 
-    @Autowired(required = false)
-    private IAiClientApiDao dao;
+    private final ObjectProvider<IAiClientApiDao> daoProvider;
 
-    @Override
-    public int insert(AiClientConfigRecord record) {
-        return dao == null ? 0 : dao.insert(toPo(record));
+    public AiClientApiConfigRepository(ObjectProvider<IAiClientApiDao> daoProvider) {
+        this.daoProvider = daoProvider;
     }
 
     @Override
-    public int updateById(AiClientConfigRecord record) {
-        return dao == null ? 0 : dao.updateById(toPo(record));
+    public boolean insert(AiClientApiDefinition definition) {
+        IAiClientApiDao dao = dao();
+        return dao != null && dao.insert(toPo(definition)) > 0;
     }
 
     @Override
-    public int updateByApiId(AiClientConfigRecord record) {
-        return dao == null ? 0 : dao.updateByApiId(toPo(record));
+    public boolean updateById(AiClientApiDefinition definition) {
+        IAiClientApiDao dao = dao();
+        return dao != null && dao.updateById(toPo(definition)) > 0;
     }
 
     @Override
-    public int deleteById(Long id) {
-        return dao == null ? 0 : dao.deleteById(id);
+    public boolean updateByApiId(AiClientApiDefinition definition) {
+        IAiClientApiDao dao = dao();
+        return dao != null && dao.updateByApiId(toPo(definition)) > 0;
     }
 
     @Override
-    public int deleteByApiId(String apiId) {
-        return dao == null ? 0 : dao.deleteByApiId(apiId);
+    public boolean deleteById(Long id) {
+        IAiClientApiDao dao = dao();
+        return dao != null && dao.deleteById(id) > 0;
     }
 
     @Override
-    public AiClientConfigRecord queryById(Long id) {
-        return dao == null ? null : toRecord(dao.queryById(id));
+    public boolean deleteByApiId(String apiId) {
+        IAiClientApiDao dao = dao();
+        return dao != null && dao.deleteByApiId(apiId) > 0;
     }
 
     @Override
-    public AiClientConfigRecord queryByApiId(String apiId) {
-        return dao == null ? null : toRecord(dao.queryByApiId(apiId));
+    public AiClientApiDefinition findById(Long id) {
+        IAiClientApiDao dao = dao();
+        return dao == null ? null : toDefinition(dao.queryById(id));
     }
 
     @Override
-    public List<AiClientConfigRecord> queryEnabledApis() {
-        return dao == null ? List.of() : toRecords(dao.queryEnabledApis());
+    public AiClientApiDefinition findByApiId(String apiId) {
+        IAiClientApiDao dao = dao();
+        return dao == null ? null : toDefinition(dao.queryByApiId(apiId));
     }
 
     @Override
-    public List<AiClientConfigRecord> queryAll() {
-        return dao == null ? List.of() : toRecords(dao.queryAll());
+    public List<AiClientApiDefinition> listEnabled() {
+        IAiClientApiDao dao = dao();
+        return dao == null ? List.of() : definitions(dao.queryEnabledApis());
     }
 
-    private AiClientApi toPo(AiClientConfigRecord record) {
-        AiClientApi po = new AiClientApi();
-        BeanUtils.copyProperties(record, po);
-        return po;
+    @Override
+    public List<AiClientApiDefinition> listAll() {
+        IAiClientApiDao dao = dao();
+        return dao == null ? List.of() : definitions(dao.queryAll());
     }
 
-    private AiClientConfigRecord toRecord(AiClientApi po) {
+    private IAiClientApiDao dao() {
+        return daoProvider == null ? null : daoProvider.getIfAvailable();
+    }
+
+    private AiClientApi toPo(AiClientApiDefinition definition) {
+        if (definition == null) {
+            throw new IllegalArgumentException("AI_CLIENT_API_DEFINITION_REQUIRED");
+        }
+        return AiClientApi.builder()
+                .id(definition.id())
+                .apiId(definition.apiId())
+                .providerName(definition.providerName())
+                .providerType(definition.providerType())
+                .baseUrl(definition.baseUrl())
+                .apiKey(definition.apiKey())
+                .completionsPath(definition.completionsPath())
+                .embeddingsPath(definition.embeddingsPath())
+                .status(definition.status())
+                .createTime(definition.createTime())
+                .updateTime(definition.updateTime())
+                .build();
+    }
+
+    private AiClientApiDefinition toDefinition(AiClientApi po) {
         if (po == null) {
             return null;
         }
-        AiClientConfigRecord record = new AiClientConfigRecord();
-        BeanUtils.copyProperties(po, record);
-        return record;
+        return new AiClientApiDefinition(
+                po.getId(),
+                po.getApiId(),
+                po.getProviderName(),
+                po.getProviderType(),
+                po.getBaseUrl(),
+                po.getApiKey(),
+                po.getCompletionsPath(),
+                po.getEmbeddingsPath(),
+                po.getStatus(),
+                po.getCreateTime(),
+                po.getUpdateTime());
     }
 
-    private List<AiClientConfigRecord> toRecords(List<AiClientApi> rows) {
-        return rows == null ? List.of() : rows.stream().map(this::toRecord).toList();
+    private List<AiClientApiDefinition> definitions(List<AiClientApi> rows) {
+        return rows == null || rows.isEmpty()
+                ? List.of()
+                : rows.stream().map(this::toDefinition).toList();
     }
 }

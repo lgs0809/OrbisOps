@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.trigger.ops.rag.advisor;
 
-import cn.lgs.orbisops.domain.agent.model.valobj.AiClientAdvisorVO;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagRetrievalSettings;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import org.junit.jupiter.api.Test;
@@ -47,7 +47,7 @@ class RagLlmQueryRewriteProtocolTest {
                     response.put("choices", List.of(choice));
                     return response.toJSONString();
                 });
-        AiClientAdvisorVO.RagAnswer settings = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings settings = RagRetrievalSettings.builder()
                 .llmQueryRewriteBaseUrl("http://rewrite.local/")
                 .llmQueryRewriteApiKey("configured-key")
                 .llmQueryRewritePath("/v1/chat/completions")
@@ -110,7 +110,7 @@ class RagLlmQueryRewriteProtocolTest {
                     calls.incrementAndGet();
                     return "{}";
                 });
-        AiClientAdvisorVO.RagAnswer settings = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings settings = RagRetrievalSettings.builder()
                 .llmQueryRewriteBaseUrl("http://rewrite.local")
                 .llmQueryRewritePath("v1/chat/completions")
                 .llmQueryRewriteModel("model")
@@ -136,7 +136,7 @@ class RagLlmQueryRewriteProtocolTest {
 
     @Test
     void shouldPreserveChoicesContentAndQueriesValidationErrors() {
-        AiClientAdvisorVO.RagAnswer settings = configuredSettings();
+        RagRetrievalSettings settings = configuredSettings();
         List<ProtocolCase> cases = List.of(
                 new ProtocolCase("{}", "RAG LLM query rewrite 未返回 choices"),
                 new ProtocolCase("{\"choices\":[]}", "RAG LLM query rewrite 未返回 choices"),
@@ -198,7 +198,7 @@ class RagLlmQueryRewriteProtocolTest {
                     body.set(requestBody);
                     return "{\"choices\":[{\"message\":{\"content\":\"{\\\"queries\\\":[\\\"new query\\\"]}\"}}]}";
                 });
-        AiClientAdvisorVO.RagAnswer settings = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings settings = RagRetrievalSettings.builder()
                 .llmQueryRewriteBaseUrl("http://rewrite.local")
                 .llmQueryRewriteApiKey("key")
                 .llmQueryRewritePath("v1/chat/completions")
@@ -250,8 +250,8 @@ class RagLlmQueryRewriteProtocolTest {
         assertNotNull(result.queries());
     }
 
-    private AiClientAdvisorVO.RagAnswer configuredSettings() {
-        return AiClientAdvisorVO.RagAnswer.builder()
+    private RagRetrievalSettings configuredSettings() {
+        return RagRetrievalSettings.builder()
                 .llmQueryRewriteBaseUrl("http://rewrite.local")
                 .llmQueryRewriteApiKey("key")
                 .llmQueryRewritePath("v1/chat/completions")

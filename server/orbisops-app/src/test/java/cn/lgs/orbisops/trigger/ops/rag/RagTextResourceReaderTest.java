@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.trigger.ops.rag;
 
-import cn.lgs.orbisops.domain.agent.model.entity.RagFileResource;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagFileResource;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;

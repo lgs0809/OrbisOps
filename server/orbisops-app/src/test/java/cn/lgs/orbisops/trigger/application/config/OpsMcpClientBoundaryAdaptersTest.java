@@ -1,64 +1,21 @@
 package cn.lgs.orbisops.trigger.application.config;
 
 import cn.lgs.orbisops.application.config.McpClientDefinition;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientToolMcpConfigRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.AiClientConfigRecord;
 import cn.lgs.orbisops.trigger.ops.OpsConfigAuditService;
 import cn.lgs.orbisops.trigger.ops.runtime.OpsMcpToolProvider;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 class OpsMcpClientBoundaryAdaptersTest {
-
-    @Test
-    void catalogAdapterMapsTypedDefinitionAndRepositoryRecord() {
-        IAiClientToolMcpConfigRepository repository = mock(IAiClientToolMcpConfigRepository.class);
-        OpsMcpClientCatalogAdapter adapter = new OpsMcpClientCatalogAdapter(repository);
-        when(repository.insert(org.mockito.ArgumentMatchers.any())).thenReturn(1);
-        McpClientDefinition definition = definition("raw-config");
-
-        assertTrue(adapter.insert(definition));
-
-        ArgumentCaptor<AiClientConfigRecord> record = ArgumentCaptor.forClass(AiClientConfigRecord.class);
-        verify(repository).insert(record.capture());
-        assertEquals("ops-mcp", record.getValue().getMcpId());
-        assertEquals("raw-config", record.getValue().getTransportConfig());
-        assertEquals(definition.createTime(), record.getValue().getCreateTime());
-    }
-
-    @Test
-    void catalogAdapterProjectsRepositoryLists() {
-        IAiClientToolMcpConfigRepository repository = mock(IAiClientToolMcpConfigRepository.class);
-        OpsMcpClientCatalogAdapter adapter = new OpsMcpClientCatalogAdapter(repository);
-        when(repository.queryByStatus(1)).thenReturn(List.of(AiClientConfigRecord.builder()
-                .id(7L)
-                .mcpId("ops-mcp")
-                .mcpName("Ops MCP")
-                .transportType("stdio")
-                .transportConfig("raw-config")
-                .requestTimeout(30)
-                .status(1)
-                .build()));
-
-        List<McpClientDefinition> result = adapter.listByStatus(1);
-
-        assertEquals(1, result.size());
-        assertEquals("ops-mcp", result.get(0).mcpId());
-        assertEquals("raw-config", result.get(0).transportConfig());
-    }
 
     @Test
     void transportProtectionRestoresPlaceholderAndMasksNestedJson() {

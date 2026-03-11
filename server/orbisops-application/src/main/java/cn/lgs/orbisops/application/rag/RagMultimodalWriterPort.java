@@ -1,7 +1,7 @@
 package cn.lgs.orbisops.application.rag;
 
-import cn.lgs.orbisops.domain.agent.model.entity.RagDocument;
-import cn.lgs.orbisops.domain.agent.model.entity.RagFileResource;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagDocument;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagFileResource;
 
 import java.util.List;
 

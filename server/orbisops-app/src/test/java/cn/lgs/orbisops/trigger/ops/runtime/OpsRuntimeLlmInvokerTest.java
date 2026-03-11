@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -21,7 +21,7 @@ class OpsRuntimeLlmInvokerTest {
 
     @Test
     void unavailableModelFailsClosedAndEmitsBlockedEvent() {
-        AiModelAvailability availability = mock(AiModelAvailability.class);
+        ModelAvailabilityPort availability = mock(ModelAvailabilityPort.class);
         when(availability.isChatAvailable()).thenReturn(false);
         when(availability.unavailableMessage("Agent 模型调用")).thenReturn("model unavailable");
         OpsRuntimeLlmInvoker invoker = new OpsRuntimeLlmInvoker(availability);
@@ -47,7 +47,7 @@ class OpsRuntimeLlmInvokerTest {
         IllegalStateException error = assertThrows(IllegalStateException.class, () -> invoker.call(
                 "system", "user", null, events, null, System.nanoTime()));
 
-        assertTrue(error.getMessage().contains("AiModelAvailability 未初始化"));
+        assertTrue(error.getMessage().contains("模型可用性服务未初始化"));
         assertEquals("MODEL_CALL_BLOCKED", events.get(0).getEventType());
     }
 

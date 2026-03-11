@@ -10,7 +10,7 @@ import cn.lgs.orbisops.application.knowledge.KnowledgeAggregateSnapshot;
 import cn.lgs.orbisops.application.knowledge.KnowledgeCatalogApplicationService;
 import cn.lgs.orbisops.application.rag.RagIngestionCommandUseCase;
 import cn.lgs.orbisops.application.rag.RagIngestionJobView;
-import cn.lgs.orbisops.domain.agent.model.entity.RagFileResource;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagFileResource;
 import cn.lgs.orbisops.trigger.application.knowledge.OpsKnowledgeAuthorizationCommandMapper;
 import cn.lgs.orbisops.trigger.application.knowledge.OpsKnowledgeCatalogCommandMapper;
 import cn.lgs.orbisops.trigger.application.rag.AiClientRagOrderApplicationService;

@@ -36,6 +36,14 @@ public final class TaskScheduleExecutionUseCase {
         return executionPort.submit(schedule, "MANUAL");
     }
 
+    /** Trusted scheduler entry; task ownership is resolved from the authoritative catalog by id. */
+    public Long runScheduled(Long id) {
+        if (id == null) {
+            throw new IllegalArgumentException("任务ID不能为空");
+        }
+        return executionPort.submit(requireSchedule(id), "SCHEDULED");
+    }
+
     public List<TaskExecutionView> listExecutions(String projectId, Long scheduleId, Integer limit) {
         if (scheduleId == null) {
             throw new IllegalArgumentException("查询巡检记录必须提供 scheduleId");

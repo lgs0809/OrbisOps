@@ -67,7 +67,7 @@ class MemoryCompressionApplicationArchitectureTest {
 
         assertAll(
                 () -> assertTrue(modelAdapter.contains("implements MemoryModelSummaryPort")),
-                () -> assertTrue(modelAdapter.contains("AiModelAvailability")),
+                () -> assertTrue(modelAdapter.contains("ModelAvailabilityPort")),
                 () -> assertTrue(modelAdapter.contains("ChatClient.builder(chatModel)")),
                 () -> assertTrue(modelAdapter.contains("modelResolver.resolve()")),
                 () -> assertTrue(modelAdapter.contains("modelResolver.chatAvailable()")),
@@ -96,7 +96,7 @@ class MemoryCompressionApplicationArchitectureTest {
                 () -> assertFalse(compressor.contains("ColdMemoryStoreApplicationService")),
                 () -> assertFalse(compressor.contains("OpsHotMemoryStore")),
                 () -> assertFalse(compressor.contains("ChatClient")),
-                () -> assertFalse(compressor.contains("AiModelAvailability")),
+                () -> assertFalse(compressor.contains("ModelAvailabilityPort")),
                 () -> assertTrue(postAdapter.contains("HotMemoryQueryPort hotMemoryQueryPort")),
                 () -> assertTrue(postAdapter.contains("hotMemoryQueryPort.recent(")),
                 () -> assertFalse(postAdapter.contains("OpsHotMemoryStore")),

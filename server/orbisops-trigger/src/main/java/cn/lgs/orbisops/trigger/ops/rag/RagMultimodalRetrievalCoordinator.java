@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.trigger.ops.rag;
 
-import cn.lgs.orbisops.domain.agent.model.entity.RagDocument;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagDocument;
 import org.springframework.ai.document.Document;
 
 import java.util.List;

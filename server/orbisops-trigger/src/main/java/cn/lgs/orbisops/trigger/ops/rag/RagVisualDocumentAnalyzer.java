@@ -1,7 +1,7 @@
 package cn.lgs.orbisops.trigger.ops.rag;
 
-import cn.lgs.orbisops.domain.agent.model.entity.RagFileResource;
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagFileResource;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.beans.factory.ObjectProvider;
@@ -22,19 +22,19 @@ public class RagVisualDocumentAnalyzer {
     private final RagVisualDocumentProjector projector;
 
     public RagVisualDocumentAnalyzer() {
-        this(RagVisualAnalysisSettings.defaults(), (AiModelAvailability) null);
+        this(RagVisualAnalysisSettings.defaults(), (ModelAvailabilityPort) null);
     }
 
     @Autowired
     public RagVisualDocumentAnalyzer(
             RagVisualAnalysisSettings settings,
-            ObjectProvider<AiModelAvailability> availabilityProvider) {
+            ObjectProvider<ModelAvailabilityPort> availabilityProvider) {
         this(settings, availabilityProvider.getIfAvailable());
     }
 
     public RagVisualDocumentAnalyzer(
             RagVisualAnalysisSettings settings,
-            AiModelAvailability aiModelAvailability) {
+            ModelAvailabilityPort aiModelAvailability) {
         this(
                 new RagVisualAnalysisAvailability(settings, aiModelAvailability),
                 new RagVisualMediaPreparer(settings),

@@ -18,7 +18,7 @@ class RagPdfParsingBoundaryArchitectureTest {
     private static final String COORDINATOR = RAG + "RagDocumentParseCoordinator.java";
     private static final String PDF_EXTRACTOR = RAG + "RagPdfChunkExtractor.java";
     private static final String MATERIALIZER = "orbisops-domain/src/main/java/"
-            + "cn/lgs/orbisops/domain/agent/service/rag/RagChunkMaterializer.java";
+            + "cn/lgs/orbisops/domain/knowledge/rag/service/RagChunkMaterializer.java";
 
     @Test
     void pdfBoxFacadeMustCoordinateDedicatedPdfBoundaries() throws IOException {

@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
-import cn.lgs.orbisops.domain.agent.model.entity.AiClientConfigRecord;
+import cn.lgs.orbisops.application.config.McpClientDefinition;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.TypeReference;
 import lombok.extern.slf4j.Slf4j;
@@ -14,17 +14,17 @@ import java.util.Map;
 @Slf4j
 public final class OpsLegacyMcpConfigMapper {
 
-    public OpsMcpServerConfig map(AiClientConfigRecord mcp) {
+    public OpsMcpServerConfig map(McpClientDefinition mcp) {
         if (mcp == null) {
             throw new IllegalArgumentException("LEGACY_MCP_CONFIG_REQUIRED");
         }
-        String transport = firstText(mcp.getTransportType(), "stdio").trim().toLowerCase();
+        String transport = firstText(mcp.transportType(), "stdio").trim().toLowerCase();
         OpsMcpServerConfig.OpsMcpServerConfigBuilder builder = OpsMcpServerConfig.builder()
-                .name(mcp.getMcpName())
-                .description("MCP工具库：" + mcp.getMcpId())
+                .name(mcp.mcpName())
+                .description("MCP工具库：" + mcp.mcpId())
                 .transport(transport)
-                .timeoutSeconds(mcp.getRequestTimeout());
-        Map<String, Object> root = parseJsonMap(mcp.getTransportConfig());
+                .timeoutSeconds(mcp.requestTimeout());
+        Map<String, Object> root = parseJsonMap(mcp.transportConfig());
         builder.toolCapabilities(stringMap(root.get("toolCapabilities")))
                 .allowedTools(stringList(root.get("allowedTools")))
                 .notificationTools(stringList(root.get("notificationTools")))
@@ -39,7 +39,7 @@ public final class OpsLegacyMcpConfigMapper {
             builder.url(joinUrl(baseUri, endpoint));
             return builder.build();
         }
-        Object selected = root.get(mcp.getMcpName());
+        Object selected = root.get(mcp.mcpName());
         Map<String, Object> stdio = selected instanceof Map<?, ?> map
                 ? toStringObjectMap(map)
                 : root;

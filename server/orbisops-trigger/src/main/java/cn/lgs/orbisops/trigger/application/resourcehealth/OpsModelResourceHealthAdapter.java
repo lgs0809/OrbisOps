@@ -1,8 +1,9 @@
 package cn.lgs.orbisops.trigger.application.resourcehealth;
 
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
+import cn.lgs.orbisops.application.model.ModelAvailabilitySnapshot;
 import cn.lgs.orbisops.application.resourcehealth.ModelResourceHealthProbePort;
 import cn.lgs.orbisops.application.resourcehealth.ResourceHealthCheck;
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -12,21 +13,31 @@ import java.util.Map;
 public class OpsModelResourceHealthAdapter
         implements ModelResourceHealthProbePort {
 
-    private final AiModelAvailability availability;
+    private final ModelAvailabilityPort availability;
 
-    public OpsModelResourceHealthAdapter(AiModelAvailability availability) {
+    public OpsModelResourceHealthAdapter(ModelAvailabilityPort availability) {
         this.availability = availability;
     }
 
     @Override
     public ResourceHealthCheck probe() {
-        Map<String, Object> status = availability.status();
-        Map<String, Object> detail = status == null ? Map.of() : status;
-        boolean healthy = Boolean.TRUE.equals(detail.get("chatAvailable"))
-                || Boolean.TRUE.equals(detail.get("embeddingAvailable"));
-        String message = String.valueOf(detail.getOrDefault(
-                "message",
-                healthy ? "模型配置可用" : "模型未完整配置"));
+        ModelAvailabilitySnapshot snapshot = availability.snapshot();
+        boolean healthy = snapshot != null
+                && (snapshot.chatAvailable() || snapshot.embeddingAvailable());
+        String message = snapshot == null || snapshot.message() == null
+                ? healthy ? "模型配置可用" : "模型未完整配置"
+                : snapshot.message();
+        Map<String, Object> detail = snapshot == null ? Map.of() : Map.ofEntries(
+                Map.entry("modelCallsEnabled", snapshot.modelCallsEnabled()),
+                Map.entry("chatAvailable", snapshot.chatAvailable()),
+                Map.entry("embeddingAvailable", snapshot.embeddingAvailable()),
+                Map.entry("rerankAvailable", snapshot.rerankAvailable()),
+                Map.entry("openAiApiKeyUsable", snapshot.openAiApiKeyUsable()),
+                Map.entry("embeddingApiKeyUsable", snapshot.embeddingApiKeyUsable()),
+                Map.entry("rerankApiKeyUsable", snapshot.rerankApiKeyUsable()),
+                Map.entry("embeddingLocalEndpointReady", snapshot.embeddingLocalEndpointReady()),
+                Map.entry("rerankLocalEndpointReady", snapshot.rerankLocalEndpointReady()),
+                Map.entry("message", message));
         return new ResourceHealthCheck(
                 "model",
                 "OpenAI/兼容模型",

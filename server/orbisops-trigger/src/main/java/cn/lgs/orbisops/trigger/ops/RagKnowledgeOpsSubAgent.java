@@ -2,7 +2,7 @@ package cn.lgs.orbisops.trigger.ops;
 
 import cn.lgs.orbisops.api.dto.OpsAgentRunRequestDTO;
 import cn.lgs.orbisops.api.dto.OpsAnalysisResponseDTO;
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
 import org.springframework.ai.document.Document;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -20,7 +20,7 @@ import static cn.lgs.orbisops.trigger.ops.OpsMainAgentPlanner.SOURCE_RAG;
 public class RagKnowledgeOpsSubAgent extends AbstractOpsSubAgent {
 
     private final OpsSubAgentDecisionService decisionService;
-    private final AiModelAvailability aiModelAvailability;
+    private final ModelAvailabilityPort aiModelAvailability;
     private final OpsRunCancellationRegistry cancellationRegistry;
     private final OpsRagKnowledgeRetrievalService retrievalService;
     private final OpsRagKnowledgeSettings settings;
@@ -30,7 +30,7 @@ public class RagKnowledgeOpsSubAgent extends AbstractOpsSubAgent {
 
     @Autowired
     public RagKnowledgeOpsSubAgent(OpsSubAgentDecisionService decisionService,
-                                   AiModelAvailability aiModelAvailability,
+                                   ModelAvailabilityPort aiModelAvailability,
                                    OpsRunCancellationRegistry cancellationRegistry,
                                    OpsRagKnowledgeRetrievalService retrievalService,
                                    OpsRagKnowledgeSettings settings,
@@ -48,7 +48,7 @@ public class RagKnowledgeOpsSubAgent extends AbstractOpsSubAgent {
 
     RagKnowledgeOpsSubAgent(
             OpsSubAgentDecisionService decisionService,
-            AiModelAvailability aiModelAvailability,
+            ModelAvailabilityPort aiModelAvailability,
             OpsRunCancellationRegistry cancellationRegistry,
             OpsRagKnowledgeRetrievalService retrievalService,
             OpsRagKnowledgeSettings settings,

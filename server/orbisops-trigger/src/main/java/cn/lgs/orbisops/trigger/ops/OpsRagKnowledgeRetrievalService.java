@@ -1,7 +1,7 @@
 package cn.lgs.orbisops.trigger.ops;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IRagKnowledgeRepository;
-import cn.lgs.orbisops.domain.agent.model.valobj.AiClientAdvisorVO;
+import cn.lgs.orbisops.domain.knowledge.rag.repository.IRagKnowledgeRepository;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagRetrievalSettings;
 import cn.lgs.orbisops.trigger.ops.rag.RagMultimodalEmbeddingService;
 import cn.lgs.orbisops.trigger.ops.rag.advisor.RagAnswerAdvisor;
 import org.springframework.ai.document.Document;
@@ -44,7 +44,7 @@ public final class OpsRagKnowledgeRetrievalService {
                         : 5)
                 .filterExpression(input.knowledgeFilter())
                 .build();
-        AiClientAdvisorVO.RagAnswer config = buildConfig(input);
+        RagRetrievalSettings config = buildConfig(input);
         Map<String, Object> context = buildContext(input);
         List<Document> documents = retrievalExecutor.retrieve(
                 input,
@@ -63,7 +63,7 @@ public final class OpsRagKnowledgeRetrievalService {
     private List<Document> retrieveWithAdvisor(
             Input input,
             SearchRequest searchRequest,
-            AiClientAdvisorVO.RagAnswer config,
+            RagRetrievalSettings config,
             Map<String, Object> context) {
         RagAnswerAdvisor advisor = new RagAnswerAdvisor(
                 input.vectorStore(),
@@ -98,9 +98,9 @@ public final class OpsRagKnowledgeRetrievalService {
         return context;
     }
 
-    private AiClientAdvisorVO.RagAnswer buildConfig(Input input) {
+    private RagRetrievalSettings buildConfig(Input input) {
         Settings settings = input.settings();
-        AiClientAdvisorVO.RagAnswer config = new AiClientAdvisorVO.RagAnswer();
+        RagRetrievalSettings config = new RagRetrievalSettings();
         config.setRetrievalMode("auto");
         config.setVectorTopK(settings.rerankEnabled()
                 ? Math.max(5, Math.min(settings.rerankCandidateTopK(), 20))
@@ -183,7 +183,7 @@ public final class OpsRagKnowledgeRetrievalService {
         List<Document> retrieve(
                 Input input,
                 SearchRequest searchRequest,
-                AiClientAdvisorVO.RagAnswer config,
+                RagRetrievalSettings config,
                 Map<String, Object> context);
     }
 

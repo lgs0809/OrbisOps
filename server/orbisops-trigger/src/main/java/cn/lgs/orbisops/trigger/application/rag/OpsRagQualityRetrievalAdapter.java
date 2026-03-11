@@ -3,8 +3,8 @@ package cn.lgs.orbisops.trigger.application.rag;
 import cn.lgs.orbisops.application.rag.RagQualityProbeCommand;
 import cn.lgs.orbisops.application.rag.RagQualityRetrievalHit;
 import cn.lgs.orbisops.application.rag.RagQualityRetrievalPort;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IRagKnowledgeRepository;
-import cn.lgs.orbisops.domain.agent.model.valobj.AiClientAdvisorVO;
+import cn.lgs.orbisops.domain.knowledge.rag.repository.IRagKnowledgeRepository;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagRetrievalSettings;
 import cn.lgs.orbisops.trigger.ops.rag.RagMultimodalEmbeddingService;
 import cn.lgs.orbisops.trigger.ops.rag.advisor.RagAnswerAdvisor;
 import org.springframework.ai.document.Document;
@@ -49,7 +49,7 @@ public final class OpsRagQualityRetrievalAdapter
     public List<RagQualityRetrievalHit<Map<String, Object>>> retrieve(
             RagQualityProbeCommand command) {
         Map<String, Object> context = context(command);
-        AiClientAdvisorVO.RagAnswer ragAnswer = answer(command);
+        RagRetrievalSettings ragAnswer = answer(command);
         RagAnswerAdvisor advisor = new RagAnswerAdvisor(
                 vectorStoreProvider.getIfAvailable(),
                 SearchRequest.builder().topK(Math.max(command.topK(), 8)).build(),
@@ -76,8 +76,8 @@ public final class OpsRagQualityRetrievalAdapter
         return context;
     }
 
-    private AiClientAdvisorVO.RagAnswer answer(RagQualityProbeCommand command) {
-        AiClientAdvisorVO.RagAnswer ragAnswer = new AiClientAdvisorVO.RagAnswer();
+    private RagRetrievalSettings answer(RagQualityProbeCommand command) {
+        RagRetrievalSettings ragAnswer = new RagRetrievalSettings();
         ragAnswer.setRetrievalMode(command.retrievalMode());
         ragAnswer.setDynamicSearch(true);
         ragAnswer.setVectorTopK(Math.max(command.topK(), 8));

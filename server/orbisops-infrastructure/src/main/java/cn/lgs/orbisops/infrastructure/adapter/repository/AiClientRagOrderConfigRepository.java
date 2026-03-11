@@ -1,87 +1,150 @@
 package cn.lgs.orbisops.infrastructure.adapter.repository;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientRagOrderConfigRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.AiClientConfigRecord;
+import cn.lgs.orbisops.application.rag.RagOrderCatalogPort;
+import cn.lgs.orbisops.application.rag.RagOrderDefinition;
+import cn.lgs.orbisops.application.rag.RagTagOrderPort;
 import cn.lgs.orbisops.infrastructure.dao.IAiClientRagOrderDao;
 import cn.lgs.orbisops.infrastructure.dao.po.AiClientRagOrder;
-import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Repository;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import java.util.List;
+import java.util.Locale;
+import java.util.UUID;
 
+/** MyBatis adapter for the typed knowledge-base catalog. */
 @Repository
-public class AiClientRagOrderConfigRepository implements IAiClientRagOrderConfigRepository {
+public class AiClientRagOrderConfigRepository implements RagOrderCatalogPort, RagTagOrderPort {
 
-    @Autowired(required = false)
-    private IAiClientRagOrderDao dao;
+    private final ObjectProvider<IAiClientRagOrderDao> daoProvider;
 
-    @Override
-    public int insert(AiClientConfigRecord record) {
-        return dao == null ? 0 : dao.insert(toPo(record));
+    public AiClientRagOrderConfigRepository(ObjectProvider<IAiClientRagOrderDao> daoProvider) {
+        this.daoProvider = daoProvider;
     }
 
     @Override
-    public int updateById(AiClientConfigRecord record) {
-        return dao == null ? 0 : dao.updateById(toPo(record));
+    public boolean insert(RagOrderDefinition definition) {
+        IAiClientRagOrderDao dao = dao();
+        return dao != null && dao.insert(toPo(definition)) > 0;
     }
 
     @Override
-    public int updateByRagId(AiClientConfigRecord record) {
-        return dao == null ? 0 : dao.updateByRagId(toPo(record));
+    public boolean updateById(RagOrderDefinition definition) {
+        IAiClientRagOrderDao dao = dao();
+        return dao != null && dao.updateById(toPo(definition)) > 0;
     }
 
     @Override
-    public int deleteById(Long id) {
-        return dao == null ? 0 : dao.deleteById(id);
+    public boolean updateByRagId(RagOrderDefinition definition) {
+        IAiClientRagOrderDao dao = dao();
+        return dao != null && dao.updateByRagId(toPo(definition)) > 0;
     }
 
     @Override
-    public int deleteByRagId(String ragId) {
-        return dao == null ? 0 : dao.deleteByRagId(ragId);
+    public boolean deleteById(Long id) {
+        IAiClientRagOrderDao dao = dao();
+        return dao != null && dao.deleteById(id) > 0;
     }
 
     @Override
-    public AiClientConfigRecord queryById(Long id) {
-        return dao == null ? null : toRecord(dao.queryById(id));
+    public boolean deleteByRagId(String ragId) {
+        IAiClientRagOrderDao dao = dao();
+        return dao != null && dao.deleteByRagId(ragId) > 0;
     }
 
     @Override
-    public AiClientConfigRecord queryByRagId(String ragId) {
-        return dao == null ? null : toRecord(dao.queryByRagId(ragId));
+    public RagOrderDefinition queryById(Long id) {
+        IAiClientRagOrderDao dao = dao();
+        return dao == null ? null : toDefinition(dao.queryById(id));
     }
 
     @Override
-    public List<AiClientConfigRecord> queryEnabledRagOrders() {
-        return dao == null ? List.of() : toRecords(dao.queryEnabledRagOrders());
+    public RagOrderDefinition queryByRagId(String ragId) {
+        IAiClientRagOrderDao dao = dao();
+        return dao == null ? null : toDefinition(dao.queryByRagId(ragId));
     }
 
     @Override
-    public List<AiClientConfigRecord> queryByKnowledgeTag(String knowledgeTag) {
-        return dao == null ? List.of() : toRecords(dao.queryByKnowledgeTag(knowledgeTag));
+    public List<RagOrderDefinition> queryEnabled() {
+        IAiClientRagOrderDao dao = dao();
+        return dao == null ? List.of() : definitions(dao.queryEnabledRagOrders());
     }
 
     @Override
-    public List<AiClientConfigRecord> queryAll() {
-        return dao == null ? List.of() : toRecords(dao.queryAll());
+    public List<RagOrderDefinition> queryByKnowledgeTag(String knowledgeTag) {
+        IAiClientRagOrderDao dao = dao();
+        return dao == null ? List.of() : definitions(dao.queryByKnowledgeTag(knowledgeTag));
     }
 
-    private AiClientRagOrder toPo(AiClientConfigRecord record) {
-        AiClientRagOrder po = new AiClientRagOrder();
-        BeanUtils.copyProperties(record, po);
-        return po;
+    @Override
+    public List<RagOrderDefinition> queryAll() {
+        IAiClientRagOrderDao dao = dao();
+        return dao == null ? List.of() : definitions(dao.queryAll());
     }
 
-    private AiClientConfigRecord toRecord(AiClientRagOrder po) {
+    @Override
+    public void create(String ragName, String knowledgeTag) {
+        String normalizedName = required(ragName, "RAG_NAME_REQUIRED");
+        String normalizedTag = required(knowledgeTag, "RAG_KNOWLEDGE_TAG_REQUIRED");
+        IAiClientRagOrderDao dao = dao();
+        if (dao == null) {
+            return;
+        }
+        dao.insert(AiClientRagOrder.builder()
+                .ragId("RAG_" + UUID.randomUUID().toString()
+                        .replace("-", "")
+                        .substring(0, 16)
+                        .toUpperCase(Locale.ROOT))
+                .ragName(normalizedName)
+                .knowledgeTag(normalizedTag)
+                .status(1)
+                .build());
+    }
+
+    private IAiClientRagOrderDao dao() {
+        return daoProvider == null ? null : daoProvider.getIfAvailable();
+    }
+
+    private String required(String value, String reasonCode) {
+        String normalized = value == null ? "" : value.trim();
+        if (normalized.isBlank()) {
+            throw new IllegalArgumentException(reasonCode);
+        }
+        return normalized;
+    }
+
+    private AiClientRagOrder toPo(RagOrderDefinition definition) {
+        if (definition == null) {
+            throw new IllegalArgumentException("RAG_ORDER_DEFINITION_REQUIRED");
+        }
+        return AiClientRagOrder.builder()
+                .id(definition.id())
+                .ragId(definition.ragId())
+                .ragName(definition.ragName())
+                .knowledgeTag(definition.knowledgeTag())
+                .status(definition.status())
+                .createTime(definition.createTime())
+                .updateTime(definition.updateTime())
+                .build();
+    }
+
+    private RagOrderDefinition toDefinition(AiClientRagOrder po) {
         if (po == null) {
             return null;
         }
-        AiClientConfigRecord record = new AiClientConfigRecord();
-        BeanUtils.copyProperties(po, record);
-        return record;
+        return new RagOrderDefinition(
+                po.getId(),
+                po.getRagId(),
+                po.getRagName(),
+                po.getKnowledgeTag(),
+                po.getStatus(),
+                po.getCreateTime(),
+                po.getUpdateTime());
     }
 
-    private List<AiClientConfigRecord> toRecords(List<AiClientRagOrder> rows) {
-        return rows == null ? List.of() : rows.stream().map(this::toRecord).toList();
+    private List<RagOrderDefinition> definitions(List<AiClientRagOrder> rows) {
+        return rows == null || rows.isEmpty()
+                ? List.of()
+                : rows.stream().map(this::toDefinition).toList();
     }
 }

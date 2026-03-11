@@ -1,22 +1,21 @@
 package cn.lgs.orbisops.infrastructure.adapter.model;
 
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
+import cn.lgs.orbisops.application.model.ModelAvailabilitySnapshot;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.net.HttpURLConnection;
 import java.net.URI;
-import java.util.LinkedHashMap;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 /** Spring configuration and local endpoint readiness adapter for model-call availability. */
 @Component
-public final class SpringAiModelAvailabilityAdapter implements AiModelAvailability {
+public final class SpringAiModelAvailabilityAdapter implements ModelAvailabilityPort {
 
     private static final Set<String> PLACEHOLDER_KEYS = Set.of(
             "dev-placeholder-key", "dev-local-placeholder", "placeholder", "dummy",
@@ -110,29 +109,29 @@ public final class SpringAiModelAvailabilityAdapter implements AiModelAvailabili
     }
 
     @Override
-    public Map<String, Object> status() {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("modelCallsEnabled", modelCallsEnabled);
-        data.put("openAiBaseUrl", openAiBaseUrl);
-        data.put("embeddingBaseUrl", embeddingBaseUrl);
-        data.put("chatModel", chatModel);
-        data.put("embeddingModel", embeddingModel);
-        data.put("rerankProvider", rerankProvider);
-        data.put("rerankBaseUrl", rerankBaseUrl);
-        data.put("rerankModel", rerankModel);
-        data.put("openAiApiKeyConfigured", StringUtils.hasText(openAiApiKey));
-        data.put("openAiApiKeyUsable", isApiKeyUsable(openAiApiKey));
-        data.put("embeddingApiKeyConfigured", StringUtils.hasText(embeddingApiKey));
-        data.put("embeddingApiKeyUsable", isApiKeyUsable(embeddingApiKey));
-        data.put("embeddingLocalEndpointReady", localEndpointReadyIfRequired(embeddingBaseUrl, embeddingApiKey));
-        data.put("rerankApiKeyConfigured", StringUtils.hasText(rerankApiKey));
-        data.put("rerankApiKeyUsable", isApiKeyUsable(rerankApiKey));
-        data.put("rerankLocalEndpointReady", localEndpointReadyIfRequired(rerankBaseUrl, rerankApiKey));
-        data.put("chatAvailable", isChatAvailable());
-        data.put("embeddingAvailable", isEmbeddingAvailable());
-        data.put("rerankAvailable", isRerankAvailable(rerankApiKey));
-        data.put("message", isChatAvailable() ? "模型调用已启用。" : unavailableMessage("大模型功能"));
-        return data;
+    public ModelAvailabilitySnapshot snapshot() {
+        boolean chatAvailable = isChatAvailable();
+        return new ModelAvailabilitySnapshot(
+                modelCallsEnabled,
+                openAiBaseUrl,
+                embeddingBaseUrl,
+                chatModel,
+                embeddingModel,
+                rerankProvider,
+                rerankBaseUrl,
+                rerankModel,
+                StringUtils.hasText(openAiApiKey),
+                isApiKeyUsable(openAiApiKey),
+                StringUtils.hasText(embeddingApiKey),
+                isApiKeyUsable(embeddingApiKey),
+                localEndpointReadyIfRequired(embeddingBaseUrl, embeddingApiKey),
+                StringUtils.hasText(rerankApiKey),
+                isApiKeyUsable(rerankApiKey),
+                localEndpointReadyIfRequired(rerankBaseUrl, rerankApiKey),
+                chatAvailable,
+                isEmbeddingAvailable(),
+                isRerankAvailable(rerankApiKey),
+                chatAvailable ? "模型调用已启用。" : unavailableMessage("大模型功能"));
     }
 
     private boolean localEndpointReadyIfRequired(String baseUrl, String apiKey) {

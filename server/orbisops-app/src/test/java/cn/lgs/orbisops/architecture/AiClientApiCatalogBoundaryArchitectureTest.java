@@ -16,6 +16,8 @@ class AiClientApiCatalogBoundaryArchitectureTest {
             "orbisops-application/src/main/java/cn/lgs/orbisops/application/config/";
     private static final String TRIGGER_CONFIG =
             "orbisops-trigger/src/main/java/cn/lgs/orbisops/trigger/application/config/";
+    private static final String INFRASTRUCTURE_REPOSITORY =
+            "orbisops-infrastructure/src/main/java/cn/lgs/orbisops/infrastructure/adapter/repository/";
 
     @Test
     void catalogCrudSecretResolutionFilteringAndAuditMustBelongToTypedApplicationBoundary()
@@ -25,6 +27,7 @@ class AiClientApiCatalogBoundaryArchitectureTest {
         String port = read(APPLICATION_CONFIG + "AiClientApiCatalogPort.java");
         String auditPort = read(APPLICATION_CONFIG + "AiClientApiCatalogAuditPort.java");
         String useCase = read(APPLICATION_CONFIG + "AiClientApiCatalogUseCase.java");
+        String repository = read(INFRASTRUCTURE_REPOSITORY + "AiClientApiConfigRepository.java");
         String adapter = read(TRIGGER_CONFIG + "OpsAiClientApiCatalogAdapter.java");
         String configuration = read(TRIGGER_CONFIG + "AiClientApiCatalogConfiguration.java");
         String facade = read(TRIGGER_CONFIG + "AiClientApiApplicationService.java");
@@ -51,12 +54,17 @@ class AiClientApiCatalogBoundaryArchitectureTest {
                 () -> assertFalse(useCase.contains("AiClientConfigRecord")),
                 () -> assertFalse(useCase.contains("OpsConfigAuditService")),
                 () -> assertFalse(useCase.contains("org.springframework")),
-                () -> assertTrue(adapter.contains("implements AiClientApiCatalogPort, AiClientApiCatalogAuditPort")),
-                () -> assertTrue(adapter.contains("private final IAiClientApiConfigRepository repository")),
+                () -> assertTrue(repository.contains("implements AiClientApiCatalogPort")),
+                () -> assertTrue(repository.contains("AiClientApiDefinition")),
+                () -> assertFalse(repository.contains("domain.agent")),
+                () -> assertFalse(repository.contains("AiClientConfigRecord")),
+                () -> assertTrue(adapter.contains("implements AiClientApiCatalogAuditPort")),
+                () -> assertFalse(adapter.contains("AiClientApiCatalogPort")),
+                () -> assertFalse(adapter.contains("Repository")),
                 () -> assertTrue(adapter.contains("private final OpsConfigAuditService auditService")),
-                () -> assertTrue(adapter.contains("AiClientConfigRecord.builder()")),
                 () -> assertTrue(adapter.contains("apiKey(hasText(definition.apiKey()) ? MASK")),
                 () -> assertTrue(configuration.contains("AiClientApiCatalogUseCase aiClientApiCatalogUseCase")),
+                () -> assertTrue(configuration.contains("AiClientApiCatalogPort catalogPort")),
                 () -> assertTrue(configuration.contains(
                         "OpsAiClientApiCatalogAdapter opsAiClientApiCatalogAdapter")),
                 () -> assertTrue(configuration.contains("new OpsAiClientApiCatalogAdapter")),

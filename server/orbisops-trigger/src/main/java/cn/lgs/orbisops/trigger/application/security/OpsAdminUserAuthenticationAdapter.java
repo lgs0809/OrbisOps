@@ -1,7 +1,6 @@
 package cn.lgs.orbisops.trigger.application.security;
 
 import cn.lgs.orbisops.application.security.AdminUserAuthenticationPort;
-import cn.lgs.orbisops.domain.agent.model.entity.AdminUserRecord;
 import cn.lgs.orbisops.domain.security.AdminUserAccount;
 
 /** Authentication protocol adapter backed by the existing AdminAuthService. */
@@ -33,24 +32,11 @@ public final class OpsAdminUserAuthenticationAdapter implements AdminUserAuthent
 
     @Override
     public String issueToken(AdminUserAccount account) {
-        return authenticationService.issueToken(record(account));
+        return authenticationService.issueToken(account);
     }
 
     @Override
     public boolean revokeAuthorization(String authorization) {
         return authenticationService.revokeAuthorization(authorization);
-    }
-
-    private AdminUserRecord record(AdminUserAccount account) {
-        return AdminUserRecord.builder()
-                .id(account.id())
-                .userId(account.userId())
-                .username(account.username())
-                .password(account.credential())
-                .userRole(account.role() == null ? null : account.role().value())
-                .status(account.status())
-                .createTime(account.createTime())
-                .updateTime(account.updateTime())
-                .build();
     }
 }

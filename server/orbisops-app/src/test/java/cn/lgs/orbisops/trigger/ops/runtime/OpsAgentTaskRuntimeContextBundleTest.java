@@ -169,7 +169,7 @@ class OpsRuntimeContextBundleTest {
                         null,
                         System.nanoTime()));
 
-        assertTrue(error.getMessage().contains("AiModelAvailability 未初始化"));
+        assertTrue(error.getMessage().contains("模型可用性服务未初始化"));
         assertTrue(events.stream().anyMatch(event -> "MODEL_CALL_BLOCKED".equals(event.getEventType())));
     }
 

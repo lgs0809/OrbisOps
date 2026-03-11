@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.trigger.application.rag;
 
-import cn.lgs.orbisops.domain.agent.model.entity.RagFileResource;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagFileResource;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;

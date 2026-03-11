@@ -1,7 +1,7 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IRagKnowledgeRepository;
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.domain.knowledge.rag.repository.IRagKnowledgeRepository;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
 import cn.lgs.orbisops.trigger.ops.rag.RagMultimodalEmbeddingService;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -61,7 +61,7 @@ public class OpsNodeRagConfiguration {
             ObjectProvider<VectorStore> vectorStoreProvider,
             ObjectProvider<RagMultimodalEmbeddingService> multimodalProvider,
             @Qualifier("ragEmbeddingModel") ObjectProvider<EmbeddingModel> embeddingProvider,
-            AiModelAvailability aiModelAvailability,
+            ModelAvailabilityPort aiModelAvailability,
             IRagKnowledgeRepository ragKnowledgeRepository) {
         return new OpsNodeRagAdvisorFactory(
                 vectorStoreProvider::getIfAvailable,

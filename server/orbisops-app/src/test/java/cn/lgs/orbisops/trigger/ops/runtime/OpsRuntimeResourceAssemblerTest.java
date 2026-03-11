@@ -1,13 +1,13 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
 import cn.lgs.orbisops.api.dto.OpsAgentRunRequestDTO;
+import cn.lgs.orbisops.application.config.AiClientApiCatalogPort;
+import cn.lgs.orbisops.application.config.AiClientModelCatalogPort;
 import cn.lgs.orbisops.application.project.ProjectKnowledgeAuthorizationApplicationService;
 import cn.lgs.orbisops.application.project.ProjectMcpAuthorizationApplicationService;
 import cn.lgs.orbisops.application.project.ProjectSkillAuthorizationApplicationService;
 import cn.lgs.orbisops.application.skill.SkillCatalogQueryService;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientApiConfigRepository;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientModelConfigRepository;
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
 import cn.lgs.orbisops.domain.worksession.runtime.model.AgentExecutionStyle;
 import cn.lgs.orbisops.domain.worksession.runtime.model.AgentExecutionStage;
 import cn.lgs.orbisops.domain.worksession.runtime.model.AgentRunExecutionContext;
@@ -53,8 +53,8 @@ class OpsRuntimeResourceAssemblerTest {
     @Test
     void shouldFallbackToDefaultChatModelWhenConfiguredModelMissing() {
         ChatModel defaultChatModel = mock(ChatModel.class);
-        IAiClientModelConfigRepository modelDao = mock(IAiClientModelConfigRepository.class);
-        when(modelDao.queryByModelId("missing-model")).thenReturn(null);
+        AiClientModelCatalogPort modelDao = mock(AiClientModelCatalogPort.class);
+        when(modelDao.findByModelId("missing-model")).thenReturn(null);
 
         OpsMcpToolProvider mcpToolProvider = mock(OpsMcpToolProvider.class);
         when(mcpToolProvider.buildToolCallbacks(anyList())).thenReturn(List.of());
@@ -62,7 +62,7 @@ class OpsRuntimeResourceAssemblerTest {
                 modelResolver(
                         defaultChatModel,
                         modelDao,
-                        mock(IAiClientApiConfigRepository.class)),
+                        mock(AiClientApiCatalogPort.class)),
                 mcpResolver(mcpToolProvider),
                 skillResolver(null),
                 knowledgeResolver(null),
@@ -670,14 +670,14 @@ class OpsRuntimeResourceAssemblerTest {
 
     private static OpsRuntimeModelResolver modelResolver(
             ChatModel defaultChatModel,
-            IAiClientModelConfigRepository modelRepository,
-            IAiClientApiConfigRepository apiRepository) {
+            AiClientModelCatalogPort modelRepository,
+            AiClientApiCatalogPort apiRepository) {
         return new OpsRuntimeModelResolver(
                 () -> defaultChatModel,
                 () -> defaultChatModel,
                 () -> modelRepository,
                 () -> apiRepository,
-                mock(AiModelAvailability.class),
+                mock(ModelAvailabilityPort.class),
                 new OpsSecretResolver(mock(Environment.class)),
                 OpsRuntimeModelSettings.forTest(5, 45));
     }

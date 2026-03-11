@@ -1,92 +1,132 @@
 package cn.lgs.orbisops.infrastructure.adapter.repository;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientModelConfigRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.AiClientConfigRecord;
+import cn.lgs.orbisops.application.config.AiClientModelCatalogPort;
+import cn.lgs.orbisops.application.config.AiClientModelDefinition;
 import cn.lgs.orbisops.infrastructure.dao.IAiClientModelDao;
 import cn.lgs.orbisops.infrastructure.dao.po.AiClientModel;
-import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Repository;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import java.util.List;
 
+/** MyBatis adapter for the typed AI model catalog. */
 @Repository
-public class AiClientModelConfigRepository implements IAiClientModelConfigRepository {
+public class AiClientModelConfigRepository implements AiClientModelCatalogPort {
 
-    @Autowired(required = false)
-    private IAiClientModelDao dao;
+    private final ObjectProvider<IAiClientModelDao> daoProvider;
 
-    @Override
-    public int insert(AiClientConfigRecord record) {
-        return dao == null ? 0 : dao.insert(toPo(record));
+    public AiClientModelConfigRepository(ObjectProvider<IAiClientModelDao> daoProvider) {
+        this.daoProvider = daoProvider;
     }
 
     @Override
-    public int updateById(AiClientConfigRecord record) {
-        return dao == null ? 0 : dao.updateById(toPo(record));
+    public boolean insert(AiClientModelDefinition definition) {
+        IAiClientModelDao dao = dao();
+        return dao != null && dao.insert(toPo(definition)) > 0;
     }
 
     @Override
-    public int updateByModelId(AiClientConfigRecord record) {
-        return dao == null ? 0 : dao.updateByModelId(toPo(record));
+    public boolean updateById(AiClientModelDefinition definition) {
+        IAiClientModelDao dao = dao();
+        return dao != null && dao.updateById(toPo(definition)) > 0;
     }
 
     @Override
-    public int deleteById(Long id) {
-        return dao == null ? 0 : dao.deleteById(id);
+    public boolean updateByModelId(AiClientModelDefinition definition) {
+        IAiClientModelDao dao = dao();
+        return dao != null && dao.updateByModelId(toPo(definition)) > 0;
     }
 
     @Override
-    public int deleteByModelId(String modelId) {
-        return dao == null ? 0 : dao.deleteByModelId(modelId);
+    public boolean deleteById(Long id) {
+        IAiClientModelDao dao = dao();
+        return dao != null && dao.deleteById(id) > 0;
     }
 
     @Override
-    public AiClientConfigRecord queryById(Long id) {
-        return dao == null ? null : toRecord(dao.queryById(id));
+    public boolean deleteByModelId(String modelId) {
+        IAiClientModelDao dao = dao();
+        return dao != null && dao.deleteByModelId(modelId) > 0;
     }
 
     @Override
-    public AiClientConfigRecord queryByModelId(String modelId) {
-        return dao == null ? null : toRecord(dao.queryByModelId(modelId));
+    public AiClientModelDefinition findById(Long id) {
+        IAiClientModelDao dao = dao();
+        return dao == null ? null : toDefinition(dao.queryById(id));
     }
 
     @Override
-    public List<AiClientConfigRecord> queryByApiId(String apiId) {
-        return dao == null ? List.of() : toRecords(dao.queryByApiId(apiId));
+    public AiClientModelDefinition findByModelId(String modelId) {
+        IAiClientModelDao dao = dao();
+        return dao == null ? null : toDefinition(dao.queryByModelId(modelId));
     }
 
     @Override
-    public List<AiClientConfigRecord> queryByModelType(String modelType) {
-        return dao == null ? List.of() : toRecords(dao.queryByModelType(modelType));
+    public List<AiClientModelDefinition> findByApiId(String apiId) {
+        IAiClientModelDao dao = dao();
+        return dao == null ? List.of() : definitions(dao.queryByApiId(apiId));
     }
 
     @Override
-    public List<AiClientConfigRecord> queryEnabledModels() {
-        return dao == null ? List.of() : toRecords(dao.queryEnabledModels());
+    public List<AiClientModelDefinition> findByModelType(String modelType) {
+        IAiClientModelDao dao = dao();
+        return dao == null ? List.of() : definitions(dao.queryByModelType(modelType));
     }
 
     @Override
-    public List<AiClientConfigRecord> queryAll() {
-        return dao == null ? List.of() : toRecords(dao.queryAll());
+    public List<AiClientModelDefinition> listEnabled() {
+        IAiClientModelDao dao = dao();
+        return dao == null ? List.of() : definitions(dao.queryEnabledModels());
     }
 
-    private AiClientModel toPo(AiClientConfigRecord record) {
-        AiClientModel po = new AiClientModel();
-        BeanUtils.copyProperties(record, po);
-        return po;
+    @Override
+    public List<AiClientModelDefinition> listAll() {
+        IAiClientModelDao dao = dao();
+        return dao == null ? List.of() : definitions(dao.queryAll());
     }
 
-    private AiClientConfigRecord toRecord(AiClientModel po) {
+    private IAiClientModelDao dao() {
+        return daoProvider == null ? null : daoProvider.getIfAvailable();
+    }
+
+    private AiClientModel toPo(AiClientModelDefinition definition) {
+        if (definition == null) {
+            throw new IllegalArgumentException("AI_CLIENT_MODEL_DEFINITION_REQUIRED");
+        }
+        return AiClientModel.builder()
+                .id(definition.id())
+                .modelId(definition.modelId())
+                .apiId(definition.apiId())
+                .modelName(definition.modelName())
+                .modelType(definition.modelType())
+                .modelUsage(definition.modelUsage())
+                .description(definition.description())
+                .status(definition.status())
+                .createTime(definition.createTime())
+                .updateTime(definition.updateTime())
+                .build();
+    }
+
+    private AiClientModelDefinition toDefinition(AiClientModel po) {
         if (po == null) {
             return null;
         }
-        AiClientConfigRecord record = new AiClientConfigRecord();
-        BeanUtils.copyProperties(po, record);
-        return record;
+        return new AiClientModelDefinition(
+                po.getId(),
+                po.getModelId(),
+                po.getApiId(),
+                po.getModelName(),
+                po.getModelType(),
+                po.getModelUsage(),
+                po.getDescription(),
+                po.getStatus(),
+                po.getCreateTime(),
+                po.getUpdateTime());
     }
 
-    private List<AiClientConfigRecord> toRecords(List<AiClientModel> rows) {
-        return rows == null ? List.of() : rows.stream().map(this::toRecord).toList();
+    private List<AiClientModelDefinition> definitions(List<AiClientModel> rows) {
+        return rows == null || rows.isEmpty()
+                ? List.of()
+                : rows.stream().map(this::toDefinition).toList();
     }
 }

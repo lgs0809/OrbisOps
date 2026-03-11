@@ -46,11 +46,13 @@ class RuntimeMcpResourceBoundaryArchitectureTest {
     }
 
     @Test
-    void legacyMapperMustOwnOnlyPersistenceCompatibilityConversion() throws IOException {
+    void legacyMapperMustOwnOnlyTypedCatalogTransportConversion() throws IOException {
         String mapper = read(RUNTIME + "OpsLegacyMcpConfigMapper.java");
 
         assertAll(
-                () -> assertTrue(mapper.contains("AiClientConfigRecord")),
+                () -> assertTrue(mapper.contains("McpClientDefinition")),
+                () -> assertFalse(mapper.contains("AiClientConfigRecord")),
+                () -> assertFalse(mapper.contains("domain.agent")),
                 () -> assertTrue(mapper.contains("JSON.parseObject")),
                 () -> assertTrue(mapper.contains("toolCapabilities")),
                 () -> assertTrue(mapper.contains("allowedTools")),
@@ -103,7 +105,9 @@ class RuntimeMcpResourceBoundaryArchitectureTest {
                 () -> assertTrue(configuration.contains("new OpsRuntimeMcpResolver(")),
                 () -> assertTrue(configuration.contains("authorizationProvider::getIfAvailable")),
                 () -> assertTrue(projectSource.contains("ObjectProvider<OpsProjectMcpRuntimeConfigService>")),
-                () -> assertTrue(legacySource.contains("ObjectProvider<IAiClientToolMcpConfigRepository>")),
+                () -> assertTrue(legacySource.contains("ObjectProvider<McpClientCatalogPort>")),
+                () -> assertFalse(legacySource.contains("IAiClientToolMcpConfigRepository")),
+                () -> assertFalse(legacySource.contains("AiClientConfigRecord")),
                 () -> assertTrue(legacySource.contains("ObjectProvider<ProjectMcpAuthorizationApplicationService>")),
                 () -> assertTrue(repositorySource.contains("ObjectProvider<OpsSourceRepositoryService>")),
                 () -> assertTrue(configuration.lines().count() < 45));

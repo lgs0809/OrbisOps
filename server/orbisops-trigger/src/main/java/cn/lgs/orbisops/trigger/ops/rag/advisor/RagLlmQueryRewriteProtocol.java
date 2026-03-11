@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.trigger.ops.rag.advisor;
 
-import cn.lgs.orbisops.domain.agent.model.valobj.AiClientAdvisorVO;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagRetrievalSettings;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 
@@ -55,13 +55,13 @@ public final class RagLlmQueryRewriteProtocol {
 
     public RagLlmQueryRewriteResult rewrite(String userText,
                                             Map<String, Object> context,
-                                            AiClientAdvisorVO.RagAnswer configured,
+                                            RagRetrievalSettings configured,
                                             List<String> seedQueries,
                                             boolean lowRecallRetry,
                                             String defaultFilterExpression) {
         Map<String, Object> safeContext = context == null ? Map.of() : context;
-        AiClientAdvisorVO.RagAnswer settings = configured == null
-                ? new AiClientAdvisorVO.RagAnswer()
+        RagRetrievalSettings settings = configured == null
+                ? new RagRetrievalSettings()
                 : configured;
         List<String> fallbackQueries = seedQueries == null ? List.of(userText) : seedQueries;
 

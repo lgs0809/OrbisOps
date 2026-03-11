@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.trigger.application.rag;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IRagMultimodalRepository;
+import cn.lgs.orbisops.domain.knowledge.rag.repository.IRagMultimodalRepository;
 import cn.lgs.orbisops.trigger.ops.rag.RagMultimodalRuntimeComponents;
 import cn.lgs.orbisops.trigger.ops.rag.RagMultimodalRuntimeFactory;
 import cn.lgs.orbisops.trigger.ops.rag.RagMultimodalSettings;

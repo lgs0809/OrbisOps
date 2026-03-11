@@ -1,9 +1,9 @@
 package cn.lgs.orbisops.infrastructure.adapter.repository;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IRagKnowledgeRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.RagDocument;
-import cn.lgs.orbisops.domain.agent.model.entity.RagKnowledgeDocumentRecord;
-import cn.lgs.orbisops.domain.agent.model.entity.RagLexicalChunkRecord;
+import cn.lgs.orbisops.domain.knowledge.rag.repository.IRagKnowledgeRepository;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagDocument;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagKnowledgeDocumentRecord;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagLexicalChunkRecord;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import lombok.extern.slf4j.Slf4j;

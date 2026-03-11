@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.trigger.ops.rag;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IRagMultimodalRepository;
+import cn.lgs.orbisops.domain.knowledge.rag.repository.IRagMultimodalRepository;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 

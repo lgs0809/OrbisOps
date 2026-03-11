@@ -5,7 +5,6 @@ import cn.lgs.orbisops.application.config.McpClientCatalogPort;
 import cn.lgs.orbisops.application.config.McpClientCatalogUseCase;
 import cn.lgs.orbisops.application.config.McpClientRuntimeCachePort;
 import cn.lgs.orbisops.application.config.McpTransportConfigProtectionPort;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientToolMcpConfigRepository;
 import cn.lgs.orbisops.trigger.ops.OpsConfigAuditService;
 import cn.lgs.orbisops.trigger.ops.runtime.OpsMcpToolProvider;
 import org.springframework.beans.factory.ObjectProvider;
@@ -15,11 +14,6 @@ import org.springframework.context.annotation.Configuration;
 /** Spring assembly for the MCP client catalog Application boundary. */
 @Configuration
 public class McpClientCatalogConfiguration {
-
-    @Bean
-    public McpClientCatalogPort mcpClientCatalogPort(IAiClientToolMcpConfigRepository repository) {
-        return new OpsMcpClientCatalogAdapter(repository);
-    }
 
     @Bean
     public McpClientAuditPort mcpClientAuditPort(OpsConfigAuditService auditService) {

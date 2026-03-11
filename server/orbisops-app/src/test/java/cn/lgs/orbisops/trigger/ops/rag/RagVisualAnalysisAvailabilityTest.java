@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.trigger.ops.rag;
 
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -41,7 +41,7 @@ class RagVisualAnalysisAvailabilityTest {
 
     @Test
     void modelAvailabilityPortMustGateConfiguredAnalyzer() {
-        AiModelAvailability models = mock(AiModelAvailability.class);
+        ModelAvailabilityPort models = mock(ModelAvailabilityPort.class);
         when(models.isRerankAvailable("sk-test")).thenReturn(false, true);
         RagVisualAnalysisAvailability availability = new RagVisualAnalysisAvailability(
                 settings(true, false, "openai", "https://api.example.com", "sk-test"),

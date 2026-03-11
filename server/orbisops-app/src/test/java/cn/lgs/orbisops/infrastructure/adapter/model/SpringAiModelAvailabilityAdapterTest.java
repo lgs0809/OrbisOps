@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.infrastructure.adapter.model;
 
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -11,7 +11,7 @@ class SpringAiModelAvailabilityAdapterTest {
 
     @Test
     void marksLocalEmbeddingUnavailableWhenSidecarIsNotReady() {
-        AiModelAvailability availability = availability();
+        ModelAvailabilityPort availability = availability();
         ReflectionTestUtils.setField(availability, "embeddingApiKey", "local-rag-models");
         ReflectionTestUtils.setField(availability, "embeddingBaseUrl", "http://127.0.0.1:1");
 
@@ -20,7 +20,7 @@ class SpringAiModelAvailabilityAdapterTest {
 
     @Test
     void doesNotProbeRemoteEmbeddingEndpoint() {
-        AiModelAvailability availability = availability();
+        ModelAvailabilityPort availability = availability();
         ReflectionTestUtils.setField(availability, "embeddingApiKey", "sk-real");
         ReflectionTestUtils.setField(availability, "embeddingBaseUrl", "https://api.example.com");
 
@@ -29,7 +29,7 @@ class SpringAiModelAvailabilityAdapterTest {
 
     @Test
     void rejectsPlaceholderKeysAndDisabledModelCalls() {
-        AiModelAvailability availability = availability();
+        ModelAvailabilityPort availability = availability();
         ReflectionTestUtils.setField(availability, "openAiApiKey", "dev-placeholder-key");
         assertFalse(availability.isChatAvailable());
         ReflectionTestUtils.setField(availability, "openAiApiKey", "sk-real");

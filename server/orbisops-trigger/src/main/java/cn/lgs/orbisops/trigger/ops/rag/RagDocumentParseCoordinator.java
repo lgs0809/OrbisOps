@@ -1,9 +1,9 @@
 package cn.lgs.orbisops.trigger.ops.rag;
 
 import cn.lgs.orbisops.application.rag.RagBinaryAssetPort;
-import cn.lgs.orbisops.domain.agent.model.entity.RagFileResource;
-import cn.lgs.orbisops.domain.agent.model.valobj.RagChunkDraft;
-import cn.lgs.orbisops.domain.agent.service.rag.RagChunkMaterializer;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagFileResource;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagChunkDraft;
+import cn.lgs.orbisops.domain.knowledge.rag.service.RagChunkMaterializer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 

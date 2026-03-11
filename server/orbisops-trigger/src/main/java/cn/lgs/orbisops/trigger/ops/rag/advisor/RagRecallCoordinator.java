@@ -1,7 +1,7 @@
 package cn.lgs.orbisops.trigger.ops.rag.advisor;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IRagKnowledgeRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.RagDocument;
+import cn.lgs.orbisops.domain.knowledge.rag.repository.IRagKnowledgeRepository;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagDocument;
 import cn.lgs.orbisops.trigger.ops.rag.RagMultimodalEmbeddingService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;

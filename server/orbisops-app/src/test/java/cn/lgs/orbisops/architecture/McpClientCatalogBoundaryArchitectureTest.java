@@ -16,6 +16,8 @@ class McpClientCatalogBoundaryArchitectureTest {
             "orbisops-application/src/main/java/cn/lgs/orbisops/application/config/";
     private static final String TRIGGER_CONFIG =
             "orbisops-trigger/src/main/java/cn/lgs/orbisops/trigger/application/config/";
+    private static final String INFRASTRUCTURE_REPOSITORY =
+            "orbisops-infrastructure/src/main/java/cn/lgs/orbisops/infrastructure/adapter/repository/";
 
     @Test
     void mcpClientCatalogMustRemainAHexagonalApplicationProcessManager() throws IOException {
@@ -24,7 +26,7 @@ class McpClientCatalogBoundaryArchitectureTest {
         String cachePort = read(APPLICATION_CONFIG + "McpClientRuntimeCachePort.java");
         String auditPort = read(APPLICATION_CONFIG + "McpClientAuditPort.java");
         String protectionPort = read(APPLICATION_CONFIG + "McpTransportConfigProtectionPort.java");
-        String catalogAdapter = read(TRIGGER_CONFIG + "OpsMcpClientCatalogAdapter.java");
+        String repository = read(INFRASTRUCTURE_REPOSITORY + "AiClientToolMcpConfigRepository.java");
         String cacheAdapter = read(TRIGGER_CONFIG + "OpsMcpClientRuntimeCacheAdapter.java");
         String auditAdapter = read(TRIGGER_CONFIG + "OpsMcpClientAuditAdapter.java");
         String protectionAdapter = read(TRIGGER_CONFIG + "OpsMcpTransportConfigProtectionAdapter.java");
@@ -49,11 +51,11 @@ class McpClientCatalogBoundaryArchitectureTest {
                 () -> assertFalse(useCase.contains("OpsMcpToolProvider")),
                 () -> assertFalse(useCase.contains("OpsConfigAuditService")),
                 () -> assertFalse(useCase.contains("DTO")),
-                () -> assertTrue(catalogAdapter.contains("IAiClientToolMcpConfigRepository")),
-                () -> assertTrue(catalogAdapter.contains("AiClientConfigRecord")),
-                () -> assertFalse(catalogAdapter.contains("OpsMcpToolProvider")),
-                () -> assertFalse(catalogAdapter.contains("OpsConfigAuditService")),
-                () -> assertFalse(catalogAdapter.contains("com.alibaba.fastjson")),
+                () -> assertTrue(repository.contains("implements McpClientCatalogPort")),
+                () -> assertTrue(repository.contains("McpClientDefinition")),
+                () -> assertFalse(repository.contains("domain.agent")),
+                () -> assertFalse(repository.contains("AiClientConfigRecord")),
+                () -> assertFalse(repository.contains("BeanUtils")),
                 () -> assertTrue(cacheAdapter.contains("OpsMcpToolProvider")),
                 () -> assertFalse(cacheAdapter.contains("IAiClientToolMcpConfigRepository")),
                 () -> assertTrue(auditAdapter.contains("OpsConfigAuditService")),

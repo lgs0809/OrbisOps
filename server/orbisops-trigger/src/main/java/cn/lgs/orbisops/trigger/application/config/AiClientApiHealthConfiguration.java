@@ -2,7 +2,7 @@ package cn.lgs.orbisops.trigger.application.config;
 
 import cn.lgs.orbisops.application.config.AiClientApiCatalogUseCase;
 import cn.lgs.orbisops.application.config.AiClientApiHealthCheckUseCase;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientApiHealthCheckRepository;
+import cn.lgs.orbisops.application.config.AiClientApiHealthRecordPort;
 import cn.lgs.orbisops.trigger.ops.OpsConfigAuditService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,18 +16,17 @@ public class AiClientApiHealthConfiguration {
     @Bean
     public AiClientApiHealthCheckUseCase aiClientApiHealthCheckUseCase(
             AiClientApiCatalogUseCase catalogUseCase,
-            IAiClientApiHealthCheckRepository healthRepository,
+            AiClientApiHealthRecordPort healthRecordPort,
             OpsConfigAuditService auditService) {
-        OpsAiClientApiHealthResultAdapter resultAdapter = new OpsAiClientApiHealthResultAdapter(
-                healthRepository,
-                auditService);
+        OpsAiClientApiHealthResultAdapter auditAdapter =
+                new OpsAiClientApiHealthResultAdapter(auditService);
         return new AiClientApiHealthCheckUseCase(
                 new OpsAiClientApiHealthTargetAdapter(catalogUseCase),
                 new OpsAiClientApiHealthHttpProbeAdapter(HttpClient.newBuilder()
                         .connectTimeout(Duration.ofSeconds(8))
                         .build()),
                 new OpsAiClientApiHealthOperatorAdapter(),
-                resultAdapter,
-                resultAdapter);
+                healthRecordPort,
+                auditAdapter);
     }
 }

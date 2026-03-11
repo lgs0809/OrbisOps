@@ -1,7 +1,7 @@
 package cn.lgs.orbisops.trigger.ops.rag.advisor;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IRagKnowledgeRepository;
-import cn.lgs.orbisops.domain.agent.model.valobj.AiClientAdvisorVO;
+import cn.lgs.orbisops.domain.knowledge.rag.repository.IRagKnowledgeRepository;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagRetrievalSettings;
 import cn.lgs.orbisops.trigger.ops.rag.RagMultimodalEmbeddingService;
 import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.client.ChatClientResponse;
@@ -25,7 +25,7 @@ import java.util.Map;
 
 public class RagAnswerAdvisor implements BaseAdvisor {
 
-    private final AiClientAdvisorVO.RagAnswer ragAnswer;
+    private final RagRetrievalSettings ragAnswer;
     private final RagRetrievalOrchestrator retrievalOrchestrator;
     private final RagContextRenderer contextRenderer;
     private final RagRetrievalPlanPolicy retrievalPlanPolicy;
@@ -34,16 +34,16 @@ public class RagAnswerAdvisor implements BaseAdvisor {
         this(vectorStore, searchRequest, null, null, null);
     }
 
-    public RagAnswerAdvisor(VectorStore vectorStore, SearchRequest searchRequest, AiClientAdvisorVO.RagAnswer ragAnswer, IRagKnowledgeRepository ragKnowledgeRepository) {
+    public RagAnswerAdvisor(VectorStore vectorStore, SearchRequest searchRequest, RagRetrievalSettings ragAnswer, IRagKnowledgeRepository ragKnowledgeRepository) {
         this(vectorStore, searchRequest, ragAnswer, ragKnowledgeRepository, null);
     }
 
-    public RagAnswerAdvisor(VectorStore vectorStore, SearchRequest searchRequest, AiClientAdvisorVO.RagAnswer ragAnswer, IRagKnowledgeRepository ragKnowledgeRepository, RagMultimodalEmbeddingService ragMultimodalEmbeddingService) {
+    public RagAnswerAdvisor(VectorStore vectorStore, SearchRequest searchRequest, RagRetrievalSettings ragAnswer, IRagKnowledgeRepository ragKnowledgeRepository, RagMultimodalEmbeddingService ragMultimodalEmbeddingService) {
         this(vectorStore, searchRequest, ragAnswer, ragKnowledgeRepository, ragMultimodalEmbeddingService, null);
     }
 
-    public RagAnswerAdvisor(VectorStore vectorStore, SearchRequest searchRequest, AiClientAdvisorVO.RagAnswer ragAnswer, IRagKnowledgeRepository ragKnowledgeRepository, RagMultimodalEmbeddingService ragMultimodalEmbeddingService, EmbeddingModel embeddingModel) {
-        this.ragAnswer = ragAnswer == null ? new AiClientAdvisorVO.RagAnswer() : ragAnswer;
+    public RagAnswerAdvisor(VectorStore vectorStore, SearchRequest searchRequest, RagRetrievalSettings ragAnswer, IRagKnowledgeRepository ragKnowledgeRepository, RagMultimodalEmbeddingService ragMultimodalEmbeddingService, EmbeddingModel embeddingModel) {
+        this.ragAnswer = ragAnswer == null ? new RagRetrievalSettings() : ragAnswer;
         RagRecallCoordinator recallCoordinator = new RagRecallCoordinator(
                 vectorStore,
                 searchRequest,

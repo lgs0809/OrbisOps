@@ -1,8 +1,8 @@
 package cn.lgs.orbisops.trigger.application.project;
 
 import cn.lgs.orbisops.application.project.ProjectKnowledgeBaseValidationPort;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientRagOrderConfigRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.AiClientConfigRecord;
+import cn.lgs.orbisops.application.rag.RagOrderCatalogPort;
+import cn.lgs.orbisops.application.rag.RagOrderDefinition;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -11,10 +11,10 @@ import java.util.List;
 public class OpsProjectKnowledgeBaseValidationAdapter
         implements ProjectKnowledgeBaseValidationPort {
 
-    private final IAiClientRagOrderConfigRepository repository;
+    private final RagOrderCatalogPort repository;
 
     public OpsProjectKnowledgeBaseValidationAdapter(
-            IAiClientRagOrderConfigRepository repository) {
+            RagOrderCatalogPort repository) {
         this.repository = repository;
     }
 
@@ -24,13 +24,13 @@ public class OpsProjectKnowledgeBaseValidationAdapter
         if (id.isBlank()) {
             return;
         }
-        AiClientConfigRecord record = repository.queryByRagId(id);
-        boolean enabled = record != null && Integer.valueOf(1).equals(record.getStatus());
+        RagOrderDefinition record = repository.queryByRagId(id);
+        boolean enabled = record != null && Integer.valueOf(1).equals(record.status());
         if (!enabled) {
-            List<AiClientConfigRecord> matches = repository.queryByKnowledgeTag(id);
+            List<RagOrderDefinition> matches = repository.queryByKnowledgeTag(id);
             enabled = matches != null && matches.stream()
                     .anyMatch(item -> item != null
-                            && Integer.valueOf(1).equals(item.getStatus()));
+                            && Integer.valueOf(1).equals(item.status()));
         }
         if (!enabled) {
             throw new IllegalArgumentException("知识库不存在或未启用：" + id);

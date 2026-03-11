@@ -1,8 +1,8 @@
 package cn.lgs.orbisops.infrastructure.adapter.resourcehealth;
 
+import cn.lgs.orbisops.application.rag.RagOrderCatalogPort;
 import cn.lgs.orbisops.application.resourcehealth.PgVectorResourceHealthProbePort;
 import cn.lgs.orbisops.application.resourcehealth.ResourceHealthCheck;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientRagOrderConfigRepository;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -20,12 +20,12 @@ public class JdbcPgVectorResourceHealthProbeAdapter
         implements PgVectorResourceHealthProbePort {
 
     private final JdbcTemplate jdbcTemplate;
-    private final IAiClientRagOrderConfigRepository ragOrderRepository;
+    private final RagOrderCatalogPort ragOrderRepository;
 
     public JdbcPgVectorResourceHealthProbeAdapter(
             @Qualifier("pgVectorJdbcTemplate")
             ObjectProvider<JdbcTemplate> jdbcTemplateProvider,
-            ObjectProvider<IAiClientRagOrderConfigRepository> ragOrderRepositoryProvider) {
+            ObjectProvider<RagOrderCatalogPort> ragOrderRepositoryProvider) {
         this.jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
         this.ragOrderRepository = ragOrderRepositoryProvider.getIfAvailable();
     }

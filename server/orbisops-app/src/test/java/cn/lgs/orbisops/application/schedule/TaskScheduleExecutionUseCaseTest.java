@@ -31,6 +31,22 @@ class TaskScheduleExecutionUseCaseTest {
     }
 
     @Test
+    void runScheduledUsesAuthoritativeCatalogAndScheduledTriggerType() {
+        TaskScheduleCatalogPort catalog = mock(TaskScheduleCatalogPort.class);
+        TaskScheduleExecutionPort execution = mock(TaskScheduleExecutionPort.class);
+        TaskExecutionCatalogPort history = mock(TaskExecutionCatalogPort.class);
+        TaskScheduleExecutionUseCase useCase = new TaskScheduleExecutionUseCase(catalog, execution, history);
+        TaskScheduleDefinition schedule = definition(7L, "payment");
+        when(catalog.findById(7L)).thenReturn(schedule);
+        when(execution.submit(schedule, "SCHEDULED")).thenReturn(43L);
+
+        assertEquals(43L, useCase.runScheduled(7L));
+
+        verify(catalog).findById(7L);
+        verify(execution).submit(schedule, "SCHEDULED");
+    }
+
+    @Test
     void runNowRejectsCrossProjectWithoutSubmission() {
         TaskScheduleCatalogPort catalog = mock(TaskScheduleCatalogPort.class);
         TaskScheduleExecutionPort execution = mock(TaskScheduleExecutionPort.class);

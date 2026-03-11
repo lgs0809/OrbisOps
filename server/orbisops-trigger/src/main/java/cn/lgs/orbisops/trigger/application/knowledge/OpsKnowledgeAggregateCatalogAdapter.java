@@ -4,7 +4,7 @@ import cn.lgs.orbisops.application.knowledge.KnowledgeAggregateCatalogPort;
 import cn.lgs.orbisops.application.knowledge.KnowledgeAggregateSnapshot;
 import cn.lgs.orbisops.application.rag.RagOrderCatalogUseCase;
 import cn.lgs.orbisops.application.rag.RagOrderDefinition;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IRagKnowledgeRepository;
+import cn.lgs.orbisops.domain.knowledge.rag.repository.IRagKnowledgeRepository;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;

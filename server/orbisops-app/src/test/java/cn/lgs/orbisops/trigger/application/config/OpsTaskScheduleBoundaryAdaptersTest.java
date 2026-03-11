@@ -1,12 +1,9 @@
 package cn.lgs.orbisops.trigger.application.config;
 
-import cn.lgs.orbisops.application.schedule.TaskExecutionView;
+import cn.lgs.orbisops.application.schedule.ScheduledTaskExecutionCommand;
 import cn.lgs.orbisops.application.schedule.TaskScheduleAgentSnapshot;
 import cn.lgs.orbisops.application.schedule.TaskScheduleDefinition;
 import cn.lgs.orbisops.application.schedule.TaskScheduleRuntimeConfiguration;
-import cn.lgs.orbisops.domain.agent.adapter.repository.ITaskExecutionRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.TaskExecutionRecord;
-import cn.lgs.orbisops.domain.agent.model.entity.TaskScheduleRecord;
 import cn.lgs.orbisops.trigger.application.agentdefinition.OpsAgentDefinitionQueryGateway;
 import cn.lgs.orbisops.trigger.job.AgentTaskExecutionService;
 import cn.lgs.orbisops.trigger.ops.OpsConfigAuditService;
@@ -22,7 +19,6 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -54,44 +50,21 @@ class OpsTaskScheduleBoundaryAdaptersTest {
     }
 
     @Test
-    void executionAdapterProjectsTypedScheduleToLegacyRuntimeRecord() {
+    void executionAdapterProjectsTypedScheduleToExecutionCommand() {
         AgentTaskExecutionService executionService = mock(AgentTaskExecutionService.class);
         OpsTaskScheduleRuntimeConfigurationCodec codec = new OpsTaskScheduleRuntimeConfigurationCodec();
         OpsTaskScheduleExecutionAdapter adapter = new OpsTaskScheduleExecutionAdapter(executionService, codec);
-        when(executionService.submitExecution(any(TaskScheduleRecord.class), eq("MANUAL"))).thenReturn(42L);
+        when(executionService.submitExecution(any(ScheduledTaskExecutionCommand.class))).thenReturn(42L);
         TaskScheduleDefinition schedule = definition();
 
         assertEquals(42L, adapter.submit(schedule, "MANUAL"));
 
-        ArgumentCaptor<TaskScheduleRecord> record = ArgumentCaptor.forClass(TaskScheduleRecord.class);
-        verify(executionService).submitExecution(record.capture(), eq("MANUAL"));
-        assertEquals(7L, record.getValue().getId());
-        assertEquals(schedule.runtimeConfiguration(), codec.decode(record.getValue().getTaskParam()));
-    }
-
-    @Test
-    void executionCatalogAdapterProjectsRepositoryHistory() {
-        ITaskExecutionRepository repository = mock(ITaskExecutionRepository.class);
-        OpsTaskExecutionCatalogAdapter adapter = new OpsTaskExecutionCatalogAdapter(repository);
-        LocalDateTime started = LocalDateTime.of(2026, 7, 30, 6, 0);
-        when(repository.list(7L, 20)).thenReturn(List.of(TaskExecutionRecord.builder()
-                .id(42L)
-                .scheduleId(7L)
-                .taskName("支付巡检")
-                .agentId("ops-agent")
-                .triggerType("MANUAL")
-                .status("SUCCESS")
-                .startedAt(started)
-                .input("in")
-                .output("out")
-                .build()));
-
-        List<TaskExecutionView> result = adapter.list(7L, 20);
-
-        assertEquals(1, result.size());
-        assertEquals(42L, result.get(0).id());
-        assertEquals(started, result.get(0).startedAt());
-        assertEquals("SUCCESS", result.get(0).status());
+        ArgumentCaptor<ScheduledTaskExecutionCommand> command =
+                ArgumentCaptor.forClass(ScheduledTaskExecutionCommand.class);
+        verify(executionService).submitExecution(command.capture());
+        assertEquals(7L, command.getValue().scheduleId());
+        assertEquals("MANUAL", command.getValue().triggerType());
+        assertEquals(schedule.runtimeConfiguration(), codec.decode(command.getValue().runtimePayload()));
     }
 
     @Test

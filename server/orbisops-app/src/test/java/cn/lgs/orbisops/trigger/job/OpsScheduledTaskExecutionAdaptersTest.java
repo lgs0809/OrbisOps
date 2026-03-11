@@ -4,7 +4,6 @@ import cn.lgs.orbisops.api.dto.OpsAgentRunRequestDTO;
 import cn.lgs.orbisops.api.dto.OpsAnalysisResponseDTO;
 import cn.lgs.orbisops.application.project.ProjectDefinitionApplicationService;
 import cn.lgs.orbisops.application.schedule.ScheduledTaskExecutionCommand;
-import cn.lgs.orbisops.domain.agent.adapter.repository.ITaskExecutionRepository;
 import cn.lgs.orbisops.trigger.application.config.OpsTaskScheduleRuntimeConfigurationCodec;
 import cn.lgs.orbisops.trigger.application.ops.OpsAnalysisApplicationService;
 import org.junit.jupiter.api.Test;
@@ -19,29 +18,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class OpsScheduledTaskExecutionAdaptersTest {
-
-    @Test
-    void catalogAdapterProjectsExecutionLifecycleToRepository() {
-        ITaskExecutionRepository repository = mock(ITaskExecutionRepository.class);
-        OpsScheduledTaskExecutionCatalogAdapter adapter = new OpsScheduledTaskExecutionCatalogAdapter(repository);
-        ScheduledTaskExecutionCommand command = command("{}");
-        when(repository.create(7L, "支付巡检", "ops-agent", "SCHEDULED")).thenReturn(42L);
-
-        adapter.ensureStorage();
-        assertEquals(42L, adapter.create(command));
-        adapter.updateInput(42L, "input");
-        adapter.markSucceeded(42L, "output");
-        adapter.markFailed(42L, "error", null);
-
-        verify(repository).ensureTable();
-        verify(repository).updateInput(42L, "input");
-        verify(repository).markSuccess(42L, "output");
-        verify(repository).markFailed(42L, "error", null);
-    }
 
     @Test
     void analysisAdapterDecodesUnifiedRuntimeAndBuildsNormalizedAgentRequest() {

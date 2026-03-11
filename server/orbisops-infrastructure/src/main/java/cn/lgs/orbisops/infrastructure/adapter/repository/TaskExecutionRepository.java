@@ -1,7 +1,9 @@
 package cn.lgs.orbisops.infrastructure.adapter.repository;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.ITaskExecutionRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.TaskExecutionRecord;
+import cn.lgs.orbisops.application.schedule.ScheduledTaskExecutionCatalogPort;
+import cn.lgs.orbisops.application.schedule.ScheduledTaskExecutionCommand;
+import cn.lgs.orbisops.application.schedule.TaskExecutionCatalogPort;
+import cn.lgs.orbisops.application.schedule.TaskExecutionView;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -15,8 +17,14 @@ import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * JDBC adapter for scheduled task execution lifecycle and history.
+ *
+ * <p>The persistence adapter implements the typed Application ports directly. Database rows never
+ * leak into Domain/Application as compatibility records.</p>
+ */
 @Repository
-public class TaskExecutionRepository implements ITaskExecutionRepository {
+public class TaskExecutionRepository implements ScheduledTaskExecutionCatalogPort, TaskExecutionCatalogPort {
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 
@@ -25,7 +33,7 @@ public class TaskExecutionRepository implements ITaskExecutionRepository {
     }
 
     @Override
-    public void ensureTable() {
+    public void ensureStorage() {
         JdbcTemplate jdbcTemplate = jdbcTemplate();
         if (jdbcTemplate == null) {
             return;
@@ -55,12 +63,15 @@ public class TaskExecutionRepository implements ITaskExecutionRepository {
     }
 
     @Override
-    public Long create(Long scheduleId, String taskName, String agentId, String triggerType) {
+    public Long create(ScheduledTaskExecutionCommand command) {
+        if (command == null) {
+            throw new IllegalArgumentException("SCHEDULED_TASK_EXECUTION_COMMAND_REQUIRED");
+        }
         JdbcTemplate jdbcTemplate = jdbcTemplate();
         if (jdbcTemplate == null) {
             return 0L;
         }
-        if (!StringUtils.hasText(agentId)) {
+        if (!StringUtils.hasText(command.agentId())) {
             throw new IllegalArgumentException("执行 Agent 不能为空");
         }
         KeyHolder keyHolder = new GeneratedKeyHolder();
@@ -70,10 +81,10 @@ public class TaskExecutionRepository implements ITaskExecutionRepository {
                     (schedule_id, task_name, agent_id, trigger_type, status, started_at)
                     VALUES (?, ?, ?, ?, 'RUNNING', ?)
                     """, Statement.RETURN_GENERATED_KEYS);
-            ps.setLong(1, scheduleId);
-            ps.setString(2, abbreviate(taskName, 255));
-            ps.setString(3, agentId.trim());
-            ps.setString(4, triggerType);
+            ps.setLong(1, command.scheduleId());
+            ps.setString(2, abbreviate(command.taskName(), 255));
+            ps.setString(3, command.agentId().trim());
+            ps.setString(4, command.triggerType());
             ps.setObject(5, LocalDateTime.now());
             return ps;
         }, keyHolder);
@@ -94,7 +105,7 @@ public class TaskExecutionRepository implements ITaskExecutionRepository {
     }
 
     @Override
-    public void markSuccess(Long executionId, String output) {
+    public void markSucceeded(Long executionId, String output) {
         JdbcTemplate jdbcTemplate = jdbcTemplate();
         if (jdbcTemplate == null || invalidExecutionId(executionId)) {
             return;
@@ -120,7 +131,7 @@ public class TaskExecutionRepository implements ITaskExecutionRepository {
     }
 
     @Override
-    public List<TaskExecutionRecord> list(Long scheduleId, int limit) {
+    public List<TaskExecutionView> list(Long scheduleId, int limit) {
         JdbcTemplate jdbcTemplate = jdbcTemplate();
         if (jdbcTemplate == null) {
             return List.of();
@@ -132,19 +143,18 @@ public class TaskExecutionRepository implements ITaskExecutionRepository {
                             ORDER BY started_at DESC
                             LIMIT ?
                             """,
-                    (rs, rowNum) -> TaskExecutionRecord.builder()
-                            .id(rs.getLong("id"))
-                            .scheduleId(rs.getLong("schedule_id"))
-                            .taskName(rs.getString("task_name"))
-                            .agentId(rs.getString("agent_id"))
-                            .triggerType(rs.getString("trigger_type"))
-                            .status(rs.getString("status"))
-                            .startedAt(rs.getObject("started_at", LocalDateTime.class))
-                            .endedAt(rs.getObject("ended_at", LocalDateTime.class))
-                            .input(rs.getString("input"))
-                            .output(rs.getString("output"))
-                            .errorMessage(rs.getString("error_message"))
-                            .build(),
+                    (rs, rowNum) -> view(
+                            rs.getLong("id"),
+                            rs.getLong("schedule_id"),
+                            rs.getString("task_name"),
+                            rs.getString("agent_id"),
+                            rs.getString("trigger_type"),
+                            rs.getString("status"),
+                            rs.getObject("started_at", LocalDateTime.class),
+                            rs.getObject("ended_at", LocalDateTime.class),
+                            rs.getString("input"),
+                            rs.getString("output"),
+                            rs.getString("error_message")),
                     limit);
         }
         return jdbcTemplate.query("""
@@ -154,20 +164,45 @@ public class TaskExecutionRepository implements ITaskExecutionRepository {
                         ORDER BY started_at DESC
                         LIMIT ?
                         """,
-                (rs, rowNum) -> TaskExecutionRecord.builder()
-                        .id(rs.getLong("id"))
-                        .scheduleId(rs.getLong("schedule_id"))
-                        .taskName(rs.getString("task_name"))
-                        .agentId(rs.getString("agent_id"))
-                        .triggerType(rs.getString("trigger_type"))
-                        .status(rs.getString("status"))
-                        .startedAt(rs.getObject("started_at", LocalDateTime.class))
-                        .endedAt(rs.getObject("ended_at", LocalDateTime.class))
-                        .input(rs.getString("input"))
-                        .output(rs.getString("output"))
-                        .errorMessage(rs.getString("error_message"))
-                        .build(),
+                (rs, rowNum) -> view(
+                        rs.getLong("id"),
+                        rs.getLong("schedule_id"),
+                        rs.getString("task_name"),
+                        rs.getString("agent_id"),
+                        rs.getString("trigger_type"),
+                        rs.getString("status"),
+                        rs.getObject("started_at", LocalDateTime.class),
+                        rs.getObject("ended_at", LocalDateTime.class),
+                        rs.getString("input"),
+                        rs.getString("output"),
+                        rs.getString("error_message")),
                 scheduleId, limit);
+    }
+
+    private TaskExecutionView view(
+            Long id,
+            Long scheduleId,
+            String taskName,
+            String agentId,
+            String triggerType,
+            String status,
+            LocalDateTime startedAt,
+            LocalDateTime endedAt,
+            String input,
+            String output,
+            String errorMessage) {
+        return new TaskExecutionView(
+                id,
+                scheduleId,
+                taskName,
+                agentId,
+                triggerType,
+                status,
+                startedAt,
+                endedAt,
+                input,
+                output,
+                errorMessage);
     }
 
     private JdbcTemplate jdbcTemplate() {

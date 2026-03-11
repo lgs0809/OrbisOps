@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.trigger.ops.rag.advisor;
 
-import cn.lgs.orbisops.domain.agent.model.valobj.AiClientAdvisorVO;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagRetrievalSettings;
 
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -17,10 +17,10 @@ public final class RagQueryRewritePolicy {
 
     public RagQueryRewriteDecision initialDecision(String userText,
                                                     Map<String, Object> context,
-                                                    AiClientAdvisorVO.RagAnswer configured) {
+                                                    RagRetrievalSettings configured) {
         Map<String, Object> safeContext = context == null ? Map.of() : context;
-        AiClientAdvisorVO.RagAnswer settings = configured == null
-                ? new AiClientAdvisorVO.RagAnswer()
+        RagRetrievalSettings settings = configured == null
+                ? new RagRetrievalSettings()
                 : configured;
         boolean enabled = booleanFromContext(safeContext, "qa_query_rewrite_enabled", true);
         if (!enabled || !hasText(userText)) {
@@ -42,15 +42,15 @@ public final class RagQueryRewritePolicy {
 
     public boolean shouldRetryAfterLowRecall(String userText,
                                              Map<String, Object> context,
-                                             AiClientAdvisorVO.RagAnswer configured,
+                                             RagRetrievalSettings configured,
                                              boolean llmGenerated,
                                              int candidateCount) {
         if (llmGenerated) {
             return false;
         }
         Map<String, Object> safeContext = context == null ? Map.of() : context;
-        AiClientAdvisorVO.RagAnswer settings = configured == null
-                ? new AiClientAdvisorVO.RagAnswer()
+        RagRetrievalSettings settings = configured == null
+                ? new RagRetrievalSettings()
                 : configured;
         boolean llmEnabled = booleanFromContext(
                 safeContext,
@@ -74,7 +74,7 @@ public final class RagQueryRewritePolicy {
 
     private List<String> ruleQueries(String userText,
                                      Map<String, Object> context,
-                                     AiClientAdvisorVO.RagAnswer settings) {
+                                     RagRetrievalSettings settings) {
         LinkedHashSet<String> queries = new LinkedHashSet<>();
         queries.add(userText);
         String lower = userText.toLowerCase(Locale.ROOT);
@@ -103,7 +103,7 @@ public final class RagQueryRewritePolicy {
 
     private boolean isComplexQuery(String userText,
                                    Map<String, Object> context,
-                                   AiClientAdvisorVO.RagAnswer settings) {
+                                   RagRetrievalSettings settings) {
         int minChars = intFromContext(
                 context,
                 "qa_llm_query_rewrite_min_chars",

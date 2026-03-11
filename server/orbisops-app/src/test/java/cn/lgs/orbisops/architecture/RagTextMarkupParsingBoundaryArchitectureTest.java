@@ -19,7 +19,7 @@ class RagTextMarkupParsingBoundaryArchitectureTest {
     private static final String EXTRACTOR = "orbisops-trigger/src/main/java/"
             + "cn/lgs/orbisops/trigger/ops/rag/RagTextMarkupChunkExtractor.java";
     private static final String MATERIALIZER = "orbisops-domain/src/main/java/"
-            + "cn/lgs/orbisops/domain/agent/service/rag/RagChunkMaterializer.java";
+            + "cn/lgs/orbisops/domain/knowledge/rag/service/RagChunkMaterializer.java";
 
     @Test
     void markupProtocolsMustRemainInsideDedicatedExtractor() throws IOException {

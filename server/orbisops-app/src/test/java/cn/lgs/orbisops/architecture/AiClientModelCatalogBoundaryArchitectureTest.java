@@ -16,6 +16,8 @@ class AiClientModelCatalogBoundaryArchitectureTest {
             "orbisops-application/src/main/java/cn/lgs/orbisops/application/config/";
     private static final String TRIGGER_CONFIG =
             "orbisops-trigger/src/main/java/cn/lgs/orbisops/trigger/application/config/";
+    private static final String INFRASTRUCTURE_REPOSITORY =
+            "orbisops-infrastructure/src/main/java/cn/lgs/orbisops/infrastructure/adapter/repository/";
 
     @Test
     void modelCatalogBusinessSequenceMustBelongToTypedApplicationBoundary() throws IOException {
@@ -24,6 +26,7 @@ class AiClientModelCatalogBoundaryArchitectureTest {
         String port = read(APPLICATION_CONFIG + "AiClientModelCatalogPort.java");
         String auditPort = read(APPLICATION_CONFIG + "AiClientModelCatalogAuditPort.java");
         String useCase = read(APPLICATION_CONFIG + "AiClientModelCatalogUseCase.java");
+        String repository = read(INFRASTRUCTURE_REPOSITORY + "AiClientModelConfigRepository.java");
         String adapter = read(TRIGGER_CONFIG + "OpsAiClientModelCatalogAdapter.java");
         String configuration = read(TRIGGER_CONFIG + "AiClientModelCatalogConfiguration.java");
         String facade = read(TRIGGER_CONFIG + "AiClientModelApplicationService.java");
@@ -47,11 +50,16 @@ class AiClientModelCatalogBoundaryArchitectureTest {
                 () -> assertFalse(useCase.contains("AiClientConfigRecord")),
                 () -> assertFalse(useCase.contains("IAiClientModelConfigRepository")),
                 () -> assertFalse(useCase.contains("OpsConfigAuditService")),
-                () -> assertTrue(adapter.contains("implements AiClientModelCatalogPort, AiClientModelCatalogAuditPort")),
-                () -> assertTrue(adapter.contains("IAiClientModelConfigRepository")),
-                () -> assertTrue(adapter.contains("AiClientConfigRecord")),
+                () -> assertTrue(repository.contains("implements AiClientModelCatalogPort")),
+                () -> assertTrue(repository.contains("AiClientModelDefinition")),
+                () -> assertFalse(repository.contains("domain.agent")),
+                () -> assertFalse(repository.contains("AiClientConfigRecord")),
+                () -> assertTrue(adapter.contains("implements AiClientModelCatalogAuditPort")),
+                () -> assertFalse(adapter.contains("AiClientModelCatalogPort")),
+                () -> assertFalse(adapter.contains("Repository")),
                 () -> assertTrue(adapter.contains("OpsConfigAuditService")),
                 () -> assertTrue(configuration.contains("AiClientModelCatalogUseCase aiClientModelCatalogUseCase")),
+                () -> assertTrue(configuration.contains("AiClientModelCatalogPort catalogPort")),
                 () -> assertTrue(configuration.contains("new OpsAiClientModelCatalogAdapter")),
                 () -> assertTrue(facade.contains("private final AiClientModelCatalogUseCase catalogUseCase")),
                 () -> assertTrue(facade.contains("return catalogUseCase.create(toDefinition(request))")),

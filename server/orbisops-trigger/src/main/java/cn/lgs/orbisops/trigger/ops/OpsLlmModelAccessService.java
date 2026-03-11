@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.trigger.ops;
 
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
@@ -13,12 +13,12 @@ final class OpsLlmModelAccessService {
 
     private final ApplicationContext applicationContext;
     private final ObjectProvider<ChatModel> chatModelProvider;
-    private final AiModelAvailability aiModelAvailability;
+    private final ModelAvailabilityPort aiModelAvailability;
 
     OpsLlmModelAccessService(
             ApplicationContext applicationContext,
             ObjectProvider<ChatModel> chatModelProvider,
-            AiModelAvailability aiModelAvailability) {
+            ModelAvailabilityPort aiModelAvailability) {
         this.applicationContext = applicationContext;
         this.chatModelProvider = chatModelProvider;
         this.aiModelAvailability = aiModelAvailability;

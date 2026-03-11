@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.trigger.ops;
 
-import cn.lgs.orbisops.domain.agent.model.valobj.AiClientAdvisorVO;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagRetrievalSettings;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
@@ -22,7 +22,7 @@ class OpsRagKnowledgeRetrievalServiceTest {
     void retrieveBuildsSearchConfigContextAndReturnsDiagnostics() throws Exception {
         AtomicReference<OpsRagKnowledgeRetrievalService.Input> capturedInput = new AtomicReference<>();
         AtomicReference<SearchRequest> capturedSearch = new AtomicReference<>();
-        AtomicReference<AiClientAdvisorVO.RagAnswer> capturedConfig = new AtomicReference<>();
+        AtomicReference<RagRetrievalSettings> capturedConfig = new AtomicReference<>();
         AtomicReference<Map<String, Object>> capturedContext = new AtomicReference<>();
         AtomicInteger cancellationChecks = new AtomicInteger();
         List<Document> documents = List.of(new Document(
@@ -59,7 +59,7 @@ class OpsRagKnowledgeRetrievalServiceTest {
         assertEquals("auto", capturedInput.get().retrievalMode());
         assertTrue(capturedSearch.get() != null);
 
-        AiClientAdvisorVO.RagAnswer config = capturedConfig.get();
+        RagRetrievalSettings config = capturedConfig.get();
         assertEquals("auto", config.getRetrievalMode());
         assertEquals(20, config.getVectorTopK());
         assertEquals(30, config.getBm25TopK());

@@ -2,7 +2,7 @@ package cn.lgs.orbisops.trigger.ops;
 
 import cn.lgs.orbisops.trigger.ops.runtime.OpsRuntimePersistenceException;
 
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
 import cn.lgs.orbisops.trigger.ops.skill.SkillRuntimeToolProvider;
 import com.alibaba.fastjson.JSONObject;
 import org.springframework.ai.chat.model.ChatModel;
@@ -31,7 +31,7 @@ public class OpsAgentLlmClient {
             ApplicationContext applicationContext,
             ObjectProvider<ChatModel> chatModelProvider,
             ObjectProvider<SkillRuntimeToolProvider> skillToolProvider,
-            AiModelAvailability aiModelAvailability,
+            ModelAvailabilityPort aiModelAvailability,
             @Qualifier("opsModelCallExecutor") ExecutorService modelCallExecutor) {
         this(
                 applicationContext,
@@ -47,7 +47,7 @@ public class OpsAgentLlmClient {
             ApplicationContext applicationContext,
             ObjectProvider<ChatModel> chatModelProvider,
             ObjectProvider<SkillRuntimeToolProvider> skillToolProvider,
-            AiModelAvailability aiModelAvailability,
+            ModelAvailabilityPort aiModelAvailability,
             @Qualifier("opsModelCallExecutor") ExecutorService modelCallExecutor,
             OpsAgentLlmSettings settings) {
         OpsLlmSkillContextService skillContextService =

@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.trigger.ops.rag.advisor;
 
-import cn.lgs.orbisops.domain.agent.model.valobj.AiClientAdvisorVO;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagRetrievalSettings;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import org.junit.jupiter.api.Test;
@@ -235,7 +235,7 @@ class RagRerankProtocolTest {
 
     private RagRerankProtocol protocol(String apiKey,
                                        RagRerankProtocol.HttpTransport transport) {
-        AiClientAdvisorVO.RagAnswer settings = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings settings = RagRetrievalSettings.builder()
                 .rerankApiKey(apiKey)
                 .build();
         return new RagRerankProtocol(settings, transport);

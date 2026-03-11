@@ -125,16 +125,6 @@ class BoundedContextDependencyArchitectureTest {
 
     private boolean allowedPublishedLanguage(Path file, String importLine) {
         String relative = projectRoot().relativize(file).toString().replace('\\', '/');
-        if (relative.contains("/application/rag/")) {
-            return importLine.startsWith("import cn.lgs.orbisops.domain.agent.adapter.repository.IRag")
-                    || importLine.startsWith("import cn.lgs.orbisops.domain.agent.model.entity.Rag")
-                    || importLine.startsWith("import cn.lgs.orbisops.domain.agent.model.valobj.Rag")
-                    || importLine.startsWith("import cn.lgs.orbisops.domain.agent.service.rag.");
-        }
-        if (relative.contains("/application/knowledge/")) {
-            return importLine.equals("import cn.lgs.orbisops.domain.agent.model.entity.RagFileResource;")
-                    || importLine.equals("import cn.lgs.orbisops.domain.agent.service.rag.RagParsePolicy;");
-        }
         if (relative.contains("/application/agentdefinition/")) {
             return importLine.startsWith("import cn.lgs.orbisops.domain.agenteval.model.");
         }

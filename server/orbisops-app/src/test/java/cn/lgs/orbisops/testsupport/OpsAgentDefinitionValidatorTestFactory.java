@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.testsupport;
 
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientToolMcpConfigRepository;
+import cn.lgs.orbisops.application.config.McpClientCatalogPort;
 import cn.lgs.orbisops.trigger.ops.runtime.OpsAgentDefinitionResourceValidator;
 import cn.lgs.orbisops.trigger.ops.runtime.OpsAgentDefinitionValidator;
 import cn.lgs.orbisops.trigger.ops.runtime.OpsAgentGraphDefinitionPolicy;
@@ -23,7 +23,7 @@ public final class OpsAgentDefinitionValidatorTestFactory {
     }
 
     public static OpsAgentDefinitionValidator create(
-            IAiClientToolMcpConfigRepository mcpRepository) {
+            McpClientCatalogPort mcpRepository) {
         OpsAgentToolNamePolicy toolNamePolicy = new OpsAgentToolNamePolicy();
         OpsAgentMcpServerDefinitionPolicy mcpServerPolicy =
                 new OpsAgentMcpServerDefinitionPolicy(toolNamePolicy);

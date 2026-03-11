@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.trigger.ops.rag.advisor;
 
-import cn.lgs.orbisops.domain.agent.model.valobj.AiClientAdvisorVO;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagRetrievalSettings;
 import com.alibaba.fastjson.JSONObject;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.document.Document;
@@ -27,7 +27,7 @@ class RagRetrievalOrchestratorTest {
             filter.set(filterExpression);
             return List.of(document("chunk", "锁单失败排查"));
         });
-        AiClientAdvisorVO.RagAnswer settings = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings settings = RagRetrievalSettings.builder()
                 .filterExpression("knowledge == 'configured'")
                 .build();
         RagRetrievalOrchestrator orchestrator = orchestrator(settings, recall, noCallRewriteProtocol());
@@ -52,7 +52,7 @@ class RagRetrievalOrchestratorTest {
             filters.add(filterExpression);
             return List.of(document(query, query));
         });
-        AiClientAdvisorVO.RagAnswer settings = AiClientAdvisorVO.RagAnswer.builder()
+        RagRetrievalSettings settings = RagRetrievalSettings.builder()
                 .filterExpression("knowledge == 'configured'")
                 .build();
         RagRetrievalOrchestrator orchestrator = orchestrator(settings, recall, noCallRewriteProtocol());
@@ -79,7 +79,7 @@ class RagRetrievalOrchestratorTest {
             return List.of(document(String.valueOf(queries.size()), query));
         });
         RagRetrievalOrchestrator orchestrator = orchestrator(
-                new AiClientAdvisorVO.RagAnswer(),
+                new RagRetrievalSettings(),
                 recall,
                 noCallRewriteProtocol());
         Map<String, Object> context = mutableContext(
@@ -115,7 +115,7 @@ class RagRetrievalOrchestratorTest {
             return "{\"choices\":[{\"message\":{\"content\":\"{\\\"queries\\\":[\\\"expanded query\\\"]}\"}}]}";
         });
         RagRetrievalOrchestrator orchestrator = orchestrator(
-                new AiClientAdvisorVO.RagAnswer(),
+                new RagRetrievalSettings(),
                 recall,
                 rewriteProtocol);
         Map<String, Object> context = mutableContext(
@@ -152,7 +152,7 @@ class RagRetrievalOrchestratorTest {
             throw new IllegalStateException("rewrite unavailable");
         });
         RagRetrievalOrchestrator orchestrator = orchestrator(
-                new AiClientAdvisorVO.RagAnswer(),
+                new RagRetrievalSettings(),
                 recall,
                 rewriteProtocol);
         Map<String, Object> context = mutableContext(
@@ -182,7 +182,7 @@ class RagRetrievalOrchestratorTest {
                 document("b", "beta"),
                 document("c", "gamma")));
         RagRetrievalOrchestrator orchestrator = orchestrator(
-                new AiClientAdvisorVO.RagAnswer(),
+                new RagRetrievalSettings(),
                 recall,
                 noCallRewriteProtocol());
         Map<String, Object> context = mutableContext(
@@ -195,7 +195,7 @@ class RagRetrievalOrchestratorTest {
         assertEquals(List.of("a", "b"), documents.stream().map(Document::getId).toList());
     }
 
-    private RagRetrievalOrchestrator orchestrator(AiClientAdvisorVO.RagAnswer settings,
+    private RagRetrievalOrchestrator orchestrator(RagRetrievalSettings settings,
                                                    RagRecallCoordinator recall,
                                                    RagLlmQueryRewriteProtocol rewriteProtocol) {
         return new RagRetrievalOrchestrator(

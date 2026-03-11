@@ -1,6 +1,6 @@
 package cn.lgs.orbisops.trigger.ops.rag;
 
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
 
 import java.util.Map;
 
@@ -8,11 +8,11 @@ import java.util.Map;
 public final class RagVisualAnalysisAvailability {
 
     private final RagVisualAnalysisSettings settings;
-    private final AiModelAvailability aiModelAvailability;
+    private final ModelAvailabilityPort aiModelAvailability;
 
     public RagVisualAnalysisAvailability(
             RagVisualAnalysisSettings settings,
-            AiModelAvailability aiModelAvailability) {
+            ModelAvailabilityPort aiModelAvailability) {
         if (settings == null) throw new IllegalArgumentException("RAG_VISUAL_SETTINGS_REQUIRED");
         this.settings = settings;
         this.aiModelAvailability = aiModelAvailability;

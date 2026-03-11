@@ -1,9 +1,9 @@
 package cn.lgs.orbisops.trigger.ops.rag;
 
 import cn.lgs.orbisops.application.rag.RagBinaryAssetPort;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IRagMultimodalRepository;
-import cn.lgs.orbisops.domain.agent.model.entity.RagDocument;
-import cn.lgs.orbisops.domain.agent.model.entity.RagFileResource;
+import cn.lgs.orbisops.domain.knowledge.rag.repository.IRagMultimodalRepository;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagDocument;
+import cn.lgs.orbisops.domain.knowledge.rag.model.RagFileResource;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.document.Document;
 

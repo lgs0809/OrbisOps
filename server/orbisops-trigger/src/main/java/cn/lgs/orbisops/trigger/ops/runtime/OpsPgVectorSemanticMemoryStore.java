@@ -1,7 +1,7 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
 import cn.lgs.orbisops.application.memory.SemanticMemoryApplicationFacade;
-import cn.lgs.orbisops.domain.agent.service.model.AiModelAvailability;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
 import cn.lgs.orbisops.trigger.application.memory.OpsSemanticMemoryMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -18,13 +18,13 @@ import java.util.List;
         havingValue = "true")
 public class OpsPgVectorSemanticMemoryStore implements OpsSemanticMemoryStore {
 
-    private final AiModelAvailability aiModelAvailability;
+    private final ModelAvailabilityPort aiModelAvailability;
     private final SemanticMemoryApplicationFacade applicationFacade;
     private final OpsSemanticMemoryMapper memoryMapper = new OpsSemanticMemoryMapper();
     private final OpsSemanticMemoryRetrievalSettings settings;
 
     public OpsPgVectorSemanticMemoryStore(
-            AiModelAvailability aiModelAvailability,
+            ModelAvailabilityPort aiModelAvailability,
             SemanticMemoryApplicationFacade applicationFacade,
             int semanticTopK,
             boolean recencyAwareEnabled,
@@ -40,7 +40,7 @@ public class OpsPgVectorSemanticMemoryStore implements OpsSemanticMemoryStore {
 
     @Autowired
     public OpsPgVectorSemanticMemoryStore(
-            AiModelAvailability aiModelAvailability,
+            ModelAvailabilityPort aiModelAvailability,
             SemanticMemoryApplicationFacade applicationFacade,
             OpsSemanticMemoryRetrievalSettings settings) {
         this.aiModelAvailability = aiModelAvailability;

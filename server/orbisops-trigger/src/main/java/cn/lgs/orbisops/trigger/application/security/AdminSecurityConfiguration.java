@@ -4,7 +4,6 @@ import cn.lgs.orbisops.application.security.AdminUserAuthenticationPort;
 import cn.lgs.orbisops.application.security.AdminUserAuthenticationUseCase;
 import cn.lgs.orbisops.application.security.AdminUserCatalogPort;
 import cn.lgs.orbisops.application.security.AdminUserCatalogUseCase;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAdminUserRepository;
 import cn.lgs.orbisops.domain.security.AdminCredentialRules;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,11 +23,6 @@ public class AdminSecurityConfiguration {
     @Bean
     public AdminCredentialRules adminCredentialRules(AdminUserSecuritySettings settings) {
         return new AdminCredentialRules(settings.minimumLength(), settings.prehashedAllowed());
-    }
-
-    @Bean
-    public AdminUserCatalogPort adminUserCatalogPort(IAdminUserRepository repository) {
-        return new OpsAdminUserCatalogAdapter(repository);
     }
 
     @Bean

@@ -1,9 +1,9 @@
 package cn.lgs.orbisops.trigger.application.statistics;
 
+import cn.lgs.orbisops.application.config.AiClientModelCatalogPort;
+import cn.lgs.orbisops.application.config.McpClientCatalogPort;
+import cn.lgs.orbisops.application.rag.RagOrderCatalogPort;
 import cn.lgs.orbisops.application.statistics.DataCatalogStatisticsPort;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientModelConfigRepository;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientRagOrderConfigRepository;
-import cn.lgs.orbisops.domain.agent.adapter.repository.IAiClientToolMcpConfigRepository;
 import cn.lgs.orbisops.domain.statistics.model.DataCatalogCounts;
 import cn.lgs.orbisops.trigger.application.agentdefinition.OpsAgentDefinitionQueryGateway;
 import org.springframework.stereotype.Component;
@@ -11,15 +11,15 @@ import org.springframework.stereotype.Component;
 @Component
 public class OpsDataCatalogStatisticsAdapter implements DataCatalogStatisticsPort {
 
-    private final IAiClientModelConfigRepository models;
-    private final IAiClientRagOrderConfigRepository ragOrders;
-    private final IAiClientToolMcpConfigRepository mcpTools;
+    private final AiClientModelCatalogPort models;
+    private final RagOrderCatalogPort ragOrders;
+    private final McpClientCatalogPort mcpTools;
     private final OpsAgentDefinitionQueryGateway agentDefinitions;
 
     public OpsDataCatalogStatisticsAdapter(
-            IAiClientModelConfigRepository models,
-            IAiClientRagOrderConfigRepository ragOrders,
-            IAiClientToolMcpConfigRepository mcpTools,
+            AiClientModelCatalogPort models,
+            RagOrderCatalogPort ragOrders,
+            McpClientCatalogPort mcpTools,
             OpsAgentDefinitionQueryGateway agentDefinitions) {
         this.models = models;
         this.ragOrders = ragOrders;
@@ -31,8 +31,8 @@ public class OpsDataCatalogStatisticsAdapter implements DataCatalogStatisticsPor
     public DataCatalogCounts loadCatalogCounts() {
         return new DataCatalogCounts(
                 agentDefinitions.list().size(),
-                mcpTools.queryAll().size(),
+                mcpTools.listAll().size(),
                 ragOrders.queryAll().size(),
-                models.queryAll().size());
+                models.listAll().size());
     }
 }

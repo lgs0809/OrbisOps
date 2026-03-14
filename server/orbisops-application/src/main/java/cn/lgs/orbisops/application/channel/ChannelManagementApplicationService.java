@@ -1,6 +1,8 @@
 package cn.lgs.orbisops.application.channel;
 
+import cn.lgs.orbisops.application.channel.provider.ChannelProtocolDescriptor;
 import cn.lgs.orbisops.domain.channel.adapter.repository.IChannelRepository;
+import cn.lgs.orbisops.domain.channel.model.ChannelAccessPolicy;
 import cn.lgs.orbisops.domain.channel.model.ChannelIdentityRecord;
 import cn.lgs.orbisops.domain.channel.model.ChannelMessageRecord;
 import cn.lgs.orbisops.domain.channel.model.ChannelRecord;
@@ -79,6 +81,7 @@ public final class ChannelManagementApplicationService {
                 required(command.channelType().value(), "CHANNEL_TYPE_REQUIRED"),
                 command.credentialRef().orElse(""),
                 command.configuration().orElse(Map.of()),
+                command.accessPolicy().orElse(ChannelAccessPolicy.DENY_UNKNOWN),
                 command.status().orElse(ChannelStatus.ACTIVE),
                 command.actor(),
                 null,
@@ -94,7 +97,7 @@ public final class ChannelManagementApplicationService {
         return catalogQuery.list(required(projectId, "CHANNEL_PROJECT_ID_REQUIRED"));
     }
 
-    public List<Map<String, Object>> supportedTypes() {
+    public List<ChannelProtocolDescriptor> supportedTypes() {
         return catalogQuery.supportedTypes();
     }
 
@@ -113,6 +116,7 @@ public final class ChannelManagementApplicationService {
                 command.channelType().orElse(current.channelType()),
                 command.credentialRef().orElse(current.credentialRef()),
                 command.configuration().orElse(current.config()),
+                command.accessPolicy().orElse(current.accessPolicy()),
                 command.status().orElse(current.status()),
                 current.createdBy(),
                 current.createTime(),
@@ -231,8 +235,8 @@ public final class ChannelManagementApplicationService {
 
     private ChannelRecord withInboundExecution(ChannelRecord channel, ExecutionBinding execution) {
         return new ChannelRecord(channel.channelId(), channel.projectId(), execution, channel.name(),
-                channel.channelType(), channel.credentialRef(), channel.config(), channel.status(), channel.createdBy(),
-                channel.createTime(), channel.updateTime());
+                channel.channelType(), channel.credentialRef(), channel.config(), channel.accessPolicy(), channel.status(),
+                channel.createdBy(), channel.createTime(), channel.updateTime());
     }
 
     private ExecutionBinding requestedExecution(ChannelModels.ConfigurationMutation command,

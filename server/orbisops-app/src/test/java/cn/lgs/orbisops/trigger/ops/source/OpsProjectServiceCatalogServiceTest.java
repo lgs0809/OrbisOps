@@ -60,7 +60,7 @@ class OpsProjectServiceCatalogServiceTest {
 
     private ProjectService service() {
         return new ProjectService(
-                "order-service", "demo-project", "Example Service", "demo-project-source", "demo-project",
+                "order-service", "demo-project", "Demo Project", "demo-project-source", "demo-project",
                 BuildProfile.MAVEN_VERIFY, "demo-project/target/app.jar", "", "", List.of(),
                 "READY", "now", "now");
     }

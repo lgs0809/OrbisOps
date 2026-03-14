@@ -30,6 +30,34 @@ public class OpsWorkSessionFinalizer {
         return response;
     }
 
+    public OpsAgentChatResponse waitingApproval(Context context,
+                                                String nodeId,
+                                                String approvalId,
+                                                Hooks hooks) {
+        String safeNodeId = value(nodeId);
+        String safeApprovalId = value(approvalId);
+        String message = "Workflow is waiting for human approval at node " + safeNodeId + ".";
+        hooks.record(OpsRuntimeEvent.builder()
+                .eventType("WORKFLOW_APPROVAL_WAITING")
+                .status("WAITING_APPROVAL")
+                .nodeId(safeNodeId)
+                .summary(message)
+                .payload(Map.of(
+                        "runId", value(context.request().getRunId()),
+                        "approvalId", safeApprovalId))
+                .build());
+        if (!context.analysisRequest()) {
+            hooks.appendAssistant(message, Map.of(
+                    "agentId", context.definition().getAgentId(),
+                    "engine", context.engine(),
+                    "status", "WAITING_APPROVAL",
+                    "runId", value(context.request().getRunId()),
+                    "approvalId", safeApprovalId,
+                    "nodeId", safeNodeId));
+        }
+        return response(context, "WAITING_APPROVAL", message);
+    }
+
     public OpsAgentChatResponse canceled(Context context, String reason, Hooks hooks) {
         String message = value(reason);
         hooks.record(OpsRuntimeEvent.builder()
@@ -57,6 +85,14 @@ public class OpsWorkSessionFinalizer {
 
     public void failed(Context context, RuntimeException error, Hooks hooks) {
         String message = value(error == null ? null : error.getMessage());
+        hooks.record(OpsRuntimeEvent.builder()
+                .eventType("RUN_FAILED")
+                .status("FAILED")
+                .summary(message.isBlank() ? "Agent task failed." : message)
+                .payload(Map.of(
+                        "runId", value(context.request().getRunId()),
+                        "elapsedMs", elapsedMs(context.startedNanos())))
+                .build());
         hooks.telemetryFailed(elapsedMs(context.startedNanos()));
         hooks.finishTaskContext("FAILED", message);
         if (!context.analysisRequest()) {

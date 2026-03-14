@@ -31,13 +31,22 @@ final class OpsRuntimeEventJournal {
     private final OpsWorkSessionRunAdapter workSessionRunService;
     private final GraphEventApplicationService graphEventService;
     private final Supplier<OpsConfigAuditService> configAuditServiceSupplier;
+    private final OpsChannelRunProgressProjector channelRunProgressProjector;
 
     OpsRuntimeEventJournal(OpsWorkSessionRunAdapter workSessionRunService,
                            GraphEventApplicationService graphEventService,
                            Supplier<OpsConfigAuditService> configAuditServiceSupplier) {
+        this(workSessionRunService, graphEventService, configAuditServiceSupplier, null);
+    }
+
+    OpsRuntimeEventJournal(OpsWorkSessionRunAdapter workSessionRunService,
+                           GraphEventApplicationService graphEventService,
+                           Supplier<OpsConfigAuditService> configAuditServiceSupplier,
+                           OpsChannelRunProgressProjector channelRunProgressProjector) {
         this.workSessionRunService = workSessionRunService;
         this.graphEventService = graphEventService;
         this.configAuditServiceSupplier = configAuditServiceSupplier;
+        this.channelRunProgressProjector = channelRunProgressProjector;
     }
 
     void markRequestStarted(OpsAgentChatRequest request, long startedNanos) {
@@ -96,6 +105,15 @@ final class OpsRuntimeEventJournal {
                 } catch (RuntimeException error) {
                     throw new OpsRuntimePersistenceException(
                             "WORK_SESSION_RUNTIME_PERSISTENCE_FAILED", error);
+                }
+                if (channelRunProgressProjector != null) {
+                    try {
+                        channelRunProgressProjector.project(request, event);
+                    } catch (RuntimeException projectionFailure) {
+                        log.debug("Channel progress projection dispatch failed, runId={}, eventType={}, reason={}",
+                                canonicalRunId(request), value(event == null ? null : event.getEventType()),
+                                value(projectionFailure.getMessage()));
+                    }
                 }
                 if (delegate != null) {
                     delegate.accept(event);

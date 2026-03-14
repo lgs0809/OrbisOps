@@ -88,6 +88,17 @@ public final class OpsChannelInboundProtocolAdapter implements ChannelInboundPro
         if (!OpsChannelSignature.verify(secret, OpsChannelSignature.inboundPayload(protocolMessage, timestamp), signature)) {
             throw new SecurityException("CHANNEL_SIGNATURE_INVALID");
         }
+        return protect(channel, message);
+    }
+
+    @Override
+    public VerifiedInbound protectTrusted(ChannelRecord channel, ChannelModels.InboundMessage message) {
+        if (channel == null) throw new IllegalArgumentException("CHANNEL_CONFIGURATION_REQUIRED");
+        validate(message);
+        return protect(channel, message);
+    }
+
+    private VerifiedInbound protect(ChannelRecord channel, ChannelModels.InboundMessage message) {
         if (cipher == null || !cipher.available()) {
             throw new IllegalStateException("CHANNEL_INBOUND_ENCRYPTION_UNAVAILABLE");
         }

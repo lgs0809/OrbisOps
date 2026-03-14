@@ -64,6 +64,34 @@ public final class WorkSessionRunControlUseCase<R, Q> {
                 "已从安全检查点重新取得 Work Session；可通过事件接口继续查看。");
     }
 
+    public void assertCanResumeApproval(
+            String runId,
+            String projectId,
+            String actor) {
+        runPort.approvalResumeRequest(
+                requiredRunId(runId),
+                required(projectId, "projectId"),
+                required(actor, "actor"));
+    }
+
+    public WorkSessionResumeAccepted resumeApproval(
+            String runId,
+            String projectId,
+            String actor) {
+        String normalizedRun = requiredRunId(runId);
+        String normalizedProject = required(projectId, "projectId");
+        Q request = runPort.approvalResumeRequest(
+                normalizedRun,
+                normalizedProject,
+                required(actor, "actor"));
+        resumeScheduler.schedule(request);
+        return new WorkSessionResumeAccepted(
+                normalizedRun,
+                normalizedProject,
+                "APPROVAL_RESUME_SCHEDULED",
+                "审批决定已记录，Work Session 已从审批等待点重新调度。");
+    }
+
     public boolean cancelLocal(String runId) {
         String normalizedRun = requiredRunId(runId);
         localCancellation.markCanceled(normalizedRun);

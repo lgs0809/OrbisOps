@@ -22,6 +22,10 @@ public interface IWorkSessionRunRepository {
 
     Optional<WorkSessionRunSnapshot> findByRunId(String runId);
 
+    default List<WorkSessionRunSnapshot> findByStatus(WorkSessionRunStatus status, int limit) {
+        return List.of();
+    }
+
     boolean bindManifest(
             WorkSessionRunClaim claim,
             Map<String, Object> manifest,
@@ -30,6 +34,9 @@ public interface IWorkSessionRunRepository {
             Instant updatedAt);
 
     boolean heartbeat(WorkSessionRunClaim claim, Instant leaseExpiresAt, Instant updatedAt);
+
+    /** Release the active execution lease while retaining a durable human-approval wait point. */
+    boolean suspendForApproval(WorkSessionRunClaim claim, Instant updatedAt);
 
     long appendCheckpoint(WorkSessionRunClaim claim, WorkSessionCheckpoint checkpoint);
 

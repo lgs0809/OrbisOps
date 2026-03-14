@@ -6,6 +6,7 @@ import cn.lgs.orbisops.application.changepackage.LandChangePackageUseCase;
 import cn.lgs.orbisops.application.changepackage.PrepareChangePackageUseCase;
 import cn.lgs.orbisops.application.changepackage.ReviewChangePackageUseCase;
 import cn.lgs.orbisops.application.changepackage.ValidateChangePackageUseCase;
+import cn.lgs.orbisops.trigger.application.channel.OpsChannelApprovalCardService;
 import cn.lgs.orbisops.trigger.application.security.AdminAuthService;
 import cn.lgs.orbisops.trigger.http.admin.security.AdminWebSecurityConfig;
 import cn.lgs.orbisops.trigger.ops.change.OpsChangePackagePermissionService;
@@ -76,7 +77,8 @@ class OpsUserChangePackageControllerTest {
                 mock(ReviewChangePackageUseCase.class),
                 mock(LandChangePackageUseCase.class),
                 queries,
-                permissionService);
+                permissionService,
+                mock(OpsChannelApprovalCardService.class));
     }
 
     private MockHttpServletRequest authenticatedUserRequest() {

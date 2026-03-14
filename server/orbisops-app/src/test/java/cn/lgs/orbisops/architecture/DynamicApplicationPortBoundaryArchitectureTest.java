@@ -24,7 +24,6 @@ class DynamicApplicationPortBoundaryArchitectureTest {
     private static final Map<String, String> ALLOWED_DYNAMIC_RESULT_PORTS = Map.ofEntries(
             Map.entry("analysis/AnalysisTaskSupplementPort.java", "QUERY_SUPPLEMENT"),
             Map.entry("changepackage/ChangePackageQueryPort.java", "QUERY_READ_MODEL"),
-            Map.entry("channel/ChannelProtocolCatalogPort.java", "OPEN_PROTOCOL_CATALOG"),
             Map.entry("execution/ExecutionAdapterTemplatePort.java", "QUERY_GENERATED_TARGETS"),
             Map.entry("mcp/McpRuntimeOperationsPort.java", "QUERY_RUNTIME_CATALOG"),
             Map.entry("mcp/McpSummaryPort.java", "QUERY_SUMMARY_PROJECTION"),

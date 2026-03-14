@@ -39,6 +39,8 @@ public class OpsWorkSessionLifecycleCoordinator {
         try {
             executeWorkSessionEngine(context);
             return succeedWorkSession(context);
+        } catch (OpsWorkflowApprovalPendingException pending) {
+            return terminalCoordinator.waitingApproval(context, pending);
         } catch (OpsRunCanceledException error) {
             return cancelWorkSession(context, error);
         } catch (RuntimeException error) {
@@ -58,6 +60,9 @@ public class OpsWorkSessionLifecycleCoordinator {
         try (OpsWorkSessionLeaseHeartbeat.Scope heartbeat = leaseHeartbeat.start(context.request())) {
             try {
                 engineExecutor.execute(context);
+            } catch (OpsWorkflowApprovalPendingException pending) {
+                heartbeat.suspendForApproval();
+                throw pending;
             } catch (RuntimeException error) {
                 heartbeat.assertHealthy();
                 throw error;

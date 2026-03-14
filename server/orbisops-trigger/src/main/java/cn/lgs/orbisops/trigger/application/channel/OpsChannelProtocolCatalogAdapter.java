@@ -1,61 +1,82 @@
 package cn.lgs.orbisops.trigger.application.channel;
 
 import cn.lgs.orbisops.application.channel.ChannelProtocolCatalogPort;
+import cn.lgs.orbisops.application.channel.provider.ChannelCapabilitySet.ChannelCapability;
+import cn.lgs.orbisops.application.channel.provider.ChannelConnectionMode;
+import cn.lgs.orbisops.application.channel.provider.ChannelProtocolDescriptor;
+import cn.lgs.orbisops.application.channel.provider.ChannelProviderAdapter;
+import cn.lgs.orbisops.application.channel.provider.ChannelProviderConfiguration;
+import cn.lgs.orbisops.application.channel.provider.ChannelType;
 import cn.lgs.orbisops.domain.channel.model.ChannelRecord;
-import cn.lgs.orbisops.trigger.ops.channel.OpsChannelAdapter;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.Set;
 
 @Component
 public final class OpsChannelProtocolCatalogAdapter implements ChannelProtocolCatalogPort {
 
-    private final Map<String, OpsChannelAdapter> adapters;
+    private final ObjectProvider<ChannelProviderAdapter<?>> adapters;
 
-    public OpsChannelProtocolCatalogAdapter(List<OpsChannelAdapter> adapters) {
-        Map<String, OpsChannelAdapter> byType = new LinkedHashMap<>();
-        if (adapters != null) {
-            adapters.forEach(adapter -> byType.put(adapter.type().toUpperCase(Locale.ROOT), adapter));
-        }
-        this.adapters = Map.copyOf(byType);
+    public OpsChannelProtocolCatalogAdapter(ObjectProvider<ChannelProviderAdapter<?>> adapters) {
+        if (adapters == null) throw new IllegalArgumentException("CHANNEL_PROVIDER_REGISTRY_REQUIRED");
+        this.adapters = adapters;
     }
 
     @Override
-    public List<Map<String, Object>> supportedTypes() {
-        return adapters.keySet().stream().sorted().map(type -> Map.<String, Object>of(
-                "type", type,
-                "displayName", "GENERIC_WEBHOOK".equals(type) ? "通用 Webhook" : type,
-                "supportsInbound", true,
-                "supportsOutbound", true)).toList();
+    public List<ChannelProtocolDescriptor> supportedTypes() {
+        return adapters.orderedStream()
+                .sorted((left, right) -> left.type().name().compareTo(right.type().name()))
+                .map(this::descriptor)
+                .toList();
     }
 
     @Override
     public void validateConfiguration(ChannelRecord channel) {
         if (channel == null) throw new IllegalArgumentException("CHANNEL_CONFIGURATION_REQUIRED");
-        Map<String, Object> view = new LinkedHashMap<>();
-        view.put("channelId", channel.channelId());
-        view.put("projectId", channel.projectId());
-        view.put("executionType", channel.inboundExecution().type().name());
-        view.put("workflowId", channel.inboundExecution().workflowId());
-        view.put("workflowVersionPolicy", channel.inboundExecution().versionPolicy().name());
-        view.put("workflowVersion", channel.inboundExecution().version());
-        view.put("workflowDefinitionHash", channel.inboundExecution().definitionHash());
-        view.put("name", channel.name());
-        view.put("type", channel.channelType());
-        view.put("channelType", channel.channelType());
-        view.put("credentialRef", channel.credentialRef());
-        view.put("config", channel.config());
-        view.put("status", channel.status().name());
-        adapter(channel.channelType()).validateConfiguration(Map.copyOf(view));
+        validateCaptured(adapter(channel.channelType()), channel);
     }
 
-    private OpsChannelAdapter adapter(String channelType) {
-        String normalized = channelType == null ? "" : channelType.trim().toUpperCase(Locale.ROOT);
-        OpsChannelAdapter adapter = adapters.get(normalized);
-        if (adapter == null) throw new IllegalArgumentException("渠道类型尚未接入：" + channelType);
-        return adapter;
+    private ChannelProtocolDescriptor descriptor(ChannelProviderAdapter<?> adapter) {
+        boolean inbound = adapter.capabilities().supports(ChannelCapability.INBOUND);
+        boolean outbound = adapter.capabilities().supports(ChannelCapability.OUTBOUND);
+        Set<ChannelConnectionMode> connectionModes = adapter.capabilities().supports(ChannelCapability.LONG_CONNECTION)
+                ? adapter.capabilities().supports(ChannelCapability.WEBHOOK)
+                ? Set.of(ChannelConnectionMode.LONG_CONNECTION, ChannelConnectionMode.WEBHOOK, ChannelConnectionMode.HYBRID)
+                : Set.of(ChannelConnectionMode.LONG_CONNECTION)
+                : adapter.capabilities().supports(ChannelCapability.WEBHOOK)
+                ? Set.of(ChannelConnectionMode.WEBHOOK)
+                : Set.of();
+        return new ChannelProtocolDescriptor(adapter.type(), displayName(adapter.type()), inbound, outbound,
+                connectionModes, adapter.capabilities());
+    }
+
+    private String displayName(ChannelType type) {
+        return switch (type) {
+            case GENERIC_WEBHOOK -> "Generic Webhook";
+            case FEISHU -> "Feishu / Lark";
+            case WECOM -> "WeCom";
+            case DINGTALK -> "DingTalk";
+            case SLACK -> "Slack";
+            case TELEGRAM -> "Telegram";
+            case DISCORD -> "Discord";
+            case QQ -> "QQ";
+            case WECHAT -> "WeChat";
+        };
+    }
+
+    private ChannelProviderAdapter<?> adapter(String channelType) {
+        ChannelType type = ChannelType.parse(channelType);
+        return adapters.orderedStream()
+                .filter(candidate -> candidate.type() == type)
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("CHANNEL_PROVIDER_NOT_CONFIGURED:" + type.name()));
+    }
+
+    private <C extends ChannelProviderConfiguration> void validateCaptured(ChannelProviderAdapter<C> adapter,
+                                                                           ChannelRecord channel) {
+        C configuration = adapter.configuration(channel);
+        adapter.validateConfiguration(configuration);
     }
 }

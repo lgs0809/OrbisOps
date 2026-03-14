@@ -9,6 +9,8 @@ public interface WorkSessionRunControlPort<R, Q> {
 
     Q resumeRequest(String runId, String projectId, String actor);
 
+    Q approvalResumeRequest(String runId, String projectId, String actor);
+
     boolean requestCancel(String runId, String projectId, String actor, String reason);
 
     boolean requestCancelForActor(String runId, String actor, String reason);

@@ -68,7 +68,24 @@ public final class OpsWorkSessionRunApplicationFacade {
             String runId,
             String projectId,
             String actor) {
-        WorkSessionResumeAccepted accepted = control.resume(runId, projectId, actor);
+        return resumeView(control.resume(runId, projectId, actor));
+    }
+
+    public void assertCanResumeApproval(
+            String runId,
+            String projectId,
+            String actor) {
+        control.assertCanResumeApproval(runId, projectId, actor);
+    }
+
+    public Map<String, Object> resumeApproval(
+            String runId,
+            String projectId,
+            String actor) {
+        return resumeView(control.resumeApproval(runId, projectId, actor));
+    }
+
+    private Map<String, Object> resumeView(WorkSessionResumeAccepted accepted) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("runId", accepted.runId());
         result.put("projectId", accepted.projectId());

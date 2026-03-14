@@ -1,6 +1,8 @@
 package cn.lgs.orbisops.infrastructure.adapter.repository;
 
+import cn.lgs.orbisops.application.channel.ChannelRuntimeReadPort;
 import cn.lgs.orbisops.domain.channel.adapter.repository.IChannelRepository;
+import cn.lgs.orbisops.domain.channel.model.ChannelAccessPolicy;
 import cn.lgs.orbisops.domain.channel.model.ChannelIdentityRecord;
 import cn.lgs.orbisops.domain.channel.model.ChannelMessageRecord;
 import cn.lgs.orbisops.domain.channel.model.ChannelRecord;
@@ -25,7 +27,7 @@ import java.util.Map;
 import java.util.Optional;
 
 @Repository
-public class OpsChannelRepository implements IChannelRepository {
+public class OpsChannelRepository implements IChannelRepository, ChannelRuntimeReadPort {
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -42,7 +44,8 @@ public class OpsChannelRepository implements IChannelRepository {
                   agent_id VARCHAR(128) NOT NULL DEFAULT '', agent_binding_mode VARCHAR(24) NOT NULL DEFAULT 'LATEST_PUBLISHED',
                   agent_version INT NULL, agent_definition_hash VARCHAR(64) NOT NULL DEFAULT '',
                   name VARCHAR(128) NOT NULL, channel_type VARCHAR(32) NOT NULL,
-                  credential_ref VARCHAR(256) NOT NULL DEFAULT '', config_json MEDIUMTEXT NULL, status VARCHAR(24) NOT NULL DEFAULT 'ACTIVE',
+                  credential_ref VARCHAR(256) NOT NULL DEFAULT '', config_json MEDIUMTEXT NULL,
+                  access_policy VARCHAR(32) NOT NULL DEFAULT 'DENY_UNKNOWN', status VARCHAR(24) NOT NULL DEFAULT 'ACTIVE',
                   created_by VARCHAR(128) NOT NULL DEFAULT '', create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                   update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                   PRIMARY KEY (id), UNIQUE KEY uk_ops_channel_id (channel_id), KEY idx_ops_channel_project (project_id,status)
@@ -52,6 +55,7 @@ public class OpsChannelRepository implements IChannelRepository {
         ensureColumn("agent_binding_mode", "VARCHAR(24) NOT NULL DEFAULT 'LATEST_PUBLISHED'");
         ensureColumn("agent_version", "INT NULL");
         ensureColumn("agent_definition_hash", "VARCHAR(64) NOT NULL DEFAULT ''");
+        ensureColumn("access_policy", "VARCHAR(32) NOT NULL DEFAULT 'DENY_UNKNOWN'");
         template.execute("""
                 CREATE TABLE IF NOT EXISTS ai_ops_channel_session (
                   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, channel_session_id VARCHAR(80) NOT NULL, channel_id VARCHAR(80) NOT NULL,
@@ -113,12 +117,12 @@ public class OpsChannelRepository implements IChannelRepository {
         int inserted = requiredTemplate().update("""
                 INSERT INTO ai_ops_channel
                   (channel_id,project_id,execution_kind,agent_id,agent_binding_mode,agent_version,agent_definition_hash,
-                   name,channel_type,credential_ref,config_json,status,created_by)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+                   name,channel_type,credential_ref,config_json,access_policy,status,created_by)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """, channel.channelId(), channel.projectId(), execution.type().name(), execution.workflowId(),
                 execution.versionPolicy().name(), execution.version(), execution.definitionHash(), channel.name(),
-                channel.channelType(), channel.credentialRef(), encodeConfig(channel.config()), channel.status().name(),
-                channel.createdBy());
+                channel.channelType(), channel.credentialRef(), encodeConfig(channel.config()), channel.accessPolicy().name(),
+                channel.status().name(), channel.createdBy());
         if (inserted != 1) throw new IllegalStateException("CHANNEL_CREATE_FAILED");
     }
 
@@ -127,11 +131,11 @@ public class OpsChannelRepository implements IChannelRepository {
         ExecutionBinding execution = channel.inboundExecution();
         return requiredTemplate().update("""
                 UPDATE ai_ops_channel SET execution_kind=?,agent_id=?,agent_binding_mode=?,agent_version=?,agent_definition_hash=?,
-                  name=?,credential_ref=?,config_json=?,status=?,update_time=CURRENT_TIMESTAMP
+                  name=?,credential_ref=?,config_json=?,access_policy=?,status=?,update_time=CURRENT_TIMESTAMP
                 WHERE project_id=? AND channel_id=?
                 """, execution.type().name(), execution.workflowId(), execution.versionPolicy().name(), execution.version(),
                 execution.definitionHash(), channel.name(), channel.credentialRef(), encodeConfig(channel.config()),
-                channel.status().name(), channel.projectId(), channel.channelId()) == 1;
+                channel.accessPolicy().name(), channel.status().name(), channel.projectId(), channel.channelId()) == 1;
     }
 
     @Override
@@ -139,6 +143,12 @@ public class OpsChannelRepository implements IChannelRepository {
         List<ChannelRecord> rows = requiredTemplate().query(
                 "SELECT * FROM ai_ops_channel WHERE channel_id=? LIMIT 1", this::channel, channelId);
         return rows.stream().findFirst();
+    }
+
+    @Override
+    public List<ChannelRecord> findAll() {
+        return requiredTemplate().query(
+                "SELECT * FROM ai_ops_channel ORDER BY id DESC", this::channel);
     }
 
     @Override
@@ -368,9 +378,9 @@ public class OpsChannelRepository implements IChannelRepository {
         int inserted = requiredTemplate().update("""
                 INSERT INTO ai_ops_channel_message
                   (message_id,channel_id,project_id,external_message_id,external_conversation_id,sender_id,session_id,run_id,direction,status,payload_json)
-                VALUES (?,?,?,?,?,'platform',?,?,'OUTBOUND','SENDING',?)
+                VALUES (?,?,?,?,?,?,?,?, 'OUTBOUND','SENDING',?)
                 """, message.messageId(), message.channelId(), message.projectId(), message.externalMessageId(),
-                message.externalConversationId(), message.sessionId(), message.runId(), message.payloadJson());
+                message.externalConversationId(), message.senderId(), message.sessionId(), message.runId(), message.payloadJson());
         if (inserted != 1) throw new IllegalStateException("CHANNEL_OUTBOUND_CREATE_FAILED");
     }
 
@@ -388,6 +398,30 @@ public class OpsChannelRepository implements IChannelRepository {
                 UPDATE ai_ops_channel_message SET status='FAILED',error_message=?,update_time=CURRENT_TIMESTAMP WHERE message_id=?
                 """, errorMessage, messageId);
         if (updated != 1) throw new IllegalStateException("CHANNEL_OUTBOUND_STATE_CONFLICT");
+    }
+
+    @Override
+    public void bindOutboundExternalMessageId(String messageId, String externalMessageId) {
+        if (externalMessageId == null || externalMessageId.isBlank()) return;
+        int updated = requiredTemplate().update("""
+                UPDATE ai_ops_channel_message SET external_message_id=?,update_time=CURRENT_TIMESTAMP
+                WHERE message_id=? AND direction='OUTBOUND'
+                """, externalMessageId.trim(), messageId);
+        if (updated != 1) throw new IllegalStateException("CHANNEL_OUTBOUND_STATE_CONFLICT");
+    }
+
+    @Override
+    public Optional<ChannelMessageRecord> findLatestOutboundByRun(String projectId,
+                                                                  String channelId,
+                                                                  String runId,
+                                                                  String senderId) {
+        return requiredTemplate().query("""
+                SELECT message_id,channel_id,project_id,external_message_id,external_conversation_id,sender_id,
+                       session_id,run_id,direction,status,payload_json,error_message,create_time,update_time
+                FROM ai_ops_channel_message
+                WHERE project_id=? AND channel_id=? AND run_id=? AND direction='OUTBOUND' AND sender_id=?
+                ORDER BY id DESC LIMIT 1
+                """, this::message, projectId, channelId, runId, senderId).stream().findFirst();
     }
 
     @Override
@@ -497,6 +531,7 @@ public class OpsChannelRepository implements IChannelRepository {
                 rs.getString("channel_id"), rs.getString("project_id"), execution,
                 rs.getString("name"), rs.getString("channel_type"), rs.getString("credential_ref"),
                 decodeConfig(rs.getString("config_json")),
+                ChannelAccessPolicy.parse(rs.getString("access_policy"), ChannelAccessPolicy.DENY_UNKNOWN),
                 cn.lgs.orbisops.domain.channel.model.ChannelStatus.require(rs.getString("status")),
                 rs.getString("created_by"), instant(rs, "create_time"), instant(rs, "update_time"));
     }

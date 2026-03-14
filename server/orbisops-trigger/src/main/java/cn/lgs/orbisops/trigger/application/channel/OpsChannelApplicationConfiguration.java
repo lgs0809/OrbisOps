@@ -16,11 +16,14 @@ import cn.lgs.orbisops.application.channel.ChannelReplyOutboxPort;
 import cn.lgs.orbisops.application.channel.ChannelTaskExecutorPort;
 import cn.lgs.orbisops.application.channel.ChannelRecoveryDispatchPort;
 import cn.lgs.orbisops.application.channel.ChannelOutboundApplicationService;
+import cn.lgs.orbisops.application.channel.ChannelRunProgressApplicationService;
 import cn.lgs.orbisops.application.channel.ChannelOutboundDeliveryPort;
 import cn.lgs.orbisops.application.channel.ChannelRuntimeAuditPort;
 import cn.lgs.orbisops.application.channel.ChannelQueryService;
 import cn.lgs.orbisops.application.channel.ChannelProtocolCatalogPort;
 import cn.lgs.orbisops.application.channel.ReceiveChannelMessageUseCase;
+import cn.lgs.orbisops.application.channel.approval.ChannelApprovalActionTokenRepositoryPort;
+import cn.lgs.orbisops.application.channel.approval.ChannelApprovalActionTokenService;
 import cn.lgs.orbisops.domain.channel.adapter.repository.IChannelRepository;
 import cn.lgs.orbisops.domain.channel.service.ChannelOutboundContentPolicy;
 import org.springframework.context.annotation.Bean;
@@ -33,6 +36,12 @@ public class OpsChannelApplicationConfiguration {
     @Bean
     public ChannelOutboundContentPolicy channelOutboundContentPolicy() {
         return new ChannelOutboundContentPolicy();
+    }
+
+    @Bean
+    public ChannelApprovalActionTokenService channelApprovalActionTokenService(
+            ChannelApprovalActionTokenRepositoryPort repository) {
+        return new ChannelApprovalActionTokenService(repository);
     }
 
     @Bean
@@ -86,6 +95,14 @@ public class OpsChannelApplicationConfiguration {
             @Value("${ops.channel.outbound.max-message-chars:20000}") int maxMessageChars) {
         return new ChannelOutboundApplicationService(repository, deliveryPort, auditPort,
                 contentPolicy, maxMessageChars);
+    }
+
+    @Bean
+    public ChannelRunProgressApplicationService channelRunProgressApplicationService(
+            IChannelRepository repository,
+            ChannelOutboundApplicationService outbound,
+            ChannelOutboundDeliveryPort deliveryPort) {
+        return new ChannelRunProgressApplicationService(repository, outbound, deliveryPort);
     }
 
     @Bean

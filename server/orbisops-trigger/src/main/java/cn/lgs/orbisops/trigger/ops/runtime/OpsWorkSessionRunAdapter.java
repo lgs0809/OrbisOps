@@ -48,6 +48,13 @@ public class OpsWorkSessionRunAdapter {
         application.heartbeat(mapper.claim(request));
     }
 
+    public void suspendForApproval(OpsAgentChatRequest request) {
+        if (!mapper.hasClaim(request)) {
+            throw new IllegalStateException("WORK_SESSION_APPROVAL_WAIT_REQUIRES_CLAIM");
+        }
+        application.suspendForApproval(mapper.claim(request));
+    }
+
     public void checkpoint(
             OpsAgentChatRequest request,
             String checkpointType,
@@ -122,6 +129,11 @@ public class OpsWorkSessionRunAdapter {
 
     public OpsAgentChatRequest resumeRequest(String runId, String projectId, String actor) {
         WorkSessionRunSnapshot snapshot = application.resume(runId, projectId, actor);
+        return mapper.resumeRequest(snapshot);
+    }
+
+    public OpsAgentChatRequest approvalResumeRequest(String runId, String projectId, String actor) {
+        WorkSessionRunSnapshot snapshot = application.resumeApproval(runId, projectId, actor);
         return mapper.resumeRequest(snapshot);
     }
 

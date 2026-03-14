@@ -13,6 +13,10 @@ enum OpsRuntimeAgentAuthority {
     PROD_FULL;
 
     static OpsRuntimeAgentAuthority resolve(OpsRuntimeResourceContext context) {
+        if (context != null && context.getRequest() != null
+                && Boolean.TRUE.equals(context.getRequest().getTrustedObserveOnly())) {
+            return OBSERVE_ONLY;
+        }
         AgentRunExecutionContext execution = context == null ? null : context.getExecutionContext();
         if (execution == null) {
             return OBSERVE_ONLY;

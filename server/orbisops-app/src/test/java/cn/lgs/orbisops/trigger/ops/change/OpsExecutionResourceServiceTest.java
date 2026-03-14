@@ -130,7 +130,7 @@ class OpsExecutionResourceServiceTest {
         return new ExecutionResourceDraft(
                 "demo-project-runtime",
                 "demo-project",
-                "Example Service Runtime",
+                "Demo Runtime",
                 "worker-a",
                 "local-java-service",
                 "",

@@ -12,6 +12,7 @@ public final class JdbcChannelSchemaInitializer {
 
     private final OpsChannelRepository channelRepository;
     private final OpsChannelOutboxRepository outboxRepository;
+    private final OpsChannelApprovalActionRepository approvalActionRepository;
 
     @Value("${ops.channel.auto-init:false}")
     private boolean channelAutoInit;
@@ -20,16 +21,22 @@ public final class JdbcChannelSchemaInitializer {
     private boolean outboxAutoInit;
 
     public JdbcChannelSchemaInitializer(OpsChannelRepository channelRepository,
-                                        OpsChannelOutboxRepository outboxRepository) {
+                                        OpsChannelOutboxRepository outboxRepository,
+                                        OpsChannelApprovalActionRepository approvalActionRepository) {
         if (channelRepository == null) throw new IllegalArgumentException("CHANNEL_REPOSITORY_REQUIRED");
         if (outboxRepository == null) throw new IllegalArgumentException("CHANNEL_OUTBOX_REPOSITORY_REQUIRED");
+        if (approvalActionRepository == null) throw new IllegalArgumentException("CHANNEL_APPROVAL_ACTION_REPOSITORY_REQUIRED");
         this.channelRepository = channelRepository;
         this.outboxRepository = outboxRepository;
+        this.approvalActionRepository = approvalActionRepository;
     }
 
     @PostConstruct
     public void initialize() {
-        if (channelAutoInit) channelRepository.ensureSchema();
+        if (channelAutoInit) {
+            channelRepository.ensureSchema();
+            approvalActionRepository.ensureSchema();
+        }
         if (outboxAutoInit && outboxRepository.available()) outboxRepository.ensureSchema();
     }
 }

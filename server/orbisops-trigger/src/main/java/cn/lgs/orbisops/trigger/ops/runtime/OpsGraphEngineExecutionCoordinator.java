@@ -131,15 +131,23 @@ final class OpsGraphEngineExecutionCoordinator {
                     graphRuntimeStateManager.keyStrategyFactory());
             for (OpsWorkflowNode node : nodes) {
                 graph.addNode(node.getNodeId(), node_async(state -> {
-                    if (typedWorkflowCoordinator != null) {
-                        Optional<Map<String, Object>> replayed =
-                                typedWorkflowCoordinator.replayCompletedNode(
-                                        request, node, events, eventSink);
-                        if (replayed.isPresent()) return replayed.get();
-                        typedWorkflowCoordinator.beforeNode(
-                                request, node, events, eventSink);
-                    }
                     try {
+                        if (typedWorkflowCoordinator != null) {
+                            Optional<Map<String, Object>> replayed =
+                                    typedWorkflowCoordinator.replayCompletedNode(
+                                            request, node, events, eventSink);
+                            if (replayed.isPresent()) return replayed.get();
+                            Optional<Map<String, Object>> approval =
+                                    typedWorkflowCoordinator.handleHumanApproval(
+                                            request, node, events, eventSink);
+                            if (approval.isPresent()) {
+                                typedWorkflowCoordinator.afterNode(
+                                        request, node, approval.get(), events, eventSink);
+                                return approval.get();
+                            }
+                            typedWorkflowCoordinator.beforeNode(
+                                    request, node, events, eventSink);
+                        }
                         Map<String, Object> output = graphNodeExecutionCoordinator.execute(
                                 definition,
                                 node,
@@ -153,6 +161,8 @@ final class OpsGraphEngineExecutionCoordinator {
                                     request, node, output, events, eventSink);
                         }
                         return output;
+                    } catch (OpsWorkflowApprovalPendingException pending) {
+                        throw pending;
                     } catch (OpsRunCanceledException canceled) {
                         throw canceled;
                     } catch (RuntimeException error) {
@@ -207,6 +217,8 @@ final class OpsGraphEngineExecutionCoordinator {
             return state
                     .map(overAllState -> messageText(overAllState.value("output", "")))
                     .orElse("");
+        } catch (OpsWorkflowApprovalPendingException pending) {
+            throw pending;
         } catch (OpsRunCanceledException error) {
             if (typedWorkflowCoordinator != null) {
                 try {

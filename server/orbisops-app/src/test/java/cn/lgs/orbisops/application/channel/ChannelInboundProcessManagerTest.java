@@ -1,6 +1,7 @@
 package cn.lgs.orbisops.application.channel;
 
 import cn.lgs.orbisops.domain.channel.adapter.repository.IChannelRepository;
+import cn.lgs.orbisops.domain.channel.model.ChannelAccessPolicy;
 import cn.lgs.orbisops.domain.channel.model.ChannelIdentityRecord;
 import cn.lgs.orbisops.domain.channel.model.ChannelMessageRecord;
 import cn.lgs.orbisops.domain.channel.model.ChannelRecord;
@@ -82,6 +83,61 @@ class ChannelInboundProcessManagerTest {
     }
 
     @Test
+    void providerThreadUsesRootInSessionKeyWithoutChangingStoredProviderConversationId() {
+        var conversation = new cn.lgs.orbisops.application.channel.provider.ChannelConversationRef(
+                "conversation-1", cn.lgs.orbisops.application.channel.provider.ChannelConversationRef.ConversationKind.GROUP);
+        var envelope = new cn.lgs.orbisops.application.channel.provider.ChannelInboundEnvelope(
+                new cn.lgs.orbisops.application.channel.provider.ChannelMessageRef("external-thread-1", conversation, "thread-root-1"),
+                new cn.lgs.orbisops.application.channel.provider.ChannelExternalPrincipal(
+                        "sender-1", "Alice", cn.lgs.orbisops.application.channel.provider.ChannelExternalPrincipal.PrincipalKind.USER),
+                cn.lgs.orbisops.application.channel.provider.ChannelRichContent.text("continue"),
+                List.of(), Instant.now(), "provider-envelope-1");
+        ArgumentCaptor<ChannelModels.InboundMessage> protectedMessage = ArgumentCaptor.forClass(ChannelModels.InboundMessage.class);
+        when(protocol.protectTrusted(any(), protectedMessage.capture()))
+                .thenReturn(new ChannelInboundProtocolPort.VerifiedInbound("encrypted-thread-envelope"));
+        when(repository.insertInbound(any())).thenReturn(true);
+        when(repository.resolveSession(any(), any(), any(), any(), any(), any())).thenReturn("session-thread-1");
+
+        manager.receiveProvider("channel-1", envelope);
+
+        assertEquals("thread-root-1", protectedMessage.getValue().metadata().get("threadId"));
+        verify(repository).resolveSession(
+                org.mockito.ArgumentMatchers.eq("channel-1"),
+                org.mockito.ArgumentMatchers.eq("project-1"),
+                org.mockito.ArgumentMatchers.eq("agent-1"),
+                org.mockito.ArgumentMatchers.eq("conversation-1\nthread:thread-root-1"),
+                org.mockito.ArgumentMatchers.eq("sender-1"),
+                org.mockito.ArgumentMatchers.anyString());
+        ArgumentCaptor<ChannelMessageRecord> stored = ArgumentCaptor.forClass(ChannelMessageRecord.class);
+        verify(repository).insertInbound(stored.capture());
+        assertEquals("conversation-1", stored.getValue().externalConversationId());
+    }
+
+    @Test
+    void restoredThreadMessageRepliesToRootInsteadOfNestedMessageId() {
+        ChannelMessageRecord stored = queued();
+        ChannelConversationLeaseService.LeaseHandle lease = lease();
+        ChannelModels.InboundMessage threadMessage = new ChannelModels.InboundMessage(
+                "external-1", "conversation-1", "sender-1", "continue", 100,
+                Map.of("providerAuthenticated", true, "threadId", "thread-root-1"), "TEXT", List.of(), null);
+        when(repository.findInbound("channel-1", "external-1")).thenReturn(Optional.of(stored));
+        when(leases.acquire(any(), any())).thenReturn(Optional.of(lease));
+        when(protocol.restore(stored)).thenReturn(threadMessage);
+        when(bindings.resolve("project-1", channel().inboundExecution()))
+                .thenReturn(new ChannelExecutionBindingPort.ResolvedExecution(ExecutionType.WORKFLOW, "agent-1", 3, "agent-hash"));
+        when(repository.findIdentity("channel-1", "sender-1")).thenReturn(Optional.empty());
+        when(chat.chat(any())).thenReturn(new ChannelAgentChatPort.ChatResult("answer", "channel-user"));
+        when(replies.enqueue(any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(new ChannelReplyOutboxPort.ReplyDelivery(false, false));
+        when(leases.complete(lease, "REPLY_QUEUED", "run-1", "session-1")).thenReturn(true);
+
+        manager.processQueued("channel-1", "external-1");
+
+        verify(replies).enqueue("project-1", "channel-1", "conversation-1", "answer",
+                "run-1", "session-1", "thread-root-1");
+    }
+
+    @Test
     void outputOnlyChannelRejectsInboundBeforeProtocolOrQueue() {
         when(repository.findById("channel-1")).thenReturn(Optional.of(new ChannelRecord(
                 "channel-1", "project-1", ExecutionBinding.none(), "Notify only", "GENERIC_WEBHOOK",
@@ -155,7 +211,11 @@ class ChannelInboundProcessManagerTest {
 
         manager.processQueued("channel-1", "external-1");
 
-        verify(chat).chat(any());
+        ArgumentCaptor<ChannelAgentChatPort.ChatCommand> command =
+                ArgumentCaptor.forClass(ChannelAgentChatPort.ChatCommand.class);
+        verify(chat).chat(command.capture());
+        assertEquals(ChannelAgentChatPort.IdentityStatus.UNMAPPED, command.getValue().identityStatus());
+        assertEquals(ChannelAgentChatPort.RuntimeAccess.OBSERVE_ONLY_UNKNOWN, command.getValue().runtimeAccess());
         verify(replies).enqueue("project-1", "channel-1", "conversation-1", "answer",
                 "run-1", "session-1", "external-1");
         verify(leases).complete(lease, "REPLY_QUEUED", "run-1", "session-1");
@@ -163,6 +223,82 @@ class ChannelInboundProcessManagerTest {
         verify(audit).record("project-1", "agent-1", "channel-user", "CHANNEL_MESSAGE_COMPLETED",
                 "external-1", "LOW", "SUCCEEDED",
                 Map.of("channelId", "channel-1", "runId", "run-1", "sessionId", "session-1"));
+    }
+
+    @Test
+    void unknownSenderIsDeniedByDefaultBeforeExecutionResolution() {
+        ChannelMessageRecord stored = queued();
+        ChannelConversationLeaseService.LeaseHandle lease = lease();
+        when(repository.findById("channel-1")).thenReturn(Optional.of(channelWithPolicy(ChannelAccessPolicy.DENY_UNKNOWN)));
+        when(repository.findInbound("channel-1", "external-1")).thenReturn(Optional.of(stored));
+        when(leases.acquire(any(), any())).thenReturn(Optional.of(lease));
+        when(protocol.restore(stored)).thenReturn(message());
+        when(repository.findIdentity("channel-1", "sender-1")).thenReturn(Optional.empty());
+        when(leases.fail(lease, "CHANNEL_UNKNOWN_SENDER_DENIED")).thenReturn(true);
+
+        manager.processQueued("channel-1", "external-1");
+
+        verify(bindings, never()).resolve(any(), any());
+        verify(chat, never()).chat(any());
+        verify(replies, never()).enqueue(any(), any(), any(), any(), any(), any(), any());
+        verify(leases).fail(lease, "CHANNEL_UNKNOWN_SENDER_DENIED");
+        verify(audit).record(org.mockito.ArgumentMatchers.eq("project-1"),
+                org.mockito.ArgumentMatchers.eq("agent-1"), any(),
+                org.mockito.ArgumentMatchers.eq("CHANNEL_UNKNOWN_SENDER_DENIED"),
+                org.mockito.ArgumentMatchers.eq("external-1"), org.mockito.ArgumentMatchers.eq("MEDIUM"),
+                org.mockito.ArgumentMatchers.eq("BLOCKED"), any());
+    }
+
+    @Test
+    void pairingPolicyReturnsSafePairingGuidanceWithoutEnteringAgentRuntime() {
+        ChannelMessageRecord stored = queued();
+        ChannelConversationLeaseService.LeaseHandle lease = lease();
+        when(repository.findById("channel-1")).thenReturn(Optional.of(channelWithPolicy(ChannelAccessPolicy.PAIRING)));
+        when(repository.findInbound("channel-1", "external-1")).thenReturn(Optional.of(stored));
+        when(leases.acquire(any(), any())).thenReturn(Optional.of(lease));
+        when(protocol.restore(stored)).thenReturn(message());
+        when(repository.findIdentity("channel-1", "sender-1")).thenReturn(Optional.empty());
+        when(replies.enqueue(any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(new ChannelReplyOutboxPort.ReplyDelivery(false, false));
+        when(leases.complete(lease, "REPLY_QUEUED", "run-1", "session-1")).thenReturn(true);
+
+        manager.processQueued("channel-1", "external-1");
+
+        verify(bindings, never()).resolve(any(), any());
+        verify(chat, never()).chat(any());
+        verify(replies).enqueue("project-1", "channel-1", "conversation-1",
+                "身份尚未绑定，请联系项目管理员完成 Channel 身份绑定后再使用。",
+                "run-1", "session-1", "external-1");
+        verify(leases).complete(lease, "REPLY_QUEUED", "run-1", "session-1");
+    }
+
+    @Test
+    void mappedSenderRemainsAuthenticatedEvenWhenUnknownSendersAreDenied() {
+        ChannelMessageRecord stored = queued();
+        ChannelConversationLeaseService.LeaseHandle lease = lease();
+        ChannelIdentityRecord identity = new ChannelIdentityRecord("mapping-1", "channel-1", "project-1",
+                "sender-1", "user-1", "alice", ChannelStatus.ACTIVE, 1, "admin", null, null);
+        when(repository.findById("channel-1")).thenReturn(Optional.of(channelWithPolicy(ChannelAccessPolicy.DENY_UNKNOWN)));
+        when(repository.findInbound("channel-1", "external-1")).thenReturn(Optional.of(stored));
+        when(leases.acquire(any(), any())).thenReturn(Optional.of(lease));
+        when(protocol.restore(stored)).thenReturn(message());
+        when(repository.findIdentity("channel-1", "sender-1")).thenReturn(Optional.of(identity));
+        when(identities.isTrusted("project-1", identity)).thenReturn(true);
+        when(bindings.resolve(any(), any()))
+                .thenReturn(new ChannelExecutionBindingPort.ResolvedExecution(ExecutionType.WORKFLOW, "agent-1", 3, "agent-hash"));
+        when(chat.chat(any())).thenReturn(new ChannelAgentChatPort.ChatResult("answer", "user-1"));
+        when(replies.enqueue(any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(new ChannelReplyOutboxPort.ReplyDelivery(true, false));
+        when(leases.complete(lease, "COMPLETED", "run-1", "session-1")).thenReturn(true);
+
+        manager.processQueued("channel-1", "external-1");
+
+        ArgumentCaptor<ChannelAgentChatPort.ChatCommand> command =
+                ArgumentCaptor.forClass(ChannelAgentChatPort.ChatCommand.class);
+        verify(chat).chat(command.capture());
+        assertEquals(ChannelAgentChatPort.IdentityStatus.MAPPED, command.getValue().identityStatus());
+        assertEquals(ChannelAgentChatPort.RuntimeAccess.AUTHENTICATED, command.getValue().runtimeAccess());
+        assertEquals("user-1", command.getValue().identity().platformUserId());
     }
 
     @Test
@@ -174,23 +310,15 @@ class ChannelInboundProcessManagerTest {
         when(repository.findInbound("channel-1", "external-1")).thenReturn(Optional.of(stored));
         when(leases.acquire(any(), any())).thenReturn(Optional.of(lease));
         when(protocol.restore(stored)).thenReturn(message());
-        when(bindings.resolve(any(), any()))
-                .thenReturn(new ChannelExecutionBindingPort.ResolvedExecution(ExecutionType.WORKFLOW, "agent-1", 3, "agent-hash"));
         when(repository.findIdentity("channel-1", "sender-1")).thenReturn(Optional.of(identity));
         when(identities.isTrusted("project-1", identity)).thenReturn(false);
-        when(chat.chat(any())).thenReturn(new ChannelAgentChatPort.ChatResult("answer", "channel-user"));
-        when(replies.enqueue(any(), any(), any(), any(), any(), any(), any()))
-                .thenReturn(new ChannelReplyOutboxPort.ReplyDelivery(true, false));
-        when(leases.complete(any(), any(), any(), any())).thenReturn(true);
+        when(leases.fail(lease, "CHANNEL_IDENTITY_NO_LONGER_AUTHORIZED")).thenReturn(true);
 
         manager.processQueued("channel-1", "external-1");
 
-        ArgumentCaptor<ChannelAgentChatPort.ChatCommand> command =
-                ArgumentCaptor.forClass(ChannelAgentChatPort.ChatCommand.class);
-        verify(chat).chat(command.capture());
-        assertEquals(null, command.getValue().identity());
-        assertEquals(ChannelAgentChatPort.IdentityStatus.INVALID, command.getValue().identityStatus());
-        assertEquals(ExecutionType.WORKFLOW, command.getValue().executionType());
+        verify(chat, never()).chat(any());
+        verify(bindings, never()).resolve(any(), any());
+        verify(leases).fail(lease, "CHANNEL_IDENTITY_NO_LONGER_AUTHORIZED");
         verify(audit).record(org.mockito.ArgumentMatchers.eq("project-1"),
                 org.mockito.ArgumentMatchers.eq("agent-1"), any(),
                 org.mockito.ArgumentMatchers.eq("CHANNEL_IDENTITY_REJECTED"),
@@ -346,11 +474,15 @@ class ChannelInboundProcessManagerTest {
     }
 
     private ChannelRecord channel() {
+        return channelWithPolicy(ChannelAccessPolicy.OBSERVE_ONLY_UNKNOWN);
+    }
+
+    private ChannelRecord channelWithPolicy(ChannelAccessPolicy accessPolicy) {
         return new ChannelRecord("channel-1", "project-1",
                 ExecutionBinding.workflow("agent-1", ExecutionVersionPolicy.LATEST_PUBLISHED, 3, "agent-hash"),
                 "Oncall", "GENERIC_WEBHOOK", "credential-ref",
-                Map.of("outboundUrl", "https://bridge.test/reply"), ChannelStatus.ACTIVE,
-                "admin", null, null);
+                Map.of("outboundUrl", "https://bridge.test/reply"), accessPolicy,
+                ChannelStatus.ACTIVE, "admin", null, null);
     }
 
     private ChannelMessageRecord queued() {

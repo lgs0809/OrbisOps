@@ -1,13 +1,17 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
+import cn.lgs.orbisops.application.runtime.workflow.WorkflowApprovalApplicationService;
+import cn.lgs.orbisops.application.runtime.workflow.WorkflowApprovalRecord;
 import cn.lgs.orbisops.domain.agentdefinition.compilation.CompiledAgentDefinitionVersion;
 import cn.lgs.orbisops.domain.runtime.contextbundle.model.RuntimeContextBundleSnapshot;
 import cn.lgs.orbisops.domain.runtime.workflow.model.BoundWorkflowExecutionPlan;
 import cn.lgs.orbisops.domain.runtime.workflow.model.DurableWorkflowNodeStatus;
 import cn.lgs.orbisops.domain.runtime.workflow.model.DurableWorkflowRunState;
+import cn.lgs.orbisops.domain.runtime.workflow.model.DurableWorkflowWaitType;
 import cn.lgs.orbisops.domain.shared.service.CanonicalObjectHasher;
 import cn.lgs.orbisops.trigger.application.runtime.OpsRuntimeContextBundleAdapter;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -32,6 +36,8 @@ final class OpsTypedWorkflowExecutionCoordinator {
     private final OpsDurableWorkflowRuntimeCoordinator durableRuntime;
     private final OpsRuntimeResourceAssembler resourceAssembler;
     private final OpsRuntimeContextBundleAdapter contextBundles;
+    private final WorkflowApprovalApplicationService workflowApprovals;
+    private final OpsWorkflowApprovalChannelBridge workflowApprovalChannelBridge;
     private final OpsTypedWorkflowSettings settings;
     private final OpsRuntimeEventJournal eventJournal;
     private final Map<String, ActiveRun> activeRuns = new ConcurrentHashMap<>();
@@ -42,6 +48,8 @@ final class OpsTypedWorkflowExecutionCoordinator {
             OpsDurableWorkflowRuntimeCoordinator durableRuntime,
             OpsRuntimeResourceAssembler resourceAssembler,
             OpsRuntimeContextBundleAdapter contextBundles,
+            WorkflowApprovalApplicationService workflowApprovals,
+            OpsWorkflowApprovalChannelBridge workflowApprovalChannelBridge,
             OpsTypedWorkflowSettings settings,
             OpsRuntimeEventJournal eventJournal) {
         if (definitionValidator == null
@@ -49,6 +57,8 @@ final class OpsTypedWorkflowExecutionCoordinator {
                 || durableRuntime == null
                 || resourceAssembler == null
                 || contextBundles == null
+                || workflowApprovals == null
+                || workflowApprovalChannelBridge == null
                 || settings == null
                 || eventJournal == null) {
             throw new IllegalArgumentException("TYPED_WORKFLOW_COORDINATOR_DEPENDENCY_REQUIRED");
@@ -58,6 +68,8 @@ final class OpsTypedWorkflowExecutionCoordinator {
         this.durableRuntime = durableRuntime;
         this.resourceAssembler = resourceAssembler;
         this.contextBundles = contextBundles;
+        this.workflowApprovals = workflowApprovals;
+        this.workflowApprovalChannelBridge = workflowApprovalChannelBridge;
         this.settings = settings;
         this.eventJournal = eventJournal;
     }
@@ -229,6 +241,89 @@ final class OpsTypedWorkflowExecutionCoordinator {
                     error);
             return Optional.empty();
         }
+    }
+
+    Optional<Map<String, Object>> handleHumanApproval(
+            OpsAgentChatRequest request,
+            OpsWorkflowNode node,
+            List<OpsRuntimeEvent> events,
+            Consumer<OpsRuntimeEvent> eventSink) {
+        ActiveRun run = active(request);
+        if (run == null || node == null || !"HUMAN_APPROVAL".equalsIgnoreCase(value(node.getType()))) {
+            return Optional.empty();
+        }
+        String nodeId = requiredNodeId(node);
+        WorkflowApprovalRecord approval = workflowApprovals.find(request.getRunId(), nodeId).orElse(null);
+        if (approval == null) {
+            durableRuntime.beforeNode(request, nodeId, maxAttempts(run, nodeId));
+            String channelId = request.getMetadata() == null ? "" : value(request.getMetadata().get("channelId"));
+            String target = request.getMetadata() == null ? "" : value(request.getMetadata().get("externalConversationId"));
+            WorkflowApprovalApplicationService.IssuedApproval issued = workflowApprovals.issue(
+                    new WorkflowApprovalApplicationService.IssueCommand(
+                            request.getRunId(),
+                            request.getProjectId(),
+                            nodeId,
+                            channelId,
+                            target,
+                            approvalRequestSummary(node),
+                            Duration.ofSeconds(approvalTimeoutSeconds(node))));
+            try {
+                workflowApprovalChannelBridge.sendIfChannel(request, node, issued);
+            } catch (RuntimeException deliveryFailure) {
+                workflowApprovals.invalidate(issued.record().approvalId());
+                throw deliveryFailure;
+            }
+            durableRuntime.waitFor(
+                    request,
+                    nodeId,
+                    DurableWorkflowWaitType.HUMAN_APPROVAL,
+                    issued.record().waitTokenHash(),
+                    issued.record().expiresAt());
+            record(events, eventSink, OpsRuntimeEvent.builder()
+                    .eventType("WORKFLOW_APPROVAL_WAITING")
+                    .status("WAITING_APPROVAL")
+                    .nodeId(nodeId)
+                    .nodeType("HUMAN_APPROVAL")
+                    .summary("Workflow 已进入 durable human approval wait。")
+                    .payload(Map.of(
+                            "approvalId", issued.record().approvalId(),
+                            "expiresAt", issued.record().expiresAt().toString(),
+                            "channelBound", !issued.record().channelId().isBlank()))
+                    .build());
+            throw new OpsWorkflowApprovalPendingException(nodeId, issued.record().approvalId());
+        }
+
+        if (approval.status() == WorkflowApprovalRecord.Status.WAITING) {
+            throw new OpsWorkflowApprovalPendingException(nodeId, approval.approvalId());
+        }
+        if (approval.status() == WorkflowApprovalRecord.Status.EXPIRED) {
+            throw new SecurityException("WORKFLOW_APPROVAL_EXPIRED:" + approval.approvalId());
+        }
+
+        DurableWorkflowRunState state = durableRuntime.state(request);
+        if (state.waitState().active()) {
+            durableRuntime.resumeWait(request, approval.waitTokenHash(), approval.status().name());
+            state = durableRuntime.state(request);
+        }
+        if (state.node(nodeId).status() == DurableWorkflowNodeStatus.READY) {
+            durableRuntime.beforeNode(request, nodeId, maxAttempts(run, nodeId));
+        }
+        Map<String, Object> output = Map.of(
+                "approvalId", approval.approvalId(),
+                "decision", approval.status().name(),
+                "approved", approval.status() == WorkflowApprovalRecord.Status.APPROVED,
+                "decidedBy", value(approval.decidedBy()));
+        record(events, eventSink, OpsRuntimeEvent.builder()
+                .eventType("WORKFLOW_APPROVAL_RESUMED")
+                .status("SUCCEEDED")
+                .nodeId(nodeId)
+                .nodeType("HUMAN_APPROVAL")
+                .summary("Workflow 已消费 durable human approval decision 并恢复节点执行。")
+                .payload(Map.of(
+                        "approvalId", approval.approvalId(),
+                        "decision", approval.status().name()))
+                .build());
+        return Optional.of(output);
     }
 
     void beforeNode(
@@ -458,6 +553,36 @@ final class OpsTypedWorkflowExecutionCoordinator {
     private int maxAttempts(ActiveRun run, String nodeId) {
         if (run == null || nodeId == null) return settings.maxNodeAttempts();
         return Math.max(settings.maxNodeAttempts(), run.nodeAttemptLimits().getOrDefault(nodeId, 1));
+    }
+
+    private String approvalRequestSummary(OpsWorkflowNode node) {
+        if (node == null) return "Workflow human approval required";
+        String description = value(node.getDescription());
+        String instruction = value(node.getInstruction());
+        StringBuilder summary = new StringBuilder();
+        if (!description.isBlank()) summary.append(description);
+        if (!instruction.isBlank()) {
+            if (!summary.isEmpty()) summary.append("\n");
+            summary.append(instruction.length() <= 1200 ? instruction : instruction.substring(0, 1200) + "...");
+        }
+        return summary.isEmpty() ? "Workflow human approval required" : summary.toString();
+    }
+
+    private long approvalTimeoutSeconds(OpsWorkflowNode node) {
+        Object configured = node == null || node.getConfig() == null
+                ? null
+                : node.getConfig().get("timeoutSeconds");
+        long seconds = 1800L;
+        if (configured instanceof Number number) {
+            seconds = number.longValue();
+        } else if (configured != null) {
+            try {
+                seconds = Long.parseLong(String.valueOf(configured).trim());
+            } catch (NumberFormatException ignored) {
+                seconds = 1800L;
+            }
+        }
+        return Math.max(60L, Math.min(86400L, seconds));
     }
 
     private Map<String, Object> outputMap(Object value) {

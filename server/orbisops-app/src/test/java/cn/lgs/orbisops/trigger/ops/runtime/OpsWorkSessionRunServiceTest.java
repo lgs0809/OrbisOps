@@ -129,6 +129,39 @@ class WorkSessionRunApplicationServiceTest {
     }
 
     @Test
+    void approvalWaitReleasesLeaseAndUsesDedicatedResumeAuthorization() {
+        FakeRepository repository = new FakeRepository();
+        WorkSessionRunApplicationService service = service(repository);
+        WorkSessionRunClaim claim = service.begin(command(7, "PROJECT_PRE_APPROVAL"));
+        repository.roles.put("observer", WorkSessionParticipantRole.OBSERVER);
+        repository.roles.put("editor", WorkSessionParticipantRole.EDITOR);
+
+        service.suspendForApproval(claim);
+
+        assertEquals(WorkSessionRunStatus.WAITING_APPROVAL, repository.snapshot.status());
+        assertEquals("", repository.snapshot.leaseToken());
+        assertEquals(null, repository.snapshot.leaseExpiresAt());
+        assertThrows(IllegalStateException.class,
+                () -> service.resume("run-1", "p1", "editor"));
+        assertThrows(SecurityException.class,
+                () -> service.resumeApproval("run-1", "p1", "observer"));
+        assertEquals("run-1", service.resumeApproval("run-1", "p1", "editor").runId());
+        assertEquals("run-1", service.resumeApproval("run-1", "p1", "u1").runId());
+    }
+
+    @Test
+    void approvalResumeRejectsWrongOuterRunState() {
+        FakeRepository repository = new FakeRepository();
+        WorkSessionRunApplicationService service = service(repository);
+        service.begin(command(7, "PROJECT_PRE_APPROVAL"));
+
+        IllegalStateException failure = assertThrows(IllegalStateException.class,
+                () -> service.resumeApproval("run-1", "p1", "u1"));
+
+        assertTrue(failure.getMessage().startsWith("WORK_SESSION_NOT_WAITING_APPROVAL"));
+    }
+
+    @Test
     void observerCanReadButOnlyEditorOrOwnerCanResumeAndCancel() {
         FakeRepository repository = new FakeRepository();
         WorkSessionRunApplicationService service = service(repository);
@@ -299,6 +332,20 @@ class WorkSessionRunApplicationServiceTest {
 
         @Override public boolean heartbeat(WorkSessionRunClaim claim, Instant leaseExpiresAt, Instant updatedAt) {
             return heartbeatAccepted;
+        }
+
+        @Override
+        public boolean suspendForApproval(WorkSessionRunClaim claim, Instant updatedAt) {
+            if (snapshot == null || snapshot.status() != WorkSessionRunStatus.RUNNING) return false;
+            snapshot = new WorkSessionRunSnapshot(
+                    snapshot.runId(), snapshot.projectId(), snapshot.sessionId(), snapshot.owner(),
+                    snapshot.agentId(), snapshot.agentVersion(), snapshot.agentDefinitionHash(),
+                    snapshot.executionHarness(), WorkSessionRunStatus.WAITING_APPROVAL, snapshot.currentAttemptId(),
+                    snapshot.stateVersion() + 1, snapshot.fencingToken(), snapshot.workerId(),
+                    "", null, snapshot.cancelRequested(), snapshot.manifest(), snapshot.manifestHash(),
+                    snapshot.requestPayload(), snapshot.responsePayload(), snapshot.errorMessage(),
+                    snapshot.createdAt(), updatedAt);
+            return true;
         }
 
         @Override public long appendCheckpoint(WorkSessionRunClaim claim, WorkSessionCheckpoint checkpoint) {

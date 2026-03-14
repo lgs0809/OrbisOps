@@ -89,6 +89,25 @@ class OpsRuntimeToolAuthorityPolicyTest {
     }
 
     @Test
+    void trustedChannelObserveOnlyDowngradeOverridesPrepareAuthorityAndHidesMutationTools() {
+        ToolCallback repair = governedRepair("code_edit");
+        ToolCallback write = governedWrite(
+                "update_test", Set.of(AgentExecutionStage.PREPARE, AgentExecutionStage.LANDING));
+        OpsRuntimeResourceContext context = context(
+                authority(AgentExecutionStage.PREPARE, Instant.now().plusSeconds(60)),
+                "PREPARE_CHANGE",
+                governedReadOnly("search_logs"), repair, write);
+        context.getRequest().setTrustedObserveOnly(true);
+
+        policy.enforce(context);
+
+        assertEquals(List.of("search_logs"), names(context));
+        assertEquals("OBSERVE_ONLY", context.getMetadata().get("agentAuthority"));
+        verify(unwrap(repair), never()).call(anyString());
+        verify(unwrap(write), never()).call(anyString());
+    }
+
+    @Test
     void untrustedContextCannotElevateItselfWithPrepareChangeConfiguration() {
         ToolCallback write = governedWrite(
                 "update_test", Set.of(AgentExecutionStage.PREPARE, AgentExecutionStage.LANDING));

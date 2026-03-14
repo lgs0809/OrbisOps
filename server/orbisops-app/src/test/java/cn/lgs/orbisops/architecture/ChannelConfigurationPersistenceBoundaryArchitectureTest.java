@@ -33,6 +33,7 @@ class ChannelConfigurationPersistenceBoundaryArchitectureTest {
         assertAll(
                 () -> assertTrue(channel.contains("ExecutionBinding inboundExecution")),
                 () -> assertFalse(channel.contains("String agentId")),
+                () -> assertTrue(channel.contains("ChannelAccessPolicy accessPolicy")),
                 () -> assertTrue(channel.contains("ChannelStatus status")),
                 () -> assertTrue(channel.contains("Map<String, Object> config")),
                 () -> assertTrue(channel.contains("Collections.unmodifiableMap")),
@@ -54,7 +55,6 @@ class ChannelConfigurationPersistenceBoundaryArchitectureTest {
         String outbound = read(APPLICATION + "ChannelOutboundApplicationService.java");
         String outboundMetadata = read(APPLICATION + "ChannelOutboundMetadata.java");
         String deliveryConfiguration = read(APPLICATION + "ChannelDeliveryConfiguration.java");
-        String delivery = read(APPLICATION + "ChannelDeliveryResult.java");
         String encoder = read(APPLICATION + "ChannelOutboundPayloadEncoder.java");
         String query = read(APPLICATION + "ChannelQueryService.java");
 
@@ -73,17 +73,17 @@ class ChannelConfigurationPersistenceBoundaryArchitectureTest {
                 () -> assertTrue(inbound.contains("ChannelStatus.ACTIVE")),
                 () -> assertTrue(inbound.contains("ExecutionVersionPolicy.PINNED_VERSION")),
                 () -> assertTrue(inbound.contains("CHANNEL_INBOUND_DISABLED")),
-                () -> assertTrue(outbound.contains("ChannelDeliveryResult delivery")),
+                () -> assertTrue(outbound.contains("ChannelDeliveryReceipt delivery")),
+                () -> assertTrue(outbound.contains("new ChannelOutboundMessage(")),
                 () -> assertTrue(outbound.contains("safeDelivery.delivered()")),
                 () -> assertFalse(outbound.contains("safeDelivery.get(\"delivered\")")),
-                () -> assertTrue(delivery.contains("normalized.put(\"delivered\", delivered)")),
+                () -> assertFalse(outbound.contains("ChannelDeliveryResult")),
                 () -> assertTrue(inbound.contains(
                         "ChannelDeliveryConfiguration.from(channel.config()).replyConfigured()")),
                 () -> assertFalse(inbound.contains(".get(\"outboundUrl\")")),
                 () -> assertTrue(outbound.contains("ChannelOutboundMetadata.from(command.metadata())")),
                 () -> assertTrue(outbound.contains("deliveryMetadata.toProtocolMap()")),
-                () -> assertTrue(outbound.contains(
-                        "ChannelDeliveryConfiguration.from(channel.config()).protocolConfig()")),
+                () -> assertFalse(outbound.contains("ChannelDeliveryConfiguration.from(channel.config()).protocolConfig()")),
                 () -> assertFalse(outbound.contains("metadata.get(\"runId\")")),
                 () -> assertFalse(outbound.contains("metadata.get(\"sessionId\")")),
                 () -> assertFalse(outbound.contains("metadata.get(\"outboxId\")")),
@@ -123,8 +123,11 @@ class ChannelConfigurationPersistenceBoundaryArchitectureTest {
                 () -> assertTrue(mapper.contains("ExecutionVersionPolicy::require")),
                 () -> assertTrue(mapper.contains("ExecutionType.require")),
                 () -> assertTrue(mapper.contains("ChannelStatus::require")),
-                () -> assertTrue(outboundAdapter.contains("safe.get(\"delivered\")")),
-                () -> assertTrue(outboundAdapter.contains("new ChannelDeliveryResult")),
+                () -> assertTrue(mapper.contains("ChannelAccessPolicy::require")),
+                () -> assertTrue(outboundAdapter.contains("ChannelProviderAdapter<?>")),
+                () -> assertTrue(outboundAdapter.contains("ChannelDeliveryReceipt")),
+                () -> assertTrue(outboundAdapter.contains("sendCaptured")),
+                () -> assertFalse(outboundAdapter.contains("Map<String, Object> configuration")),
                 () -> assertTrue(repository.contains("config_json")),
                 () -> assertTrue(repository.contains("encodeConfig(channel.config())")),
                 () -> assertTrue(repository.contains("decodeConfig(rs.getString(\"config_json\"))")),

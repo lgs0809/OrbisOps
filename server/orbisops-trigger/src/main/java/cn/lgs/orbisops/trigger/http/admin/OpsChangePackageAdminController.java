@@ -9,6 +9,7 @@ import cn.lgs.orbisops.application.changepackage.LandChangePackageUseCase;
 import cn.lgs.orbisops.application.changepackage.PrepareChangePackageUseCase;
 import cn.lgs.orbisops.application.changepackage.ReviewChangePackageUseCase;
 import cn.lgs.orbisops.application.changepackage.ValidateChangePackageUseCase;
+import cn.lgs.orbisops.trigger.application.channel.OpsChannelApprovalCardService;
 import cn.lgs.orbisops.trigger.application.security.AdminAuthService;
 import cn.lgs.orbisops.trigger.http.admin.security.AdminWebSecurityConfig;
 import cn.lgs.orbisops.trigger.ops.change.OpsChangePackagePermissionService;
@@ -37,19 +38,22 @@ public class OpsChangePackageAdminController {
     private final LandChangePackageUseCase landing;
     private final ChangePackageQueryService queries;
     private final OpsChangePackagePermissionService permissionService;
+    private final OpsChannelApprovalCardService approvalCards;
 
     public OpsChangePackageAdminController(PrepareChangePackageUseCase preparation,
                                            ValidateChangePackageUseCase validation,
                                            ReviewChangePackageUseCase review,
                                            LandChangePackageUseCase landing,
                                            ChangePackageQueryService queries,
-                                           OpsChangePackagePermissionService permissionService) {
+                                           OpsChangePackagePermissionService permissionService,
+                                           OpsChannelApprovalCardService approvalCards) {
         this.preparation = preparation;
         this.validation = validation;
         this.review = review;
         this.landing = landing;
         this.queries = queries;
         this.permissionService = permissionService;
+        this.approvalCards = approvalCards;
     }
 
     @GetMapping("/capabilities")
@@ -152,6 +156,30 @@ public class OpsChangePackageAdminController {
                 actor(servletRequest), approvalContext(request, principal))));
     }
 
+    @GetMapping("/{packageId}/approval-channels")
+    public Response<List<Map<String, Object>>> approvalChannels(@PathVariable("packageId") String packageId,
+                                                                 HttpServletRequest servletRequest) {
+        AdminAuthService.AuthPrincipal principal = principal(servletRequest);
+        String projectId = projectId(packageId);
+        permissionService.assertCanApprovePackage(projectId, principal);
+        return success(approvalCards.available(projectId));
+    }
+
+    @PostMapping("/{packageId}/approval-card")
+    public Response<Map<String, Object>> sendApprovalCard(@PathVariable("packageId") String packageId,
+                                                           @RequestBody Map<String, Object> request,
+                                                           HttpServletRequest servletRequest) {
+        AdminAuthService.AuthPrincipal principal = principal(servletRequest);
+        String projectId = projectId(packageId);
+        permissionService.assertCanApprovePackage(projectId, principal);
+        return success(approvalCards.send(
+                projectId,
+                required(request == null ? null : request.get("channelId"), "Channel 不能为空"),
+                required(request == null ? null : request.get("target"), "审批卡目标不能为空"),
+                packageId,
+                actor(servletRequest)));
+    }
+
     @PostMapping("/{packageId}/reject")
     public Response<Map<String, Object>> reject(@PathVariable("packageId") String packageId,
                                                  @RequestBody(required = false) Map<String, Object> request,
@@ -248,6 +276,12 @@ public class OpsChangePackageAdminController {
 
     private String text(Object value, String fallback) {
         return value == null || !StringUtils.hasText(String.valueOf(value)) ? fallback : String.valueOf(value).trim();
+    }
+
+    private String required(Object value, String message) {
+        String normalized = text(value, "");
+        if (normalized.isBlank()) throw new IllegalArgumentException(message);
+        return normalized;
     }
 
     private <T> Response<T> success(T data) {

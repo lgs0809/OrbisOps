@@ -17,6 +17,8 @@ public interface IChannelRepository {
 
     Optional<ChannelRecord> findById(String channelId);
 
+    List<ChannelRecord> findAll();
+
     List<ChannelRecord> findByProject(String projectId);
 
     boolean insertInbound(ChannelMessageRecord message);
@@ -82,6 +84,13 @@ public interface IChannelRepository {
     void markOutboundCompleted(String messageId, String status, String payloadJson);
 
     void markOutboundFailed(String messageId, String errorMessage);
+
+    void bindOutboundExternalMessageId(String messageId, String externalMessageId);
+
+    Optional<ChannelMessageRecord> findLatestOutboundByRun(String projectId,
+                                                           String channelId,
+                                                           String runId,
+                                                           String senderId);
 
     List<ChannelMessageRecord> findMessages(String projectId, String channelId, int limit);
 

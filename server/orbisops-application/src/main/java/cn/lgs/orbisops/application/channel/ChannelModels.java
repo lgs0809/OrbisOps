@@ -1,5 +1,7 @@
 package cn.lgs.orbisops.application.channel;
 
+import cn.lgs.orbisops.application.channel.provider.ChannelRichContent;
+import cn.lgs.orbisops.domain.channel.model.ChannelAccessPolicy;
 import cn.lgs.orbisops.domain.channel.model.ChannelStatus;
 import cn.lgs.orbisops.types.execution.ExecutionType;
 import cn.lgs.orbisops.types.execution.ExecutionVersionPolicy;
@@ -94,6 +96,42 @@ public final class ChannelModels {
         }
     }
 
+    public record RichSend(String projectId,
+                           String channelId,
+                           String target,
+                           ChannelRichContent content,
+                           Map<String, Object> metadata,
+                           String actor) {
+        public RichSend {
+            projectId = required(projectId, "CHANNEL_PROJECT_ID_REQUIRED");
+            channelId = required(channelId, "CHANNEL_ID_REQUIRED");
+            target = required(target, "CHANNEL_TARGET_REQUIRED");
+            if (content == null) throw new IllegalArgumentException("CHANNEL_CONTENT_REQUIRED");
+            metadata = copy(metadata);
+            actor = required(actor, "CHANNEL_ACTOR_REQUIRED");
+        }
+    }
+
+    public record Update(String projectId,
+                         String channelId,
+                         String target,
+                         String messageId,
+                         String externalMessageId,
+                         String content,
+                         Map<String, Object> metadata,
+                         String actor) {
+        public Update {
+            projectId = required(projectId, "CHANNEL_PROJECT_ID_REQUIRED");
+            channelId = required(channelId, "CHANNEL_ID_REQUIRED");
+            target = required(target, "CHANNEL_TARGET_REQUIRED");
+            messageId = required(messageId, "CHANNEL_MESSAGE_ID_REQUIRED");
+            externalMessageId = required(externalMessageId, "CHANNEL_EXTERNAL_MESSAGE_ID_REQUIRED");
+            content = required(content, "CHANNEL_CONTENT_REQUIRED");
+            metadata = copy(metadata);
+            actor = required(actor, "CHANNEL_ACTOR_REQUIRED");
+        }
+    }
+
     public record Recovery(String projectId,
                            String channelId,
                            String externalMessageId,
@@ -134,6 +172,7 @@ public final class ChannelModels {
             Field<String> channelType,
             Field<String> credentialRef,
             Field<Map<String, Object>> configuration,
+            Field<ChannelAccessPolicy> accessPolicy,
             Field<ChannelStatus> status,
             String actor) {
         public ConfigurationMutation {
@@ -151,6 +190,7 @@ public final class ChannelModels {
             configuration = configuration == null || !configuration.supplied()
                     ? Field.absent()
                     : Field.supplied(copy(configuration.value()));
+            accessPolicy = field(accessPolicy);
             status = field(status);
             actor = required(actor, "CHANNEL_ACTOR_REQUIRED");
         }

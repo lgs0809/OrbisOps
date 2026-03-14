@@ -20,7 +20,8 @@ public interface ChannelAgentChatPort {
                        String definitionHash,
                        ChannelModels.InboundMessage message,
                        ChannelIdentityRecord identity,
-                       IdentityStatus identityStatus) {
+                       IdentityStatus identityStatus,
+                       RuntimeAccess runtimeAccess) {
         public ChatCommand {
             projectId = required(projectId, "CHANNEL_PROJECT_ID_REQUIRED");
             channelId = required(channelId, "CHANNEL_ID_REQUIRED");
@@ -43,6 +44,16 @@ public interface ChannelAgentChatPort {
             if (identityStatus != IdentityStatus.MAPPED && identity != null) {
                 throw new IllegalArgumentException("CHANNEL_UNTRUSTED_IDENTITY_MUST_NOT_BE_PROPAGATED");
             }
+            runtimeAccess = runtimeAccess == null ? RuntimeAccess.AUTHENTICATED : runtimeAccess;
+            if (identityStatus == IdentityStatus.INVALID) {
+                throw new SecurityException("CHANNEL_INVALID_IDENTITY_MUST_NOT_ENTER_RUNTIME");
+            }
+            if (runtimeAccess == RuntimeAccess.AUTHENTICATED && identityStatus != IdentityStatus.MAPPED) {
+                throw new SecurityException("CHANNEL_AUTHENTICATED_RUNTIME_REQUIRES_MAPPED_IDENTITY");
+            }
+            if (runtimeAccess == RuntimeAccess.OBSERVE_ONLY_UNKNOWN && identityStatus != IdentityStatus.UNMAPPED) {
+                throw new SecurityException("CHANNEL_OBSERVE_ONLY_REQUIRES_UNKNOWN_IDENTITY");
+            }
         }
     }
 
@@ -50,6 +61,11 @@ public interface ChannelAgentChatPort {
         MAPPED,
         INVALID,
         UNMAPPED
+    }
+
+    enum RuntimeAccess {
+        AUTHENTICATED,
+        OBSERVE_ONLY_UNKNOWN
     }
 
     record ChatResult(String content, String userId) {

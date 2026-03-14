@@ -1,5 +1,6 @@
 package cn.lgs.orbisops.infrastructure.adapter.repository;
 
+import cn.lgs.orbisops.application.changepackage.ChangePackageCurrentReadPort;
 import cn.lgs.orbisops.domain.changepackage.adapter.repository.IChangePackageCurrentRepository;
 import cn.lgs.orbisops.domain.changepackage.model.ChangePackageCurrent;
 import cn.lgs.orbisops.domain.changepackage.model.ChangePackageCurrentQuery;
@@ -24,7 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 
 @Repository
-public class JdbcChangePackageCurrentRepository implements IChangePackageCurrentRepository {
+public class JdbcChangePackageCurrentRepository implements IChangePackageCurrentRepository, ChangePackageCurrentReadPort {
 
     private static final String INSERT_CURRENT = """
             INSERT INTO ai_ops_change_package

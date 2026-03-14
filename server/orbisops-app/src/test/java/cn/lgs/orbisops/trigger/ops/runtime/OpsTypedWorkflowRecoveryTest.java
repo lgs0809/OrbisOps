@@ -94,6 +94,8 @@ class OpsTypedWorkflowRecoveryTest {
                         durable,
                         resources,
                         contextBundles,
+                        mock(cn.lgs.orbisops.application.runtime.workflow.WorkflowApprovalApplicationService.class),
+                        mock(OpsWorkflowApprovalChannelBridge.class),
                         new OpsTypedWorkflowSettings("GUARDED", 3),
                         journal);
         OpsAgentDefinition definition = OpsAgentDefinition.builder()

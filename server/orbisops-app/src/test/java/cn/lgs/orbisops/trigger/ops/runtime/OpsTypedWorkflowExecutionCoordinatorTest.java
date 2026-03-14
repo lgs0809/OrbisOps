@@ -93,6 +93,8 @@ class OpsTypedWorkflowExecutionCoordinatorTest {
                 mock(OpsDurableWorkflowRuntimeCoordinator.class),
                 mock(OpsRuntimeResourceAssembler.class),
                 mock(OpsRuntimeContextBundleAdapter.class),
+                mock(cn.lgs.orbisops.application.runtime.workflow.WorkflowApprovalApplicationService.class),
+                mock(OpsWorkflowApprovalChannelBridge.class),
                 settings,
                 journal);
     }

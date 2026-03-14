@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -67,15 +66,26 @@ class OpsChannelAgentChatAdapterTest {
     }
 
     @Test
-    void invalidIdentityRemainsInvalidWithoutTrustedPrincipal() {
+    void invalidIdentityCannotReachChannelChatAdapter() {
+        SecurityException failure = assertThrows(SecurityException.class,
+                () -> command(null, ChannelAgentChatPort.IdentityStatus.INVALID));
+
+        assertEquals("CHANNEL_INVALID_IDENTITY_MUST_NOT_ENTER_RUNTIME", failure.getMessage());
+        verify(chat, never()).chat(any(), any());
+    }
+
+    @Test
+    void observeOnlyUnknownSetsServerOwnedRuntimeDowngradeWithoutTrustedPrincipal() {
         ChannelAgentChatPort.ChatResult result = adapter.chat(command(
-                null, ChannelAgentChatPort.IdentityStatus.INVALID));
+                null, ChannelAgentChatPort.IdentityStatus.UNMAPPED));
 
         ArgumentCaptor<OpsAgentChatRequest> request = ArgumentCaptor.forClass(OpsAgentChatRequest.class);
         verify(chat).chat(request.capture(), eq("channel:channel-1:sender-1"));
         assertEquals("channel:channel-1:sender-1", result.userId());
-        assertEquals("INVALID", request.getValue().getMetadata().get("channelIdentityStatus"));
-        assertFalse(request.getValue().getMetadata().containsKey(OpsTrustedRequestMetadata.AUTH_PRINCIPAL));
+        assertEquals("UNMAPPED", request.getValue().getMetadata().get("channelIdentityStatus"));
+        assertEquals("OBSERVE_ONLY_UNKNOWN", request.getValue().getMetadata().get("channelRuntimeAccess"));
+        assertTrue(request.getValue().getTrustedObserveOnly());
+        assertTrue(!request.getValue().getMetadata().containsKey(OpsTrustedRequestMetadata.AUTH_PRINCIPAL));
     }
 
     @Test
@@ -94,7 +104,10 @@ class OpsChannelAgentChatAdapterTest {
                                                      ChannelAgentChatPort.IdentityStatus status) {
         return new ChannelAgentChatPort.ChatCommand(
                 "project-1", "channel-1", "GENERIC_WEBHOOK", "run-1", "session-1",
-                ExecutionType.WORKFLOW, "agent-1", 3, "agent-hash", message(), identity, status);
+                ExecutionType.WORKFLOW, "agent-1", 3, "agent-hash", message(), identity, status,
+                status == ChannelAgentChatPort.IdentityStatus.MAPPED
+                        ? ChannelAgentChatPort.RuntimeAccess.AUTHENTICATED
+                        : ChannelAgentChatPort.RuntimeAccess.OBSERVE_ONLY_UNKNOWN);
     }
 
     private ChannelModels.InboundMessage message() {

@@ -65,7 +65,6 @@ public class OpsChatApplicationService {
                 mainAgentCoordinator, null);
     }
 
-    @org.springframework.beans.factory.annotation.Autowired
     public OpsChatApplicationService(
                                      ExecuteWorkSessionUseCase<OpsAgentChatRequest, OpsAgentChatResponse, OpsRuntimeEvent> executeWorkSession,
                                      OpsChatSessionService chatSessionService,
@@ -77,6 +76,24 @@ public class OpsChatApplicationService {
                                      OpsWorkSessionRunAdapter workSessionRunService,
                                      OpsMainAgentCoordinator mainAgentCoordinator,
                                      OpsChatIncidentPromotionService incidentPromotionService) {
+        this(executeWorkSession, chatSessionService, aiModelAvailability, opsAgentLlmClient,
+                projectDefinitionService, graphEventService, cancellationRegistry, workSessionRunService,
+                mainAgentCoordinator, incidentPromotionService, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public OpsChatApplicationService(
+                                     ExecuteWorkSessionUseCase<OpsAgentChatRequest, OpsAgentChatResponse, OpsRuntimeEvent> executeWorkSession,
+                                     OpsChatSessionService chatSessionService,
+                                     ModelAvailabilityPort aiModelAvailability,
+                                     OpsAgentLlmClient opsAgentLlmClient,
+                                     ProjectDefinitionApplicationService projectDefinitionService,
+                                     GraphEventApplicationService graphEventService,
+                                     OpsRunCancellationRegistry cancellationRegistry,
+                                     OpsWorkSessionRunAdapter workSessionRunService,
+                                     OpsMainAgentCoordinator mainAgentCoordinator,
+                                     OpsChatIncidentPromotionService incidentPromotionService,
+                                     OpsWorkSessionRunApplicationFacade workSessionRunFacade) {
         this.executeWorkSession = executeWorkSession;
         this.chatSessionFacade = new OpsChatSessionApplicationFacade(
                 chatSessionService,
@@ -87,16 +104,18 @@ public class OpsChatApplicationService {
         this.requestPreparationFacade = new OpsChatRequestPreparationFacade(
                 projectDefinitionService,
                 chatSessionFacade);
-        this.workSessionRunFacade = new OpsWorkSessionRunApplicationFacade(
-                workSessionRunService,
-                cancellationRegistry,
-                request -> {
-                    if (workSessionResumeExecutor == null) {
-                        throw new IllegalStateException("WORK_SESSION_RESUME_EXECUTOR_UNAVAILABLE");
-                    }
-                    workSessionResumeExecutor.execute(() -> executeWorkSession.execute(request));
-                },
-                graphEventService);
+        this.workSessionRunFacade = workSessionRunFacade != null
+                ? workSessionRunFacade
+                : new OpsWorkSessionRunApplicationFacade(
+                        workSessionRunService,
+                        cancellationRegistry,
+                        request -> {
+                            if (workSessionResumeExecutor == null) {
+                                throw new IllegalStateException("WORK_SESSION_RESUME_EXECUTOR_UNAVAILABLE");
+                            }
+                            workSessionResumeExecutor.execute(() -> executeWorkSession.execute(request));
+                        },
+                        graphEventService);
         this.mainAgentExecutionFacade = new OpsChatMainAgentExecutionFacade(mainAgentCoordinator);
         this.incidentPromotionService = incidentPromotionService;
     }

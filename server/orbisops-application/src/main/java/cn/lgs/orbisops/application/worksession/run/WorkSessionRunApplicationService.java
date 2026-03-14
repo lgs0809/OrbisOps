@@ -97,6 +97,13 @@ public final class WorkSessionRunApplicationService {
         }
     }
 
+    public void suspendForApproval(WorkSessionRunClaim claim) {
+        WorkSessionRunClaim requiredClaim = requireClaim(claim);
+        if (!repository.suspendForApproval(requiredClaim, identity.now())) {
+            throw new IllegalStateException("WORK_SESSION_APPROVAL_WAIT_CAS_FAILED：运行所有权已变化");
+        }
+    }
+
     public long checkpoint(
             WorkSessionRunClaim claim,
             String checkpointType,
@@ -188,6 +195,12 @@ public final class WorkSessionRunApplicationService {
                         "Work Session 不存在或不属于当前项目：" + normalizedRun));
     }
 
+    public List<WorkSessionRunSnapshot> listByStatus(WorkSessionRunStatus status, int limit) {
+        if (status == null) throw new IllegalArgumentException("WORK_SESSION_STATUS_REQUIRED");
+        int boundedLimit = Math.max(1, Math.min(limit, 500));
+        return List.copyOf(repository.findByStatus(status, boundedLimit));
+    }
+
     public void assertActorCanRead(String runId, String projectId, String actor) {
         WorkSessionRunSnapshot current = get(runId, projectId);
         String normalizedActor = required(actor, "actor");
@@ -205,6 +218,21 @@ public final class WorkSessionRunApplicationService {
                 current.runId(), current.projectId(), normalizedActor).orElse(null);
         if (!policy.actorAllowed(current, normalizedActor, role, true)) {
             throw new SecurityException("WORK_SESSION_RESUME_FORBIDDEN");
+        }
+        return current;
+    }
+
+    public WorkSessionRunSnapshot resumeApproval(String runId, String projectId, String actor) {
+        WorkSessionRunSnapshot current = get(runId, projectId);
+        if (current.status() != WorkSessionRunStatus.WAITING_APPROVAL) {
+            throw new IllegalStateException(
+                    "WORK_SESSION_NOT_WAITING_APPROVAL：当前状态=" + current.status().name());
+        }
+        String normalizedActor = required(actor, "actor");
+        WorkSessionParticipantRole role = repository.participantRole(
+                current.runId(), current.projectId(), normalizedActor).orElse(null);
+        if (!policy.actorAllowed(current, normalizedActor, role, true)) {
+            throw new SecurityException("WORK_SESSION_APPROVAL_FORBIDDEN");
         }
         return current;
     }

@@ -49,6 +49,7 @@ public final class OpsChannelAgentChatAdapter implements ChannelAgentChatPort {
         metadata.put("executionType", command.executionType().name());
         metadata.put("agentDefinitionHash", command.definitionHash());
         metadata.put("channelIdentityStatus", command.identityStatus().name());
+        metadata.put("channelRuntimeAccess", command.runtimeAccess().name());
         if (command.identity() != null) {
             metadata.put("channelIdentityMappingId", command.identity().mappingId());
             metadata.put(OpsTrustedRequestMetadata.AUTH_PRINCIPAL, new AdminAuthService.AuthPrincipal(
@@ -65,6 +66,7 @@ public final class OpsChannelAgentChatAdapter implements ChannelAgentChatPort {
                 .agentDefinition(definition)
                 .query(query(command.message()))
                 .mode("AGENT")
+                .trustedObserveOnly(command.runtimeAccess() == ChannelAgentChatPort.RuntimeAccess.OBSERVE_ONLY_UNKNOWN)
                 .metadata(metadata)
                 .build();
         OpsAgentChatResponse response = chat.chat(request, userId);

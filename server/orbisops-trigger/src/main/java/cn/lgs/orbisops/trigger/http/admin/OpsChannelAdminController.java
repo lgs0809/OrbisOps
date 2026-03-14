@@ -6,7 +6,10 @@ import cn.lgs.orbisops.application.channel.ChannelIdentityService;
 import cn.lgs.orbisops.application.channel.ChannelManagementApplicationService;
 import cn.lgs.orbisops.application.channel.ChannelModels;
 import cn.lgs.orbisops.application.channel.ChannelQueryService;
+import cn.lgs.orbisops.application.channel.provider.ChannelProtocolDescriptor;
+import cn.lgs.orbisops.application.channel.provider.ChannelReadinessSnapshot;
 import cn.lgs.orbisops.trigger.application.channel.OpsChannelCommandMapper;
+import cn.lgs.orbisops.trigger.application.channel.OpsChannelProviderReadinessService;
 import cn.lgs.orbisops.trigger.application.security.AdminAuthService;
 import cn.lgs.orbisops.trigger.http.admin.security.AdminWebSecurityConfig;
 import cn.lgs.orbisops.types.enums.ResponseCode;
@@ -32,17 +35,20 @@ public class OpsChannelAdminController {
     private final ChannelIdentityService identities;
     private final ChannelChatProcessManager chat;
     private final OpsChannelCommandMapper commandMapper;
+    private final OpsChannelProviderReadinessService readiness;
 
     public OpsChannelAdminController(ChannelManagementApplicationService channels,
                                      ChannelQueryService queries,
                                      ChannelIdentityService identities,
                                      ChannelChatProcessManager chat,
-                                     OpsChannelCommandMapper commandMapper) {
+                                     OpsChannelCommandMapper commandMapper,
+                                     OpsChannelProviderReadinessService readiness) {
         this.channels = channels;
         this.queries = queries;
         this.identities = identities;
         this.chat = chat;
         this.commandMapper = commandMapper;
+        this.readiness = readiness;
     }
 
     @GetMapping
@@ -51,8 +57,14 @@ public class OpsChannelAdminController {
     }
 
     @GetMapping("/types")
-    public Response<List<Map<String, Object>>> types() {
+    public Response<List<ChannelProtocolDescriptor>> types() {
         return success(queries.supportedTypes());
+    }
+
+    @GetMapping("/{channelId}/readiness")
+    public Response<ChannelReadinessSnapshot> readiness(@PathVariable("channelId") String channelId,
+                                                        @RequestParam("projectId") String projectId) {
+        return success(readiness.readiness(projectId, channelId));
     }
 
     @GetMapping("/{channelId}/messages")

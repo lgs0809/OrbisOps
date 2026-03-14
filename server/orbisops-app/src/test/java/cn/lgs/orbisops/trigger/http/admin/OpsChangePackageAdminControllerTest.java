@@ -6,6 +6,7 @@ import cn.lgs.orbisops.application.changepackage.LandChangePackageUseCase;
 import cn.lgs.orbisops.application.changepackage.PrepareChangePackageUseCase;
 import cn.lgs.orbisops.application.changepackage.ReviewChangePackageUseCase;
 import cn.lgs.orbisops.application.changepackage.ValidateChangePackageUseCase;
+import cn.lgs.orbisops.trigger.application.channel.OpsChannelApprovalCardService;
 import cn.lgs.orbisops.trigger.application.security.AdminAuthService;
 import cn.lgs.orbisops.trigger.http.admin.security.AdminWebSecurityConfig;
 import cn.lgs.orbisops.trigger.ops.change.OpsChangePackagePermissionService;
@@ -16,9 +17,12 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -34,7 +38,8 @@ class OpsChangePackageAdminControllerTest {
                 mock(ReviewChangePackageUseCase.class),
                 mock(LandChangePackageUseCase.class),
                 mock(ChangePackageQueryService.class),
-                permissionService);
+                permissionService,
+                mock(OpsChannelApprovalCardService.class));
         when(preparation.prepare(any())).thenReturn(Map.of("packageId", "cp-1"));
         MockHttpServletRequest servletRequest = new MockHttpServletRequest();
         servletRequest.setAttribute(AdminWebSecurityConfig.AUTH_PRINCIPAL_ATTRIBUTE,
@@ -57,7 +62,8 @@ class OpsChangePackageAdminControllerTest {
                 mock(ReviewChangePackageUseCase.class),
                 mock(LandChangePackageUseCase.class),
                 queries,
-                permissionService);
+                permissionService,
+                mock(OpsChannelApprovalCardService.class));
         when(queries.list(any())).thenReturn(List.of(Map.of(
                 "packageId", "cp-1",
                 "projectId", "project-1")));
@@ -79,6 +85,29 @@ class OpsChangePackageAdminControllerTest {
     }
 
     @Test
+    void approvalCardRouteReappliesApprovePermissionBeforeDispatch() {
+        ChangePackageQueryService queries = mock(ChangePackageQueryService.class);
+        OpsChangePackagePermissionService permissionService = mock(OpsChangePackagePermissionService.class);
+        OpsChannelApprovalCardService approvalCards = mock(OpsChannelApprovalCardService.class);
+        OpsChangePackageAdminController controller = new OpsChangePackageAdminController(
+                mock(PrepareChangePackageUseCase.class),
+                mock(ValidateChangePackageUseCase.class),
+                mock(ReviewChangePackageUseCase.class),
+                mock(LandChangePackageUseCase.class),
+                queries,
+                permissionService,
+                approvalCards);
+        when(queries.detail("cp-1")).thenReturn(Map.of("packageId", "cp-1", "projectId", "project-1"));
+        doThrow(new SecurityException("denied")).when(permissionService).assertCanApprovePackage(eq("project-1"), any());
+
+        assertThrows(SecurityException.class, () -> controller.sendApprovalCard(
+                "cp-1", Map.of("channelId", "channel-1", "target", "room-1"), authenticatedAdminRequest()));
+
+        verify(permissionService).assertCanApprovePackage(eq("project-1"), any());
+        verify(approvalCards, never()).send(any(), any(), any(), any(), any());
+    }
+
+    @Test
     void adminCleanupRequiresLandingCapabilityBeforeCleanup() {
         ChangePackageQueryService queries = mock(ChangePackageQueryService.class);
         LandChangePackageUseCase landing = mock(LandChangePackageUseCase.class);
@@ -89,7 +118,8 @@ class OpsChangePackageAdminControllerTest {
                 mock(ReviewChangePackageUseCase.class),
                 landing,
                 queries,
-                permissionService);
+                permissionService,
+                mock(OpsChannelApprovalCardService.class));
         when(queries.detail("cp-1")).thenReturn(Map.of("packageId", "cp-1", "projectId", "project-1"));
         when(landing.cleanup(any())).thenReturn(Map.of("status", "CLOSED"));
         MockHttpServletRequest servletRequest = authenticatedAdminRequest();

@@ -1,5 +1,6 @@
 package cn.lgs.orbisops.application.channel;
 
+import cn.lgs.orbisops.application.channel.provider.ChannelProtocolDescriptor;
 import cn.lgs.orbisops.domain.channel.adapter.repository.IChannelRepository;
 import cn.lgs.orbisops.domain.channel.model.ChannelIdentityRecord;
 import cn.lgs.orbisops.domain.channel.model.ChannelMessageRecord;
@@ -31,7 +32,7 @@ public final class ChannelQueryService implements ChannelCatalogQuery {
     }
 
     @Override
-    public List<Map<String, Object>> supportedTypes() {
+    public List<ChannelProtocolDescriptor> supportedTypes() {
         return protocolCatalog.supportedTypes();
     }
 
@@ -95,6 +96,7 @@ public final class ChannelQueryService implements ChannelCatalogQuery {
         data.put("type", row.channelType());
         data.put("credentialRef", text(row.credentialRef()));
         data.put("config", row.config());
+        data.put("accessPolicy", row.accessPolicy().name());
         data.put("status", row.status().name());
         data.put("createdBy", row.createdBy());
         if (row.createTime() != null) data.put("createTime", row.createTime().toString());

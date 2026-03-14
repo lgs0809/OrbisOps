@@ -1,6 +1,8 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
 import cn.lgs.orbisops.application.runtime.graph.GraphEventApplicationService;
+import cn.lgs.orbisops.application.runtime.workflow.WorkflowApprovalApplicationService;
+import cn.lgs.orbisops.application.runtime.workflow.WorkflowApprovalRepositoryPort;
 import cn.lgs.orbisops.api.dto.OpsAnalysisResponseDTO;
 import cn.lgs.orbisops.application.worksession.ToolLoopCoordinator;
 import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
@@ -34,6 +36,12 @@ import java.util.function.Consumer;
 public class OpsWorkSessionRuntimeConfiguration {
 
     @Bean
+    WorkflowApprovalApplicationService workflowApprovalApplicationService(
+            WorkflowApprovalRepositoryPort repository) {
+        return new WorkflowApprovalApplicationService(repository);
+    }
+
+    @Bean
     OpsWorkSessionLifecycleCoordinator opsWorkSessionLifecycleCoordinator(
             OpsWorkSessionRuntimeAssembly runtimeAssembly) {
         return new OpsWorkSessionLifecycleCoordinator(runtimeAssembly);
@@ -57,6 +65,8 @@ public class OpsWorkSessionRuntimeConfiguration {
             OpsRuntimeWorkflowBindingAdapter runtimeWorkflowBindingAdapter,
             OpsDurableWorkflowRuntimeCoordinator durableWorkflowRuntimeCoordinator,
             OpsRuntimeContextBundleAdapter runtimeContextBundleAdapter,
+            WorkflowApprovalApplicationService workflowApprovalApplicationService,
+            OpsWorkflowApprovalChannelBridge workflowApprovalChannelBridge,
             OpsTypedWorkflowSettings typedWorkflowSettings,
             OpsTelemetryService telemetryService,
             GraphEventApplicationService graphEventService,
@@ -70,6 +80,7 @@ public class OpsWorkSessionRuntimeConfiguration {
             OpsWorkSessionRunAdapter workSessionRunService,
             OpsWorkSessionContextPreparationService contextPreparationService,
             OpsWorkSessionFinalizer workSessionFinalizer,
+            OpsChannelRunProgressProjector channelRunProgressProjector,
             ObjectProvider<OpsConfigAuditService> configAuditService,
             ObjectProvider<OpsTaskContextAdapter> taskContextService,
             ObjectProvider<OpsAgentGraphCompilerAdapter> graphCompilerAdapter,
@@ -106,7 +117,8 @@ public class OpsWorkSessionRuntimeConfiguration {
         OpsRuntimeEventJournal runtimeEventJournal = new OpsRuntimeEventJournal(
                 requiredRunService,
                 graphEventService,
-                configAuditService::getIfAvailable);
+                configAuditService::getIfAvailable,
+                channelRunProgressProjector);
         OpsTypedWorkflowExecutionCoordinator typedWorkflowCoordinator =
                 new OpsTypedWorkflowExecutionCoordinator(
                         definitionValidator,
@@ -114,6 +126,8 @@ public class OpsWorkSessionRuntimeConfiguration {
                         durableWorkflowRuntimeCoordinator,
                         resourceAssembler,
                         runtimeContextBundleAdapter,
+                        workflowApprovalApplicationService,
+                        workflowApprovalChannelBridge,
                         typedWorkflowSettings,
                         runtimeEventJournal);
         OpsRuntimeConversationContextCoordinator conversationContextCoordinator =

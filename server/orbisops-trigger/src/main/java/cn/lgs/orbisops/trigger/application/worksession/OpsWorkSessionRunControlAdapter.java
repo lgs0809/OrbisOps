@@ -35,6 +35,11 @@ public final class OpsWorkSessionRunControlAdapter
     }
 
     @Override
+    public OpsAgentChatRequest approvalResumeRequest(String runId, String projectId, String actor) {
+        return runAdapter.approvalResumeRequest(runId, projectId, actor);
+    }
+
+    @Override
     public boolean requestCancel(String runId, String projectId, String actor, String reason) {
         return runAdapter.requestCancel(runId, projectId, actor, reason);
     }

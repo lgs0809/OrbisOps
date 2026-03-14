@@ -66,7 +66,7 @@ public class JdbcWorkSessionRunRepository implements IWorkSessionRunRepository {
                     lease_expires_at=?, cancel_requested=0,
                     run_manifest_json=?, run_manifest_hash=?, updated_at=?
                 WHERE run_id=? AND project_id=?
-                  AND (status='PENDING' OR status='RECOVERABLE')
+                  AND status IN ('PENDING','RECOVERABLE','WAITING_APPROVAL')
                   AND user_id=? AND session_id=?
                   AND agent_id=? AND agent_version=? AND agent_definition_hash=? AND execution_harness=?
                 """,
@@ -121,6 +121,24 @@ public class JdbcWorkSessionRunRepository implements IWorkSessionRunRepository {
     }
 
     @Override
+    public List<WorkSessionRunSnapshot> findByStatus(WorkSessionRunStatus status, int limit) {
+        if (status == null) return List.of();
+        int boundedLimit = Math.max(1, Math.min(limit, 500));
+        return jdbcTemplate.query("""
+                        SELECT run_id, project_id, session_id, user_id, agent_id, agent_version,
+                               agent_definition_hash, execution_harness, status, current_attempt_id,
+                               state_version, fencing_token, worker_id, lease_token, lease_expires_at,
+                               cancel_requested, run_manifest_json, run_manifest_hash, request_json,
+                               response_json, error_message, created_at, updated_at
+                        FROM ai_ops_agent_run
+                        WHERE status=?
+                        ORDER BY updated_at DESC
+                        LIMIT ?
+                        """,
+                this::snapshot, status.name(), boundedLimit);
+    }
+
+    @Override
     @Transactional(transactionManager = "mysqlTransactionManager")
     public boolean bindManifest(
             WorkSessionRunClaim claim,
@@ -159,6 +177,28 @@ public class JdbcWorkSessionRunRepository implements IWorkSessionRunRepository {
         if (updated != 1) return false;
         jdbcTemplate.update("""
                 UPDATE ai_ops_agent_run_attempt SET heartbeat_at=CURRENT_TIMESTAMP
+                WHERE attempt_id=? AND run_id=? AND lease_token=? AND fencing_token=? AND status='RUNNING'
+                """,
+                claim.attemptId(), claim.runId(), claim.leaseToken(), claim.fencingToken());
+        return true;
+    }
+
+    @Override
+    @Transactional(transactionManager = "mysqlTransactionManager")
+    public boolean suspendForApproval(WorkSessionRunClaim claim, Instant updatedAt) {
+        int updated = jdbcTemplate.update("""
+                UPDATE ai_ops_agent_run FORCE INDEX (uk_run_id)
+                SET status='WAITING_APPROVAL', state_version=state_version+1,
+                    lease_token='', lease_expires_at=NULL, updated_at=?
+                WHERE run_id=? AND project_id=? AND current_attempt_id=? AND lease_token=?
+                  AND fencing_token=? AND status='RUNNING' AND cancel_requested=0
+                """,
+                timestamp(updatedAt), claim.runId(), claim.projectId(), claim.attemptId(),
+                claim.leaseToken(), claim.fencingToken());
+        if (updated != 1) return false;
+        jdbcTemplate.update("""
+                UPDATE ai_ops_agent_run_attempt
+                SET status='WAITING_APPROVAL', finished_at=CURRENT_TIMESTAMP
                 WHERE attempt_id=? AND run_id=? AND lease_token=? AND fencing_token=? AND status='RUNNING'
                 """,
                 claim.attemptId(), claim.runId(), claim.leaseToken(), claim.fencingToken());
@@ -243,7 +283,7 @@ public class JdbcWorkSessionRunRepository implements IWorkSessionRunRepository {
                 SET cancel_requested=1, cancel_requested_at=CURRENT_TIMESTAMP(3), cancel_requested_by=?,
                     cancel_reason=?, state_version=state_version+1, updated_at=?
                 WHERE run_id=? AND project_id=? AND state_version=?
-                  AND status IN ('PENDING','RUNNING','RECOVERABLE')
+                  AND status IN ('PENDING','RUNNING','WAITING_APPROVAL','RECOVERABLE')
                 """,
                 actor, reason, timestamp(updatedAt), runId, projectId, expectedVersion) == 1;
     }

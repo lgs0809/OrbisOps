@@ -39,6 +39,17 @@ final class OpsWorkSessionTerminalCoordinator {
                 finalizerHooks(context));
     }
 
+    OpsAgentChatResponse waitingApproval(
+            OpsWorkSessionRuntimeContext context,
+            OpsWorkflowApprovalPendingException pending) {
+        requirePrepared(context);
+        return workSessionFinalizer.waitingApproval(
+                finalizerContext(context),
+                pending.nodeId(),
+                pending.approvalId(),
+                finalizerHooks(context));
+    }
+
     OpsAgentChatResponse canceled(
             OpsWorkSessionRuntimeContext context,
             RuntimeException error) {

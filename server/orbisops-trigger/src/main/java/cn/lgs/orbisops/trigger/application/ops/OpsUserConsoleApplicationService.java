@@ -5,8 +5,11 @@ import cn.lgs.orbisops.application.changepackage.ChangePackageListQuery;
 import cn.lgs.orbisops.application.changepackage.ChangePackageQueryService;
 import cn.lgs.orbisops.application.incident.IncidentQueryApplicationService;
 import cn.lgs.orbisops.application.project.AuthorizeProjectAccessUseCase;
-import cn.lgs.orbisops.domain.incident.model.IncidentStatus;
 import cn.lgs.orbisops.application.project.ProjectCatalogEntry;
+import cn.lgs.orbisops.application.worksession.run.WorkSessionRunApplicationService;
+import cn.lgs.orbisops.domain.incident.model.IncidentStatus;
+import cn.lgs.orbisops.domain.worksession.run.model.WorkSessionRunSnapshot;
+import cn.lgs.orbisops.domain.worksession.run.model.WorkSessionRunStatus;
 import cn.lgs.orbisops.trigger.application.security.AdminAuthService;
 import cn.lgs.orbisops.trigger.ops.OpsConfigAuditService;
 import cn.lgs.orbisops.trigger.ops.change.OpsChangePackagePermissionService;
@@ -25,38 +28,44 @@ import java.util.stream.Collectors;
 public class OpsUserConsoleApplicationService {
 
     private final AuthorizeProjectAccessUseCase projectAccessUseCase;
-    private final OpsAgentDefinitionApplicationService agentDefinitionApplicationService;
     private final OpsChatApplicationService chatApplicationService;
     private final IncidentQueryApplicationService incidentQueries;
     private final ChangePackageQueryService changePackageQueries;
     private final OpsChangePackagePermissionService changePackagePermissionService;
     private final OpsConfigAuditService configAuditService;
+    private final WorkSessionRunApplicationService workSessionRuns;
 
     public OpsUserConsoleApplicationService(AuthorizeProjectAccessUseCase projectAccessUseCase,
-                                            OpsAgentDefinitionApplicationService agentDefinitionApplicationService,
                                             OpsChatApplicationService chatApplicationService,
                                             IncidentQueryApplicationService incidentQueries,
                                             ChangePackageQueryService changePackageQueries,
                                             OpsChangePackagePermissionService changePackagePermissionService,
-                                            OpsConfigAuditService configAuditService) {
+                                            OpsConfigAuditService configAuditService,
+                                            WorkSessionRunApplicationService workSessionRuns) {
         this.projectAccessUseCase = projectAccessUseCase;
-        this.agentDefinitionApplicationService = agentDefinitionApplicationService;
         this.chatApplicationService = chatApplicationService;
         this.incidentQueries = incidentQueries;
         this.changePackageQueries = changePackageQueries;
         this.changePackagePermissionService = changePackagePermissionService;
         this.configAuditService = configAuditService;
+        this.workSessionRuns = workSessionRuns;
     }
 
     public Map<String, Object> dashboardOverview(String username, String userId) {
         List<ProjectCatalogEntry> projects = authorizedProjects(username, userId);
-        List<Map<String, Object>> agents = projectAgents(projects);
+        Set<String> projectIds = projects.stream().map(ProjectCatalogEntry::projectId).collect(Collectors.toSet());
         List<OpsChatSession> sessions = chatApplicationService.listSessions(
                 null, null, null, null, 8, safeUserId(username, userId));
         List<Map<String, Object>> executions = myExecutions(username, userId, null, 50);
         List<Map<String, Object>> audits = myAudits(username, userId, 20);
         var incidents = projects.stream()
                 .flatMap(project -> incidentQueries.list(project.projectId(), null, 50).stream())
+                .toList();
+        List<WorkSessionRunSnapshot> workflowDecisions = workSessionRuns
+                .listByStatus(WorkSessionRunStatus.WAITING_APPROVAL, 200).stream()
+                .filter(run -> projectIds.contains(run.projectId()))
+                .filter(run -> canDecideWorkflow(run, username, userId))
+                .limit(8)
                 .toList();
 
         Map<String, Object> result = new LinkedHashMap<>();
@@ -71,8 +80,8 @@ public class OpsUserConsoleApplicationService {
                 .limit(8)
                 .toList());
         result.put("availableProjects", projectViews(projects, username, userId));
-        result.put("availableAgents", agents);
         result.put("recentSessions", sessions);
+        result.put("pendingWorkflowDecisions", workflowDecisions.stream().map(this::workflowDecisionView).toList());
         List<Map<String, Object>> pendingApprovals = executions.stream()
                 .filter(item -> ChangePackageStatus.REVIEWING.name().equals(item.get("status")))
                 .filter(item -> Boolean.TRUE.equals(item.get("canApprove")))
@@ -91,7 +100,8 @@ public class OpsUserConsoleApplicationService {
         result.put("pendingOperations", pendingOperations.stream().limit(8).toList());
         result.put("workQueue", Map.of(
                 "incidentActionCount", ((List<?>) result.get("actionRequiredIncidents")).size(),
-                "approvalCount", pendingApprovals.size(),
+                "approvalCount", pendingApprovals.size() + workflowDecisions.size(),
+                "workflowDecisionCount", workflowDecisions.size(),
                 "operationCount", pendingOperations.size(),
                 "auditReminderCount", audits.size()));
         result.put("auditReminders", audits.stream().limit(8).toList());
@@ -163,6 +173,34 @@ public class OpsUserConsoleApplicationService {
         }
     }
 
+    private boolean canDecideWorkflow(WorkSessionRunSnapshot run, String username, String userId) {
+        for (String actor : principalKeys(username, userId)) {
+            try {
+                workSessionRuns.resumeApproval(run.runId(), run.projectId(), actor);
+                return true;
+            } catch (RuntimeException ignored) {
+                // Current Work Session authority is decisive; project visibility alone is insufficient.
+            }
+        }
+        return false;
+    }
+
+    private Map<String, Object> workflowDecisionView(WorkSessionRunSnapshot run) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("runId", run.runId());
+        item.put("projectId", run.projectId());
+        item.put("sessionId", run.sessionId());
+        item.put("owner", run.owner());
+        item.put("agentId", run.agentId());
+        item.put("status", run.status().name());
+        item.put("goal", text(firstNonNull(
+                run.requestPayload().get("query"),
+                run.requestPayload().get("goal"),
+                "Workflow requires human decision")));
+        item.put("updatedAt", run.updatedAt().toString());
+        return Map.copyOf(item);
+    }
+
     public List<Map<String, Object>> myAudits(String username, String userId, int limit) {
         LinkedHashMap<String, Map<String, Object>> rows = new LinkedHashMap<>();
         for (String operator : principalKeys(username, userId)) {
@@ -198,24 +236,6 @@ public class OpsUserConsoleApplicationService {
             result.add(item);
         }
         return List.copyOf(result);
-    }
-
-    private List<Map<String, Object>> projectAgents(List<ProjectCatalogEntry> projects) {
-        List<Map<String, Object>> agents = new ArrayList<>();
-        for (ProjectCatalogEntry project : projects) {
-            String projectId = project.projectId();
-            try {
-                for (Map<String, Object> agent : agentDefinitionApplicationService.listAgents(projectId)) {
-                    Map<String, Object> item = new LinkedHashMap<>(agent);
-                    item.put("projectId", projectId);
-                    item.put("projectName", project.name());
-                    agents.add(item);
-                }
-            } catch (Exception ignored) {
-                // A project without a published agent should not break the user's dashboard.
-            }
-        }
-        return agents;
     }
 
     private List<ProjectCatalogEntry> authorizedProjects(String username, String userId) {

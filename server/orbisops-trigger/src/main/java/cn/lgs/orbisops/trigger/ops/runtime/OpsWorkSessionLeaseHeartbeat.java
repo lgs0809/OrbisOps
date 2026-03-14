@@ -8,6 +8,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -50,6 +51,7 @@ final class OpsWorkSessionLeaseHeartbeat {
         OpsAgentChatRequest leaseRequest = leaseRequest(request);
         Thread owner = Thread.currentThread();
         AtomicReference<RuntimeException> failure = new AtomicReference<>();
+        AtomicBoolean intentionallySuspended = new AtomicBoolean(false);
 
         // Prove ownership before dispatching potentially long-running model/tool work. The heartbeat
         // carries an immutable copy of the durable claim so later request metadata projection cannot
@@ -61,6 +63,7 @@ final class OpsWorkSessionLeaseHeartbeat {
             try {
                 runService.heartbeat(leaseRequest);
             } catch (Throwable error) {
+                if (intentionallySuspended.get()) return;
                 RuntimeException heartbeatFailure = error instanceof RuntimeException runtimeException
                         ? runtimeException
                         : new IllegalStateException("WORK_SESSION_HEARTBEAT_FAILED", error);
@@ -71,7 +74,7 @@ final class OpsWorkSessionLeaseHeartbeat {
                 }
             }
         }, periodMillis, periodMillis, TimeUnit.MILLISECONDS);
-        return new Scope(future, failure);
+        return new Scope(future, failure, intentionallySuspended, runService, leaseRequest);
     }
 
     private OpsAgentChatRequest leaseRequest(OpsAgentChatRequest request) {
@@ -96,13 +99,30 @@ final class OpsWorkSessionLeaseHeartbeat {
     static final class Scope implements AutoCloseable {
         private final ScheduledFuture<?> future;
         private final AtomicReference<RuntimeException> failure;
+        private final AtomicBoolean intentionallySuspended;
+        private final OpsWorkSessionRunAdapter runService;
+        private final OpsAgentChatRequest leaseRequest;
 
-        private Scope(ScheduledFuture<?> future, AtomicReference<RuntimeException> failure) {
+        private Scope(ScheduledFuture<?> future,
+                      AtomicReference<RuntimeException> failure,
+                      AtomicBoolean intentionallySuspended,
+                      OpsWorkSessionRunAdapter runService,
+                      OpsAgentChatRequest leaseRequest) {
             this.future = future;
             this.failure = failure;
+            this.intentionallySuspended = intentionallySuspended;
+            this.runService = runService;
+            this.leaseRequest = leaseRequest;
+        }
+
+        void suspendForApproval() {
+            intentionallySuspended.set(true);
+            future.cancel(false);
+            runService.suspendForApproval(leaseRequest);
         }
 
         void assertHealthy() {
+            if (intentionallySuspended.get()) return;
             RuntimeException error = failure.get();
             if (error != null) throw error;
         }

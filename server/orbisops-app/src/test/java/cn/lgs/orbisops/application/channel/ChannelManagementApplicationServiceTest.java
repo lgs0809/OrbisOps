@@ -260,7 +260,8 @@ class ChannelManagementApplicationServiceTest {
             ChannelModels.Field<Map<String, Object>> config,
             ChannelModels.Field<ChannelStatus> status) {
         return new ChannelModels.ConfigurationMutation(projectId, channelId, requestedProjectId, requestedChannelId,
-                executionType, workflowId, versionPolicy, version, name, type, credentialRef, config, status, "admin");
+                executionType, workflowId, versionPolicy, version, name, type, credentialRef, config,
+                ChannelModels.Field.absent(), status, "admin");
     }
 
     private ChannelRecord channel() {

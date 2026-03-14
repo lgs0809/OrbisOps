@@ -1,6 +1,7 @@
 package cn.lgs.orbisops.trigger.application.channel;
 
 import cn.lgs.orbisops.application.channel.ChannelModels;
+import cn.lgs.orbisops.domain.channel.model.ChannelAccessPolicy;
 import cn.lgs.orbisops.domain.channel.model.ChannelStatus;
 import cn.lgs.orbisops.types.execution.ExecutionType;
 import cn.lgs.orbisops.types.execution.ExecutionVersionPolicy;
@@ -30,6 +31,7 @@ public final class OpsChannelCommandMapper {
                 channelTypeField(safe),
                 textField(safe, "credentialRef"),
                 mapField(safe, "config"),
+                enumField(safe, "accessPolicy", ChannelAccessPolicy::require),
                 enumField(safe, "status", ChannelStatus::require),
                 actor);
     }

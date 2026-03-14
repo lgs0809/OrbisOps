@@ -5,6 +5,7 @@ import java.util.Locale;
 public enum WorkSessionRunStatus {
     PENDING,
     RUNNING,
+    WAITING_APPROVAL,
     RECOVERABLE,
     RECOVERY_REVIEW_REQUIRED,
     SUCCEEDED,
@@ -29,6 +30,6 @@ public enum WorkSessionRunStatus {
     }
 
     public boolean cancellable() {
-        return this == PENDING || this == RUNNING || this == RECOVERABLE;
+        return this == PENDING || this == RUNNING || this == WAITING_APPROVAL || this == RECOVERABLE;
     }
 }

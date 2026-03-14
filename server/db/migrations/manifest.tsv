@@ -33,7 +33,7 @@ orbisops	036	ops-toolset	db/migrations/sql/ops-toolset.sql	ea9a9bf96136fbb4e7734
 orbisops	037	ops-tool-result	db/migrations/sql/ops-tool-result.sql	b6a327679c84d1c4b4d21ed192d82b221f1ea3b394d05123205151f6cbb26635	2026-07-02
 orbisops	038	ops-trusted-proof	db/migrations/sql/ops-trusted-proof.sql	9d252198b537e2bc9860f59ad86dabec33b88b753664ad3f2f23570859b75313	2026-07-02
 orbisops	039	ops-runtime-id-width-hardening	db/migrations/sql/ops-runtime-id-width-hardening.sql	2f7ffc1435aa01ec12e9ece28366ae70d09069a6cfc51049cb06cf501b4baf9b	2026-07-03
-orbisops	040	ops-intent-memory-skill-channel	db/migrations/sql/ops-intent-memory-skill-channel.sql	e21c8cdaf1e0cc6677293fa9f793181e7f046d87cfa95fb825748cb81b5a9798	2026-07-10
+orbisops	040	ops-intent-memory-skill-channel	db/migrations/sql/ops-intent-memory-skill-channel.sql	4210444807edba226f4587b35ad2177bffcb6f5cf0afcba48d8f9dce9581743a	2026-07-10
 orbisops	041	ops-channel-notification	db/migrations/sql/ops-channel-notification.sql	6683e17bba23cd4c22e3b99a4d31455edd21c6fbebfe4d0c334f9fac8ff3ab36	2026-07-14
 orbisops	042	ops-channel-outbox-hardening	db/migrations/sql/ops-channel-outbox-hardening.sql	8461158689310c641cc7c99221440e963e572deae72c149100982779db7b9b64	2026-07-14
 orbisops	043	ops-landing-operation-journal	db/migrations/sql/ops-landing-operation-journal.sql	f78c0e6942e9f8ebf5d7b344eb8091368605d5041f9e75234eab8a5dc869ccdf	2026-07-15

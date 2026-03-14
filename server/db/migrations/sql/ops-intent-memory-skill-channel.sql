@@ -162,6 +162,7 @@ CREATE TABLE IF NOT EXISTS `ai_ops_channel` (
   `channel_type` VARCHAR(32) NOT NULL,
   `credential_ref` VARCHAR(256) NOT NULL DEFAULT '',
   `config_json` MEDIUMTEXT NULL,
+  `access_policy` VARCHAR(32) NOT NULL DEFAULT 'DENY_UNKNOWN' COMMENT 'DENY_UNKNOWN/PAIRING/ALLOWLIST/OBSERVE_ONLY_UNKNOWN',
   `status` VARCHAR(24) NOT NULL DEFAULT 'ACTIVE',
   `created_by` VARCHAR(128) NOT NULL DEFAULT '',
   `create_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -211,6 +212,66 @@ CREATE TABLE IF NOT EXISTS `ai_ops_channel_message` (
   KEY `idx_channel_message_run` (`project_id`, `run_id`),
   KEY `idx_channel_message_status` (`status`, `create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='渠道消息去重和投递状态';
+
+CREATE TABLE IF NOT EXISTS `ai_ops_channel_approval_action` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `action_id` VARCHAR(96) NOT NULL,
+  `token_hash` CHAR(64) NOT NULL,
+  `channel_id` VARCHAR(80) NOT NULL,
+  `project_id` VARCHAR(128) NOT NULL,
+  `package_id` VARCHAR(96) NOT NULL,
+  `package_version` INT NOT NULL,
+  `package_hash` VARCHAR(128) NOT NULL,
+  `decision` VARCHAR(16) NOT NULL,
+  `status` VARCHAR(24) NOT NULL DEFAULT 'ACTIVE',
+  `issued_by` VARCHAR(128) NOT NULL,
+  `expires_at` DATETIME(3) NOT NULL,
+  `created_at` DATETIME(3) NOT NULL,
+  `consumed_by` VARCHAR(128) NOT NULL DEFAULT '',
+  `consumed_at` DATETIME(3) NULL,
+  `terminal_reason` VARCHAR(256) NOT NULL DEFAULT '',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_channel_approval_action_id` (`action_id`),
+  UNIQUE KEY `uk_channel_approval_token_hash` (`token_hash`),
+  KEY `idx_channel_approval_package` (`project_id`, `package_id`, `package_version`, `status`),
+  KEY `idx_channel_approval_expiry` (`status`, `expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Channel opaque approval action token ledger';
+
+CREATE TABLE IF NOT EXISTS `ai_ops_channel_approval_action_actor` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `token_hash` CHAR(64) NOT NULL,
+  `actor` VARCHAR(128) NOT NULL,
+  `claimed_at` DATETIME(3) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_channel_approval_action_actor` (`token_hash`, `actor`),
+  KEY `idx_channel_approval_actor` (`actor`, `claimed_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Per-actor idempotency for Channel approval actions';
+
+CREATE TABLE IF NOT EXISTS `ai_ops_workflow_approval` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `approval_id` VARCHAR(96) NOT NULL,
+  `run_id` VARCHAR(100) NOT NULL,
+  `project_id` VARCHAR(128) NOT NULL,
+  `node_id` VARCHAR(128) NOT NULL,
+  `wait_token_hash` CHAR(64) NOT NULL,
+  `approve_action_hash` CHAR(64) NOT NULL,
+  `reject_action_hash` CHAR(64) NOT NULL,
+  `status` VARCHAR(24) NOT NULL DEFAULT 'WAITING',
+  `channel_id` VARCHAR(80) NOT NULL DEFAULT '',
+  `target` VARCHAR(256) NOT NULL DEFAULT '',
+  `request_summary` TEXT NOT NULL,
+  `requested_at` DATETIME(3) NOT NULL,
+  `expires_at` DATETIME(3) NOT NULL,
+  `decided_by` VARCHAR(128) NOT NULL DEFAULT '',
+  `decided_at` DATETIME(3) NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_workflow_approval_id` (`approval_id`),
+  UNIQUE KEY `uk_workflow_approval_run_node` (`run_id`, `node_id`),
+  UNIQUE KEY `uk_workflow_approval_approve_action` (`approve_action_hash`),
+  UNIQUE KEY `uk_workflow_approval_reject_action` (`reject_action_hash`),
+  KEY `idx_workflow_approval_project_status` (`project_id`, `status`, `requested_at`),
+  KEY `idx_workflow_approval_expiry` (`status`, `expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Durable HUMAN_APPROVAL workflow decision ledger';
 
 CREATE TABLE IF NOT EXISTS `ai_ops_skill_evolution_signal` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,

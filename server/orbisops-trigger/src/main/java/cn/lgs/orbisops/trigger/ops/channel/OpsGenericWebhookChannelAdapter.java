@@ -15,7 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Service
-public class OpsGenericWebhookChannelAdapter implements OpsChannelAdapter {
+public class OpsGenericWebhookChannelAdapter {
 
     private final OpsSecretResolver secretResolver;
     private final OpsOutboundUrlPolicy outboundUrlPolicy;
@@ -30,12 +30,10 @@ public class OpsGenericWebhookChannelAdapter implements OpsChannelAdapter {
         this.outboundUrlPolicy = outboundUrlPolicy;
     }
 
-    @Override
     public String type() {
         return "GENERIC_WEBHOOK";
     }
 
-    @Override
     public void validateConfiguration(Map<String, Object> channel) {
         String credentialRef = text(channel.get("credentialRef"));
         if (!secretResolver.isReference(credentialRef)) {
@@ -48,7 +46,6 @@ public class OpsGenericWebhookChannelAdapter implements OpsChannelAdapter {
         }
     }
 
-    @Override
     public Map<String, Object> send(Map<String, Object> channel,
                                     String externalConversationId,
                                     String content,

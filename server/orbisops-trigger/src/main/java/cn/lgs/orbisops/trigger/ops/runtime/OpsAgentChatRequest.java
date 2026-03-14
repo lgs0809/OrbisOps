@@ -1,5 +1,6 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -45,6 +46,10 @@ public class OpsAgentChatRequest {
     private Boolean notifyChannel;
     private String notificationChannelId;
     private String notificationTarget;
+
+    /** Server-owned authority downgrade. Ignored from HTTP JSON so clients cannot self-assert it. */
+    @JsonIgnore
+    private Boolean trustedObserveOnly;
 
     @Builder.Default
     private Map<String, Object> metadata = new LinkedHashMap<>();

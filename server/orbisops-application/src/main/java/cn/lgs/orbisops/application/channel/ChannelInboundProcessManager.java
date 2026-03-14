@@ -1,5 +1,7 @@
 package cn.lgs.orbisops.application.channel;
 
+import cn.lgs.orbisops.application.channel.provider.ChannelInboundEnvelope;
+import cn.lgs.orbisops.application.channel.provider.ChannelInteractiveAction;
 import cn.lgs.orbisops.domain.channel.adapter.repository.IChannelRepository;
 import cn.lgs.orbisops.domain.channel.model.ChannelIdentityRecord;
 import cn.lgs.orbisops.types.execution.ExecutionType;
@@ -10,6 +12,7 @@ import cn.lgs.orbisops.domain.channel.model.ChannelStatus;
 import cn.lgs.orbisops.domain.channel.service.ChannelOutboundContentPolicy;
 
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -71,39 +74,51 @@ public final class ChannelInboundProcessManager {
 
     public Map<String, Object> receive(ChannelModels.Receive command) {
         if (command == null) throw new IllegalArgumentException("CHANNEL_RECEIVE_COMMAND_REQUIRED");
-        ChannelRecord channel = channel(command.channelId());
-        if (channel.status() != ChannelStatus.ACTIVE) throw new SecurityException("CHANNEL_DISABLED");
-        if (!channel.acceptsInbound()) throw new SecurityException("CHANNEL_INBOUND_DISABLED");
-        boolean replyConfigured = ChannelDeliveryConfiguration.from(channel.config()).replyConfigured();
+        ChannelRecord channel = activeInboundChannel(command.channelId());
         ChannelInboundProtocolPort.VerifiedInbound verified = protocol.verifyAndProtect(
                 channel, command.message(), command.timestampHeader(), command.signature());
+        return acceptVerified(channel, command.message(), verified);
+    }
+
+    public Map<String, Object> receiveProvider(String channelId, ChannelInboundEnvelope envelope) {
+        if (envelope == null) throw new IllegalArgumentException("CHANNEL_PROVIDER_ENVELOPE_REQUIRED");
+        ChannelRecord channel = activeInboundChannel(channelId);
+        ChannelModels.InboundMessage message = providerMessage(envelope);
+        ChannelInboundProtocolPort.VerifiedInbound verified = protocol.protectTrusted(channel, message);
+        return acceptVerified(channel, message, verified);
+    }
+
+    private Map<String, Object> acceptVerified(ChannelRecord channel,
+                                                ChannelModels.InboundMessage message,
+                                                ChannelInboundProtocolPort.VerifiedInbound verified) {
+        boolean replyConfigured = ChannelDeliveryConfiguration.from(channel.config()).replyConfigured();
         boolean inserted = repository.insertInbound(new ChannelMessageRecord(
                 "channel-message-" + UUID.randomUUID(), channel.channelId(), channel.projectId(),
-                command.message().externalMessageId(), command.message().externalConversationId(),
-                command.message().senderId(), "", "", "INBOUND", "RECEIVED",
+                message.externalMessageId(), message.externalConversationId(),
+                message.senderId(), "", "", "INBOUND", "RECEIVED",
                 verified.storagePayloadJson(), null, null, null));
         if (!inserted) {
             return Map.of("status", "DUPLICATE_IGNORED", "channelId", channel.channelId(),
-                    "externalMessageId", command.message().externalMessageId());
+                    "externalMessageId", message.externalMessageId());
         }
         String sessionId = repository.resolveSession(channel.channelId(), channel.projectId(), executionKey(channel),
-                command.message().externalConversationId(), command.message().senderId(),
+                sessionConversationKey(message), message.senderId(),
                 "channel-session-" + UUID.randomUUID());
         String runId = "channel-" + channel.channelId() + "-" + UUID.randomUUID().toString().substring(0, 12);
-        repository.markInboundQueued(channel.channelId(), command.message().externalMessageId(), runId, sessionId);
+        repository.markInboundQueued(channel.channelId(), message.externalMessageId(), runId, sessionId);
         try {
             audit.record(channel.projectId(), executionKey(channel),
-                    "channel:" + channel.channelId() + ":" + command.message().senderId(),
-                    "CHANNEL_MESSAGE_ACCEPTED", command.message().externalMessageId(), "LOW", "QUEUED",
+                    "channel:" + channel.channelId() + ":" + message.senderId(),
+                    "CHANNEL_MESSAGE_ACCEPTED", message.externalMessageId(), "LOW", "QUEUED",
                     Map.of("channelId", channel.channelId(), "runId", runId, "sessionId", sessionId));
         } catch (RuntimeException auditFailure) {
-            failAccepted(channel, command.message().externalMessageId(), "CHANNEL_ACCEPTANCE_AUDIT_FAILED", auditFailure);
+            failAccepted(channel, message.externalMessageId(), "CHANNEL_ACCEPTANCE_AUDIT_FAILED", auditFailure);
         }
         try {
-            executor.execute(() -> processQueued(channel.channelId(), command.message().externalMessageId()));
+            executor.execute(() -> processQueued(channel.channelId(), message.externalMessageId()));
         } catch (RuntimeException rejected) {
             try {
-                failUnclaimed(channel, command.message().externalMessageId(),
+                failUnclaimed(channel, message.externalMessageId(),
                         "CHANNEL_EXECUTOR_REJECTED:" + error(rejected));
             } catch (RuntimeException stateFailure) {
                 rejected.addSuppressed(stateFailure);
@@ -166,13 +181,6 @@ public final class ChannelInboundProcessManager {
         ChannelAgentChatPort.ChatResult response;
         ChannelReplyOutboxPort.ReplyDelivery delivery;
         try {
-            ChannelExecutionBindingPort.ResolvedExecution execution = executionBindings.resolve(
-                    channel.projectId(), channel.inboundExecution());
-            if (channel.inboundExecution().type() == ExecutionType.WORKFLOW
-                    && channel.inboundExecution().versionPolicy() == ExecutionVersionPolicy.PINNED_VERSION
-                    && !text(channel.inboundExecution().definitionHash()).equals(execution.definitionHash())) {
-                throw new SecurityException("CHANNEL_WORKFLOW_DEFINITION_HASH_MISMATCH");
-            }
             Optional<ChannelIdentityRecord> storedIdentity = repository.findIdentity(channel.channelId(), message.senderId())
                     .filter(item -> item.status() == ChannelStatus.ACTIVE);
             Optional<ChannelIdentityRecord> trustedIdentity = storedIdentity
@@ -189,14 +197,44 @@ public final class ChannelInboundProcessManager {
                         Map.of("channelId", channel.channelId(), "runId", text(stored.runId()),
                                 "sessionId", text(stored.sessionId()),
                                 "reasonCode", "CHANNEL_IDENTITY_NO_LONGER_AUTHORIZED"));
+                throw new SecurityException("CHANNEL_IDENTITY_NO_LONGER_AUTHORIZED");
             }
-            response = chat.chat(new ChannelAgentChatPort.ChatCommand(
-                    channel.projectId(), channel.channelId(), channel.channelType(), text(stored.runId()),
-                    text(stored.sessionId()), execution.type(), execution.definitionId(), execution.version(),
-                    execution.definitionHash(), message, trustedIdentity.orElse(null), identityStatus));
-            delivery = replies.enqueue(channel.projectId(), channel.channelId(), message.externalConversationId(),
-                    response.content(), text(stored.runId()), text(stored.sessionId()), message.externalMessageId());
-            if (delivery == null) throw new IllegalStateException("CHANNEL_REPLY_DELIVERY_RESULT_REQUIRED");
+            if (identityStatus == ChannelAgentChatPort.IdentityStatus.UNMAPPED
+                    && !channel.accessPolicy().allowsUnknownRuntime()) {
+                if (channel.accessPolicy() == cn.lgs.orbisops.domain.channel.model.ChannelAccessPolicy.PAIRING) {
+                    auditUnknownSender(channel, stored, message, "CHANNEL_IDENTITY_PAIRING_REQUIRED");
+                    response = new ChannelAgentChatPort.ChatResult(
+                            "身份尚未绑定，请联系项目管理员完成 Channel 身份绑定后再使用。",
+                            "channel:" + channel.channelId() + ":" + message.senderId());
+                    delivery = replies.enqueue(channel.projectId(), channel.channelId(), message.externalConversationId(),
+                            response.content(), text(stored.runId()), text(stored.sessionId()), replyAnchor(message));
+                    if (delivery == null) throw new IllegalStateException("CHANNEL_REPLY_DELIVERY_RESULT_REQUIRED");
+                } else {
+                    String reasonCode = channel.accessPolicy() == cn.lgs.orbisops.domain.channel.model.ChannelAccessPolicy.ALLOWLIST
+                            ? "CHANNEL_SENDER_NOT_ALLOWLISTED"
+                            : "CHANNEL_UNKNOWN_SENDER_DENIED";
+                    auditUnknownSender(channel, stored, message, reasonCode);
+                    throw new SecurityException(reasonCode);
+                }
+            } else {
+                ChannelExecutionBindingPort.ResolvedExecution execution = executionBindings.resolve(
+                        channel.projectId(), channel.inboundExecution());
+                if (channel.inboundExecution().type() == ExecutionType.WORKFLOW
+                        && channel.inboundExecution().versionPolicy() == ExecutionVersionPolicy.PINNED_VERSION
+                        && !text(channel.inboundExecution().definitionHash()).equals(execution.definitionHash())) {
+                    throw new SecurityException("CHANNEL_WORKFLOW_DEFINITION_HASH_MISMATCH");
+                }
+                ChannelAgentChatPort.RuntimeAccess runtimeAccess = identityStatus == ChannelAgentChatPort.IdentityStatus.MAPPED
+                        ? ChannelAgentChatPort.RuntimeAccess.AUTHENTICATED
+                        : ChannelAgentChatPort.RuntimeAccess.OBSERVE_ONLY_UNKNOWN;
+                response = chat.chat(new ChannelAgentChatPort.ChatCommand(
+                        channel.projectId(), channel.channelId(), channel.channelType(), text(stored.runId()),
+                        text(stored.sessionId()), execution.type(), execution.definitionId(), execution.version(),
+                        execution.definitionHash(), message, trustedIdentity.orElse(null), identityStatus, runtimeAccess));
+                delivery = replies.enqueue(channel.projectId(), channel.channelId(), message.externalConversationId(),
+                        response.content(), text(stored.runId()), text(stored.sessionId()), replyAnchor(message));
+                if (delivery == null) throw new IllegalStateException("CHANNEL_REPLY_DELIVERY_RESULT_REQUIRED");
+            }
         } catch (RuntimeException failure) {
             failClaimed(stored, lease, error(failure));
             return;
@@ -221,6 +259,20 @@ public final class ChannelInboundProcessManager {
         } catch (RuntimeException auditFailure) {
             throw new IllegalStateException("CHANNEL_COMPLETION_AUDIT_FAILED_AFTER_COMMIT", auditFailure);
         }
+    }
+
+    private void auditUnknownSender(ChannelRecord channel,
+                                    ChannelMessageRecord stored,
+                                    ChannelModels.InboundMessage message,
+                                    String reasonCode) {
+        audit.record(channel.projectId(), executionKey(channel),
+                "channel:" + channel.channelId() + ":" + message.senderId(),
+                reasonCode, message.externalMessageId(), "MEDIUM", "BLOCKED",
+                Map.of("channelId", channel.channelId(),
+                        "accessPolicy", channel.accessPolicy().name(),
+                        "runId", text(stored.runId()),
+                        "sessionId", text(stored.sessionId()),
+                        "reasonCode", reasonCode));
     }
 
     private void failAccepted(ChannelRecord channel,
@@ -271,6 +323,43 @@ public final class ChannelInboundProcessManager {
                         "reasonCode", "CHANNEL_INBOUND_OUTCOME_UNKNOWN"));
     }
 
+    private ChannelRecord activeInboundChannel(String channelId) {
+        ChannelRecord channel = channel(channelId);
+        if (channel.status() != ChannelStatus.ACTIVE) throw new SecurityException("CHANNEL_DISABLED");
+        if (!channel.acceptsInbound()) throw new SecurityException("CHANNEL_INBOUND_DISABLED");
+        return channel;
+    }
+
+    private ChannelModels.InboundMessage providerMessage(ChannelInboundEnvelope envelope) {
+        ChannelInteractiveAction firstAction = envelope.content().actions().isEmpty()
+                ? null
+                : envelope.content().actions().get(0);
+        ChannelModels.Action action = firstAction == null ? null : new ChannelModels.Action(
+                firstAction.actionId(), "INTERACTIVE", firstAction.opaqueActionToken(), Map.of());
+        var attachments = envelope.attachments().stream()
+                .map(item -> new ChannelModels.Attachment(item.attachmentId(), item.fileName(), item.contentType(),
+                        item.sizeBytes(), item.contentRef(), item.contentHash()))
+                .toList();
+        String content = envelope.content().plainText().isBlank()
+                ? envelope.content().markdown()
+                : envelope.content().plainText();
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("providerAuthenticated", true);
+        if (!text(envelope.message().threadId()).isBlank()) {
+            metadata.put("threadId", text(envelope.message().threadId()));
+        }
+        return new ChannelModels.InboundMessage(
+                envelope.message().externalMessageId(),
+                envelope.message().conversation().externalConversationId(),
+                envelope.sender().externalPrincipalId(),
+                content,
+                envelope.receivedAt().getEpochSecond(),
+                Map.copyOf(metadata),
+                action == null ? "TEXT" : "ACTION",
+                attachments,
+                action);
+    }
+
     private ChannelRecord channel(String channelId) {
         return repository.findById(channelId)
                 .orElseThrow(() -> new IllegalArgumentException("CHANNEL_NOT_FOUND"));
@@ -281,6 +370,18 @@ public final class ChannelInboundProcessManager {
         return channel.inboundExecution().type() == ExecutionType.WORKFLOW
                 ? channel.inboundExecution().workflowId()
                 : channel.inboundExecution().type().name();
+    }
+
+    private String sessionConversationKey(ChannelModels.InboundMessage message) {
+        String threadId = text(message == null ? null : message.metadata().get("threadId"));
+        return threadId.isBlank()
+                ? message.externalConversationId()
+                : message.externalConversationId() + "\nthread:" + threadId;
+    }
+
+    private String replyAnchor(ChannelModels.InboundMessage message) {
+        String threadId = text(message == null ? null : message.metadata().get("threadId"));
+        return threadId.isBlank() ? message.externalMessageId() : threadId;
     }
 
     private String text(Object value) {

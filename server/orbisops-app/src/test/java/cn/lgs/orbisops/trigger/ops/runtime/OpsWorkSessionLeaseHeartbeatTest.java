@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 class OpsWorkSessionLeaseHeartbeatTest {
 
@@ -103,6 +104,29 @@ class OpsWorkSessionLeaseHeartbeatTest {
         }
 
         assertTrue(calls.get() >= 2);
+    }
+
+    @Test
+    void approvalSuspendStopsHeartbeatBeforeReleasingDurableLease() throws Exception {
+        OpsWorkSessionRunAdapter runService = mock(OpsWorkSessionRunAdapter.class);
+        AtomicInteger calls = new AtomicInteger();
+        doAnswer(invocation -> {
+            calls.incrementAndGet();
+            return null;
+        }).when(runService).heartbeat(org.mockito.ArgumentMatchers.any());
+        scheduler = Executors.newSingleThreadScheduledExecutor();
+        OpsWorkSessionLeaseHeartbeat heartbeat = new OpsWorkSessionLeaseHeartbeat(
+                runService, Duration.ofMillis(10), scheduler);
+
+        OpsWorkSessionLeaseHeartbeat.Scope scope = heartbeat.start(request());
+        scope.suspendForApproval();
+        int afterSuspend = calls.get();
+        Thread.sleep(60);
+
+        verify(runService).suspendForApproval(org.mockito.ArgumentMatchers.any());
+        assertEquals(afterSuspend, calls.get());
+        scope.assertHealthy();
+        scope.close();
     }
 
     @Test

@@ -6,7 +6,10 @@ import { OpsPageHeader, OpsPageShell, OpsSectionCard, OpsEmptyState, TableScroll
 import { ProjectScopeBar } from '../components/project-scope-bar';
 import { useProjectScope } from '../hooks/use-project-scope';
 import { OpsAgentDefinition, opsAdminService } from '../services/ops-admin-service';
-import { OpsChannel, OpsChannelIdentity, OpsChannelMessageRecord, OpsChannelOutboxItem, opsChannelService } from '../services/ops-channel-service';
+import { OpsChannel, OpsChannelAccessPolicy, OpsChannelIdentity, OpsChannelMessageRecord, OpsChannelOutboxItem, opsChannelService } from '../services/ops-channel-service';
+import { useChannelsQuery, useChannelTypesQuery } from '../features/channels/api/channel-queries';
+import { buildChannelProviderCards } from '../features/channels/model/channel-model';
+import { ChannelProviderCards } from '../features/channels/components/ChannelProviderCards';
 import { AdminUserResponseDTO, AdminUserService } from '../services/admin-user-service';
 import { OpsProjectMember, opsProjectService } from '../services/ops-project-service';
 import { API_CONFIG } from '../config/api';
@@ -26,9 +29,12 @@ const environmentName = (name: string) => `${name || 'OPS_CHANNEL'}_WEBHOOK_SECR
 
 export const ChannelManagementPage: React.FC = () => {
   const scope = useProjectScope();
-  const [channels, setChannels] = useState<OpsChannel[]>([]);
+  const channelsQuery = useChannelsQuery(scope.projectId);
+  const channelTypesQuery = useChannelTypesQuery();
+  const channels = channelsQuery.data || [];
   const [agents, setAgents] = useState<OpsAgentDefinition[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [accessPolicy, setAccessPolicy] = useState<OpsChannelAccessPolicy>('DENY_UNKNOWN');
+  const loading = channelsQuery.isLoading || channelTypesQuery.isLoading;
   const [visible, setVisible] = useState(false);
   const [editing, setEditing] = useState<OpsChannel | null>(null);
   const [form, setFormState] = useState({ ...emptyForm });
@@ -62,25 +68,25 @@ export const ChannelManagementPage: React.FC = () => {
 
   const webhookBase = `${API_CONFIG.BASE_DOMAIN}/api/v1/channels`;
   const activeCount = useMemo(() => channels.filter((item) => item.status === 'ACTIVE').length, [channels]);
+  const providerCards = useMemo(() => buildChannelProviderCards(channelTypesQuery.data || [], channels), [channelTypesQuery.data, channels]);
 
   const load = async () => {
     if (!scope.projectId) return;
-    setLoading(true);
     try {
-      const [channelResponse, agentResponse] = await Promise.all([
-        opsChannelService.list(scope.projectId), opsAdminService.listAgents(scope.projectId),
+      const [, agentResponse] = await Promise.all([
+        channelsQuery.refetch(), opsAdminService.listAgents(scope.projectId),
       ]);
-      setChannels(channelResponse.data || []);
       setAgents((agentResponse.data || []).filter((agent) => agent.definitionKind === 'SPECIALIZED_WORKFLOW'));
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '加载渠道失败');
-    } finally { setLoading(false); }
+    }
   };
 
   useEffect(() => { void load(); }, [scope.projectId]);
 
-  const openCreate = () => { setEditing(null); setForm({ ...emptyForm }); setVisible(true); };
+  const openCreate = () => { setEditing(null); setAccessPolicy('DENY_UNKNOWN'); setForm({ ...emptyForm }); setVisible(true); };
   const openEdit = (channel: OpsChannel) => {
+    setAccessPolicy(channel.accessPolicy || 'DENY_UNKNOWN');
     setEditing(channel);
     setForm({
       name: channel.name,
@@ -121,6 +127,7 @@ export const ChannelManagementPage: React.FC = () => {
       type: 'GENERIC_WEBHOOK',
       credentialRef: `\${env:${envName}}`,
       status: snapshot.status,
+      accessPolicy,
       config: { outboundUrl: snapshot.outboundUrl.trim(), timeoutSeconds: Number(snapshot.timeoutSeconds) || 15 },
     };
     try {
@@ -297,6 +304,13 @@ export const ChannelManagementPage: React.FC = () => {
       <ProjectScopeBar projects={scope.projects} projectId={scope.projectId} onChange={scope.selectProject}
         loading={scope.loading} onRefresh={scope.reloadProjects}
         actions={<Space wrap><Button icon={<IconHistory />} onClick={() => void openOutbox()} disabled={!scope.projectId}>投递队列</Button><Button theme="solid" icon={<IconPlus />} onClick={openCreate} disabled={!scope.projectId}>新建渠道</Button></Space>} />
+      <OpsSectionCard title="Channel Providers">
+        <Paragraph type="tertiary">Provider readiness 来自后端实际 Adapter Catalog。尚未接入或缺少外部凭据的 Provider 明确显示 Blocked，不会用“保存成功”冒充可用。</Paragraph>
+        <ChannelProviderCards providers={providerCards} onConnect={(type) => {
+          if (type === 'GENERIC_WEBHOOK') openCreate();
+          else Toast.info(`${type} Provider 配置将在对应 Native Adapter 接入后启用`);
+        }} />
+      </OpsSectionCard>
       <OpsSectionCard title={`渠道列表 · ${activeCount} 个运行中`} actions={[<Button key="refresh" icon={<IconRefresh />} onClick={load}>刷新</Button>]}>
         <Paragraph type="tertiary">Channel 是统一消息传输层：可只用于通知，也可把入站消息交给 ReAct 或指定 Workflow。外部系统使用时间戳和 HMAC-SHA256 签名调用接收地址；平台按“渠道 + 会话 + 发送人”复用会话并做消息去重。</Paragraph>
         <TableScroll><Table rowKey="channelId" columns={columns} dataSource={channels} loading={loading} pagination={false}
@@ -320,6 +334,8 @@ export const ChannelManagementPage: React.FC = () => {
               setForm({ ...form, workflowVersionPolicy, workflowVersion: workflowVersionPolicy === 'PINNED_VERSION' ? selected?.version : undefined });
             }}><Select.Option value="LATEST_PUBLISHED">每条新消息使用最新已发布版本</Select.Option><Select.Option value="PINNED_VERSION">固定到当前 Workflow 版本</Select.Option></Select><Paragraph type="tertiary">已开始的 Run 始终冻结 exact version/hash；固定模式适合生产 SOP。</Paragraph></div>
           </>}
+          <div style={{ width: '100%' }}><Text strong>Unknown sender access</Text><Select value={accessPolicy} style={{ width: '100%' }} onChange={(value) => setAccessPolicy(String(value) as OpsChannelAccessPolicy)}><Select.Option value="DENY_UNKNOWN">Deny unknown（默认拒绝）</Select.Option><Select.Option value="PAIRING">Pairing（仅返回绑定提示）</Select.Option><Select.Option value="ALLOWLIST">Allowlist（仅授权身份）</Select.Option><Select.Option value="OBSERVE_ONLY_UNKNOWN">Observe only unknown（强制只读）</Select.Option></Select></div>
+          <Paragraph type="tertiary">未知发送人默认不能进入 Project ReAct。仅显式选择 Observe only unknown 时允许调查，并由 Runtime Tool Authority 强制移除变更、审批与 Landing 能力。</Paragraph>
           <div style={{ width: '100%' }}><Text strong>签名密钥环境变量</Text><Input value={form.secretEnvironmentVariable} placeholder={environmentName(form.name)} onChange={(secretEnvironmentVariable) => setForm({ ...form, secretEnvironmentVariable })} /><Paragraph type="tertiary">部署时把真实密钥注入这个环境变量。页面和数据库只保存 credentialRef。</Paragraph></div>
           <div style={{ width: '100%' }}><Text strong>回复地址（可选）</Text><Input value={form.outboundUrl} placeholder="https://gateway.example.com/ops-agent/replies" onChange={(outboundUrl) => setForm({ ...form, outboundUrl })} /><Paragraph type="tertiary">留空表示只接收消息、不主动回推；不会伪装成投递成功。本机联调可使用 localhost HTTP，其他地址必须 HTTPS。</Paragraph></div>
           <Space><Text strong>状态</Text><Select value={form.status} style={{ width: 140 }} onChange={(status) => setForm({ ...form, status: String(status) })}><Select.Option value="ACTIVE">运行中</Select.Option><Select.Option value="DISABLED">停用</Select.Option></Select></Space>
@@ -359,7 +375,7 @@ export const ChannelManagementPage: React.FC = () => {
         </Space>
       </Modal>
       <Modal title={`身份绑定 · ${identityChannel?.name || ''}`} visible={Boolean(identityChannel)} onCancel={() => setIdentityChannel(null)} footer={null} width={920}>
-        <Paragraph type="tertiary">只有绑定到平台启用账号且已加入当前项目的发送人，才能以该用户身份执行固定控制动作。未绑定发送人仍可对话和调查，但不能审批或落地。</Paragraph>
+        <Paragraph type="tertiary">只有绑定到平台启用账号且已加入当前项目的发送人，才能以该用户身份进入正常 Runtime。未绑定发送人默认拒绝；仅 Channel 显式启用 Observe only unknown 时允许强制只读调查，且不能审批、变更或 Landing。</Paragraph>
         <Space vertical align="start" style={{ width: '100%' }}>
           <Space wrap style={{ width: '100%' }}>
             <div style={{ minWidth: 220, flex: 1 }}><Text strong>外部发送人</Text><Select value={identityForm.externalSenderId || undefined} disabled={Boolean(editingIdentity)} placeholder={senderOptions.length ? '从已收到的消息中选择' : '收到第一条消息后即可选择'} style={{ width: '100%' }} onChange={(value) => setIdentityForm({ ...identityForm, externalSenderId: String(value) })}>{senderOptions.map((senderId) => <Select.Option key={senderId} value={senderId}>{senderId}</Select.Option>)}</Select></div>

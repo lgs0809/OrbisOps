@@ -106,6 +106,12 @@ describe('opsChangePackageService', () => {
     await opsChangePackageService.submitReview('cp-1', { summary: 'ready' }, 'user');
     assertLastCall('/api/v1/user/ops/change-packages/cp-1/submit-review', 'POST', { summary: 'ready' });
 
+    await opsChangePackageService.listApprovalChannels('cp-1', 'user');
+    assertLastCall('/api/v1/user/ops/change-packages/cp-1/approval-channels', 'GET');
+
+    await opsChangePackageService.sendApprovalCard('cp-1', 'channel-1', 'room-1', 'admin');
+    assertLastCall('/api/v1/admin/ops/change-packages/cp-1/approval-card', 'POST', { channelId: 'channel-1', target: 'room-1' });
+
     await opsChangePackageService.reject('cp-1', { reason: 'unsafe' });
     assertLastCall('/api/v1/admin/ops/change-packages/cp-1/reject', 'POST', { reason: 'unsafe' });
 

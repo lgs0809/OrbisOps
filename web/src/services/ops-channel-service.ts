@@ -1,5 +1,51 @@
 import { API_CONFIG, DEFAULT_HEADERS } from '../config/api';
 
+export type OpsChannelType = 'GENERIC_WEBHOOK' | 'FEISHU' | 'WECOM' | 'DINGTALK' | 'SLACK' | 'TELEGRAM' | 'DISCORD' | 'QQ' | 'WECHAT';
+export type OpsChannelAccessPolicy = 'DENY_UNKNOWN' | 'PAIRING' | 'ALLOWLIST' | 'OBSERVE_ONLY_UNKNOWN';
+export type OpsChannelConnectionMode = 'WEBHOOK' | 'CALLBACK' | 'LONG_CONNECTION' | 'HYBRID' | 'OUTBOUND_ONLY';
+
+export interface OpsChannelProtocolDescriptor {
+  type: OpsChannelType;
+  displayName: string;
+  supportsInbound: boolean;
+  supportsOutbound: boolean;
+  connectionModes: OpsChannelConnectionMode[];
+  capabilitySet: { capabilities: string[] };
+}
+
+export interface OpsChannelConfig {
+  outboundUrl?: string;
+  timeoutSeconds?: number;
+  appId?: string;
+  botId?: string;
+  clientId?: string;
+  corpId?: string;
+  robotCode?: string;
+  cardTemplateId?: string;
+  connectionMode?: OpsChannelConnectionMode;
+  requireMention?: boolean;
+  respondToMentionAll?: boolean;
+  verificationTokenRef?: string;
+  encryptKeyRef?: string;
+  appCredentialRef?: string;
+}
+
+export interface OpsChannelReadinessCheck {
+  kind: 'CREDENTIALS' | 'CONNECTION' | 'INBOUND' | 'OUTBOUND' | 'IDENTITY_ACCESS';
+  status: 'PASS' | 'ACTION_REQUIRED' | 'BLOCKED_EXTERNAL';
+  reasonCode: string;
+  detail: string;
+}
+
+export interface OpsChannelReadiness {
+  channelId: string;
+  projectId: string;
+  type: OpsChannelType;
+  ready: boolean;
+  checks: OpsChannelReadinessCheck[];
+  checkedAt: string;
+}
+
 export interface OpsChannel {
   channelId: string;
   projectId: string;
@@ -14,9 +60,10 @@ export interface OpsChannel {
   agentVersion?: number;
   agentDefinitionHash?: string;
   name: string;
-  type: 'GENERIC_WEBHOOK';
+  type: OpsChannelType;
   credentialRef: string;
-  config: { outboundUrl?: string; timeoutSeconds?: number };
+  config: OpsChannelConfig;
+  accessPolicy: OpsChannelAccessPolicy;
   status: 'ACTIVE' | 'DISABLED';
   createTime?: string;
   updateTime?: string;
@@ -74,6 +121,14 @@ class OpsChannelService {
 
   async list(projectId: string): Promise<ApiResponse<OpsChannel[]>> {
     return this.request(`?projectId=${encodeURIComponent(projectId)}`);
+  }
+
+  async supportedTypes(): Promise<ApiResponse<OpsChannelProtocolDescriptor[]>> {
+    return this.request('/types');
+  }
+
+  async readiness(projectId: string, channelId: string): Promise<ApiResponse<OpsChannelReadiness>> {
+    return this.request(`/${encodeURIComponent(channelId)}/readiness?projectId=${encodeURIComponent(projectId)}`);
   }
 
   async create(payload: Record<string, unknown>): Promise<ApiResponse<OpsChannel>> {

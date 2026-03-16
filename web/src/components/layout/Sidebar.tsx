@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 
 import styled from 'styled-components';
 import { Nav, Avatar, Typography } from '@douyinfe/semi-ui';
@@ -13,7 +14,14 @@ import {
 } from '@douyinfe/semi-icons';
 
 import { theme } from '../../styles/theme';
-import { getStoredUserInfo, isAdminUser, roleLabel } from '../../services/auth-session';
+import { currentUserRole, getStoredUserInfo, roleLabel } from '../../services/auth-session';
+import {
+  canonicalPathFor,
+  navigationRoutesForRole,
+  routeByPath,
+  type AppRouteMetadata,
+  type NavigationIcon,
+} from '../../app/navigation/route-metadata';
 
 const { Text } = Typography;
 
@@ -280,49 +288,87 @@ const UserInfo = styled.div<{ $collapsed: boolean }>`
   }
 `;
 
-const adminMenuItems = [
-  { itemKey: 'dashboard', text: '工作台', icon: <IconApps /> },
-  { itemKey: 'incidents', text: '事件中心', icon: <IconAlertTriangle /> },
-  { itemKey: 'chat', text: 'AI 诊断', icon: <IconBranch /> },
-  {
-    itemKey: 'automation',
-    text: '自动化',
-    icon: <IconClock />,
-    items: [
-      { itemKey: 'inspections', text: '巡检' },
-      { itemKey: 'alerts', text: '告警' },
-      { itemKey: 'agent-list', text: '专项 Workflow' },
-    ],
-  },
-  { itemKey: 'executions', text: '执行中心', icon: <IconShield /> },
-  { itemKey: 'project-workspace', text: '项目', icon: <IconFolder /> },
-  { itemKey: 'audit', text: '审计', icon: <IconHistory /> },
-  {
-    itemKey: 'platform-settings',
-    text: '平台设置',
-    icon: <IconShield />,
-    items: [
-      { itemKey: 'model-api-management', text: '模型' },
-      { itemKey: 'mcp-tool-management', text: 'MCP / 工具' },
-      { itemKey: 'rag-order-management', text: '知识库' },
-      { itemKey: 'skill-management', text: 'Skill' },
-      { itemKey: 'memory-management', text: 'Memory' },
-      { itemKey: 'skill-evolver-management', text: 'Skill Evolver' },
-      { itemKey: 'channel-management', text: 'Channel' },
-      { itemKey: 'execution-adapter-templates', text: '执行目标模板' },
-      { itemKey: 'tool-routing-observability', text: '高级工具治理' },
-    ],
-  },
-];
+interface SidebarNavItem {
+  itemKey: string;
+  text: string;
+  icon?: React.ReactNode;
+  items?: SidebarNavItem[];
+}
 
-const userMenuItems = [
-  { itemKey: 'dashboard', text: '工作台', icon: <IconApps /> },
-  { itemKey: 'incidents', text: '事件', icon: <IconAlertTriangle /> },
-  { itemKey: 'chat', text: 'AI 诊断', icon: <IconBranch /> },
-  { itemKey: 'executions', text: '执行中心', icon: <IconShield /> },
-];
+const iconForNavigation = (icon?: NavigationIcon): React.ReactNode => {
+  switch (icon) {
+    case 'home':
+      return <IconApps />;
+    case 'incident':
+      return <IconAlertTriangle />;
+    case 'diagnosis':
+      return <IconBranch />;
+    case 'automation':
+      return <IconClock />;
+    case 'project':
+      return <IconFolder />;
+    case 'governance':
+      return <IconHistory />;
+    case 'change':
+    case 'integration':
+    case 'model':
+    case 'tool':
+    case 'knowledge':
+    case 'skill':
+    case 'execution':
+    case 'advanced':
+    default:
+      return <IconShield />;
+  }
+};
 
-const nonNavigableKeys = new Set<string>(['automation', 'platform-settings']);
+const routeItem = (route: AppRouteMetadata): SidebarNavItem => ({
+  itemKey: route.path,
+  text: route.navigation?.label || route.title,
+  icon: iconForNavigation(route.navigation?.icon),
+});
+
+const routesInSection = (routes: AppRouteMetadata[], section: string, subgroup?: string) =>
+  routes
+    .filter((route) => route.navigation?.section === section && route.navigation?.subgroup === subgroup)
+    .sort((left, right) => (left.navigation?.order || 0) - (right.navigation?.order || 0));
+
+const buildMenuItems = (routes: AppRouteMetadata[]): SidebarNavItem[] => {
+  const menu: SidebarNavItem[] = routesInSection(routes, 'home').map(routeItem);
+  const work = routesInSection(routes, 'work');
+  const automations = routesInSection(routes, 'automations');
+  const projects = routesInSection(routes, 'projects');
+  const platform = routesInSection(routes, 'platform');
+  const advanced = routesInSection(routes, 'platform', 'advanced');
+
+  if (work.length) {
+    menu.push({ itemKey: 'nav-work', text: 'Work', icon: <IconBranch />, items: work.map(routeItem) });
+  }
+  if (automations.length) {
+    menu.push({ itemKey: 'nav-automations', text: 'Automations', icon: <IconClock />, items: automations.map(routeItem) });
+  }
+  menu.push(...projects.map(routeItem));
+  if (platform.length || advanced.length) {
+    const platformItems = platform.map(routeItem);
+    if (advanced.length) {
+      platformItems.push({
+        itemKey: 'nav-platform-advanced',
+        text: 'Advanced',
+        icon: <IconShield />,
+        items: advanced.map(routeItem),
+      });
+    }
+    menu.push({ itemKey: 'nav-platform', text: 'Platform', icon: <IconShield />, items: platformItems });
+  }
+  return menu;
+};
+
+const nonNavigableKeys = new Set<string>([
+  'nav-work',
+  'nav-automations',
+  'nav-platform',
+  'nav-platform-advanced',
+]);
 
 export const Sidebar: React.FC<SidebarProps> = ({
   selectedKey = 'dashboard',
@@ -330,8 +376,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   collapsed = false,
   onMobileClose,
 }) => {
+  const location = useLocation();
   const userInfo = getStoredUserInfo();
-  const menuItems = isAdminUser() ? adminMenuItems : userMenuItems;
+  const menuItems = buildMenuItems(navigationRoutesForRole(currentUserRole()));
+  const selectedPath = selectedKey.startsWith('/') ? selectedKey : `/${selectedKey}`;
+  const activeSelection = routeByPath(location.pathname)?.path || canonicalPathFor(selectedPath);
 
   return (
     <>
@@ -355,7 +404,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <SidebarContent>
         <StyledNav
           $collapsed={collapsed}
-          selectedKeys={[selectedKey]}
+          selectedKeys={[activeSelection]}
           isCollapsed={collapsed}
           onSelect={({ selectedKeys }: { selectedKeys: string[] }) => {
             const key = selectedKeys[0] as string;

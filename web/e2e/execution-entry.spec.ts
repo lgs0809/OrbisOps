@@ -36,7 +36,7 @@ test('Chat exposes ReAct plus named workflows and freezes execution per session'
         contentType: 'application/json',
         body: JSON.stringify({
           code: '0000', info: 'success', data: [
-            { projectId: 'demo-project', name: 'Example Service', defaultAgentId: 'default-react' },
+            { projectId: 'demo-project', name: 'Demo Project', defaultAgentId: 'default-react' },
           ],
         }),
       });

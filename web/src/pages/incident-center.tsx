@@ -4,12 +4,18 @@ import styled from 'styled-components';
 import { Button, Checkbox, Empty, Select, Space, Spin, Table, Tag, TextArea, Toast, Typography } from '@douyinfe/semi-ui';
 
 import {
+  OpsEvidenceCard,
   OpsEmptyState,
   OpsPageHeader,
   OpsPageShell,
   OpsSectionCard,
+  OpsStatusBadge,
+  OpsTimeline,
   TableScroll,
 } from '../components/ops-layout';
+import { ChangePackageSummaryCard } from '../features/changes/components/ChangePackageSummaryCard';
+import { toChangePackageSummary } from '../features/changes/model/change-package-summary';
+import { IncidentWorkspaceTabs, type IncidentWorkspaceTab } from '../features/incidents/components/IncidentWorkspaceTabs';
 import { isAdminUser } from '../services/auth-session';
 import {
   OpsIncident,
@@ -43,13 +49,6 @@ const Stack = styled.div`
   flex-direction: column;
   gap: ${theme.spacing.sm};
   min-width: 0;
-`;
-
-const TimelineItem = styled.div`
-  border-left: 3px solid ${theme.colors.border.primary};
-  padding: ${theme.spacing.sm} ${theme.spacing.base};
-  background: ${theme.colors.bg.secondary};
-  border-radius: 0 ${theme.borderRadius.base} ${theme.borderRadius.base} 0;
 `;
 
 const FactCard = styled.div`
@@ -94,12 +93,16 @@ const sourceLabel = (source?: string) => ({
   ALERT: '告警', ALERT_EVENT: '告警', ALERTMANAGER: '告警', SCHEDULE: '巡检', CHAT: 'AI 对话', MANUAL: '人工创建', RUN: '分析运行',
 } as Record<string, string>)[String(source || '').toUpperCase()] || source || '未知来源';
 
-const timelineMark = (item: OpsIncidentTimelineItem) => {
+const timelineStatus = (item: OpsIncidentTimelineItem) => {
   const event = String(item.eventType || '').toUpperCase();
-  if (event.includes('FAILED') || event.includes('ERROR') || event.includes('REJECTED')) return '×';
-  if (event.includes('REQUIRED') || event.includes('INSUFFICIENT') || event.includes('STARTED')) return '→';
-  if (event.includes('SUCCEEDED') || event.includes('CLOSED') || event.includes('LANDED')) return '✓';
-  return '•';
+  if (event.includes('FAILED') || event.includes('ERROR') || event.includes('REJECTED')) return 'FAILED' as const;
+  if (event.includes('VERIFICATION_SUCCEEDED') || event.includes('RESOLVED') || event.includes('CLOSED')) return 'VERIFIED' as const;
+  if (event.includes('LANDED') || event.includes('LANDING')) return 'LANDING' as const;
+  if (event.includes('APPROVED')) return 'APPROVED' as const;
+  if (event.includes('APPROVAL') || event.includes('ACTION_REQUIRED')) return 'AWAITING_APPROVAL' as const;
+  if (event.includes('CHANGE') || event.includes('REMEDIATION')) return 'PROPOSED_CHANGE' as const;
+  if (event.includes('ANALYSIS') || event.includes('DIAGNOSIS') || event.includes('INVESTIGATION')) return 'REASONING' as const;
+  return 'OBSERVE' as const;
 };
 
 const durationLabel = (item: OpsIncident) => {
@@ -150,6 +153,7 @@ export const IncidentCenterPage: React.FC = () => {
   const [commentDraft, setCommentDraft] = useState('');
   const [watcherCandidate, setWatcherCandidate] = useState('');
   const [relatedCandidate, setRelatedCandidate] = useState('');
+  const [workspaceTab, setWorkspaceTab] = useState<IncidentWorkspaceTab>('overview');
   const [members, setMembers] = useState<Array<{ value: string; label: string }>>([]);
   const [incidents, setIncidents] = useState<OpsIncident[]>([]);
   const [detail, setDetail] = useState<OpsIncidentDetail | null>(null);
@@ -224,6 +228,7 @@ export const IncidentCenterPage: React.FC = () => {
     try {
       const response = await opsAdminService.getIncidentDetail(incidentId, incidentScope);
       const nextDetail = response.data || null;
+      if (detail?.incident?.incidentId !== incidentId) setWorkspaceTab('overview');
       setDetail(nextDetail);
       if (isAdminUser() && nextDetail?.incident?.projectId) {
         try {
@@ -551,48 +556,94 @@ export const IncidentCenterPage: React.FC = () => {
                   : undefined}
             />
 
+            <OpsSectionCard title="Incident Workspace">
+              <Paragraph type="tertiary">同一个 Incident 内串联调查、证据、变更与恢复验证；Chat、Run 和 ChangePackage 都回到这个上下文。</Paragraph>
+              <IncidentWorkspaceTabs value={workspaceTab} onChange={setWorkspaceTab} />
+            </OpsSectionCard>
+
             <DetailGrid>
               <Stack>
-                <OpsSectionCard title="证据时间线">
-                  <Paragraph type="tertiary">这里只展示可核对的调查动作与结果；原始 payload 和运行细节放在高级 Trace。</Paragraph>
-                  {detail.timeline.length ? <Stack>{detail.timeline.map((item) => (
-                    <TimelineItem key={`${item.id || ''}-${item.eventType}-${item.createTime || ''}`}>
-                      <Text strong>{timelineMark(item)} {timelineLabel(item)}</Text><br />
-                      {item.detail && <Text type="secondary">{item.detail}</Text>}
-                      <div><Text type="tertiary" size="small">{item.createTime || ''}{item.refType && item.refId ? ` · ${sourceLabel(item.refType)} ${item.refId}` : ''}</Text></div>
-                    </TimelineItem>
-                  ))}</Stack> : <Text type="tertiary">还没有调查证据。</Text>}
-                </OpsSectionCard>
+                {workspaceTab === 'overview' && (
+                  <OpsSectionCard title="Incident Overview">
+                    <Space wrap>
+                      <OpsStatusBadge status="OBSERVE" label={sourceLabel(detail.incident.sourceType)} />
+                      <Tag>{detail.incident.severity || 'UNKNOWN'}</Tag>
+                      <Tag>{durationLabel(detail.incident)}</Tag>
+                    </Space>
+                    <Paragraph>{detail.diagnosis.summary || detail.incident.summary || '等待形成可信诊断'}</Paragraph>
+                    {!!detail.diagnosis.impact.length && <Stack><Title heading={6}>当前影响</Title>{detail.diagnosis.impact.map((item) => <FactCard key={item}>{item}</FactCard>)}</Stack>}
+                    <Space wrap style={{ marginTop: 12 }}>
+                      <Button onClick={() => navigate(`/chat?projectId=${encodeURIComponent(detail.incident.projectId || '')}&incidentId=${encodeURIComponent(detail.incident.incidentId)}`)}>在 Diagnosis 中继续</Button>
+                      {detail.changePackages.length > 0 && <Button onClick={() => setWorkspaceTab('change')}>查看 Change</Button>}
+                    </Space>
+                  </OpsSectionCard>
+                )}
 
-                <OpsSectionCard title="诊断结论">
-                  <Paragraph type="tertiary">事实必须绑定 evidenceRef / resultId / outputHash；推断必须引用事实。</Paragraph>
-                  <Space wrap>
-                    <Tag color={detail.diagnosis.evidenceCompleteness === 'COMPLETE' ? 'green' : detail.diagnosis.evidenceCompleteness === 'PARTIAL' ? 'orange' : 'red'}>
-                      Evidence {detail.diagnosis.evidenceCompleteness}
-                    </Tag>
-                    <Tag>{`置信度 ${detail.diagnosis.confidence}`}</Tag>
-                  </Space>
-                  <Paragraph>{detail.diagnosis.summary}</Paragraph>
-                  {!!detail.diagnosis.impact.length && <Stack><Title heading={6}>当前影响</Title>{detail.diagnosis.impact.map((item) => <FactCard key={item}>{item}</FactCard>)}</Stack>}
-                  {!!detail.diagnosis.facts.length && <Stack><Title heading={6}>已验证事实</Title>{detail.diagnosis.facts.map((fact) => <FactCard key={fact.factId}><Text strong>{fact.statement}</Text><div><Text type="tertiary" size="small">证据：{fact.evidenceRefs.map((ref) => `${ref.evidenceRef}/${ref.resultId}`).join('、')}</Text></div></FactCard>)}</Stack>}
-                  {!!detail.diagnosis.inferences.length && <Stack><Title heading={6}>诊断判断</Title>{detail.diagnosis.inferences.map((item, index) => <FactCard key={`${index}-${item.statement}`}>{item.statement}<div><Text type="tertiary" size="small">依据事实：{item.supports.join('、')}</Text></div></FactCard>)}</Stack>}
-                  {!!detail.diagnosis.excludedHypotheses.length && <Stack><Title heading={6}>已排除假设</Title>{detail.diagnosis.excludedHypotheses.map((item) => <FactCard key={item}>{item}</FactCard>)}</Stack>}
-                  {!!detail.diagnosis.unknowns.length && <Stack><Title heading={6}>未知项</Title>{detail.diagnosis.unknowns.map((item) => <FactCard key={item}>{item}</FactCard>)}</Stack>}
-                  {!!detail.diagnosis.recommendations.length && <Stack><Title heading={6}>建议</Title>{detail.diagnosis.recommendations.map((item) => <FactCard key={item}>{item}</FactCard>)}</Stack>}
-                  <div style={{ marginTop: 12 }}>
-                    <Text type="tertiary" size="small">诊断质量反馈</Text>
-                    <div style={{ marginTop: 6 }}>
-                      <Space wrap>
+                {workspaceTab === 'investigation' && (
+                  <OpsSectionCard title="Investigation">
+                    <Paragraph type="tertiary">诊断判断与事实分离；事实证据在 Evidence 工作面核验。</Paragraph>
+                    <Space wrap>
+                      <Tag color={detail.diagnosis.evidenceCompleteness === 'COMPLETE' ? 'green' : detail.diagnosis.evidenceCompleteness === 'PARTIAL' ? 'orange' : 'red'}>Evidence {detail.diagnosis.evidenceCompleteness}</Tag>
+                      <Tag>{`置信度 ${detail.diagnosis.confidence}`}</Tag>
+                    </Space>
+                    <Paragraph>{detail.diagnosis.summary}</Paragraph>
+                    {!!detail.diagnosis.inferences.length && <Stack><Title heading={6}>诊断判断</Title>{detail.diagnosis.inferences.map((item, index) => <FactCard key={`${index}-${item.statement}`}>{item.statement}<div><Text type="tertiary" size="small">依据事实：{item.supports.join('、')}</Text></div></FactCard>)}</Stack>}
+                    {!!detail.diagnosis.excludedHypotheses.length && <Stack><Title heading={6}>已排除假设</Title>{detail.diagnosis.excludedHypotheses.map((item) => <FactCard key={item}>{item}</FactCard>)}</Stack>}
+                    {!!detail.diagnosis.unknowns.length && <Stack><Title heading={6}>未知项</Title>{detail.diagnosis.unknowns.map((item) => <FactCard key={item}>{item}</FactCard>)}</Stack>}
+                    {!!detail.diagnosis.recommendations.length && <Stack><Title heading={6}>建议</Title>{detail.diagnosis.recommendations.map((item) => <FactCard key={item}>{item}</FactCard>)}</Stack>}
+                    <div style={{ marginTop: 12 }}>
+                      <Text type="tertiary" size="small">诊断质量反馈</Text>
+                      <div style={{ marginTop: 6 }}><Space wrap>
                         <Button size="small" loading={feedbackLoading} onClick={() => void submitDiagnosisFeedback('HELPFUL')}>有帮助</Button>
                         <Button size="small" loading={feedbackLoading} onClick={() => void submitDiagnosisFeedback('INACCURATE')}>不准确</Button>
                         <Button size="small" loading={feedbackLoading} onClick={() => void submitDiagnosisFeedback('INSUFFICIENT_EVIDENCE')}>证据不足</Button>
-                      </Space>
+                      </Space></div>
                     </div>
-                  </div>
-                </OpsSectionCard>
+                  </OpsSectionCard>
+                )}
+
+                {workspaceTab === 'evidence' && (
+                  <OpsSectionCard title="Evidence">
+                    <Paragraph type="tertiary">每条事实必须可回到 evidenceRef / resultId / outputHash；无法核对的内容不进入已验证事实。</Paragraph>
+                    {detail.diagnosis.facts.length ? <Stack>{detail.diagnosis.facts.map((fact) => (
+                      <OpsEvidenceCard
+                        key={fact.factId}
+                        title={fact.statement}
+                        summary={<Text type="secondary">Fact ID: {fact.factId}</Text>}
+                        source={fact.evidenceRefs.map((ref) => `${ref.evidenceRef} · ${ref.resultId} · ${ref.outputHash}`).join('；')}
+                      />
+                    ))}</Stack> : <Text type="tertiary">当前还没有已验证事实。</Text>}
+                  </OpsSectionCard>
+                )}
+
+                {workspaceTab === 'change' && (
+                  <OpsSectionCard title="Governed Change Chain">
+                    <Paragraph type="tertiary">ChangePackage → Approval → Trusted Landing → Verification。Incident 只承载上下文和状态，不成为第二审批入口。</Paragraph>
+                    <Space wrap>
+                      <OpsStatusBadge status={detail.changePackages.length ? 'PROPOSED_CHANGE' : 'BLOCKED'} label={detail.changePackages.length ? 'Change proposed' : 'No ChangePackage'} />
+                      {String(detail.incident.status).toUpperCase() === 'VERIFYING' && <OpsStatusBadge status="LANDING" label="Awaiting verification" />}
+                      {['RESOLVED', 'CLOSED'].includes(String(detail.incident.status).toUpperCase()) && <OpsStatusBadge status="VERIFIED" />}
+                    </Space>
+                    <Paragraph>{detail.suggestedUserAction || '当前无需额外操作'}</Paragraph>
+                  </OpsSectionCard>
+                )}
+
+                {workspaceTab === 'timeline' && (
+                  <OpsSectionCard title="Timeline">
+                    <Paragraph type="tertiary">统一展示告警、调查、证据、变更、审批、Landing、验证和协作事件。</Paragraph>
+                    {detail.timeline.length ? <OpsTimeline items={detail.timeline.map((item) => ({
+                      id: `${item.id || ''}-${item.eventType}-${item.createTime || ''}`,
+                      status: timelineStatus(item),
+                      title: timelineLabel(item),
+                      description: item.detail || (item.refType && item.refId ? `${sourceLabel(item.refType)} ${item.refId}` : undefined),
+                      timestamp: item.createTime,
+                    }))} /> : <Text type="tertiary">还没有 Timeline 事件。</Text>}
+                  </OpsSectionCard>
+                )}
               </Stack>
 
               <Stack>
+                {workspaceTab === 'overview' && <>
                 <OpsSectionCard title="责任归属">
                   <Paragraph type="tertiary">责任人只用于协作和工作台分流，不改变审批、生产执行或 Incident 状态权限。</Paragraph>
                   {isAdminUser() ? (
@@ -708,26 +759,55 @@ export const IncidentCenterPage: React.FC = () => {
                     </Space>
                   </Stack>
                 </OpsSectionCard>
+                </>}
 
+                {workspaceTab === 'investigation' && <>
                 <OpsSectionCard title="数据源查询状态">
                   <Paragraph type="tertiary">“查询是否成功”和“结果是否说明异常”是两件事；未查询、查询失败或没有业务判定时都不会显示成正常。</Paragraph>
                   {!!detail.diagnosis.sourceStatus.length ? <Stack>{detail.diagnosis.sourceStatus.map((source) => <FactCard key={source.sourceId}><Text strong>{source.sourceName || source.sourceId}</Text><div><Tag>查询 {source.queryStatus}</Tag> <Tag>判断 {source.assessment}</Tag></div>{source.detail && <Text type="tertiary">{source.detail}</Text>}</FactCard>)}</Stack> : <Text type="tertiary">当前诊断还没有结构化的数据源查询状态。</Text>}
                 </OpsSectionCard>
+                <OpsSectionCard title="Diagnosis Runs">
+                  <Paragraph type="tertiary">Incident 关联的诊断 Run 直接在工作区展示；无需打开 Advanced Trace 才知道执行了什么。</Paragraph>
+                  {detail.runs.length ? <Stack>{detail.runs.map((run, index) => {
+                    const runId = String(run.runId || run.analysisId || `run-${index}`);
+                    const status = String(run.status || run.runStatus || 'UNKNOWN');
+                    return <FactCard key={runId}><Text strong>{runId}</Text><div><Tag>{status}</Tag></div>{run.summary && <Text type="tertiary">{String(run.summary)}</Text>}</FactCard>;
+                  })}</Stack> : <Text type="tertiary">当前 Incident 尚未关联诊断 Run。</Text>}
+                </OpsSectionCard>
+                </>}
 
+                {workspaceTab === 'evidence' && <>
                 <OpsSectionCard title="关联来源">
                   <Paragraph type="tertiary">这里记录告警、巡检、对话和分析运行等来源关系，用于追溯事件从哪里来；它们不是业务健康判断。</Paragraph>
                   {detail.sourceRefs.length ? <Stack>{detail.sourceRefs.map((source) => <FactCard key={`${source.sourceType}-${source.sourceId}`}><Text strong>{sourceLabel(source.sourceType)}</Text><div>{source.title || source.sourceId}</div><Text type="tertiary" size="small">{source.status || '已关联'} · {source.sourceId}</Text></FactCard>)}</Stack> : <Text type="tertiary">暂无已关联来源。</Text>}
                 </OpsSectionCard>
+                </>}
 
+                {workspaceTab === 'change' && <>
                 <OpsSectionCard title="处置方案">
                   <Paragraph type="tertiary">Incident 只展示处置状态；正式审批与生产执行只能在执行中心完成。</Paragraph>
-                  {detail.changePackages.length ? <Stack>{detail.changePackages.map((change) => <FactCard key={change.packageId}><Text strong>{change.packageId}</Text><div><Tag>{change.status}</Tag> <Text type="tertiary">v{change.version}</Text></div><Button theme="borderless" onClick={() => navigate(`/executions?incidentId=${encodeURIComponent(detail.incident.incidentId)}&packageId=${encodeURIComponent(change.packageId)}`)}>前往执行中心</Button></FactCard>)}</Stack> : <Text type="tertiary">当前没有 ChangePackage。诊断需要处置时，AI 可形成变更任务书并在执行中心交接。</Text>}
+                  {detail.changePackages.length ? (
+                    <Stack>
+                      {detail.changePackages.map((change) => {
+                        const summary = toChangePackageSummary(change);
+                        return (
+                          <ChangePackageSummaryCard
+                            key={summary.packageId}
+                            summary={summary}
+                            actionLabel="前往执行中心"
+                            onOpen={() => navigate(`/executions?incidentId=${encodeURIComponent(detail.incident.incidentId)}&packageId=${encodeURIComponent(summary.packageId)}`)}
+                          />
+                        );
+                      })}
+                    </Stack>
+                  ) : <Text type="tertiary">当前没有 ChangePackage。诊断需要处置时，AI 可形成变更任务书并在执行中心交接。</Text>}
                 </OpsSectionCard>
 
                 <OpsSectionCard title="下一步">
                   <Text strong>{detail.suggestedUserAction || '无需额外操作'}</Text>
                   <Paragraph type="tertiary">生产审批与 Landing 不在本页执行，避免形成第二审批入口。</Paragraph>
                 </OpsSectionCard>
+                </>}
               </Stack>
             </DetailGrid>
 

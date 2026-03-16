@@ -36,14 +36,14 @@ import type {
 import { useProjectScope } from '../hooks/use-project-scope';
 import { getStoredUserInfo, isAdminUser } from '../services/auth-session';
 import { ExecutionQueue, PackageCapability, packageCapability, packagesForQueue } from '../features/execution/execution-center-model';
+import { ApprovalChannelDispatch } from '../features/changes/components/ApprovalChannelDispatch';
+import { ApprovalCockpit } from '../features/changes/components/ApprovalCockpit';
+import { toChangePackageSummary } from '../features/changes/model/change-package-summary';
 import { theme } from '../styles/theme';
 import {
   changePackageReasonLabel,
   changePackageRiskColor,
   changePackageRiskLabel,
-  changePackageStatusColor,
-  changePackageStatusHint,
-  changePackageStatusLabel,
 } from './change-package-ui';
 
 const { Option } = Select;
@@ -68,25 +68,6 @@ const DetailGrid = styled.div`
 
   @media (max-width: ${theme.breakpoints.lg}) {
     grid-template-columns: minmax(0, 1fr);
-  }
-`;
-
-const MetaList = styled.dl`
-  display: grid;
-  grid-template-columns: 128px minmax(0, 1fr);
-  gap: 10px 12px;
-  width: 100%;
-  min-width: 0;
-  margin: 0;
-
-  dt {
-    color: ${theme.colors.text.tertiary};
-  }
-
-  dd {
-    min-width: 0;
-    margin: 0;
-    word-break: break-word;
   }
 `;
 
@@ -133,7 +114,6 @@ const statusOptions = [
 ];
 
 const riskColor = changePackageRiskColor;
-const statusColor = changePackageStatusColor;
 
 const formatJson = (value: unknown) => {
   if (value == null || value === '') {
@@ -552,16 +532,17 @@ export const ChangePackageCenterPage: React.FC = () => {
                     title: '执行包',
                     dataIndex: 'packageId',
                     width: 260,
-                    render: (_: unknown, record: OpsChangePackage) => (
-                      <div>
-                        <Text strong ellipsis={{ showTooltip: true }}>
-                          {record.summary || record.objective || record.packageId}
-                        </Text>
-                        <div style={{ color: theme.colors.text.tertiary, fontSize: 12 }}>
-                          {record.packageId} · v{record.version}
+                    render: (_: unknown, record: OpsChangePackage) => {
+                      const summary = toChangePackageSummary(record);
+                      return (
+                        <div>
+                          <Text strong ellipsis={{ showTooltip: true }}>{summary.title}</Text>
+                          <div style={{ color: theme.colors.text.tertiary, fontSize: 12 }}>
+                            {summary.packageId} · v{summary.version}
+                          </div>
                         </div>
-                      </div>
-                    ),
+                      );
+                    },
                   },
                   {
                     title: '项目',
@@ -573,13 +554,19 @@ export const ChangePackageCenterPage: React.FC = () => {
                     title: '状态',
                     dataIndex: 'status',
                     width: 130,
-                    render: (value: string) => <Tag color={statusColor(value)}>{changePackageStatusLabel(value)}</Tag>,
+                    render: (_: string, record: OpsChangePackage) => {
+                      const summary = toChangePackageSummary(record);
+                      return <Tag color={summary.statusColor as any}>{summary.statusLabel}</Tag>;
+                    },
                   },
                   {
                     title: '风险',
                     dataIndex: 'riskLevel',
                     width: 120,
-                    render: (value: string) => <Tag color={riskColor(value)}>{changePackageRiskLabel(value)}</Tag>,
+                    render: (_: string, record: OpsChangePackage) => {
+                      const summary = toChangePackageSummary(record);
+                      return <Tag color={summary.riskColor as any}>{summary.riskLabel}</Tag>;
+                    },
                   },
                   {
                     title: '环境',
@@ -591,11 +578,14 @@ export const ChangePackageCenterPage: React.FC = () => {
                     title: '当前结论',
                     dataIndex: 'reasonCode',
                     width: 190,
-                    render: (value: string, record: OpsChangePackage) => (
-                      <Text ellipsis={{ showTooltip: true }}>
-                        {changePackageReasonLabel(value) || changePackageStatusHint(record.status, value)}
-                      </Text>
-                    ),
+                    render: (_: string, record: OpsChangePackage) => {
+                      const summary = toChangePackageSummary(record);
+                      return (
+                        <Text ellipsis={{ showTooltip: true }}>
+                          {summary.reasonCode ? summary.reasonLabel : summary.statusHint}
+                        </Text>
+                      );
+                    },
                   },
                   {
                     title: '更新时间',
@@ -630,18 +620,23 @@ export const ChangePackageCenterPage: React.FC = () => {
         {selected && (
         <div style={{ maxHeight: '72vh', overflow: 'auto', paddingRight: 8 }}>
         <DetailGrid>
-          <OpsSectionCard title="处置决策">
-            <MetaList>
-              <dt>为什么要改</dt><dd>{selected.objective || selected.summary || '未明确，审批前应补充处置目标'}</dd>
-              <dt>不改的影响</dt><dd>{valueText(field(selected, 'impact', 'businessImpact', 'impactSummary'), '未明确，需人工确认业务影响')}</dd>
-              <dt>改什么</dt><dd>{selected.diffSummary || packageOperations(selected).map((item) => item.tool).join('；') || '未声明具体操作'}</dd>
-              <dt>影响范围</dt><dd>{valueText(parseJsonValue(selected.targetScopeJson), selected.serviceId || selected.targetEnvironment || '未声明')}</dd>
-              <dt>风险</dt><dd><Tag color={riskColor(selected.riskLevel)}>{changePackageRiskLabel(selected.riskLevel)}</Tag></dd>
-              <dt>预期结果</dt><dd>{valueText(field(selected, 'expectedResult', 'expectedOutcome'), selected.validationAssessment || '未明确')}</dd>
-              <dt>验证方式</dt><dd>{selected.verificationCriteriaJson ? valueText(parseJsonValue(selected.verificationCriteriaJson)) : '未记录'}</dd>
-              <dt>失败怎么处理</dt><dd>{selected.rollbackStepsJson ? valueText(parseJsonValue(selected.rollbackStepsJson)) : valueText(parseJsonValue(selected.failureSummaryJson), '未记录回滚/失败处理')}</dd>
-              <dt>未知项</dt><dd>{selectedMissingItems.length ? selectedMissingItems.join('；') : valueText(field(selected, 'unknowns', 'unknownsJson'), '当前审批材料未发现结构性缺口')}</dd>
-            </MetaList>
+          <OpsSectionCard title="Approval Cockpit">
+            <ApprovalCockpit record={selected} />
+            <ApprovalChannelDispatch
+              record={selected}
+              scope={apiScope}
+              canApprove={packageCapability(selected, 'canApprove')}
+            />
+            {selectedMissingItems.length > 0 && (
+              <OpsDangerZone
+                title="审批材料仍有缺口"
+                description="缺口未闭合前不能把“可查看”误当成“可审批”。"
+              >
+                <Space vertical align="start" spacing={4}>
+                  {selectedMissingItems.map((item) => <Text key={item}>- {item}</Text>)}
+                </Space>
+              </OpsDangerZone>
+            )}
             <OpsAdvancedPreview title="审批版本与 Runtime 标识" description="仅用于审计与调试，不作为普通用户理解处置方案的第一屏。">
               <JsonBlock>{formatJson({
                 packageId: selected.packageId,

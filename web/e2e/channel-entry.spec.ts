@@ -2,6 +2,8 @@ import { expect, test } from '@playwright/test';
 
 type Json = Record<string, any>;
 
+const response = (data: unknown) => JSON.stringify({ code: '0000', info: 'success', data });
+
 test('Channel is transport-first and can be output-only, ReAct, or Workflow', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('token', 'x');
@@ -21,21 +23,33 @@ test('Channel is transport-first and can be output-only, ReAct, or Workflow', as
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({
-          code: '0000', info: 'success', data: {
-            projects: [{ projectId: 'demo-project', name: 'Example Service', defaultAgentId: 'default-react' }],
-          },
-        }),
+        body: response({ projects: [{ projectId: 'demo-project', name: 'Demo Project', defaultAgentId: 'default-react' }] }),
       });
     }
     if (path.includes('/api/v1/admin/ops-agents')) {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ code: '0000', info: 'success', data: [
+        body: response([
           { agentId: 'default-react', name: '内部默认 Agent', definitionKind: 'MAIN_ASSISTANT', version: 4 },
           { agentId: 'daily-inspection', name: '每日生产巡检', definitionKind: 'SPECIALIZED_WORKFLOW', version: 7 },
-        ] }),
+        ]),
+      });
+    }
+    if (path.endsWith('/api/v1/admin/ops/channels/types')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: response([
+          {
+            type: 'GENERIC_WEBHOOK',
+            displayName: 'Generic Webhook',
+            supportsInbound: true,
+            supportsOutbound: true,
+            connectionModes: ['WEBHOOK'],
+            capabilitySet: { capabilities: ['INBOUND_MESSAGE', 'OUTBOUND_MESSAGE'] },
+          },
+        ]),
       });
     }
     if (path.endsWith('/api/v1/admin/ops/channels') && request.method() === 'POST') {
@@ -44,35 +58,44 @@ test('Channel is transport-first and can be output-only, ReAct, or Workflow', as
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ code: '0000', info: 'success', data: { channelId: 'notify-only', ...body } }),
+        body: response({ channelId: 'notify-only', ...body }),
       });
     }
-    if (path.endsWith('/api/v1/admin/ops/channels')) {
+    if (path.endsWith('/api/v1/admin/ops/channels/notify-only/readiness')) {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ code: '0000', info: 'success', data: [] }),
+        body: response({
+          channelId: 'notify-only',
+          projectId: 'demo-project',
+          type: 'GENERIC_WEBHOOK',
+          ready: false,
+          checks: [],
+          checkedAt: '2026-08-17T00:00:00Z',
+        }),
       });
     }
-    return route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ code: '0000', info: 'success', data: [] }),
-    });
+    if (path.endsWith('/api/v1/admin/ops/channels')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: response([]) });
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: response([]) });
   });
 
-  await page.goto('/channel-management?projectId=demo-project');
-  await page.getByRole('button', { name: '新建渠道' }).click();
+  await page.goto('/platform/integrations?projectId=demo-project');
+  await page.getByRole('button', { name: '新建 Channel' }).click();
+  await page.getByPlaceholder('Production On-call').fill('只发通知');
+  await page.getByRole('button', { name: 'Next' }).click();
 
   const inboundSection = page.getByTestId('channel-inbound-execution');
   const inboundSelect = inboundSection.getByRole('combobox');
   await expect(inboundSelect).toBeVisible();
   await expect(inboundSection).toHaveAttribute('data-workflow-count', '1');
   await inboundSelect.click();
-  await expect(page.getByText('不处理入站（仅用于通知 / 主动发送）', { exact: true }).last()).toBeVisible();
-  await expect(page.getByText('ReAct', { exact: true }).last()).toBeVisible();
-  await expect(page.getByText('Workflow', { exact: true }).last()).toBeVisible();
-  await page.getByText('Workflow', { exact: true }).last().click();
+  await expect(page.getByRole('option', { name: 'Outbound only' })).toBeVisible();
+  await expect(page.getByRole('option', { name: 'Project Default ReAct' })).toBeVisible();
+  await expect(page.getByRole('option', { name: 'Specialized Workflow' })).toBeVisible();
+  await page.getByRole('option', { name: 'Specialized Workflow' }).click();
+
   const workflowSelect = page.getByTestId('channel-workflow-selector').getByRole('combobox');
   await expect(workflowSelect).toBeVisible();
   await workflowSelect.click();
@@ -82,9 +105,10 @@ test('Channel is transport-first and can be output-only, ReAct, or Workflow', as
   await workflowOption.click();
 
   await inboundSelect.click();
-  await page.getByText('不处理入站（仅用于通知 / 主动发送）', { exact: true }).last().click();
-  await page.getByPlaceholder('生产告警群').fill('只发通知');
-  await page.getByRole('button', { name: 'confirm' }).click();
+  await page.getByRole('option', { name: 'Outbound only' }).click();
+  await expect(inboundSection).toContainText('Outbound only');
+  await page.getByRole('button', { name: 'Save & Test' }).click();
+
   await expect.poll(() => createRequests.length).toBe(1);
   expect(createRequests[0].executionType).toBe('NONE');
   expect(createRequests[0].workflowId).toBeUndefined();

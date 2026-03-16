@@ -18,22 +18,24 @@ import {
   Typography,
 } from '@douyinfe/semi-ui';
 import {
-  IconBranch,
-  IconEdit,
-  IconEyeOpened,
   IconPlus,
-  IconSetting,
 } from '@douyinfe/semi-icons';
 
 import { Header, Sidebar } from '../components/layout';
-import { ProjectReadinessCard } from '../components/project-readiness-card';
 import { ProjectScopeBar } from '../components/project-scope-bar';
-import { SetupNav } from '../components/project-setup-nav';
 import { SkillPackageEditor } from '../components/skill/SkillPackageEditor';
+import { ProjectDataConnectionsSection } from '../features/projects/components/ProjectDataConnectionsSection';
+import { ProjectGeneratedToolsSection } from '../features/projects/components/ProjectGeneratedToolsSection';
+import { ProjectKnowledgeBasesSection } from '../features/projects/components/ProjectKnowledgeBasesSection';
+import { ProjectSkillsSection } from '../features/projects/components/ProjectSkillsSection';
+import { ProjectWorkspaceAccessSection } from '../features/projects/components/ProjectWorkspaceAccessSection';
+import { ProjectWorkspaceAdvancedTabs } from '../features/projects/components/ProjectWorkspaceAdvancedTabs';
+import { ProjectWorkspaceOverviewSection } from '../features/projects/components/ProjectWorkspaceOverviewSection';
+import { ProjectWorkspaceRuntimeSection } from '../features/projects/components/ProjectWorkspaceRuntimeSection';
+import type { ProjectWorkspaceAdvancedTab } from '../features/projects/model/project-workspace-tabs';
 import { clearAuthSession } from '../services/auth-session';
 import { AdminUserResponseDTO, AdminUserService } from '../services/admin-user-service';
 import {
-  OpsGeneratedMcp,
   OpsDiagnosticScenario,
   OpsProjectMember,
   OpsProjectResource,
@@ -141,119 +143,12 @@ const HeaderBar = styled.div`
   margin-right: auto;
 `;
 
-const ResourceGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
-  gap: ${theme.spacing.base};
-`;
-
-const SummaryGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
-  gap: ${theme.spacing.base};
-  margin-top: ${theme.spacing.base};
-`;
-
-const SummaryItem = styled.div`
-  border: 1px solid ${theme.colors.border.secondary};
-  border-radius: ${theme.borderRadius.base};
-  background: #f8fafc;
-  padding: ${theme.spacing.base};
-`;
-
-const ReadinessGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: ${theme.spacing.base};
-  margin-top: ${theme.spacing.base};
-
-  @media (max-width: ${theme.breakpoints.md}) {
-    grid-template-columns: minmax(0, 1fr);
-  }
-`;
-
-const ReadinessCard = styled.div<{ $ready: boolean }>`
-  border: 1px solid ${theme.colors.border.secondary};
-  border-radius: ${theme.borderRadius.base};
-  background: ${theme.colors.bg.secondary};
-  padding: ${theme.spacing.base};
-  min-width: 0;
-`;
-
-const ReadinessCheckRow = styled.div`
-  display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
-  gap: 8px;
-  align-items: start;
-  padding: 8px 0;
-  border-bottom: 1px solid ${theme.colors.border.secondary};
-
-  &:last-child {
-    border-bottom: 0;
-  }
-
-  .readiness-detail {
-    overflow-wrap: anywhere;
-  }
-`;
-
-const ScenarioGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
-  gap: ${theme.spacing.base};
-  margin-top: ${theme.spacing.base};
-`;
-
-const ScenarioItem = styled.div<{ $ready: boolean }>`
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 184px;
-  padding: ${theme.spacing.base};
-  border: 1px solid ${(props) => (props.$ready ? theme.colors.border.primary : theme.colors.border.secondary)};
-  border-radius: ${theme.borderRadius.base};
-  background: ${(props) => (props.$ready ? theme.colors.bg.primary : theme.colors.bg.secondary)};
-
-  .scenario-description,
-  .scenario-reason {
-    overflow-wrap: anywhere;
-    line-height: 1.6;
-  }
-
-  .scenario-action {
-    margin-top: auto;
-    padding-top: ${theme.spacing.base};
-  }
-`;
-
 const ResourceTitle = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: ${theme.spacing.base};
   flex-wrap: wrap;
-`;
-
-const SchemaList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: ${theme.spacing.base};
-`;
-
-const SchemaRow = styled.div`
-  border: 1px solid ${theme.colors.border.secondary};
-  border-radius: ${theme.borderRadius.base};
-  padding: 10px 12px;
-  background: #f8fafc;
-`;
-
-const Section = styled(Card)`
-  margin-bottom: ${theme.spacing.lg};
-
-  .semi-card-body {
-    padding: ${theme.spacing.lg};
-  }
 `;
 
 const ModalGrid = styled.div`
@@ -442,6 +337,7 @@ export const ProjectWorkspacePage: React.FC = () => {
   const { collapsed, sidebarCollapsed, toggleSidebar, closeMobileSidebar } = useResponsiveSidebar();
   const [loading, setLoading] = useState(false);
   const [projects, setProjects] = useState<OpsProjectWorkspace[]>([]);
+  const [activeFeatureTab, setActiveFeatureTab] = useState<ProjectWorkspaceAdvancedTab>('overview');
   const [templates, setTemplates] = useState<OpsProjectResourceTemplate[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [projectModalVisible, setProjectModalVisible] = useState(false);
@@ -1318,6 +1214,29 @@ export const ProjectWorkspacePage: React.FC = () => {
     }
   };
 
+  const openAddService = () => {
+    setServiceForm((current) => ({
+      ...current,
+      repositoryId: current.repositoryId || repositories[0]?.repositoryId || '',
+    }));
+    setServiceModalVisible(true);
+  };
+
+  const openEditService = (service: OpsProjectService) => {
+    setServiceForm({
+      serviceId: service.serviceId,
+      name: service.name,
+      repositoryId: service.repositoryId,
+      modulePath: service.modulePath,
+      buildProfile: service.buildProfile,
+      artifactPath: service.artifactPath || '',
+      deploymentResourceId: service.deploymentResourceId || '',
+      healthUrl: service.healthUrl || '',
+      smokeUrls: (service.smokeUrls || []).join(','),
+    });
+    setServiceModalVisible(true);
+  };
+
   const saveExecutionResource = async () => {
     if (!selectedProject) return;
     try {
@@ -1414,25 +1333,6 @@ export const ProjectWorkspacePage: React.FC = () => {
     setResourceModalVisible(true);
   };
 
-  const scrollProjectSetupSection = (title?: string) => {
-    if (!title) {
-      const firstCard = document.querySelector<HTMLElement>('.semi-spin-children > div > .semi-card');
-      firstCard?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      return;
-    }
-    const candidates = Array.from(
-      document.querySelectorAll<HTMLElement>('.semi-card-header-title, .semi-typography'),
-    );
-    const titleNode = candidates.find((node) => node.textContent?.trim() === title);
-    const card = titleNode?.closest<HTMLElement>('.semi-card');
-    if (card) {
-      card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      return;
-    }
-    const firstCard = document.querySelector<HTMLElement>('.semi-spin-children > div > .semi-card');
-    firstCard?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
   return (
     <PageLayout>
       <Sidebar selectedKey="project-workspace" onSelect={handleNavigation} collapsed={sidebarCollapsed} onMobileClose={closeMobileSidebar} />
@@ -1469,703 +1369,126 @@ export const ProjectWorkspacePage: React.FC = () => {
               <Workspace>
                 {selectedProject && (
                   <>
-                      <SetupNav aria-label="项目接入配置导航">
-                        <Text strong>接入步骤</Text>
-                        <Button theme="borderless" size="small" onClick={() => scrollProjectSetupSection()}>概览</Button>
-                        <Button theme="borderless" size="small" onClick={() => scrollProjectSetupSection('开始第一次真实诊断')}>真实诊断</Button>
-                        <Button theme="borderless" size="small" onClick={() => scrollProjectSetupSection('项目默认能力')}>默认能力</Button>
-                        <Button theme="borderless" size="small" onClick={() => scrollProjectSetupSection('项目成员与使用权限')}>成员</Button>
-                        <Button theme="borderless" size="small" onClick={() => scrollProjectSetupSection('项目 Skill')}>知识与 Skill</Button>
-                        <Button theme="borderless" size="small" onClick={() => scrollProjectSetupSection('代码与服务')}>代码与服务</Button>
-                        <Button theme="borderless" size="small" onClick={() => scrollProjectSetupSection('变更执行目标')}>生产处置</Button>
-                        <Button theme="borderless" size="small" onClick={() => scrollProjectSetupSection('数据连接与工具')}>数据与工具</Button>
-                      </SetupNav>
-                      <Section>
-                        <ResourceTitle>
-                          <div>
-                            <Title heading={4} style={{ margin: 0 }}>{selectedProject.name}</Title>
-                            <Text type="tertiary">
-                              负责人：{selectedProject.owner} · 环境：{toStringList(selectedProject.environments).join(' / ') || '-'}
-                            </Text>
-                            <div style={{ marginTop: 8 }}>
-                              <Space wrap>
-                                <Tag color={selectedProject.readyForInvestigation ? 'green' : 'orange'}>
-                                  {selectedProject.readyForInvestigation
-                                    ? '可开始排障'
-                                    : selectedProject.readinessReason === 'DEFAULT_AGENT_NOT_PUBLISHED'
-                                      ? '默认 Agent 未发布'
-                                      : '待完善接入'}
-                                </Tag>
-                                <Tag color="blue">默认 Agent：{selectedProject.defaultAgentId || '未设置'}</Tag>
-                                <Tag color="green">知识库：{selectedProject.knowledgeBaseId || '-'}</Tag>
-                              </Space>
-                            </div>
-                            <div style={{ marginTop: 8 }}>
-                              <Space wrap>
-                                {(selectedProject.onboarding || []).map((step) => (
-                                  <Tag key={step.key} color={step.completed ? 'green' : 'grey'}>
-                                    {step.label}
-                                  </Tag>
-                                ))}
-                              </Space>
-                            </div>
-                          </div>
-                          <Space>
-                            <Button onClick={() => navigate(`/agent-list?projectId=${encodeURIComponent(selectedProject.projectId)}`)}>Agent</Button>
-                            <Button onClick={() => navigate(`/inspections?projectId=${encodeURIComponent(selectedProject.projectId)}`)}>巡检</Button>
-                            <Button onClick={() => navigate(`/alerts?projectId=${encodeURIComponent(selectedProject.projectId)}`)}>告警</Button>
-                            <Button onClick={() => navigate(`/executions?projectId=${encodeURIComponent(selectedProject.projectId)}`)}>执行中心</Button>
-                            <Button onClick={() => navigate(`/audit?projectId=${encodeURIComponent(selectedProject.projectId)}`)}>审计</Button>
-                          </Space>
-                        </ResourceTitle>
-                        <ReadinessGrid>
-                          <ReadinessCard $ready={Boolean(selectedProject.diagnosisReadiness?.ready)}>
-                            <Text strong>首次价值路径</Text>
-                            {(selectedProject.onboarding || []).map((step) => (
-                              <ReadinessCheckRow key={step.key}>
-                                <Text>{step.completed ? '✓' : '×'}</Text>
-                                <Text>{step.label}</Text>
-                              </ReadinessCheckRow>
-                            ))}
-                            <Paragraph type="tertiary" style={{ marginBottom: 0 }}>
-                              首次诊断前不要求配置 Skill Evolver、Landing 或复杂 Workflow。
-                            </Paragraph>
-                          </ReadinessCard>
-                          <ProjectReadinessCard
-                            title="诊断能力"
-                            readiness={selectedProject.diagnosisReadiness}
-                            fallbackAction="完善诊断能力"
-                            onAction={() => selectedProject.defaultAgentPublished ? (selectedProject.diagnosisReadiness?.ready ? navigate('/chat') : setResourceModalVisible(true)) : void ensureDefaultAgent()}
-                          />
-                          <ProjectReadinessCard
-                            title="生产处置能力"
-                            readiness={selectedProject.remediationReadiness}
-                            fallbackAction="配置生产处置能力"
-                            onAction={() => selectedProject.executionResourceCount ? navigate('/executions') : openExecutionResource()}
-                          />
-                        </ReadinessGrid>
-                        <SummaryGrid>
-                          <SummaryItem>
-                            <Text type="tertiary" size="small">数据连接</Text>
-                            <Title heading={4} style={{ margin: '4px 0 0' }}>{selectedProject.resourceCount}</Title>
-                          </SummaryItem>
-                          <SummaryItem>
-                            <Text type="tertiary" size="small">已生成工具</Text>
-                            <Title heading={4} style={{ margin: '4px 0 0' }}>{selectedProject.generatedMcpCount}</Title>
-                          </SummaryItem>
-                          <SummaryItem>
-                            <Text type="tertiary" size="small">项目 Skill</Text>
-                            <Title heading={4} style={{ margin: '4px 0 0' }}>{selectedProject.skillIds?.length || 0}</Title>
-                          </SummaryItem>
-                          <SummaryItem>
-                            <Text type="tertiary" size="small">代码服务</Text>
-                            <Title heading={4} style={{ margin: '4px 0 0' }}>{projectServices.length}</Title>
-                          </SummaryItem>
-                        </SummaryGrid>
-                      </Section>
+                      <ProjectWorkspaceAdvancedTabs value={activeFeatureTab} onChange={setActiveFeatureTab} />
+                      <div hidden={activeFeatureTab !== 'overview'}>
+                        <ProjectWorkspaceOverviewSection
+                          project={selectedProject}
+                          projectServiceCount={projectServices.length}
+                          capabilitySaving={capabilitySaving}
+                          onNavigate={(path) => navigate(path)}
+                          onEnsureDefaultAgent={ensureDefaultAgent}
+                          onConfigureDiagnosisResources={() => setResourceModalVisible(true)}
+                          onOpenExecutionResource={openExecutionResource}
+                          onStartScenario={startDiagnosticScenario}
+                          onConfigureScenario={configureDiagnosticScenario}
+                          onOpenProjectSettings={openProjectSettings}
+                        />
+                      </div>
 
-                      <Section title="开始第一次真实诊断">
-                        <ResourceTitle>
-                          <div style={{ minWidth: 0 }}>
-                            <Text strong>选择当前项目已经具备证据来源的场景</Text>
-                            <div>
-                              <Text type="tertiary" size="small">
-                                平台只开放已接入的数据能力。未接入的场景会说明缺少什么，不会给出一个无法运行的入口。
-                              </Text>
-                            </div>
-                          </div>
-                          {selectedProject.readyForInvestigation && (
-                            <Tag color="green">已可开始诊断</Tag>
-                          )}
-                        </ResourceTitle>
-                        <ScenarioGrid>
-                          {(selectedProject.diagnosticScenarios || []).map((scenario) => (
-                            <ScenarioItem key={scenario.scenarioId} $ready={scenario.ready} data-testid={`diagnostic-scenario-${scenario.scenarioId}`}>
-                              <Space wrap style={{ justifyContent: 'space-between', width: '100%' }}>
-                                <Text strong>{scenario.name}</Text>
-                                {scenario.scenarioId === selectedProject.recommendedScenarioId && scenario.ready
-                                  ? <Tag color="blue">推荐</Tag>
-                                  : <Tag color={scenario.ready ? 'green' : 'grey'}>{scenario.ready ? '可用' : '未接入'}</Tag>}
-                              </Space>
-                              <Text className="scenario-description" type="secondary" style={{ marginTop: 10 }}>
-                                {scenario.description}
-                              </Text>
-                              {!scenario.ready && (
-                                <Text className="scenario-reason" type="tertiary" size="small" style={{ marginTop: 8 }}>
-                                  还需：{scenario.unavailableReason || '完善项目能力'}
-                                </Text>
-                              )}
-                              <div className="scenario-action">
-                                {scenario.ready ? (
-                                  <Button theme="solid" onClick={() => startDiagnosticScenario(scenario)}>
-                                    开始诊断
-                                  </Button>
-                                ) : (
-                                  <Button onClick={() => configureDiagnosticScenario(scenario)}>
-                                    {selectedProject.defaultAgentPublished ? '完善接入' : '发布默认 Agent'}
-                                  </Button>
-                                )}
-                              </div>
-                            </ScenarioItem>
-                          ))}
-                          {!selectedProject.diagnosticScenarios?.length && (
-                            <ScenarioItem $ready={false}>
-                              <Text strong>暂未生成诊断入口</Text>
-                              <Text type="tertiary" style={{ marginTop: 8 }}>
-                                刷新项目后仍未出现时，请先发布默认 Agent 并接入至少一种证据来源。
-                              </Text>
-                            </ScenarioItem>
-                          )}
-                        </ScenarioGrid>
-                      </Section>
+                      <div hidden={activeFeatureTab !== 'access'}>
+                        <ProjectWorkspaceAccessSection
+                          members={projectMembers}
+                          onManageMembers={openMemberManagement}
+                        />
+                      </div>
 
-                      <Section title="项目默认能力">
-                        <ResourceTitle>
-                          <div>
-                            <Text strong>默认 Agent、知识库和可用能力</Text>
-                            <div>
-                              <Text type="tertiary" size="small">
-                                平台默认运维 Agent 会继承这里的能力；画布 Agent 仍可在节点上单独选择 MCP、RAG 和 Skill。
-                              </Text>
-                            </div>
-                          </div>
-                          <Space>
-                            {!selectedProject.defaultAgentPublished && (
-                              <Button loading={capabilitySaving} onClick={ensureDefaultAgent}>
-                                修复默认 Agent
-                              </Button>
-                            )}
-                            <Button icon={<IconSetting />} onClick={openProjectSettings}>
-                              编辑默认能力
-                            </Button>
-                          </Space>
-                        </ResourceTitle>
-                        <SummaryGrid>
-                          <SummaryItem>
-                            <Text type="tertiary" size="small">默认 Agent</Text>
-                            <Paragraph style={{ margin: '6px 0 0' }}>{selectedProject.defaultAgentId || '未设置'}</Paragraph>
-                          </SummaryItem>
-                          <SummaryItem>
-                            <Text type="tertiary" size="small">默认知识库</Text>
-                            <Paragraph style={{ margin: '6px 0 0' }}>{selectedProject.knowledgeBaseId || '未绑定'}</Paragraph>
-                          </SummaryItem>
-                          <SummaryItem>
-                            <Text type="tertiary" size="small">项目 Skill</Text>
-                            <Paragraph style={{ margin: '6px 0 0' }}>{selectedProject.skillIds?.join(', ') || '未选择'}</Paragraph>
-                          </SummaryItem>
-                          <SummaryItem>
-                            <Text type="tertiary" size="small">通用 MCP</Text>
-                            <Paragraph style={{ margin: '6px 0 0' }}>{selectedProject.sharedMcpIds?.join(', ') || '未绑定'}</Paragraph>
-                          </SummaryItem>
-                        </SummaryGrid>
-                      </Section>
+                      <div hidden={activeFeatureTab !== 'knowledge'}>
+                        <ProjectSkillsSection
+                          projectId={selectedProject.projectId}
+                          skillIds={selectedProjectSkillIds}
+                          skillsById={skillOptionMap}
+                          saving={capabilitySaving}
+                          isProjectOwned={isProjectOwnedSkill}
+                          sourceLabel={projectSkillSourceLabel}
+                          onCreate={openCreateProjectSkill}
+                          onCopy={() => void openCopyProjectSkill()}
+                          onBindAgent={() => navigate(`/agent-list?projectId=${encodeURIComponent(selectedProject.projectId)}`)}
+                          onEdit={(skill) => void openEditProjectSkill(skill)}
+                          onToggleStatus={(skill, nextStatus) => void updateProjectSkillStatus(skill, nextStatus)}
+                          onUsage={(skill) => void openProjectSkillUsage(skill)}
+                          onPreview={(skillId, skill) => {
+                            setPreviewData({
+                              projectId: selectedProject.projectId,
+                              skillId,
+                              source: projectSkillSourceLabel(skill, selectedProject.projectId),
+                              detail: skill || null,
+                            });
+                            setPreviewVisible(true);
+                          }}
+                        />
 
-                      <Section title="项目成员与使用权限">
-                        <ResourceTitle>
-                          <div>
-                            <Text strong>谁可以使用当前项目的 Agent</Text>
-                            <div>
-                              <Text type="tertiary" size="small">
-                                项目负责人默认可访问；这里的显式成员可以在普通用户工作台看到项目，并使用项目下已发布 Agent。
-                              </Text>
-                            </div>
-                          </div>
-                          <Button icon={<IconEdit />} onClick={openMemberManagement}>
-                            管理成员
-                          </Button>
-                        </ResourceTitle>
-                        <ResourceGrid style={{ marginTop: theme.spacing.base }}>
-                          {projectMembers.map((member) => {
-                            const memberKey = String(member.memberKey || member.member_key || member.userId || member.user_id || member.username || '');
-                            return (
-                              <Card key={memberKey}>
-                                <Space vertical align="start">
-                                  <Text strong>{member.username || member.userId || member.user_id || memberKey}</Text>
-                                  <Text type="tertiary" size="small">
-                                    用户 ID：{member.userId || member.user_id || '-'}
-                                  </Text>
-                                  <Tag color="blue">{member.memberRole || member.member_role || 'MEMBER'}</Tag>
-                                </Space>
-                              </Card>
-                            );
-                          })}
-                          {!projectMembers.length && (
-                            <Card>
-                              <Space vertical align="start">
-                                <Text strong>暂无显式项目成员</Text>
-                                <Text type="tertiary" size="small">
-                                  当前只有项目负责人可访问。普通用户需要被加入项目后才能看到项目和 Agent。
-                                </Text>
-                              </Space>
-                            </Card>
-                          )}
-                        </ResourceGrid>
-                      </Section>
+                        <ProjectKnowledgeBasesSection
+                          projectId={selectedProject.projectId}
+                          knowledgeIds={selectedProjectKnowledgeIds}
+                          details={projectKnowledgeDetails}
+                          knowledgeFields={selectedProjectKnowledgeFields}
+                          onCreate={openCreateProjectKnowledge}
+                          onEnableCommon={openProjectSettings}
+                          onImportDocument={() => {
+                            setProjectDocumentForm({
+                              kbId: selectedProjectKnowledgeIds[0] || '',
+                              name: '',
+                              files: [],
+                            });
+                            setProjectDocumentModalVisible(true);
+                          }}
+                          onBindAgent={() => navigate(`/agent-list?projectId=${encodeURIComponent(selectedProject.projectId)}`)}
+                          onPreviewAll={() => {
+                            setPreviewData({
+                              projectId: selectedProject.projectId,
+                              knowledgeFields: Object.fromEntries(selectedProjectKnowledgeFields),
+                            });
+                            setPreviewVisible(true);
+                          }}
+                          onEdit={openEditProjectKnowledge}
+                          onToggleStatus={toggleProjectKnowledgeStatus}
+                          onPreviewOne={(knowledgeId) => {
+                            setPreviewData({
+                              projectId: selectedProject.projectId,
+                              knowledgeId,
+                              knowledgeFields: Object.fromEntries(selectedProjectKnowledgeFields),
+                            });
+                            setPreviewVisible(true);
+                          }}
+                        />
+                      </div>
 
-                      <Section title="项目 Skill">
-                        <ResourceTitle>
-                          <div>
-                            <Text strong>项目专属经验与 SOP</Text>
-                            <div>
-                              <Text type="tertiary" size="small">
-                                项目 Skill 用于保存当前项目专属的业务经验、表结构说明、SOP、发布规范和回滚规则。通用 Skill 可复制到项目后再定制。
-                              </Text>
-                            </div>
-                          </div>
-                          <Space wrap>
-                            <Button onClick={openCreateProjectSkill}>新建项目 Skill</Button>
-                            <Button onClick={() => void openCopyProjectSkill()}>从通用 Skill 复制</Button>
-                            <Button disabled>从 SOP 生成</Button>
-                            <Button disabled>从事故复盘沉淀</Button>
-                            <Button onClick={() => navigate(`/agent-list?projectId=${encodeURIComponent(selectedProject.projectId)}`)}>
-                              绑定 Agent
-                            </Button>
-                          </Space>
-                        </ResourceTitle>
-                        <ResourceGrid style={{ marginTop: theme.spacing.base }}>
-                          {selectedProjectSkillIds.map((skillId) => {
-                            const skill = skillOptionMap.get(skillId);
-                            const projectOwned = isProjectOwnedSkill(skill, selectedProject.projectId);
-                            const currentStatus = String(skill?.status || 'ENABLED').toUpperCase();
-                            const nextStatus = currentStatus === 'DISABLED' ? 'ENABLED' : 'DISABLED';
-                            return (
-                              <Card key={skillId}>
-                                <Space vertical align="start" style={{ width: '100%' }}>
-                                  <ResourceTitle>
-                                    <Text strong>{skill?.name || skillId}</Text>
-                                    <Tag color="green">已绑定</Tag>
-                                  </ResourceTitle>
-                                  <Text type="secondary" size="small">
-                                    ID：{skillId}
-                                  </Text>
-                                  <Text type="tertiary" size="small">
-                                    来源：{projectSkillSourceLabel(skill, selectedProject.projectId)}
-                                  </Text>
-                                  {skill?.status && (
-                                    <Text type="tertiary" size="small">
-                                      状态：{skill.status}
-                                    </Text>
-                                  )}
-                                  <Space wrap>
-                                    {projectOwned && (
-                                      <Button
-                                        size="small"
-                                        onClick={() => void openEditProjectSkill(skill)}
-                                      >
-                                        编辑
-                                      </Button>
-                                    )}
-                                    {projectOwned && (
-                                      <Button
-                                        size="small"
-                                        loading={capabilitySaving}
-                                        onClick={() => void updateProjectSkillStatus(skill, nextStatus as 'ENABLED' | 'DISABLED')}
-                                      >
-                                        {nextStatus === 'ENABLED' ? '启用' : '停用'}
-                                      </Button>
-                                    )}
-                                    <Button
-                                      size="small"
-                                      onClick={() => navigate(`/agent-list?projectId=${encodeURIComponent(selectedProject.projectId)}`)}
-                                    >
-                                      绑定 Agent
-                                    </Button>
-                                    <Button
-                                      size="small"
-                                      onClick={() => void openProjectSkillUsage(skill || ({ name: skillId, skillId } as OpsSkillSummary))}
-                                    >
-                                      查看使用记录
-                                    </Button>
-                                    <Button
-                                      size="small"
-                                      onClick={() => {
-                                        setPreviewData({
-                                          projectId: selectedProject.projectId,
-                                          skillId,
-                                          source: projectSkillSourceLabel(skill, selectedProject.projectId),
-                                          detail: skill || null,
-                                        });
-                                        setPreviewVisible(true);
-                                      }}
-                                    >
-                                      高级预览
-                                    </Button>
-                                  </Space>
-                                </Space>
-                              </Card>
-                            );
-                          })}
-                          {selectedProjectSkillIds.length === 0 && (
-                            <Card>
-                              <Space vertical align="start">
-                                <Text strong>暂无项目 Skill</Text>
-                                <Text type="tertiary" size="small">
-                                  可先从通用 Skill 复制，或后续在项目内沉淀 SOP 和事故复盘经验。
-                                </Text>
-                              </Space>
-                            </Card>
-                          )}
-                        </ResourceGrid>
-                      </Section>
+                      <div hidden={activeFeatureTab !== 'runtime'}>
+                        <ProjectWorkspaceRuntimeSection
+                          repositories={repositories}
+                          services={projectServices}
+                          executionResources={executionResources}
+                          onAddRepository={() => setRepositoryModalVisible(true)}
+                          onAddService={openAddService}
+                          onEditService={openEditService}
+                          onAddExecutionResource={() => openExecutionResource()}
+                          onEditExecutionResource={openExecutionResource}
+                        />
 
-                      <Section title="项目知识库">
-                        <ResourceTitle>
-                          <div>
-                            <Text strong>项目专属文档与授权知识范围</Text>
-                            <div>
-                              <Text type="tertiary" size="small">
-                                项目知识库保存当前项目专属的架构文档、表结构、服务说明、发布规范、事故复盘和业务 FAQ。项目可选择启用通用知识库，但 Agent 运行时只读取当前项目授权范围。
-                              </Text>
-                            </div>
-                          </div>
-                          <Space wrap>
-                            <Button onClick={openCreateProjectKnowledge}>新建项目知识库</Button>
-                            <Button onClick={openProjectSettings}>从通用知识库启用</Button>
-                            <Button
-                              disabled={!selectedProjectKnowledgeIds.length}
-                              onClick={() => {
-                                setProjectDocumentForm({
-                                  kbId: selectedProjectKnowledgeIds[0] || '',
-                                  name: '',
-                                  files: [],
-                                });
-                                setProjectDocumentModalVisible(true);
-                              }}
-                            >
-                              导入项目文档
-                            </Button>
-                            <Button onClick={() => navigate(`/agent-list?projectId=${encodeURIComponent(selectedProject.projectId)}`)}>
-                              绑定 Agent
-                            </Button>
-                            <Button
-                              onClick={() => {
-                                setPreviewData({
-                                  projectId: selectedProject.projectId,
-                                  knowledgeFields: Object.fromEntries(selectedProjectKnowledgeFields),
-                                });
-                                setPreviewVisible(true);
-                              }}
-                            >
-                              高级预览
-                            </Button>
-                          </Space>
-                        </ResourceTitle>
-                        <ResourceGrid style={{ marginTop: theme.spacing.base }}>
-          {selectedProjectKnowledgeIds.map((knowledgeId) => {
-            const knowledge = projectKnowledgeDetails.find((item) =>
-              (item.kbId || item.knowledgeTag || item.ragId) === knowledgeId);
-            const isProjectKnowledge = Boolean(
-              knowledge
-              && (String(knowledge.scope || '').toUpperCase() === 'PROJECT'
-                || knowledge.projectId === selectedProject.projectId),
-            );
-            const enabled = String(knowledge?.status || '').toUpperCase() === 'ENABLED'
-              || knowledge?.status === 1;
-            return (
-                            <Card key={knowledgeId}>
-                              <Space vertical align="start" style={{ width: '100%' }}>
-                                <ResourceTitle>
-                                  <Text strong>{knowledge?.kbName || knowledgeId}</Text>
-                                  <Tag color={enabled ? 'green' : 'grey'}>
-                                    {isProjectKnowledge ? (enabled ? '项目知识库 · 启用' : '项目知识库 · 停用') : '已授权'}
-                                  </Tag>
-                                </ResourceTitle>
-                                <Text type="tertiary" size="small">
-                                  来源字段：{selectedProjectKnowledgeFields
-                                    .filter(([, value]) => value === knowledgeId || (Array.isArray(value) && value.map(String).includes(knowledgeId)))
-                                    .map(([key]) => key)
-                                    .join(', ') || 'knowledge / rag / kb'}
-                                </Text>
-                                <Space wrap>
-                                  <Button
-                                    size="small"
-                                    onClick={() => navigate(`/agent-list?projectId=${encodeURIComponent(selectedProject.projectId)}`)}
-                                  >
-                                    绑定 Agent
-                                  </Button>
-                                  {isProjectKnowledge && knowledge && (
-                                    <Button size="small" onClick={() => openEditProjectKnowledge(knowledge)}>
-                                      编辑
-                                    </Button>
-                                  )}
-                                  {isProjectKnowledge && knowledge && (
-                                    <Button
-                                      size="small"
-                                      type={enabled ? 'danger' : 'primary'}
-                                      theme="borderless"
-                                      onClick={() => toggleProjectKnowledgeStatus(knowledge)}
-                                    >
-                                      {enabled ? '停用' : '启用'}
-                                    </Button>
-                                  )}
-                                  <Button
-                                    size="small"
-                                    onClick={() => {
-                                      setPreviewData({
-                                        projectId: selectedProject.projectId,
-                                        knowledgeId,
-                                        knowledgeFields: Object.fromEntries(selectedProjectKnowledgeFields),
-                                      });
-                                      setPreviewVisible(true);
-                                    }}
-                                  >
-                                    高级预览
-                                  </Button>
-                                </Space>
-                              </Space>
-                            </Card>
-            );
-          })}
-                          {!selectedProjectKnowledgeIds.length && (
-                            <Card>
-                              <Space vertical align="start">
-                                <Text strong>暂无项目知识库或通用知识库授权。</Text>
-                                <Text type="tertiary" size="small">
-                                  可以新建项目知识库，或从项目默认能力中显式启用通用知识库。
-                                </Text>
-                              </Space>
-                            </Card>
-                          )}
-                        </ResourceGrid>
-                      </Section>
+                      </div>
 
-                      <Section title="代码与服务">
-                        <ResourceTitle>
-                          <div>
-                            <Text strong>修复范围与构建入口</Text>
-                            <div>
-                              <Text type="tertiary" size="small">
-                                仓库限定代码边界；服务目录限定模块、构建命令、制品和健康检查。
-                              </Text>
-                            </div>
-                          </div>
-                          <Space>
-                            <Button icon={<IconPlus />} onClick={() => setRepositoryModalVisible(true)}>
-                              登记仓库
-                            </Button>
-                            <Button
-                              theme="solid"
-                              icon={<IconPlus />}
-                              disabled={!repositories.length}
-                              onClick={() => {
-                                setServiceForm((current) => ({
-                                  ...current,
-                                  repositoryId: current.repositoryId || repositories[0]?.repositoryId || '',
-                                }));
-                                setServiceModalVisible(true);
-                              }}
-                            >
-                              添加服务
-                            </Button>
-                          </Space>
-                        </ResourceTitle>
-                        <ResourceGrid style={{ marginTop: 16 }}>
-                          {repositories.map((repository) => (
-                            <Card key={repository.repositoryId}>
-                              <Text strong>{repository.name}</Text>
-                              <Paragraph type="tertiary">{repository.localPath}</Paragraph>
-                              <Space wrap>
-                                <Tag color="blue">{repository.repositoryId}</Tag>
-                                <Tag>{repository.defaultCommitSha?.slice(0, 12)}</Tag>
-                                <Tag color="green">{repository.status}</Tag>
-                              </Space>
-                            </Card>
-                          ))}
-                          {projectServices.map((service) => (
-                            <Card key={service.serviceId}>
-                              <ResourceTitle>
-                                <div>
-                                  <Text strong>{service.name}</Text>
-                                  <Paragraph type="tertiary">
-                                    {service.modulePath} · {service.buildProfile}
-                                  </Paragraph>
-                                </div>
-                                <Button
-                                  icon={<IconEdit />}
-                                  onClick={() => {
-                                    setServiceForm({
-                                      serviceId: service.serviceId,
-                                      name: service.name,
-                                      repositoryId: service.repositoryId,
-                                      modulePath: service.modulePath,
-                                      buildProfile: service.buildProfile,
-                                      artifactPath: service.artifactPath || '',
-                                      deploymentResourceId: service.deploymentResourceId || '',
-                                      healthUrl: service.healthUrl || '',
-                                      smokeUrls: (service.smokeUrls || []).join(','),
-                                    });
-                                    setServiceModalVisible(true);
-                                  }}
-                                >
-                                  编辑
-                                </Button>
-                              </ResourceTitle>
-                              <Space wrap>
-                                <Tag color="blue">{service.serviceId}</Tag>
-                                <Tag>{service.repositoryId}</Tag>
-                                <Tag color={service.deploymentResourceId ? 'green' : 'grey'}>
-                                  {service.deploymentResourceId ? '可部署' : '仅验证'}
-                                </Tag>
-                              </Space>
-                            </Card>
-                          ))}
-                          {!repositories.length && !projectServices.length && (
-                            <Text type="tertiary">
-                              尚未登记代码仓库和服务，Agent 只能分析运行态数据，不能验证代码修复。
-                            </Text>
-                          )}
-                        </ResourceGrid>
-                      </Section>
+                      <div hidden={activeFeatureTab !== 'data-tools'}>
+                        <ProjectDataConnectionsSection
+                          resources={selectedProject.resources || []}
+                          onAdd={() => setResourceModalVisible(true)}
+                          onEdit={openResourceEdit}
+                          onPermission={openPermission}
+                          onGenerate={generateMcp}
+                          typeColor={typeColor}
+                          statusColor={statusColor}
+                          credentialLabel={credentialLabel}
+                          schemaSourceLabel={schemaSourceLabel}
+                          schemaObjectMeta={schemaObjectMeta}
+                        />
+                        <ProjectGeneratedToolsSection
+                          tools={selectedProject.generatedMcps || []}
+                          onPreview={(tool) => {
+                            setPreviewData(tool);
+                            setPreviewVisible(true);
+                          }}
+                        />
 
-                      <Section title="变更执行目标">
-                        <ResourceTitle>
-                          <div>
-                            <Text strong>审批通过后允许受控执行服务操作的目标</Text>
-                            <div>
-                              <Text type="tertiary" size="small">
-                                这里只承载写操作和部署动作。它不会作为 Agent 查询数据的工具，也不会绕过审批链路。
-                              </Text>
-                            </div>
-                          </div>
-                          <Button theme="solid" icon={<IconPlus />} onClick={() => openExecutionResource()}>
-                            添加执行目标
-                          </Button>
-                        </ResourceTitle>
-                        <ResourceGrid style={{ marginTop: 16 }}>
-                          {executionResources.map((resource) => (
-                            <Card key={resource.resourceId}>
-                              <ResourceTitle>
-                                <div>
-                                  <Text strong>{resource.name}</Text>
-                                  <div><Text type="tertiary" size="small">{resource.resourceId}</Text></div>
-                                </div>
-                                <Tag color={resource.status === 'ENABLED' ? 'green' : 'grey'}>
-                                  {resource.status}
-                                </Tag>
-                              </ResourceTitle>
-                              <Paragraph type="tertiary">
-                                {resource.adapter} · 执行连接 {resource.workerId}
-                              </Paragraph>
-                              <Space wrap>
-                                {(resource.environments || []).map((environment) => (
-                                  <Tag key={environment}>{environment}</Tag>
-                                ))}
-                              </Space>
-                              <Button
-                                icon={<IconEdit />}
-                                style={{ marginTop: 14 }}
-                                onClick={() => openExecutionResource(resource)}
-                              >
-                                编辑配置
-                              </Button>
-                            </Card>
-                          ))}
-                          {!executionResources.length && (
-                            <Text type="tertiary">
-                              尚未配置执行目标。项目仍可诊断和生成方案，但审批后不能自动执行变更。
-                            </Text>
-                          )}
-                        </ResourceGrid>
-                      </Section>
-
-                      <Section title="数据连接与工具">
-                        <ResourceTitle style={{ marginBottom: 16 }}>
-                          <div>
-                            <Text strong>Agent 可查询的数据源</Text>
-                            <div><Text type="tertiary" size="small">连接保存地址与凭据；可见对象和允许动作决定生成的工具能访问哪些数据。</Text></div>
-                          </div>
-                          <Button theme="solid" icon={<IconPlus />} onClick={() => setResourceModalVisible(true)}>添加连接</Button>
-                        </ResourceTitle>
-                        <ResourceGrid>
-                          {(selectedProject.resources || []).map((resource) => (
-                            <Card key={resource.resourceId} shadows="hover">
-                              <ResourceTitle>
-                                <Space>
-                                  <IconBranch />
-                                  <div>
-                                    <Text strong>{resource.name}</Text>
-                                    <div>
-                                      <Tag color={typeColor(resource.type)}>{resource.typeName}</Tag>
-                                      <Tag>{resource.environment}</Tag>
-                                    </div>
-                                  </div>
-                                </Space>
-                                <Tag color={statusColor(resource.status)}>{resource.status}</Tag>
-                              </ResourceTitle>
-                              <Paragraph type="tertiary" style={{ marginTop: 12 }}>{resource.endpoint}</Paragraph>
-                              <Space wrap style={{ marginBottom: 10 }}>
-                                <Tag color={resource.credential?.configured ? 'green' : 'grey'}>
-                                  {credentialLabel(resource)}
-                                </Tag>
-                                <Tag color={resource.schema?.source === 'live' ? 'blue' : 'grey'}>
-                                  {schemaSourceLabel(resource.schema?.source)}
-                                </Tag>
-                              </Space>
-                              {resource.schema?.message && (
-                                <Paragraph type="tertiary" style={{ marginTop: 0, marginBottom: 10 }}>
-                                  {resource.schema.message}
-                                </Paragraph>
-                              )}
-                              <Space wrap>
-                                {(resource.permission?.actions || []).map((action) => (
-                                  <Tag key={action}>{action}</Tag>
-                                ))}
-                              </Space>
-                              <SchemaList>
-                                {(resource.schema?.objects || []).slice(0, 3).map((item) => (
-                                  <SchemaRow key={item.name}>
-                                    <Text strong>{item.name}</Text>
-                                    <div>
-                                      <Text type="tertiary" size="small">
-                                        {schemaObjectMeta(item)}
-                                      </Text>
-                                    </div>
-                                  </SchemaRow>
-                                ))}
-                              </SchemaList>
-                              <Space style={{ marginTop: 14 }}>
-                                <Button icon={<IconEdit />} onClick={() => openResourceEdit(resource)}>编辑</Button>
-                                <Button icon={<IconSetting />} onClick={() => openPermission(resource)}>权限</Button>
-                                <Button theme="solid" onClick={() => generateMcp(resource)}>生成项目工具</Button>
-                              </Space>
-                            </Card>
-                          ))}
-                        </ResourceGrid>
-                      </Section>
-
-                      <Section title="已生成工具">
-                        <ResourceGrid>
-                          {(selectedProject.generatedMcps || []).map((mcp: OpsGeneratedMcp) => (
-                            <Card key={mcp.mcpId}>
-                              <ResourceTitle>
-                                <div>
-                                  <Text strong>{mcp.toolName || mcp.mcpName}</Text>
-                                  <div><Text type="tertiary" size="small">{mcp.toolId || mcp.mcpId}</Text></div>
-                                </div>
-                                <Space>
-                                  {mcp.templateId && <Tag color="blue">{mcp.templateId}</Tag>}
-                                  <Tag color={mcp.status === 'ENABLED' ? 'green' : 'orange'}>{mcp.status}</Tag>
-                                </Space>
-                              </ResourceTitle>
-                              <Paragraph type="tertiary">
-                                {mcp.resourceType} · {mcp.transportType} · 权限以平台审核策略为准 · 超时 {mcp.requestTimeout}s
-                              </Paragraph>
-                              <Button
-                                icon={<IconEyeOpened />}
-                                onClick={() => {
-                                  setPreviewData(mcp);
-                                  setPreviewVisible(true);
-                                }}
-                              >
-                                查看配置
-                              </Button>
-                            </Card>
-                          ))}
-                          {(!selectedProject.generatedMcps || selectedProject.generatedMcps.length === 0) && (
-                            <Text type="tertiary">还没有项目工具。先添加数据连接、限制可见对象和动作，再生成工具。</Text>
-                          )}
-                        </ResourceGrid>
-                      </Section>
+                      </div>
                   </>
                 )}
               </Workspace>

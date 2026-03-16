@@ -30,10 +30,10 @@ describe('auth session product routing', () => {
 
   it('lands both authenticated personas in the operations inbox rather than forcing chat', () => {
     localStorage.setItem('userInfo', JSON.stringify({ username: 'operator', userRole: 'user' }));
-    expect(defaultRouteForCurrentUser()).toBe('/dashboard');
+    expect(defaultRouteForCurrentUser()).toBe('/home');
 
     localStorage.setItem('userInfo', JSON.stringify({ username: 'platform-admin', userRole: 'admin' }));
-    expect(defaultRouteForCurrentUser()).toBe('/dashboard');
+    expect(defaultRouteForCurrentUser()).toBe('/home');
   });
 
   it('keeps project duties out of the global platform role label', () => {

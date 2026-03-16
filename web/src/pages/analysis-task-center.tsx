@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import styled from 'styled-components';
 import {
   Button,
@@ -25,6 +25,7 @@ import {
   OpsSectionCard,
   TableScroll,
 } from '../components/ops-layout';
+import { WorkflowApprovalPanel } from '../features/execution/components/WorkflowApprovalPanel';
 import { isAdminUser } from '../services/auth-session';
 import {
   opsAdminService,
@@ -96,7 +97,7 @@ type ProjectOption = { projectId: string; name: string };
 const statusLabel = (status?: string) => {
   const normalized = String(status || '').toUpperCase();
   return ({
-    PENDING: '等待执行', RUNNING: '执行中', SUCCEEDED: '已完成', FAILED: '失败',
+    PENDING: '等待执行', RUNNING: '执行中', WAITING_APPROVAL: '等待审批', SUCCEEDED: '已完成', FAILED: '失败',
     CANCELED: '已取消', CANCELLED: '已取消', RECOVERING: '恢复中',
   } as Record<string, string>)[normalized] || normalized || '未知';
 };
@@ -105,6 +106,7 @@ const statusColor = (status?: string) => {
   const normalized = String(status || '').toUpperCase();
   if (normalized === 'SUCCEEDED') return 'green' as const;
   if (normalized === 'RUNNING' || normalized === 'RECOVERING') return 'blue' as const;
+  if (normalized === 'WAITING_APPROVAL') return 'amber' as const;
   if (normalized === 'FAILED') return 'red' as const;
   if (normalized === 'CANCELED' || normalized === 'CANCELLED') return 'grey' as const;
   return 'orange' as const;
@@ -137,6 +139,10 @@ const formatTime = (value?: string) => value ? new Date(value).toLocaleString() 
 
 export const AnalysisTaskCenterPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestedProjectId = searchParams.get('projectId')?.trim() || '';
+  const requestedRunId = searchParams.get('runId')?.trim() || '';
+  const deepLinkOpened = useRef('');
   const admin = isAdminUser();
   const scope = admin ? 'admin' as const : 'user' as const;
   const [projects, setProjects] = useState<ProjectOption[]>([]);
@@ -158,7 +164,7 @@ export const AnalysisTaskCenterPage: React.FC = () => {
         : (await opsAdminService.listChatProjects()).data || [];
       const options = values.map((item: any) => ({ projectId: item.projectId, name: item.name || item.projectId }));
       setProjects(options);
-      setProjectId((current) => current || options[0]?.projectId || '');
+      setProjectId((current) => requestedProjectId || current || options[0]?.projectId || '');
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '读取项目失败');
     }
@@ -220,9 +226,16 @@ export const AnalysisTaskCenterPage: React.FC = () => {
 
   useEffect(() => { void loadProjects(); }, []);
   useEffect(() => { void loadTasks(); }, [projectId, source, status]);
+  useEffect(() => {
+    if (!requestedRunId || deepLinkOpened.current === requestedRunId) return;
+    const target = tasks.find((task) => task.runId === requestedRunId);
+    if (!target) return;
+    deepLinkOpened.current = requestedRunId;
+    void openDetail(target);
+  }, [requestedRunId, tasks]);
 
   const counts = useMemo(() => ({
-    running: tasks.filter((item) => ['PENDING', 'RUNNING', 'RECOVERING'].includes(item.status)).length,
+    running: tasks.filter((item) => ['PENDING', 'RUNNING', 'WAITING_APPROVAL', 'RECOVERING'].includes(item.status)).length,
     succeeded: tasks.filter((item) => item.status === 'SUCCEEDED').length,
     failed: tasks.filter((item) => item.status === 'FAILED').length,
   }), [tasks]);
@@ -250,7 +263,7 @@ export const AnalysisTaskCenterPage: React.FC = () => {
             <Option value="">全部来源</Option><Option value="CHAT">对话</Option><Option value="CHANNEL">消息渠道</Option><Option value="ALERTMANAGER">告警</Option><Option value="SCHEDULE">巡检</Option>
           </Select>
           <Select value={status} style={{ width: 160 }} onChange={(value) => setStatus(String(value || ''))}>
-            <Option value="">全部状态</Option><Option value="PENDING">等待执行</Option><Option value="RUNNING">执行中</Option><Option value="SUCCEEDED">已完成</Option><Option value="FAILED">失败</Option><Option value="CANCELED">已取消</Option>
+            <Option value="">全部状态</Option><Option value="PENDING">等待执行</Option><Option value="RUNNING">执行中</Option><Option value="WAITING_APPROVAL">等待审批</Option><Option value="SUCCEEDED">已完成</Option><Option value="FAILED">失败</Option><Option value="CANCELED">已取消</Option>
           </Select>
         </Toolbar>
         <Spin spinning={loading}>
@@ -313,6 +326,18 @@ export const AnalysisTaskCenterPage: React.FC = () => {
 
                 <Space vertical align="start" spacing="medium" style={{ width: '100%', minWidth: 0 }}>
                   <OpsSectionCard title="任务信息"><Meta><dt>项目</dt><dd>{projects.find((item) => item.projectId === selected.projectId)?.name || selected.projectId}</dd><dt>来源</dt><dd>{sourceLabel(selected.source)}</dd><dt>开始</dt><dd>{formatTime(selected.createdAt)}</dd><dt>更新</dt><dd>{formatTime(selected.updatedAt)}</dd></Meta></OpsSectionCard>
+
+                  <WorkflowApprovalPanel
+                    runId={selected.runId}
+                    projectId={selected.projectId}
+                    scope={scope}
+                    onChanged={() => {
+                      void loadTasks();
+                      void opsAdminService.getAnalysisTask(selected.projectId, selected.runId, scope)
+                        .then((response) => setSelected(response.data))
+                        .catch(() => undefined);
+                    }}
+                  />
 
                   <OpsSectionCard title={`关联执行包 (${selected.changePackages?.length || 0})`}>
                     {!selected.changePackages?.length ? <Text type="tertiary">本次分析未生成执行包</Text> : <ReadableList>{selected.changePackages.map((item) => {

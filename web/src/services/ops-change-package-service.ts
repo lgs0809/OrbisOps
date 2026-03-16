@@ -8,6 +8,12 @@ import {
 
 export type OpsExecutionScope = 'admin' | 'user';
 
+export interface OpsApprovalChannelOption {
+  channelId: string;
+  name: string;
+  type: 'FEISHU' | 'WECOM' | 'SLACK' | 'DINGTALK';
+}
+
 export interface ChangePackageListParams {
   projectId?: string;
   sessionId?: string;
@@ -103,6 +109,28 @@ class OpsChangePackageService {
     return await opsRequest<OpsChangePackage>(`${this.baseUrl(scope)}/${encodeURIComponent(packageId)}/approve`, {
       method: 'POST',
       body: JSON.stringify({ version, packageHash }),
+    });
+  }
+
+  async listApprovalChannels(
+    packageId: string,
+    scope: OpsExecutionScope = 'admin',
+  ): Promise<ApiResponse<OpsApprovalChannelOption[]>> {
+    return await opsRequest<OpsApprovalChannelOption[]>(
+      `${this.baseUrl(scope)}/${encodeURIComponent(packageId)}/approval-channels`,
+      { method: 'GET' },
+    );
+  }
+
+  async sendApprovalCard(
+    packageId: string,
+    channelId: string,
+    target: string,
+    scope: OpsExecutionScope = 'admin',
+  ): Promise<ApiResponse<Record<string, any>>> {
+    return await opsRequest<Record<string, any>>(`${this.baseUrl(scope)}/${encodeURIComponent(packageId)}/approval-card`, {
+      method: 'POST',
+      body: JSON.stringify({ channelId, target }),
     });
   }
 

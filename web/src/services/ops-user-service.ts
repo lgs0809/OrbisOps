@@ -86,18 +86,30 @@ export interface UserIncidentSummary {
   [key: string]: unknown;
 }
 
+export interface UserWorkflowDecisionSummary {
+  runId: string;
+  projectId: string;
+  sessionId?: string;
+  owner?: string;
+  agentId?: string;
+  status: string;
+  goal?: string;
+  updatedAt?: string;
+}
+
 export interface UserDashboardOverview {
   currentIncidents: UserIncidentSummary[];
   actionRequiredIncidents: UserIncidentSummary[];
   availableProjects: UserProjectSummary[];
-  availableAgents: UserAgentSummary[];
   recentSessions: UserChatSessionSummary[];
   pendingExecutions: UserExecutionSummary[];
   pendingApprovals: UserExecutionSummary[];
+  pendingWorkflowDecisions: UserWorkflowDecisionSummary[];
   pendingOperations: UserExecutionSummary[];
   workQueue?: {
     incidentActionCount: number;
     approvalCount: number;
+    workflowDecisionCount?: number;
     operationCount: number;
     auditReminderCount: number;
   };

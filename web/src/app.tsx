@@ -1,5 +1,5 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import React, { Suspense } from 'react';
+import { BrowserRouter as Router, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import React, { Suspense, useEffect } from 'react';
 
 import { createRoot } from 'react-dom/client';
 
@@ -14,6 +14,7 @@ import {
   isAuthenticated,
   UserRole,
 } from './services/auth-session';
+import { APP_ROUTES, pageTitleForPath } from './app/navigation/route-metadata';
 
 installHttpInterceptor();
 
@@ -83,14 +84,13 @@ const ToolRoutingObservabilityPage = React.lazy(() =>
   import('./pages/tool-routing-observability').then((module) => ({ default: module.ToolRoutingObservabilityPage })),
 );
 const ChannelManagementPage = React.lazy(() =>
-  import('./pages/channel-management').then((module) => ({ default: module.ChannelManagementPage })),
+  import('./features/channels/pages/ChannelManagementPage').then((module) => ({ default: module.ChannelManagementPage })),
 );
 
 const PageLoading: React.FC = () => (
   <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', color: '#4b5563' }}>加载中...</div>
 );
 
-// 路由保护组件
 const ProtectedRoute: React.FC<{ children: React.ReactNode; roles?: UserRole[] }> = ({ children, roles }) => {
   if (!isAuthenticated()) {
     return <Navigate to="/login" replace />;
@@ -101,221 +101,91 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; roles?: UserRole[] }
   return <>{children}</>;
 };
 
-// 登录重定向组件
 const LoginRedirect: React.FC = () =>
   isAuthenticated() ? <Navigate to={defaultRouteForCurrentUser()} replace /> : <LoginPage />;
 
-const LegacyExecutionRedirect: React.FC = () => {
+const CanonicalRouteRedirect: React.FC<{ to: string }> = ({ to }) => {
   const location = useLocation();
-  return <Navigate to={`/executions${location.search}`} replace />;
+  return <Navigate to={`${to}${location.search}${location.hash}`} replace />;
 };
+
+const PageTitleSync: React.FC = () => {
+  const location = useLocation();
+  useEffect(() => {
+    document.title = location.pathname === '/login' ? 'Sign in · OrbisOps' : pageTitleForPath(location.pathname);
+  }, [location.pathname]);
+  return null;
+};
+
+const pageElementByRouteId: Record<string, React.ReactNode> = {
+  home: <OpsDashboardPage />,
+  incidents: <IncidentCenterPage />,
+  diagnosis: <ChatWorkspacePage />,
+  changes: <ChangeCenterPage />,
+  workflows: <AgentListPage />,
+  'workflow-editor': <AgentConfigProductPage />,
+  inspections: <TaskScheduleManagement />,
+  'alert-triggers': <AlertTriggerManagementPage />,
+  projects: <ProjectProductWorkspacePage />,
+  'project-advanced': <ProjectWorkspacePage />,
+  channels: <ChannelManagementPage />,
+  models: <ModelApiManagement />,
+  tools: <McpToolManagement />,
+  knowledge: <RagOrderManagement />,
+  skills: <SkillManagementPage />,
+  'execution-targets': <ExecutionAdapterTemplatesPage />,
+  governance: <OpsStatusManagementPage />,
+  'model-catalog': <ModelCatalogManagement />,
+  memory: <MemoryManagementPage />,
+  'skill-evolver': <SkillEvolverManagementPage />,
+  'tool-routing': <ToolRoutingObservabilityPage />,
+  'analysis-tasks': <AnalysisTaskCenterPage />,
+  'my-audit': <UserAuditRecordsPage />,
+};
+
+const AppRoutes: React.FC = () => (
+  <Routes>
+    <Route path="/login" element={<LoginRedirect />} />
+    {APP_ROUTES.map((route) => {
+      const page = pageElementByRouteId[route.id];
+      if (!page) {
+        throw new Error(`Missing page registration for route: ${route.id}`);
+      }
+      return (
+        <React.Fragment key={route.id}>
+          <Route
+            path={route.path}
+            element={
+              <ProtectedRoute roles={route.roles}>
+                {page}
+              </ProtectedRoute>
+            }
+          />
+          {route.legacyPaths?.map((legacyPath) => (
+            <Route key={legacyPath} path={legacyPath} element={<CanonicalRouteRedirect to={route.path} />} />
+          ))}
+        </React.Fragment>
+      );
+    })}
+    <Route path="/" element={<Navigate to="/login" replace />} />
+    <Route path="*" element={<Navigate to="/login" replace />} />
+  </Routes>
+);
 
 const App: React.FC = () => (
   <>
     <GlobalStyle />
     <AppErrorBoundary>
-    <Router>
-      <AppQueryProvider>
-        <ProjectScopeProvider>
-          <Suspense fallback={<PageLoading />}>
-          <Routes>
-        <Route path="/login" element={<LoginRedirect />} />
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute roles={['admin', 'user']}>
-              <OpsDashboardPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/chat"
-          element={
-            <ProtectedRoute roles={['admin', 'user']}>
-              <ChatWorkspacePage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/incidents"
-          element={
-            <ProtectedRoute roles={['admin', 'user']}>
-              <IncidentCenterPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/executions"
-          element={
-            <ProtectedRoute roles={['admin', 'user']}>
-              <ChangeCenterPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/my-executions" element={<LegacyExecutionRedirect />} />
-        <Route
-          path="/my-audit"
-          element={
-            <ProtectedRoute roles={['user']}>
-              <UserAuditRecordsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/analysis-tasks"
-          element={
-            <ProtectedRoute roles={['admin']}>
-              <AnalysisTaskCenterPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/agent-config"
-          element={
-            <ProtectedRoute roles={['admin']}>
-              <AgentConfigProductPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/agent-list"
-          element={
-            <ProtectedRoute roles={['admin']}>
-              <AgentListPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/skill-management"
-          element={
-            <ProtectedRoute roles={['admin']}>
-              <SkillManagementPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/model-api-management"
-          element={
-            <ProtectedRoute roles={['admin']}>
-              <ModelApiManagement />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/rag-order-management"
-          element={
-            <ProtectedRoute roles={['admin']}>
-              <RagOrderManagement />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/change-center" element={<LegacyExecutionRedirect />} />
-        <Route
-          path="/audit"
-          element={
-            <ProtectedRoute roles={['admin']}>
-              <OpsStatusManagementPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/inspections"
-          element={
-            <ProtectedRoute roles={['admin']}>
-              <TaskScheduleManagement />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/alerts"
-          element={
-            <ProtectedRoute roles={['admin']}>
-              <AlertTriggerManagementPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/alert-trigger-management" element={<Navigate to="/alerts" replace />} />
-        <Route path="/chat-workspace" element={<Navigate to="/chat" replace />} />
-        <Route path="/execution-center" element={<LegacyExecutionRedirect />} />
-        <Route
-          path="/model-catalog"
-          element={
-            <ProtectedRoute roles={['admin']}>
-              <ModelCatalogManagement />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/mcp-tool-management"
-          element={
-            <ProtectedRoute roles={['admin']}>
-              <McpToolManagement />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/execution-adapter-templates"
-          element={
-            <ProtectedRoute roles={['admin']}>
-              <ExecutionAdapterTemplatesPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/memory-management"
-          element={
-            <ProtectedRoute roles={['admin']}>
-              <MemoryManagementPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/skill-evolver-management"
-          element={
-            <ProtectedRoute roles={['admin']}>
-              <SkillEvolverManagementPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/tool-routing-observability"
-          element={
-            <ProtectedRoute roles={['admin']}>
-              <ToolRoutingObservabilityPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/project-workspace"
-          element={
-            <ProtectedRoute roles={['admin']}>
-              <ProjectProductWorkspacePage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/project-workspace/advanced"
-          element={
-            <ProtectedRoute roles={['admin']}>
-              <ProjectWorkspacePage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/channel-management"
-          element={
-            <ProtectedRoute roles={['admin']}>
-              <ChannelManagementPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
-          </Suspense>
-        </ProjectScopeProvider>
-      </AppQueryProvider>
-    </Router>
+      <Router>
+        <PageTitleSync />
+        <AppQueryProvider>
+          <ProjectScopeProvider>
+            <Suspense fallback={<PageLoading />}>
+              <AppRoutes />
+            </Suspense>
+          </ProjectScopeProvider>
+        </AppQueryProvider>
+      </Router>
     </AppErrorBoundary>
   </>
 );

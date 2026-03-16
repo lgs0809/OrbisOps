@@ -63,6 +63,17 @@ import {
   opsAdminService,
 } from '../services/ops-admin-service';
 import { opsAgentDefinitionService } from '../services/ops-agent-definition-service';
+import { AgentBuilderGuide } from '../features/agents/components/AgentBuilderGuide';
+import { AgentBuilderModeSwitch } from '../features/agents/components/AgentBuilderModeSwitch';
+import { AgentBuilderPropertyPanel } from '../features/agents/components/AgentBuilderPropertyPanel';
+import { AgentBuilderVersionSection } from '../features/agents/components/AgentBuilderVersionSection';
+import {
+  AgentBuilderMode,
+  AgentBuilderPanel,
+  agentBuilderMode,
+  agentBuilderPanelForMode,
+  isAgentBuilderAdvanced,
+} from '../features/agents/model/agent-builder-mode';
 
 const { Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
@@ -75,7 +86,7 @@ type UserInfo = {
   isTestAccount?: boolean;
 };
 
-type PanelKey = 'node' | 'edge' | 'json' | 'test';
+type PanelKey = AgentBuilderPanel;
 
 type McpOption = {
   mcpId: string;
@@ -267,31 +278,6 @@ const ToolbarGroup = styled.div`
   min-width: 0;
 `;
 
-const PropertyPanel = styled(Panel)`
-  min-width: 0;
-  grid-column: 1 / -1;
-`;
-
-const TabBar = styled.div<{ $count: number }>`
-  display: grid;
-  grid-template-columns: repeat(${(props) => props.$count}, 1fr);
-  border-bottom: 1px solid ${theme.colors.border.secondary};
-`;
-
-const TabButton = styled.button<{ $active?: boolean }>`
-  border: none;
-  border-right: 1px solid ${theme.colors.border.secondary};
-  background: ${(props) => (props.$active ? '#eff6ff' : theme.colors.bg.primary)};
-  color: ${(props) => (props.$active ? theme.colors.primary : theme.colors.text.secondary)};
-  font-weight: ${theme.typography.fontWeight.medium};
-  padding: 11px 8px;
-  cursor: pointer;
-
-  &:last-child {
-    border-right: none;
-  }
-`;
-
 const FormStack = styled.div`
   display: flex;
   flex-direction: column;
@@ -388,42 +374,6 @@ const NoticeBox = styled.div<{ $tone?: 'info' | 'warning' | 'neutral' }>`
       : '#1d4ed8'};
   line-height: 1.55;
   font-size: 13px;
-`;
-
-const GuideStrip = styled.div`
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: ${theme.spacing.base};
-  min-width: 0;
-
-  @media (max-width: 1280px) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  @media (max-width: 760px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const GuideItem = styled.div`
-  padding: ${theme.spacing.base};
-  border: 1px solid ${theme.colors.border.secondary};
-  border-radius: ${theme.borderRadius.base};
-  background: ${theme.colors.bg.primary};
-  min-width: 0;
-`;
-
-const GuideTitle = styled.div`
-  margin-bottom: 4px;
-  color: ${theme.colors.text.primary};
-  font-weight: ${theme.typography.fontWeight.semibold};
-`;
-
-const VersionItem = styled.div`
-  border: 1px solid ${theme.colors.border.secondary};
-  border-radius: ${theme.borderRadius.base};
-  background: ${theme.colors.bg.primary};
-  padding: ${theme.spacing.sm};
 `;
 
 const EdgeItem = styled.div<{ $active?: boolean }>`
@@ -1037,6 +987,7 @@ export const AgentConfigPage: React.FC = () => {
   const [selectedNodeId, setSelectedNodeId] = useState<string>('start');
   const [selectedEdgeIndex, setSelectedEdgeIndex] = useState<number | null>(null);
   const [activePanel, setActivePanel] = useState<PanelKey>('node');
+  const [builderMode, setBuilderMode] = useState<AgentBuilderMode>(() => agentBuilderMode(searchParams.get('mode')));
   const [edgeDraft, setEdgeDraft] = useState<OpsGraphEdge>({ from: 'start', to: 'main-plan', conditionType: 'always', condition: 'always' });
   const [jsonDraft, setJsonDraft] = useState('');
   const [jsonDirty, setJsonDirty] = useState(false);
@@ -1048,6 +999,15 @@ export const AgentConfigPage: React.FC = () => {
   const [showAdvancedNodeMcp, setShowAdvancedNodeMcp] = useState(false);
   const [nodeIdDraft, setNodeIdDraft] = useState('start');
   const [directActionsDraft, setDirectActionsDraft] = useState('[]');
+  const advancedBuilder = isAgentBuilderAdvanced(builderMode);
+
+  const handleBuilderModeChange = (mode: AgentBuilderMode) => {
+    setBuilderMode(mode);
+    setActivePanel((current) => agentBuilderPanelForMode(mode, current));
+    if (mode === 'basic') {
+      setShowAdvancedNodeMcp(false);
+    }
+  };
 
   const selectedNode = useMemo(
     () => (definition.nodes || []).find((node) => node.nodeId === selectedNodeId),
@@ -2013,7 +1973,7 @@ export const AgentConfigPage: React.FC = () => {
       return normalizedEdge.feedback ? ensureFeedbackLoopPolicy(next, normalizedEdge) : next;
     });
     setSelectedEdgeIndex((definition.edges || []).length);
-    setActivePanel('edge');
+    setActivePanel(agentBuilderPanelForMode(builderMode, 'edge'));
   };
 
   const handleCanvasConnectEdge = (edge: OpsGraphEdge) => {
@@ -2034,7 +1994,7 @@ export const AgentConfigPage: React.FC = () => {
       return normalizedEdge.feedback ? ensureFeedbackLoopPolicy(next, normalizedEdge) : next;
     });
     setSelectedEdgeIndex((definition.edges || []).length);
-    setActivePanel('edge');
+    setActivePanel(agentBuilderPanelForMode(builderMode, 'edge'));
   };
 
   const handleCanvasCreateNode = (node: OpsWorkflowNode, edge?: OpsGraphEdge) => {
@@ -2240,7 +2200,7 @@ export const AgentConfigPage: React.FC = () => {
   const handleEdgeSelect = (edgeKey: string) => {
     const index = Number(edgeKey.substring(edgeKey.lastIndexOf(':') + 1));
     setSelectedEdgeIndex(Number.isFinite(index) ? index : null);
-    setActivePanel('edge');
+    setActivePanel(agentBuilderPanelForMode(builderMode, 'edge'));
   };
 
   const renderNodePanel = () => {
@@ -2592,7 +2552,7 @@ export const AgentConfigPage: React.FC = () => {
             </Field>
           </>
         )}
-        {isAgentLike && (
+        {isAgentLike && advancedBuilder && (
           <AdvancedDetails>
             <summary>高级运行配置</summary>
             <AdvancedContent>
@@ -2648,7 +2608,7 @@ export const AgentConfigPage: React.FC = () => {
             当上游连接到 Router 时，这段说明会作为 Router choice 的后续节点描述注入给上游 Agent。
           </HelpText>
         </Field>
-        {!isStructureNode && (
+        {!isStructureNode && advancedBuilder && (
           <Field>
             <Text strong>全局 System Prompt 注入</Text>
             <Select
@@ -2813,7 +2773,7 @@ export const AgentConfigPage: React.FC = () => {
             </HelpText>
           </Field>
         )}
-        {isAgentLike && (
+        {isAgentLike && advancedBuilder && (
           <>
           <Space>
             <Button size="small" theme="light" onClick={() => setShowAdvancedNodeMcp((visible) => !visible)}>
@@ -3280,6 +3240,7 @@ export const AgentConfigPage: React.FC = () => {
                       专项 Workflow 工作台
                     </Title>
                     <Text type="secondary">项目主助手负责默认对话与任务；这里只配置重复、稳定场景下可选的专项执行流程。</Text>
+                    <AgentBuilderModeSwitch value={builderMode} onChange={handleBuilderModeChange} />
                   </Space>
                 </div>
                 <Space>
@@ -3298,24 +3259,7 @@ export const AgentConfigPage: React.FC = () => {
                 </Space>
               </PageHeader>
 
-              <GuideStrip>
-                <GuideItem>
-                  <GuideTitle>1. 主助手是默认入口</GuideTitle>
-                  <Text type="secondary" size="small">未显式选择专项流程时，始终使用项目默认智能诊断，不会根据自然语言偷偷切换 Workflow。</Text>
-                </GuideItem>
-                <GuideItem>
-                  <GuideTitle>2. Workflow 只服务固定场景</GuideTitle>
-                  <Text type="secondary" size="small">为巡检、固定诊断、周报等重复任务编排节点；临时问题无需创建 Workflow。</Text>
-                </GuideItem>
-                <GuideItem>
-                  <GuideTitle>3. 说明适用与禁用场景</GuideTitle>
-                  <Text type="secondary" size="small">“何时使用”和“何时不用”只帮助用户选择专项流程，不参与运行时自动路由。</Text>
-                </GuideItem>
-                <GuideItem>
-                  <GuideTitle>4. 画布定义内部执行</GuideTitle>
-                  <Text type="secondary" size="small">Start/Agent/Router/End 表达执行顺序，Skill、RAG 和 MCP 绑定在需要它们的节点。</Text>
-                </GuideItem>
-              </GuideStrip>
+              <AgentBuilderGuide />
 
               <Spin spinning={loading}>
                 <WorkspaceGrid>
@@ -3358,46 +3302,15 @@ export const AgentConfigPage: React.FC = () => {
                           {!agents.length && <EmptyState>暂无专项 Workflow，普通任务仍可直接使用项目主助手。</EmptyState>}
                         </AgentList>
 
-                        <Section>
-                          <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                            <Text strong>版本</Text>
-                            <Button size="small" loading={versionLoading} icon={<IconRefresh />} onClick={() => loadAgentVersions(selectedAgentId)}>
-                              刷新
-                            </Button>
-                          </Space>
-                          <FormStack>
-                            {agentVersions.slice(0, 8).map((version) => (
-                              <VersionItem key={`${version.agentId}-${version.version}`}>
-                                <Space vertical align="start" spacing="tight" style={{ width: '100%' }}>
-                                  <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                                    <Text strong>v{version.version || '-'}</Text>
-                                    <Tag color={version.lifecycle === 'PUBLISHED' ? 'green' : version.lifecycle === 'VALIDATED' ? 'blue' : 'grey'}>
-                                      {version.lifecycle || 'DRAFT'}
-                                    </Tag>
-                                  </Space>
-                                  <Text type="tertiary" size="small">
-                                    {version.name || version.agentId}
-                                  </Text>
-                                  <Space wrap>
-                                    <Button size="small" loading={versionOperating} onClick={() => handleVersionAction('validate', version.version)}>
-                                      校验
-                                    </Button>
-                                    <Button size="small" type="primary" theme="light" loading={versionOperating} onClick={() => handleVersionAction('publish', version.version)}>
-                                      发布
-                                    </Button>
-                                    <Button size="small" loading={versionOperating} onClick={() => handleVersionAction('rollback', version.version)}>
-                                      回滚
-                                    </Button>
-                                    <Button size="small" type="danger" theme="borderless" loading={versionOperating} onClick={() => handleVersionAction('disable', version.version)}>
-                                      停用
-                                    </Button>
-                                  </Space>
-                                </Space>
-                              </VersionItem>
-                            ))}
-                            {!agentVersions.length && <EmptyState>暂无版本，保存草稿后会出现在这里。</EmptyState>}
-                          </FormStack>
-                        </Section>
+                        {advancedBuilder && (
+                          <AgentBuilderVersionSection
+                            versions={agentVersions}
+                            loading={versionLoading}
+                            operating={versionOperating}
+                            onRefresh={() => loadAgentVersions(selectedAgentId)}
+                            onAction={handleVersionAction}
+                          />
+                        )}
 
                         <Section>
                           <FormStack>
@@ -3478,6 +3391,8 @@ export const AgentConfigPage: React.FC = () => {
                             <NoticeBox $tone="neutral">
                               推荐使用画布表达所有流程：Agent 节点负责模型推理或工具取证，Router 节点负责选择下游，MCP/RAG/Skill 在需要使用它们的 Agent 节点上显式选择。
                             </NoticeBox>
+                            {advancedBuilder && (
+                            <>
                             <NoticeBox $tone={agentBindings.length ? 'info' : 'neutral'}>
                               <Space vertical align="start" spacing="tight" style={{ width: '100%' }}>
                                 <Text strong>已持久化能力绑定</Text>
@@ -3640,6 +3555,8 @@ export const AgentConfigPage: React.FC = () => {
                                 </Field>
                               </AdvancedContent>
                             </AdvancedDetails>
+                            </>
+                            )}
 
                           </FormStack>
                         </Section>
@@ -3697,34 +3614,15 @@ export const AgentConfigPage: React.FC = () => {
                     />
                   </CanvasPanel>
 
-                  <PropertyPanel>
-                    <PanelHeader>
-                      <PanelTitle>
-                        <IconSetting />
-                        节点与连接配置
-                      </PanelTitle>
-                    </PanelHeader>
-                    <TabBar $count={4}>
-                      <TabButton $active={activePanel === 'node'} onClick={() => setActivePanel('node')}>
-                        节点能力
-                      </TabButton>
-                      <TabButton $active={activePanel === 'edge'} onClick={() => setActivePanel('edge')}>
-                        连接路由
-                      </TabButton>
-                      <TabButton $active={activePanel === 'json'} onClick={() => setActivePanel('json')}>
-                        高级 JSON
-                      </TabButton>
-                      <TabButton $active={activePanel === 'test'} onClick={() => setActivePanel('test')}>
-                        测试
-                      </TabButton>
-                    </TabBar>
-                    <PanelBody>
-                      {activePanel === 'node' && renderNodePanel()}
-                      {activePanel === 'edge' && renderEdgePanel()}
-                      {activePanel === 'json' && renderJsonPanel()}
-                      {activePanel === 'test' && renderTestPanel()}
-                    </PanelBody>
-                  </PropertyPanel>
+                  <AgentBuilderPropertyPanel
+                    mode={builderMode}
+                    activePanel={activePanel}
+                    onPanelChange={setActivePanel}
+                    nodePanel={renderNodePanel()}
+                    edgePanel={renderEdgePanel()}
+                    jsonPanel={renderJsonPanel()}
+                    testPanel={renderTestPanel()}
+                  />
                 </WorkspaceGrid>
               </Spin>
 

@@ -30,15 +30,15 @@ test('authenticated project members land in the operations inbox', async ({ page
   await authenticate(page, 'user');
   await page.goto('/login');
 
-  await expect(page).toHaveURL(/\/dashboard/);
-  await expect(page.getByText('工作台', { exact: true }).first()).toBeVisible();
+  await expect(page).toHaveURL(/\/home/);
+  await expect(page.getByRole('heading', { name: 'Attention & Action' })).toBeVisible();
 });
 
 test('legacy user execution route converges on the canonical Execution Center', async ({ page }) => {
   await authenticate(page, 'user');
   await page.goto('/my-executions');
 
-  await expect(page).toHaveURL(/\/executions/);
+  await expect(page).toHaveURL(/\/work\/changes/);
   await expect(page.getByText('执行中心', { exact: true }).first()).toBeVisible();
   await expect(page.getByText(/后端 capability facts/)).toBeVisible();
 });
@@ -47,7 +47,7 @@ test('legacy admin change route converges on the same Execution Center', async (
   await authenticate(page, 'admin');
   await page.goto('/change-center');
 
-  await expect(page).toHaveURL(/\/executions/);
+  await expect(page).toHaveURL(/\/work\/changes/);
   await expect(page.getByText('执行中心', { exact: true }).first()).toBeVisible();
 });
 
@@ -68,7 +68,7 @@ test('historical chat restores persisted run events and terminal status', async 
     const path = url.pathname;
     let data: unknown = [];
     if (path.endsWith('/api/v1/user/chat/catalog/projects')) {
-      data = [{ projectId: 'demo-project', name: 'Example Service', defaultAgentId: 'demo-ops-agent' }];
+      data = [{ projectId: 'demo-project', name: 'Demo Project', defaultAgentId: 'demo-ops-agent' }];
     } else if (path.endsWith('/api/v1/user/chat/catalog/projects/demo-project/agents')) {
       data = [{ agentId: 'demo-ops-agent', name: '默认诊断 Agent', engine: 'REACT', definitionKind: 'DEFAULT_REACT' }];
     } else if (path.endsWith('/api/v1/user/chat/model-status')) {

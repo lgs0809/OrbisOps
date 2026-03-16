@@ -404,14 +404,15 @@ export interface OpsIncidentSourceRef {
   createTime?: string;
 }
 
-export interface OpsIncidentChangeRef {
-  packageId: string;
-  status: string;
-  version: number;
-  packageHash?: string;
+export type OpsIncidentChangeRef = Pick<
+  OpsChangePackage,
+  'packageId' | 'status' | 'version' | 'packageHash' | 'updateTime'
+> & Partial<Pick<
+  OpsChangePackage,
+  'projectId' | 'incidentId' | 'summary' | 'objective' | 'riskLevel' | 'targetEnvironment' | 'reasonCode'
+>> & {
   landingRunId?: string;
-  updateTime?: string;
-}
+};
 
 export interface OpsIncidentWatcher {
   incidentId: string;
@@ -796,6 +797,17 @@ export interface OpsAnalysisTaskDetail extends OpsAnalysisTaskSummary {
   feedback?: Array<Record<string, any>>;
 }
 
+export interface OpsWorkflowDecisionSummary {
+  runId: string;
+  projectId: string;
+  sessionId?: string;
+  owner?: string;
+  agentId?: string;
+  status: string;
+  goal?: string;
+  updatedAt?: string;
+}
+
 export interface OpsAdminDashboardOverview {
   currentIncidentCount: number;
   actionRequiredIncidentCount: number;
@@ -803,14 +815,12 @@ export interface OpsAdminDashboardOverview {
   investigatingIncidentCount: number;
   verifyingIncidentCount: number;
   recentIncidents: OpsIncident[];
-  projectCount: number;
-  agentCount: number;
   pendingChangeCount: number;
   failedChangeCount: number;
   runningChangeCount: number;
-  highRiskToolCount: number;
-  auditAlertCount: number;
-  recentChanges: Array<Record<string, any>>;
+  pendingWorkflowDecisionCount: number;
+  pendingWorkflowDecisions: OpsWorkflowDecisionSummary[];
+  recentChanges: OpsChangePackage[];
   capabilityHealth: Record<string, any>;
   projects: Array<Record<string, any>>;
 }

@@ -7,7 +7,7 @@ import com.tngtech.archunit.lang.ArchRule;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
-@AnalyzeClasses(packages = "cn.lgs.orbisops", importOptions = ImportOption.DoNotIncludeTests.class)
+@AnalyzeClasses(locations = OrbisOpsArchitectureLocationProvider.class, importOptions = ImportOption.DoNotIncludeTests.class)
 class OpsLayerArchitectureTest {
 
     @ArchTest

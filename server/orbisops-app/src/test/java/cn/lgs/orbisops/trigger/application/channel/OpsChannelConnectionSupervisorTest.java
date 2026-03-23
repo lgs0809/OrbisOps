@@ -56,6 +56,45 @@ class OpsChannelConnectionSupervisorTest {
     }
 
     @Test
+    void restartsManagedConnectionWhenProviderConfigurationChanges() {
+        ChannelProviderConfiguration first = mock(ChannelProviderConfiguration.class);
+        ChannelProviderConfiguration second = mock(ChannelProviderConfiguration.class);
+        when(first.connectionMode()).thenReturn(ChannelConnectionMode.LONG_CONNECTION);
+        when(second.connectionMode()).thenReturn(ChannelConnectionMode.LONG_CONNECTION);
+        when(adapter.configuration(any())).thenReturn(first, second);
+        when(repository.findAll()).thenReturn(List.of(channel("channel-1")));
+
+        supervisor.reconcile();
+        supervisor.reconcile();
+
+        verify(driver).start(first);
+        verify(driver).stop("channel-1");
+        verify(driver).start(second);
+    }
+
+    @Test
+    void unchangedConfigurationIsNotRestartedOnEveryReconcile() {
+        when(repository.findAll()).thenReturn(List.of(channel("channel-1")));
+
+        supervisor.reconcile();
+        supervisor.reconcile();
+
+        verify(driver, times(1)).start(configuration);
+        verify(driver, times(0)).stop("channel-1");
+    }
+
+    @Test
+    void shutdownStopsManagedConnectionsAndReleasesProviderTransportResources() {
+        when(repository.findAll()).thenReturn(List.of(channel("channel-1")));
+
+        supervisor.reconcile();
+        supervisor.shutdown();
+
+        verify(driver).stop("channel-1");
+        verify(driver).shutdown();
+    }
+
+    @Test
     void providerFailureDoesNotPreventOtherChannelsFromReconciling() {
         ChannelProviderConfiguration first = mock(ChannelProviderConfiguration.class);
         ChannelProviderConfiguration second = mock(ChannelProviderConfiguration.class);

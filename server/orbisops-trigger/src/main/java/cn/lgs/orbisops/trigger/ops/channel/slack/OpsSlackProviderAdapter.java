@@ -73,8 +73,7 @@ public final class OpsSlackProviderAdapter implements ChannelProviderAdapter<Ops
         if (!secrets.isReference(configuration.appCredentialRef())) {
             throw new IllegalArgumentException("SLACK_APP_TOKEN_MUST_USE_CREDENTIAL_REF");
         }
-        if (configuration.connectionMode() != ChannelConnectionMode.LONG_CONNECTION
-                && configuration.connectionMode() != ChannelConnectionMode.HYBRID) {
+        if (configuration.connectionMode() != ChannelConnectionMode.LONG_CONNECTION) {
             throw new IllegalArgumentException("SLACK_SOCKET_MODE_REQUIRED");
         }
     }

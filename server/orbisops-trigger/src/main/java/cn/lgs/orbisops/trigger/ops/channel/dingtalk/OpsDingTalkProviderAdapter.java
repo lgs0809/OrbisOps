@@ -73,8 +73,7 @@ public final class OpsDingTalkProviderAdapter implements ChannelProviderAdapter<
         if (!secrets.isReference(configuration.credentialRef())) {
             throw new IllegalArgumentException("DINGTALK_CLIENT_SECRET_MUST_USE_CREDENTIAL_REF");
         }
-        if (configuration.connectionMode() != ChannelConnectionMode.LONG_CONNECTION
-                && configuration.connectionMode() != ChannelConnectionMode.HYBRID) {
+        if (configuration.connectionMode() != ChannelConnectionMode.LONG_CONNECTION) {
             throw new IllegalArgumentException("DINGTALK_STREAM_MODE_REQUIRED");
         }
     }

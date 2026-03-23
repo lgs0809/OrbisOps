@@ -10,4 +10,8 @@ public interface ChannelConnectionDriver<C extends ChannelProviderConfiguration>
     void stop(String channelId);
 
     ChannelHealthSnapshot health(String channelId);
+
+    /** Release provider-owned transport resources when the application is shutting down. */
+    default void shutdown() {
+    }
 }

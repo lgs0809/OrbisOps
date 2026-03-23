@@ -9,6 +9,7 @@ import cn.lgs.orbisops.domain.channel.adapter.repository.IChannelRepository;
 import cn.lgs.orbisops.domain.channel.model.ChannelRecord;
 import cn.lgs.orbisops.domain.channel.model.ChannelStatus;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.ContextClosedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -30,7 +31,7 @@ public final class OpsChannelConnectionSupervisor {
     private final IChannelRepository repository;
     private final Map<ChannelType, ChannelProviderAdapter<?>> adapters;
     private final Map<ChannelType, ChannelConnectionDriver<?>> drivers;
-    private final Map<String, ChannelType> managed = new ConcurrentHashMap<>();
+    private final Map<String, ManagedConnection> managed = new ConcurrentHashMap<>();
 
     public OpsChannelConnectionSupervisor(IChannelRepository repository,
                                           List<ChannelProviderAdapter<?>> adapters,
@@ -44,6 +45,20 @@ public final class OpsChannelConnectionSupervisor {
     @EventListener(ApplicationReadyEvent.class)
     public void onReady() {
         reconcile();
+    }
+
+    @EventListener(ContextClosedEvent.class)
+    public void shutdown() {
+        for (Map.Entry<String, ManagedConnection> entry : Map.copyOf(managed).entrySet()) {
+            stopManaged(entry.getKey(), entry.getValue());
+        }
+        for (ChannelConnectionDriver<?> driver : drivers.values()) {
+            try {
+                driver.shutdown();
+            } catch (RuntimeException ignored) {
+                // One provider must never prevent the remaining transports from releasing their resources.
+            }
+        }
     }
 
     @Scheduled(fixedDelayString = "${orbisops.channel.connection.reconcile-ms:30000}")
@@ -70,22 +85,19 @@ public final class OpsChannelConnectionSupervisor {
                 ChannelProviderConfiguration configuration = configuration(adapter, channel);
                 if (!persistent(configuration.connectionMode())) continue;
                 desired.add(channel.channelId());
+                ManagedConnection expected = new ManagedConnection(type, configuration);
+                ManagedConnection current = managed.get(channel.channelId());
+                if (expected.equals(current)) continue;
+                if (current != null) stopManaged(channel.channelId(), current);
                 start(driver, configuration);
-                managed.put(channel.channelId(), type);
+                managed.put(channel.channelId(), expected);
             } catch (RuntimeException providerFailure) {
                 // Provider-specific failures are reflected by driver/preflight health and never stop global reconciliation.
             }
         }
-        for (Map.Entry<String, ChannelType> entry : Map.copyOf(managed).entrySet()) {
+        for (Map.Entry<String, ManagedConnection> entry : Map.copyOf(managed).entrySet()) {
             if (desired.contains(entry.getKey())) continue;
-            ChannelConnectionDriver<?> driver = drivers.get(entry.getValue());
-            try {
-                if (driver != null) driver.stop(entry.getKey());
-            } catch (RuntimeException ignored) {
-                // Another provider must continue reconciling even if shutdown of one connection fails.
-            } finally {
-                managed.remove(entry.getKey());
-            }
+            stopManaged(entry.getKey(), entry.getValue());
         }
     }
 
@@ -112,8 +124,22 @@ public final class OpsChannelConnectionSupervisor {
         return configuration;
     }
 
+    private void stopManaged(String channelId, ManagedConnection connection) {
+        ChannelConnectionDriver<?> driver = connection == null ? null : drivers.get(connection.type());
+        try {
+            if (driver != null) driver.stop(channelId);
+        } catch (RuntimeException ignored) {
+            // Another provider must continue reconciling even if shutdown of one connection fails.
+        } finally {
+            managed.remove(channelId, connection);
+        }
+    }
+
     @SuppressWarnings({"rawtypes", "unchecked"})
     private void start(ChannelConnectionDriver driver, ChannelProviderConfiguration configuration) {
         driver.start(configuration);
+    }
+
+    private record ManagedConnection(ChannelType type, ChannelProviderConfiguration configuration) {
     }
 }

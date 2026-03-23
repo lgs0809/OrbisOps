@@ -68,8 +68,7 @@ public final class OpsWeComProviderAdapter implements ChannelProviderAdapter<Ops
         if (!secrets.isReference(configuration.credentialRef())) {
             throw new IllegalArgumentException("WECOM_BOT_SECRET_MUST_USE_CREDENTIAL_REF");
         }
-        if (configuration.connectionMode() != ChannelConnectionMode.LONG_CONNECTION
-                && configuration.connectionMode() != ChannelConnectionMode.HYBRID) {
+        if (configuration.connectionMode() != ChannelConnectionMode.LONG_CONNECTION) {
             throw new IllegalArgumentException("WECOM_CONNECTION_MODE_UNSUPPORTED:" + configuration.connectionMode());
         }
     }

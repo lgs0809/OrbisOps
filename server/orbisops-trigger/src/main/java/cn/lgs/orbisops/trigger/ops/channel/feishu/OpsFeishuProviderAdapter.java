@@ -75,13 +75,8 @@ public final class OpsFeishuProviderAdapter implements ChannelProviderAdapter<Op
         if (!secrets.isReference(configuration.credentialRef())) {
             throw new IllegalArgumentException("FEISHU_APP_SECRET_MUST_USE_CREDENTIAL_REF");
         }
-        if (configuration.connectionMode() == ChannelConnectionMode.WEBHOOK) {
-            if (configuration.verificationTokenRef().isBlank()) {
-                throw new IllegalArgumentException("FEISHU_WEBHOOK_VERIFICATION_TOKEN_REF_REQUIRED");
-            }
-            if (!secrets.isReference(configuration.verificationTokenRef())) {
-                throw new IllegalArgumentException("FEISHU_WEBHOOK_VERIFICATION_TOKEN_MUST_USE_REF");
-            }
+        if (configuration.connectionMode() != ChannelConnectionMode.LONG_CONNECTION) {
+            throw new IllegalArgumentException("FEISHU_CONNECTION_MODE_UNSUPPORTED:" + configuration.connectionMode());
         }
     }
 

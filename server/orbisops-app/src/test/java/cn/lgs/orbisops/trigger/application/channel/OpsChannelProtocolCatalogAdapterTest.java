@@ -5,12 +5,20 @@ import cn.lgs.orbisops.application.channel.provider.ChannelCapabilitySet.Channel
 import cn.lgs.orbisops.application.channel.provider.ChannelConnectionMode;
 import cn.lgs.orbisops.application.channel.provider.ChannelProviderAdapter;
 import cn.lgs.orbisops.application.channel.provider.ChannelType;
+import cn.lgs.orbisops.trigger.ops.channel.discord.OpsDiscordChannelConnectionDriver;
+import cn.lgs.orbisops.trigger.ops.channel.discord.OpsDiscordProviderAdapter;
+import cn.lgs.orbisops.trigger.ops.channel.qq.OpsQqChannelConnectionDriver;
+import cn.lgs.orbisops.trigger.ops.channel.qq.OpsQqProviderAdapter;
+import cn.lgs.orbisops.trigger.ops.channel.telegram.OpsTelegramChannelConnectionDriver;
+import cn.lgs.orbisops.trigger.ops.channel.telegram.OpsTelegramProviderAdapter;
+import cn.lgs.orbisops.trigger.ops.runtime.OpsSecretResolver;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -67,10 +75,43 @@ class OpsChannelProtocolCatalogAdapterTest {
         assertTrue(descriptor.capabilitySet().supports(ChannelCapability.PROACTIVE_PUSH));
     }
 
+    @Test
+    void exposesPhase3ProvidersFromRealCapabilitiesWithoutInventingWebhookOrUpdateSupport() {
+        OpsSecretResolver secrets = mock(OpsSecretResolver.class);
+        ChannelProviderAdapter<?> telegram = new OpsTelegramProviderAdapter(
+                secrets, mock(OpsTelegramChannelConnectionDriver.class));
+        ChannelProviderAdapter<?> discord = new OpsDiscordProviderAdapter(
+                secrets, mock(OpsDiscordChannelConnectionDriver.class));
+        ChannelProviderAdapter<?> qq = new OpsQqProviderAdapter(
+                secrets, mock(OpsQqChannelConnectionDriver.class));
+
+        OpsChannelProtocolCatalogAdapter catalog = new OpsChannelProtocolCatalogAdapter(
+                providerOf(telegram, discord, qq));
+        var descriptors = catalog.supportedTypes();
+        var telegramDescriptor = descriptors.stream().filter(item -> item.type() == ChannelType.TELEGRAM).findFirst().orElseThrow();
+        var discordDescriptor = descriptors.stream().filter(item -> item.type() == ChannelType.DISCORD).findFirst().orElseThrow();
+        var qqDescriptor = descriptors.stream().filter(item -> item.type() == ChannelType.QQ).findFirst().orElseThrow();
+
+        assertEquals(java.util.Set.of(ChannelConnectionMode.LONG_CONNECTION), telegramDescriptor.connectionModes());
+        assertTrue(telegramDescriptor.capabilitySet().supports(ChannelCapability.MESSAGE_UPDATE));
+        assertTrue(telegramDescriptor.capabilitySet().supports(ChannelCapability.INTERACTIVE_ACTIONS));
+        assertFalse(telegramDescriptor.capabilitySet().supports(ChannelCapability.WEBHOOK));
+
+        assertEquals(java.util.Set.of(ChannelConnectionMode.LONG_CONNECTION), discordDescriptor.connectionModes());
+        assertTrue(discordDescriptor.capabilitySet().supports(ChannelCapability.MESSAGE_UPDATE));
+        assertTrue(discordDescriptor.capabilitySet().supports(ChannelCapability.INTERACTIVE_ACTIONS));
+        assertFalse(discordDescriptor.capabilitySet().supports(ChannelCapability.WEBHOOK));
+
+        assertEquals(java.util.Set.of(ChannelConnectionMode.LONG_CONNECTION), qqDescriptor.connectionModes());
+        assertTrue(qqDescriptor.capabilitySet().supports(ChannelCapability.INTERACTIVE_ACTIONS));
+        assertFalse(qqDescriptor.capabilitySet().supports(ChannelCapability.MESSAGE_UPDATE));
+        assertFalse(qqDescriptor.capabilitySet().supports(ChannelCapability.WEBHOOK));
+    }
+
     @SuppressWarnings("unchecked")
-    private ObjectProvider<ChannelProviderAdapter<?>> providerOf(ChannelProviderAdapter<?> adapter) {
+    private ObjectProvider<ChannelProviderAdapter<?>> providerOf(ChannelProviderAdapter<?>... adapters) {
         ObjectProvider<ChannelProviderAdapter<?>> provider = mock(ObjectProvider.class);
-        when(provider.orderedStream()).thenReturn(Stream.of(adapter));
+        when(provider.orderedStream()).thenAnswer(ignored -> Stream.of(adapters));
         return provider;
     }
 }

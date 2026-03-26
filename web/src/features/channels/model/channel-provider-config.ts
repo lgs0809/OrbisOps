@@ -7,6 +7,8 @@ export interface ChannelProviderFormConfig {
   providerType: OpsChannelType;
   appId: string;
   botId: string;
+  botUsername?: string;
+  messageContentIntent?: boolean;
   corpId?: string;
   robotCode?: string;
   cardTemplateId?: string;
@@ -32,7 +34,13 @@ export const credentialEnvironmentName = (name: string, type: OpsChannelType): s
         ? 'SLACK_BOT_CREDENTIAL'
         : type === 'DINGTALK'
           ? 'DINGTALK_APP_CREDENTIAL'
-          : 'WEBHOOK_CREDENTIAL';
+          : type === 'TELEGRAM'
+            ? 'TELEGRAM_BOT_CREDENTIAL'
+            : type === 'DISCORD'
+              ? 'DISCORD_BOT_CREDENTIAL'
+              : type === 'QQ'
+                ? 'QQ_APP_CREDENTIAL'
+                : 'WEBHOOK_CREDENTIAL';
   return `${base}_${suffix}`;
 };
 
@@ -71,6 +79,26 @@ export const providerConfigPayload = (config: ChannelProviderFormConfig): Record
       connectionMode: config.connectionMode,
     };
   }
+  if (config.providerType === 'TELEGRAM') {
+    return {
+      botUsername: (config.botUsername || '').trim().replace(/^@+/, ''),
+      connectionMode: config.connectionMode,
+      requireMention: config.requireMention,
+    };
+  }
+  if (config.providerType === 'DISCORD') {
+    return {
+      connectionMode: config.connectionMode,
+      requireMention: config.requireMention,
+      messageContentIntent: Boolean(config.messageContentIntent),
+    };
+  }
+  if (config.providerType === 'QQ') {
+    return {
+      appId: config.appId.trim(),
+      connectionMode: config.connectionMode,
+    };
+  }
   return {
     outboundUrl: config.outboundUrl.trim(),
     timeoutSeconds: Number(config.timeoutSeconds) || 15,
@@ -79,14 +107,21 @@ export const providerConfigPayload = (config: ChannelProviderFormConfig): Record
 
 export const validateProviderConfig = (config: ChannelProviderFormConfig): string | null => {
   if (config.providerType === 'FEISHU' && !config.appId.trim()) return '请填写 Feishu App ID';
+  if (config.providerType === 'FEISHU' && config.connectionMode !== 'LONG_CONNECTION') return 'Feishu 当前仅支持 WebSocket 长连接';
   if (config.providerType === 'WECOM' && !config.botId.trim()) return '请填写 WeCom Bot ID';
   if (config.providerType === 'GENERIC_WEBHOOK' && config.connectionMode !== 'WEBHOOK') return 'Generic Webhook 只支持 Webhook 模式';
-  if (config.providerType === 'WECOM' && !['LONG_CONNECTION', 'HYBRID'].includes(config.connectionMode)) return 'WeCom 当前仅支持长连接模式';
-  if (config.providerType === 'SLACK' && !['LONG_CONNECTION', 'HYBRID'].includes(config.connectionMode)) return 'Slack 当前仅支持 Socket Mode 长连接';
+  if (config.providerType === 'WECOM' && config.connectionMode !== 'LONG_CONNECTION') return 'WeCom 当前仅支持长连接模式';
+  if (config.providerType === 'SLACK' && config.connectionMode !== 'LONG_CONNECTION') return 'Slack 当前仅支持 Socket Mode 长连接';
   if (config.providerType === 'DINGTALK' && !config.appId.trim()) return '请填写 DingTalk Client ID';
   if (config.providerType === 'DINGTALK' && !(config.corpId || '').trim()) return '请填写 DingTalk Corp ID';
   if (config.providerType === 'DINGTALK' && !(config.robotCode || '').trim()) return '请填写 DingTalk Robot Code';
   if (config.providerType === 'DINGTALK' && !(config.cardTemplateId || '').trim()) return '请填写 DingTalk Card Template ID';
-  if (config.providerType === 'DINGTALK' && !['LONG_CONNECTION', 'HYBRID'].includes(config.connectionMode)) return 'DingTalk 当前仅支持 Stream 长连接';
+  if (config.providerType === 'DINGTALK' && config.connectionMode !== 'LONG_CONNECTION') return 'DingTalk 当前仅支持 Stream 长连接';
+  if (config.providerType === 'TELEGRAM' && config.connectionMode !== 'LONG_CONNECTION') return 'Telegram 当前仅支持 Bot API long polling';
+  if (config.providerType === 'TELEGRAM' && config.requireMention && !(config.botUsername || '').trim()) return '群聊要求 @Bot 时请填写 Telegram Bot Username';
+  if (config.providerType === 'DISCORD' && config.connectionMode !== 'LONG_CONNECTION') return 'Discord 当前仅支持 Gateway 长连接';
+  if (config.providerType === 'DISCORD' && !config.requireMention && !config.messageContentIntent) return '不要求 @Bot 时必须启用 Discord MESSAGE_CONTENT privileged intent';
+  if (config.providerType === 'QQ' && !config.appId.trim()) return '请填写 QQ Bot AppID';
+  if (config.providerType === 'QQ' && config.connectionMode !== 'LONG_CONNECTION') return 'QQ 当前仅支持 Gateway 长连接';
   return null;
 };

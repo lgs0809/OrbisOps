@@ -15,9 +15,15 @@ describe('channel provider configuration', () => {
     expect(defaultConnectionMode('WECOM')).toBe('LONG_CONNECTION');
     expect(defaultConnectionMode('SLACK')).toBe('LONG_CONNECTION');
     expect(defaultConnectionMode('DINGTALK')).toBe('LONG_CONNECTION');
+    expect(defaultConnectionMode('TELEGRAM')).toBe('LONG_CONNECTION');
+    expect(defaultConnectionMode('DISCORD')).toBe('LONG_CONNECTION');
+    expect(defaultConnectionMode('QQ')).toBe('LONG_CONNECTION');
     expect(credentialEnvironmentName('Production Oncall', 'FEISHU')).toBe('PRODUCTION_ONCALL_FEISHU_APP_CREDENTIAL');
     expect(credentialEnvironmentName('Production Oncall', 'DINGTALK')).toBe('PRODUCTION_ONCALL_DINGTALK_APP_CREDENTIAL');
     expect(credentialEnvironmentName('Production Oncall', 'SLACK')).toBe('PRODUCTION_ONCALL_SLACK_BOT_CREDENTIAL');
+    expect(credentialEnvironmentName('Production Oncall', 'TELEGRAM')).toBe('PRODUCTION_ONCALL_TELEGRAM_BOT_CREDENTIAL');
+    expect(credentialEnvironmentName('Production Oncall', 'DISCORD')).toBe('PRODUCTION_ONCALL_DISCORD_BOT_CREDENTIAL');
+    expect(credentialEnvironmentName('Production Oncall', 'QQ')).toBe('PRODUCTION_ONCALL_QQ_APP_CREDENTIAL');
     expect(secondaryCredentialEnvironmentName('Production Oncall', 'SLACK')).toBe('PRODUCTION_ONCALL_SLACK_APP_CREDENTIAL');
   });
 
@@ -41,6 +47,21 @@ describe('channel provider configuration', () => {
       providerType: 'DINGTALK', appId: 'ding-client-1', botId: '', corpId: 'corp-1', robotCode: 'robot-1', cardTemplateId: 'template-1.schema', connectionMode: 'LONG_CONNECTION',
       requireMention: true, respondToMentionAll: false, outboundUrl: 'https://ignored.example', timeoutSeconds: 15,
     })).toEqual({ clientId: 'ding-client-1', corpId: 'corp-1', robotCode: 'robot-1', cardTemplateId: 'template-1.schema', connectionMode: 'LONG_CONNECTION' });
+
+    expect(providerConfigPayload({
+      providerType: 'TELEGRAM', appId: '', botId: '', botUsername: '@orbisops_bot', connectionMode: 'LONG_CONNECTION',
+      requireMention: true, respondToMentionAll: false, outboundUrl: 'https://ignored.example', timeoutSeconds: 15,
+    })).toEqual({ botUsername: 'orbisops_bot', connectionMode: 'LONG_CONNECTION', requireMention: true });
+
+    expect(providerConfigPayload({
+      providerType: 'DISCORD', appId: '', botId: '', connectionMode: 'LONG_CONNECTION', messageContentIntent: false,
+      requireMention: true, respondToMentionAll: false, outboundUrl: 'https://ignored.example', timeoutSeconds: 15,
+    })).toEqual({ connectionMode: 'LONG_CONNECTION', requireMention: true, messageContentIntent: false });
+
+    expect(providerConfigPayload({
+      providerType: 'QQ', appId: '102000001', botId: '', connectionMode: 'LONG_CONNECTION',
+      requireMention: true, respondToMentionAll: false, outboundUrl: 'https://ignored.example', timeoutSeconds: 15,
+    })).toEqual({ appId: '102000001', connectionMode: 'LONG_CONNECTION' });
   });
 
   it('fails closed on missing native provider identifiers', () => {
@@ -60,5 +81,52 @@ describe('channel provider configuration', () => {
       providerType: 'DINGTALK', appId: 'ding-client-1', botId: '', corpId: 'corp-1', robotCode: 'robot-1', cardTemplateId: '', connectionMode: 'LONG_CONNECTION',
       requireMention: false, respondToMentionAll: false, outboundUrl: '', timeoutSeconds: 15,
     })).toContain('Card Template ID');
+    expect(validateProviderConfig({
+      providerType: 'TELEGRAM', appId: '', botId: '', botUsername: '', connectionMode: 'LONG_CONNECTION',
+      requireMention: true, respondToMentionAll: false, outboundUrl: '', timeoutSeconds: 15,
+    })).toContain('Bot Username');
+    expect(validateProviderConfig({
+      providerType: 'TELEGRAM', appId: '', botId: '', botUsername: 'orbisops_bot', connectionMode: 'WEBHOOK',
+      requireMention: false, respondToMentionAll: false, outboundUrl: '', timeoutSeconds: 15,
+    })).toContain('long polling');
+    expect(validateProviderConfig({
+      providerType: 'DISCORD', appId: '', botId: '', connectionMode: 'LONG_CONNECTION', messageContentIntent: false,
+      requireMention: false, respondToMentionAll: false, outboundUrl: '', timeoutSeconds: 15,
+    })).toContain('MESSAGE_CONTENT');
+    expect(validateProviderConfig({
+      providerType: 'DISCORD', appId: '', botId: '', connectionMode: 'WEBHOOK', messageContentIntent: true,
+      requireMention: false, respondToMentionAll: false, outboundUrl: '', timeoutSeconds: 15,
+    })).toContain('Gateway');
+    expect(validateProviderConfig({
+      providerType: 'QQ', appId: '', botId: '', connectionMode: 'LONG_CONNECTION',
+      requireMention: true, respondToMentionAll: false, outboundUrl: '', timeoutSeconds: 15,
+    })).toContain('AppID');
+    expect(validateProviderConfig({
+      providerType: 'QQ', appId: '102000001', botId: '', connectionMode: 'WEBHOOK',
+      requireMention: true, respondToMentionAll: false, outboundUrl: '', timeoutSeconds: 15,
+    })).toContain('Gateway');
+  });
+
+  it('rejects HYBRID for providers that only advertise native long-connection ingress', () => {
+    const cases = [
+      { providerType: 'FEISHU' as const, appId: 'cli-1', botId: '' },
+      { providerType: 'WECOM' as const, appId: '', botId: 'bot-1' },
+      { providerType: 'DINGTALK' as const, appId: 'ding-1', botId: '', corpId: 'corp-1', robotCode: 'robot-1', cardTemplateId: 'template.schema' },
+      { providerType: 'SLACK' as const, appId: '', botId: '' },
+      { providerType: 'TELEGRAM' as const, appId: '', botId: '', botUsername: 'orbisops_bot' },
+      { providerType: 'DISCORD' as const, appId: '', botId: '', messageContentIntent: false },
+      { providerType: 'QQ' as const, appId: '102000001', botId: '' },
+    ];
+
+    cases.forEach((provider) => {
+      expect(validateProviderConfig({
+        ...provider,
+        connectionMode: 'HYBRID',
+        requireMention: true,
+        respondToMentionAll: false,
+        outboundUrl: '',
+        timeoutSeconds: 15,
+      })).not.toBeNull();
+    });
   });
 });

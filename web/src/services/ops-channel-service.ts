@@ -18,6 +18,8 @@ export interface OpsChannelConfig {
   timeoutSeconds?: number;
   appId?: string;
   botId?: string;
+  botUsername?: string;
+  messageContentIntent?: boolean;
   clientId?: string;
   corpId?: string;
   robotCode?: string;

@@ -55,6 +55,8 @@ interface ChannelForm {
   secondaryCredentialEnvironmentVariable: string;
   appId: string;
   botId: string;
+  botUsername: string;
+  messageContentIntent: boolean;
   corpId: string;
   robotCode: string;
   cardTemplateId: string;
@@ -78,6 +80,8 @@ const formFor = (type: OpsChannelType): ChannelForm => ({
   secondaryCredentialEnvironmentVariable: '',
   appId: '',
   botId: '',
+  botUsername: '',
+  messageContentIntent: false,
   corpId: '',
   robotCode: '',
   cardTemplateId: '',
@@ -192,6 +196,8 @@ export const ChannelManagementPage: React.FC = () => {
       secondaryCredentialEnvironmentVariable: environmentVariableFromRef(channel.config?.appCredentialRef),
       appId: channel.config?.clientId || channel.config?.appId || '',
       botId: channel.config?.botId || '',
+      botUsername: channel.config?.botUsername || '',
+      messageContentIntent: channel.config?.messageContentIntent ?? false,
       corpId: channel.config?.corpId || '',
       robotCode: channel.config?.robotCode || '',
       cardTemplateId: channel.config?.cardTemplateId || '',
@@ -438,7 +444,7 @@ export const ChannelManagementPage: React.FC = () => {
       </OpsSectionCard>
 
       <OpsSectionCard title={`Channels · ${activeCount} active`} actions={[<Button key="refresh" icon={<IconRefresh />} loading={channelsQuery.isFetching} onClick={() => channelsQuery.refetch()}>刷新</Button>]}>
-        <Paragraph type="tertiary">Generic Webhook 使用签名回调；Feishu / WeCom 使用各自 Provider 的认证长连接。所有入站最终进入同一 durable queue、identity/access policy 和 ReAct / Workflow runtime。</Paragraph>
+        <Paragraph type="tertiary">Generic Webhook 使用签名回调；原生 IM Provider 使用各自受认证的长连接、Stream、Socket Mode 或 Bot API long polling。所有入站最终进入同一 durable queue、identity/access policy 和 ReAct / Workflow runtime。</Paragraph>
         <TableScroll>
           <Table rowKey="channelId" columns={columns} dataSource={channels} loading={channelsQuery.isLoading || typesQuery.isLoading || agentsQuery.isLoading} pagination={false} scroll={{ x: 1300 }} empty={<OpsEmptyState title="暂无 Channel" description="从上方 Provider 卡片开始连接。" />} />
         </TableScroll>
@@ -496,6 +502,31 @@ export const ChannelManagementPage: React.FC = () => {
               <Checkbox checked={form.requireMention} onChange={(event) => setForm({ ...form, requireMention: Boolean(event.target.checked) })}>频道中要求 @App 才触发；DM 不需要</Checkbox>
               <Paragraph type="tertiary">若要接收附件，请为 Slack App 授予 files:read；OrbisOps 下载后会立即转换为受控对象引用，不持久化 Slack 私有下载地址。</Paragraph>
             </>}
+
+            {form.providerType === 'TELEGRAM' && <>
+              <div style={{ width: '100%' }}><Text strong>Telegram Bot Username</Text><Input value={form.botUsername} placeholder="@orbisops_bot" onChange={(botUsername) => setForm({ ...form, botUsername })} /><Paragraph type="tertiary">用于群组 @Bot 触发校验；OrbisOps 建立连接时会通过 getMe 校验 Username 与当前凭据对应的 Bot 一致。</Paragraph></div>
+              <div style={{ width: '100%' }}><Text strong>Connection</Text><Select value={form.connectionMode} disabled style={{ width: '100%' }}><Select.Option value="LONG_CONNECTION">Bot API long polling</Select.Option></Select></div>
+              <Checkbox checked={form.requireMention} onChange={(event) => setForm({ ...form, requireMention: Boolean(event.target.checked) })}>群组中要求 @Bot 才触发；私聊不需要</Checkbox>
+              <Paragraph type="tertiary">无需公网 Webhook。Bot credential 只以环境变量引用保存；Inline Keyboard 审批继续使用平台统一的 opaque action token 与 RBAC。</Paragraph>
+            </>}
+
+            {form.providerType === 'DISCORD' && <>
+              <div style={{ width: '100%' }}><Text strong>Connection</Text><Select value={form.connectionMode} disabled style={{ width: '100%' }}><Select.Option value="LONG_CONNECTION">Gateway v10 WebSocket</Select.Option></Select></div>
+              <Checkbox checked={form.requireMention} onChange={(event) => {
+                const requireMention = Boolean(event.target.checked);
+                setForm({ ...form, requireMention, messageContentIntent: requireMention ? form.messageContentIntent : true });
+              }}>Guild 中要求 @Bot 才触发；DM 不需要</Checkbox>
+              <Checkbox checked={form.messageContentIntent} onChange={(event) => setForm({ ...form, messageContentIntent: Boolean(event.target.checked) })}>启用 MESSAGE_CONTENT privileged intent</Checkbox>
+              <Paragraph type="tertiary">默认建议保留 @Bot gate 且不开 privileged intent；只有需要读取 Guild 中未 @Bot 的普通消息时才启用，并在 Discord Developer Portal 同步开启 Message Content Intent。</Paragraph>
+              <Paragraph type="tertiary">Button component 审批通过 Gateway 收到 Interaction，并继续走 OrbisOps 的 opaque action token、RBAC、重放保护与统一审批 authority。</Paragraph>
+            </>}
+
+            {form.providerType === 'QQ' && <>
+              <div style={{ width: '100%' }}><Text strong>QQ Bot AppID</Text><Input value={form.appId} placeholder="1020..." onChange={(appId) => setForm({ ...form, appId })} /><Paragraph type="tertiary">AppID 作为普通 Provider 配置保存；上面的凭据环境变量用于 App credential，真实值不会进入数据库。</Paragraph></div>
+              <div style={{ width: '100%' }}><Text strong>Connection</Text><Select value={form.connectionMode} disabled style={{ width: '100%' }}><Select.Option value="LONG_CONNECTION">QQ Gateway WebSocket</Select.Option></Select></div>
+              <Paragraph type="tertiary">当前原生能力覆盖 QQ C2C 私聊、群 @Bot 消息、主动/回复发送和 Inline Keyboard 审批；暂不宣称 QQ Guild、附件或原消息更新。</Paragraph>
+              <Paragraph type="tertiary">按钮点击先向 QQ Open Platform ACK，再进入 OrbisOps 统一 opaque action token、RBAC、过期与重放保护；QQ Provider 本身不决定审批结果。</Paragraph>
+            </>}
           </>}
 
           {wizardStep === 1 && <>
@@ -526,7 +557,7 @@ export const ChannelManagementPage: React.FC = () => {
               <Button onClick={() => openIdentities(testableChannel)}>Identity / Access</Button>
               <Button onClick={() => setMessageChannel(testableChannel)}>Message history</Button>
             </Space>}
-            <Paragraph type="tertiary">没有真实 Feishu / WeCom 凭据或真实消息时，Credentials / Connection / Inbound / Outbound 会保持 Blocked / Action Required，不会伪造 PASS。</Paragraph>
+            <Paragraph type="tertiary">没有真实 Provider 凭据或真实消息时，Credentials / Connection / Inbound / Outbound 会保持 Blocked / Action Required，不会伪造 PASS。</Paragraph>
           </>}
         </Space>
       </Modal>

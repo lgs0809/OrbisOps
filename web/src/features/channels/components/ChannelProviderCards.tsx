@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Typography } from '@douyinfe/semi-ui';
+import { Button, Tooltip, Typography } from '@douyinfe/semi-ui';
 import styled from 'styled-components';
 
 import { OpsStatusBadge } from '../../../components/ops-layout';
@@ -24,6 +24,23 @@ const ProviderCard = styled.div`
   border: 1px solid ${theme.colors.border.secondary};
   border-radius: ${theme.borderRadius.base};
   background: ${theme.colors.bg.primary};
+`;
+
+const CapabilityGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 12px;
+`;
+
+const CapabilityItem = styled.div<{ $supported: boolean }>`
+  min-width: 0;
+  padding: 5px 7px;
+  border-radius: ${theme.borderRadius.sm};
+  border: 1px solid ${theme.colors.border.secondary};
+  opacity: ${({ $supported }) => ($supported ? 1 : 0.56)};
+  font-size: 12px;
+  line-height: 1.3;
 `;
 
 const semanticStatus = (state: ChannelProviderCardModel['readiness']) => {
@@ -52,8 +69,17 @@ export const ChannelProviderCards: React.FC<ChannelProviderCardsProps> = ({ prov
         <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 12 }}>
           Connection: {provider.connectionMode}
         </Text>
+        <CapabilityGrid aria-label={`${provider.name} capability support`}>
+          {provider.capabilities.map((capability) => (
+            <Tooltip key={capability.key} content={capability.supported ? `${capability.label} is supported by the active provider adapter.` : capability.fallback}>
+              <CapabilityItem $supported={capability.supported} data-capability={capability.key} data-supported={capability.supported ? 'true' : 'false'}>
+                {capability.supported ? '✓' : '—'} {capability.label}
+              </CapabilityItem>
+            </Tooltip>
+          ))}
+        </CapabilityGrid>
         {provider.actionRequired && (
-          <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 6 }}>{provider.actionRequired}</Text>
+          <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 8 }}>{provider.actionRequired}</Text>
         )}
         <Button
           block

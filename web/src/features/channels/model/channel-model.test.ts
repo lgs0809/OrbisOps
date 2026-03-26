@@ -43,6 +43,44 @@ describe('channel provider cards', () => {
     expect(dingTalk?.actionRequired).toBe('Connect this provider to a project.');
   });
 
+  it('derives capability fallback from the backend descriptor instead of provider-name assumptions', () => {
+    const cards = buildChannelProviderCards([
+      {
+        type: 'TELEGRAM', displayName: 'Telegram', supportsInbound: true, supportsOutbound: true,
+        connectionModes: ['LONG_CONNECTION'],
+        capabilitySet: { capabilities: ['INBOUND', 'OUTBOUND', 'MESSAGE_UPDATE', 'INTERACTIVE_ACTIONS', 'PROACTIVE_PUSH'] },
+      },
+      {
+        type: 'DISCORD', displayName: 'Discord', supportsInbound: true, supportsOutbound: true,
+        connectionModes: ['LONG_CONNECTION'],
+        capabilitySet: { capabilities: ['INBOUND', 'OUTBOUND', 'MESSAGE_UPDATE', 'INTERACTIVE_ACTIONS', 'PROACTIVE_PUSH'] },
+      },
+      {
+        type: 'QQ', displayName: 'QQ', supportsInbound: true, supportsOutbound: true,
+        connectionModes: ['LONG_CONNECTION'],
+        capabilitySet: { capabilities: ['INBOUND', 'OUTBOUND', 'INTERACTIVE_ACTIONS', 'PROACTIVE_PUSH'] },
+      },
+    ], []);
+
+    const telegram = cards.find((item) => item.type === 'TELEGRAM');
+    const discord = cards.find((item) => item.type === 'DISCORD');
+    const qq = cards.find((item) => item.type === 'QQ');
+    expect(telegram?.capabilities.find((item) => item.key === 'APPROVAL')?.supported).toBe(true);
+    expect(telegram?.capabilities.find((item) => item.key === 'ATTACHMENTS')?.supported).toBe(false);
+    expect(discord?.capabilities.find((item) => item.key === 'UPDATE')?.supported).toBe(true);
+    expect(discord?.capabilities.find((item) => item.key === 'ATTACHMENTS')?.supported).toBe(false);
+    expect(qq?.capabilities.find((item) => item.key === 'APPROVAL')?.supported).toBe(true);
+    expect(qq?.capabilities.find((item) => item.key === 'UPDATE')?.supported).toBe(false);
+    expect(qq?.capabilities.find((item) => item.key === 'UPDATE')?.fallback).toContain('new messages');
+  });
+
+  it('keeps all capability dimensions unavailable when the provider adapter is absent', () => {
+    const telegram = buildChannelProviderCards([], []).find((item) => item.type === 'TELEGRAM');
+    expect(telegram?.capabilities).toHaveLength(6);
+    expect(telegram?.capabilities.every((item) => item.supported === false)).toBe(true);
+    expect(telegram?.capabilities[0]?.fallback).toContain('not available');
+  });
+
   it('keeps a configured active provider action-required until readiness is probed', () => {
     const cards = buildChannelProviderCards([
       {

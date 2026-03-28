@@ -2,7 +2,7 @@
 
 > 日期：2026-08-15  
 > 状态：后续实施权威方案（Proposal）  
-> 适用仓库：`<repo-root>`  
+> 适用仓库：OrbisOps monorepo  
 > 范围：OrbisOps 产品信息架构、前端工程重构、多 IM Channel、Channel Approval、Incident/Diagnosis/Change 连续工作台  
 > 不包含：重新设计 ReAct Runtime、重新设计 ChangePackage 权威模型、推翻现有 DDD、引入第二套生产变更权限体系
 
@@ -1541,15 +1541,26 @@ WeCom 同样完整跑通。
 
 ## 28. Phase 3 — Telegram / Discord / QQ
 
-- Telegram；
-- Discord；
-- QQ；
-- capability fallback；
-- message update / inline button / component；
-- provider contract tests；
-- setup UX。
+### Channel 子阶段状态：已完成
 
-同时推进：
+- Telegram：Bot API long polling、发送/原消息更新、Inline Keyboard action；
+- Discord：Gateway v10、MESSAGE_CONTENT intent gate、发送/原消息更新、Button component action；
+- QQ：当前原生 Gateway、C2C / 群 @Bot、发送、Inline Keyboard action；
+- capability fallback：前端只依据后端 capability descriptor 展示能力，不按 Provider 名称猜测；
+- provider contract：Feishu / WeCom / DingTalk / Slack / Telegram / Discord / QQ 复用统一长连接 contract；
+- setup UX：三类 Provider 的 credential ref、连接模式、必要权限/字段和能力降级已进入 Channel Setup；
+- 生命周期：Provider transport 统一由 Channel supervisor 在 ContextClosedEvent 释放，integration adapter 不直接依赖容器生命周期注解；
+- Test infrastructure：移除历史 Surefire `3.0.0-M7` 固定版本，跟随 Spring Boot 3.4.3 管理的 Surefire `3.5.2`，解决 full-reactor fork 下偶发 class loading 失败。
+
+本阶段验收：
+
+- Phase 3 Channel + architecture 定向回归：通过；
+- Backend `mvn -q -pl orbisops-app -am test`：exit 0，包含真实 Spring ApplicationContext、Testcontainers MySQL 与 MCP stdio；
+- Frontend `npm run verify`：release hygiene、typecheck、61/61 Vitest、production build 全部通过；
+- Chrome Playwright：10/10 全量 E2E 通过，其中 Phase 3 Channel Setup/capability 场景通过；
+- Server release hygiene：通过。
+
+继续推进：
 
 - `rag-order-management.tsx` feature 化；
 - Knowledge 产品化；

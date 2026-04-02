@@ -1560,12 +1560,27 @@ WeCom 同样完整跑通。
 - Chrome Playwright：10/10 全量 E2E 通过，其中 Phase 3 Channel Setup/capability 场景通过；
 - Server release hygiene：通过。
 
+### Knowledge 子阶段状态：已完成
+
+- `rag-order-management.tsx` 已收敛为兼容路由壳，真实实现迁入 `features/knowledge`；
+- Knowledge 已按 `pages / api / model / components` 拆分，页面不再直接依赖 RAG HTTP service；
+- global bases / chunks / stats / usage / ingestion jobs / eval / feedback / gaps 已迁入 TanStack Query，mutation 使用精确 query invalidation；
+- 入库任务轮询由 Query 根据 `PENDING/RUNNING` 状态按需启停，后台窗口不轮询，删除页面级 `useEffect + setInterval`；
+- search filter 与 `selectedKnowledgeId` 操作上下文分离，模糊搜索不会误触发详情、策略、删除或评测上下文；
+- 检索策略归一化/校验、Knowledge identity/status 兼容、上传约束、Overview 聚合已下沉纯 model 并覆盖单测；
+- 新增 feature boundary contract，禁止页面重新引入 direct service / page-owned server state；
+- Chrome E2E 验证未选择或仅模糊搜索知识库时不会请求 chunks/usage，明确选择后才加载详情。
+
+Knowledge 子阶段验收：
+
+- Web `npm run verify`：release hygiene、typecheck、68/68 Vitest、production build 全部通过；
+- Chrome Playwright：11/11 全量 E2E 通过，新增 Knowledge search/context 隔离验收；
+- feature boundary contract：2/2 通过，页面无 direct service / `useEffect` / 手工 polling server state。
+
 继续推进：
 
-- `rag-order-management.tsx` feature 化；
-- Knowledge 产品化；
 - Platform settings 重组；
-- TanStack Query 覆盖主要 server state。
+- TanStack Query 继续覆盖其他主要 server state。
 
 ---
 

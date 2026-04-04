@@ -18,6 +18,7 @@ import { currentUserRole, getStoredUserInfo, roleLabel } from '../../services/au
 import {
   canonicalPathFor,
   navigationRoutesForRole,
+  PLATFORM_NAVIGATION_GROUPS,
   routeByPath,
   type AppRouteMetadata,
   type NavigationIcon,
@@ -339,7 +340,13 @@ const buildMenuItems = (routes: AppRouteMetadata[]): SidebarNavItem[] => {
   const automations = routesInSection(routes, 'automations');
   const projects = routesInSection(routes, 'projects');
   const platform = routesInSection(routes, 'platform');
-  const advanced = routesInSection(routes, 'platform', 'advanced');
+  const platformGroups = PLATFORM_NAVIGATION_GROUPS
+    .map((group) => ({
+      ...group,
+      itemKey: `nav-platform-${group.key}`,
+      routes: routesInSection(routes, 'platform', group.key),
+    }))
+    .filter((group) => group.routes.length > 0);
 
   if (work.length) {
     menu.push({ itemKey: 'nav-work', text: 'Work', icon: <IconBranch />, items: work.map(routeItem) });
@@ -348,16 +355,16 @@ const buildMenuItems = (routes: AppRouteMetadata[]): SidebarNavItem[] => {
     menu.push({ itemKey: 'nav-automations', text: 'Automations', icon: <IconClock />, items: automations.map(routeItem) });
   }
   menu.push(...projects.map(routeItem));
-  if (platform.length || advanced.length) {
+  if (platform.length || platformGroups.length) {
     const platformItems = platform.map(routeItem);
-    if (advanced.length) {
+    platformGroups.forEach((group) => {
       platformItems.push({
-        itemKey: 'nav-platform-advanced',
-        text: 'Advanced',
+        itemKey: group.itemKey,
+        text: group.label,
         icon: <IconShield />,
-        items: advanced.map(routeItem),
+        items: group.routes.map(routeItem),
       });
-    }
+    });
     menu.push({ itemKey: 'nav-platform', text: 'Platform', icon: <IconShield />, items: platformItems });
   }
   return menu;
@@ -367,7 +374,7 @@ const nonNavigableKeys = new Set<string>([
   'nav-work',
   'nav-automations',
   'nav-platform',
-  'nav-platform-advanced',
+  ...PLATFORM_NAVIGATION_GROUPS.map((group) => `nav-platform-${group.key}`),
 ]);
 
 export const Sidebar: React.FC<SidebarProps> = ({

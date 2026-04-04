@@ -2,7 +2,15 @@ import type { UserRole } from '../../services/auth-session';
 
 export type AppRouteRole = Exclude<UserRole, 'unknown'>;
 export type NavigationSection = 'home' | 'work' | 'automations' | 'projects' | 'platform';
-export type NavigationSubgroup = 'advanced';
+export type NavigationSubgroup = 'integrations' | 'intelligence' | 'execution-governance' | 'advanced';
+
+export const PLATFORM_NAVIGATION_GROUPS: ReadonlyArray<{ key: NavigationSubgroup; label: string; order: number }> = [
+  { key: 'integrations', label: 'Integrations', order: 10 },
+  { key: 'intelligence', label: 'Intelligence', order: 20 },
+  { key: 'execution-governance', label: 'Execution & Governance', order: 30 },
+  { key: 'advanced', label: 'Advanced', order: 40 },
+];
+
 export type NavigationIcon =
   | 'home'
   | 'incident'
@@ -136,13 +144,21 @@ export const APP_ROUTES: readonly AppRouteMetadata[] = [
     legacyPaths: ['/project-workspace/advanced'],
   },
   {
+    id: 'platform-settings',
+    path: '/platform',
+    title: 'Platform Settings',
+    roles: admin,
+    breadcrumbs: ['Platform'],
+    navigation: { section: 'platform', label: 'Overview', order: 0, icon: 'advanced' },
+  },
+  {
     id: 'channels',
     path: '/platform/integrations',
     title: 'Integrations / Channels',
     roles: admin,
     breadcrumbs: ['Platform', 'Integrations / Channels'],
     legacyPaths: ['/channel-management'],
-    navigation: { section: 'platform', label: 'Integrations / Channels', order: 10, icon: 'integration' },
+    navigation: { section: 'platform', subgroup: 'integrations', label: 'Channels', order: 10, icon: 'integration' },
   },
   {
     id: 'models',
@@ -151,7 +167,7 @@ export const APP_ROUTES: readonly AppRouteMetadata[] = [
     roles: admin,
     breadcrumbs: ['Platform', 'Models'],
     legacyPaths: ['/model-api-management'],
-    navigation: { section: 'platform', label: 'Models', order: 20, icon: 'model' },
+    navigation: { section: 'platform', subgroup: 'intelligence', label: 'Models', order: 10, icon: 'model' },
   },
   {
     id: 'tools',
@@ -160,7 +176,7 @@ export const APP_ROUTES: readonly AppRouteMetadata[] = [
     roles: admin,
     breadcrumbs: ['Platform', 'Tools / MCP'],
     legacyPaths: ['/mcp-tool-management'],
-    navigation: { section: 'platform', label: 'Tools / MCP', order: 30, icon: 'tool' },
+    navigation: { section: 'platform', subgroup: 'execution-governance', label: 'Tools / MCP', order: 10, icon: 'tool' },
   },
   {
     id: 'knowledge',
@@ -169,7 +185,7 @@ export const APP_ROUTES: readonly AppRouteMetadata[] = [
     roles: admin,
     breadcrumbs: ['Platform', 'Knowledge'],
     legacyPaths: ['/rag-order-management'],
-    navigation: { section: 'platform', label: 'Knowledge', order: 40, icon: 'knowledge' },
+    navigation: { section: 'platform', subgroup: 'intelligence', label: 'Knowledge', order: 20, icon: 'knowledge' },
   },
   {
     id: 'skills',
@@ -178,7 +194,7 @@ export const APP_ROUTES: readonly AppRouteMetadata[] = [
     roles: admin,
     breadcrumbs: ['Platform', 'Skills'],
     legacyPaths: ['/skill-management'],
-    navigation: { section: 'platform', label: 'Skills', order: 50, icon: 'skill' },
+    navigation: { section: 'platform', subgroup: 'intelligence', label: 'Skills', order: 30, icon: 'skill' },
   },
   {
     id: 'execution-targets',
@@ -187,7 +203,7 @@ export const APP_ROUTES: readonly AppRouteMetadata[] = [
     roles: admin,
     breadcrumbs: ['Platform', 'Execution Targets'],
     legacyPaths: ['/execution-adapter-templates'],
-    navigation: { section: 'platform', label: 'Execution Targets', order: 60, icon: 'execution' },
+    navigation: { section: 'platform', subgroup: 'execution-governance', label: 'Execution Targets', order: 20, icon: 'execution' },
   },
   {
     id: 'governance',
@@ -196,7 +212,7 @@ export const APP_ROUTES: readonly AppRouteMetadata[] = [
     roles: admin,
     breadcrumbs: ['Platform', 'Governance'],
     legacyPaths: ['/audit'],
-    navigation: { section: 'platform', label: 'Governance', order: 70, icon: 'governance' },
+    navigation: { section: 'platform', subgroup: 'execution-governance', label: 'Governance', order: 30, icon: 'governance' },
   },
   {
     id: 'model-catalog',

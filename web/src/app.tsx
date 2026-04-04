@@ -44,6 +44,9 @@ const SkillManagementPage = React.lazy(() =>
 const ModelApiManagement = React.lazy(() =>
   import('./pages/model-api-management').then((module) => ({ default: module.ModelApiManagement })),
 );
+const PlatformSettingsPage = React.lazy(() =>
+  import('./features/platform/pages/PlatformSettingsPage').then((module) => ({ default: module.PlatformSettingsPage })),
+);
 const RagOrderManagement = React.lazy(() =>
   import('./pages/rag-order-management').then((module) => ({ default: module.RagOrderManagement })),
 );
@@ -128,6 +131,7 @@ const pageElementByRouteId: Record<string, React.ReactNode> = {
   'alert-triggers': <AlertTriggerManagementPage />,
   projects: <ProjectProductWorkspacePage />,
   'project-advanced': <ProjectWorkspacePage />,
+  'platform-settings': <PlatformSettingsPage />,
   channels: <ChannelManagementPage />,
   models: <ModelApiManagement />,
   tools: <McpToolManagement />,

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   APP_ROUTES,
+  PLATFORM_NAVIGATION_GROUPS,
   breadcrumbsForPath,
   canonicalPathFor,
   navigationRoutesForRole,
@@ -32,14 +33,33 @@ describe('route metadata', () => {
     expect(userPaths).toEqual(['/home', '/work/incidents', '/work/diagnosis', '/work/changes']);
     expect(adminPaths).toContain('/automations/workflows');
     expect(adminPaths).toContain('/projects');
+    expect(adminPaths).toContain('/platform');
     expect(adminPaths).toContain('/platform/integrations');
     expect(adminPaths).toContain('/platform/governance');
     expect(adminPaths).toContain('/platform/advanced/memory');
   });
 
+  it('groups platform settings instead of flattening every admin page', () => {
+    expect(PLATFORM_NAVIGATION_GROUPS.map((group) => group.key)).toEqual([
+      'integrations',
+      'intelligence',
+      'execution-governance',
+      'advanced',
+    ]);
+    const subgroupOf = (id: string) => APP_ROUTES.find((route) => route.id === id)?.navigation?.subgroup;
+    expect(subgroupOf('channels')).toBe('integrations');
+    expect(subgroupOf('models')).toBe('intelligence');
+    expect(subgroupOf('knowledge')).toBe('intelligence');
+    expect(subgroupOf('tools')).toBe('execution-governance');
+    expect(subgroupOf('governance')).toBe('execution-governance');
+    expect(subgroupOf('memory')).toBe('advanced');
+  });
+
   it('provides breadcrumb and page-title metadata without a second page map', () => {
+    expect(breadcrumbsForPath('/platform')).toEqual(['Platform']);
     expect(breadcrumbsForPath('/platform/integrations')).toEqual(['Platform', 'Integrations / Channels']);
     expect(breadcrumbsForPath('/channel-management')).toEqual(['Platform', 'Integrations / Channels']);
+    expect(pageTitleForPath('/platform')).toBe('Platform Settings · OrbisOps');
     expect(pageTitleForPath('/work/incidents')).toBe('Incidents · OrbisOps');
   });
 });

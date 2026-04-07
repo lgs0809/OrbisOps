@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import styled from 'styled-components';
 import {
   Button,
@@ -29,18 +29,19 @@ import {
 } from '../components/ops-layout';
 import { AiClientApiCreateModal } from '../components/ai-client-api-create-modal';
 import { AiClientApiEditModal } from '../components/ai-client-api-edit-modal';
-import {
-  aiClientApiAdminService,
-  AiClientApiHealthCheckResponseDTO,
-  AiClientApiResponseDTO,
-} from '../services/ai-client-api-admin-service';
-import {
-  aiClientModelAdminService,
+import type { AiClientApiResponseDTO } from '../services/ai-client-api-admin-service';
+import type {
   AiClientModelRequestDTO,
   AiClientModelResponseDTO,
-  AiClientModelSyncResponseDTO,
   ModelDefaultPolicy,
 } from '../services/ai-client-model-admin-service';
+import {
+  useModelCatalogQuery,
+  useProviderHealthCheckMutation,
+  useProviderModelSyncMutation,
+  useSaveModelMutation,
+  useUpdateDefaultModelPolicyMutation,
+} from '../features/models/api/model-queries';
 import { theme } from '../styles/theme';
 
 const { Text, Title, Paragraph } = Typography;
@@ -149,9 +150,6 @@ const emptyDefaultPolicy = (): ModelDefaultPolicy => ({
 });
 
 export const ModelApiManagement: React.FC = () => {
-  const [loading, setLoading] = useState(false);
-  const [providers, setProviders] = useState<AiClientApiResponseDTO[]>([]);
-  const [models, setModels] = useState<AiClientModelResponseDTO[]>([]);
   const [selectedProviderId, setSelectedProviderId] = useState('');
   const [keyword, setKeyword] = useState('');
   const [activeTab, setActiveTab] = useState<TabKey>('models');
@@ -160,40 +158,23 @@ export const ModelApiManagement: React.FC = () => {
   const [editingProvider, setEditingProvider] = useState<AiClientApiResponseDTO | null>(null);
   const [modelModalVisible, setModelModalVisible] = useState(false);
   const [modelForm, setModelForm] = useState<ModelForm>(defaultModelForm());
-  const [defaultPolicy, setDefaultPolicy] = useState<ModelDefaultPolicy>(emptyDefaultPolicy);
-  const [policySaving, setPolicySaving] = useState(false);
-  const [healthChecking, setHealthChecking] = useState(false);
-  const [healthResult, setHealthResult] = useState<AiClientApiHealthCheckResponseDTO | null>(null);
-  const [modelSyncing, setModelSyncing] = useState(false);
-  const [modelSyncResult, setModelSyncResult] = useState<AiClientModelSyncResponseDTO | null>(null);
+  const [policyDraft, setPolicyDraft] = useState<ModelDefaultPolicy | null>(null);
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [providerResult, modelResult, policyResult] = await Promise.all([
-        aiClientApiAdminService.queryAllAiClientApis(),
-        aiClientModelAdminService.queryAllAiClientModels(),
-        aiClientModelAdminService.getDefaultPolicy(),
-      ]);
-      const nextProviders = providerResult.data || [];
-      const nextModels = modelResult.data || [];
-      setProviders(nextProviders);
-      setModels(nextModels);
-      setDefaultPolicy(policyResult.data && Object.keys(policyResult.data).length
-        ? policyResult.data
-        : emptyDefaultPolicy());
-      setSelectedProviderId((current) => current || nextProviders[0]?.apiId || '');
-    } catch (error) {
-      console.error('加载模型接入失败:', error);
-      Toast.error('加载模型接入失败');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const catalogQuery = useModelCatalogQuery(emptyDefaultPolicy);
+  const policyMutation = useUpdateDefaultModelPolicyMutation();
+  const healthMutation = useProviderHealthCheckMutation();
+  const modelSyncMutation = useProviderModelSyncMutation();
+  const saveModelMutation = useSaveModelMutation();
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const providers = catalogQuery.data?.providers || [];
+  const models = catalogQuery.data?.models || [];
+  const defaultPolicy = policyDraft || catalogQuery.data?.defaultPolicy || emptyDefaultPolicy();
+  const loading = catalogQuery.isFetching;
+  const policySaving = policyMutation.isPending;
+  const healthChecking = healthMutation.isPending;
+  const healthResult = healthMutation.data || null;
+  const modelSyncing = modelSyncMutation.isPending;
+  const modelSyncResult = modelSyncMutation.data || null;
 
   const filteredProviders = useMemo(() => {
     const value = keyword.trim().toLowerCase();
@@ -225,18 +206,12 @@ export const ModelApiManagement: React.FC = () => {
       && `${model.modelUsage || ''} ${model.modelType || ''}`.toUpperCase().includes(usage));
 
   const saveDefaultPolicy = async () => {
-    setPolicySaving(true);
     try {
-      const response = await aiClientModelAdminService.updateDefaultPolicy(defaultPolicy);
-      if (response.code !== '0000') {
-        throw new Error(response.info || '保存默认模型策略失败');
-      }
-      setDefaultPolicy(response.data || emptyDefaultPolicy());
+      const saved = await policyMutation.mutateAsync(defaultPolicy);
+      setPolicyDraft(saved || defaultPolicy);
       Toast.success('默认模型策略已保存');
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '保存默认模型策略失败');
-    } finally {
-      setPolicySaving(false);
     }
   };
 
@@ -245,21 +220,16 @@ export const ModelApiManagement: React.FC = () => {
       Toast.warning('请先选择 Provider');
       return;
     }
-    setHealthChecking(true);
     try {
-      const response = await aiClientApiAdminService.healthCheckAiClientApi(selectedProvider.apiId);
-      const result = response.data;
-      setHealthResult(result || null);
+      const result = await healthMutation.mutateAsync(selectedProvider.apiId);
       setActiveTab('health');
-      if (response.code === '0000' && result?.status === 'SUCCESS') {
+      if (result?.status === 'SUCCESS') {
         Toast.success(`Provider 可用，耗时 ${result.latencyMs ?? '-'}ms`);
       } else {
-        Toast.error(result?.errorMessage || response.info || 'Provider 健康检测失败');
+        Toast.error(result?.errorMessage || 'Provider 健康检测失败');
       }
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : 'Provider 健康检测失败');
-    } finally {
-      setHealthChecking(false);
     }
   };
 
@@ -268,19 +238,11 @@ export const ModelApiManagement: React.FC = () => {
       Toast.warning('请先选择 Provider');
       return;
     }
-    setModelSyncing(true);
     try {
-      const response = await aiClientModelAdminService.syncFromProvider(selectedProvider.apiId);
-      if (response.code !== '0000') {
-        throw new Error(response.info || '同步模型目录失败');
-      }
-      setModelSyncResult(response.data || null);
-      Toast.success(`同步完成：新增 ${response.data?.createdCount ?? 0}，更新 ${response.data?.updatedCount ?? 0}，跳过 ${response.data?.skippedCount ?? 0}`);
-      await loadData();
+      const result = await modelSyncMutation.mutateAsync(selectedProvider.apiId);
+      Toast.success(`同步完成：新增 ${result?.createdCount ?? 0}，更新 ${result?.updatedCount ?? 0}，跳过 ${result?.skippedCount ?? 0}`);
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '同步模型目录失败');
-    } finally {
-      setModelSyncing(false);
     }
   };
 
@@ -318,42 +280,33 @@ export const ModelApiManagement: React.FC = () => {
       status: modelForm.status,
     };
     try {
-      const response = modelForm.id
-        ? await aiClientModelAdminService.updateAiClientModelById(payload)
-        : await aiClientModelAdminService.createAiClientModel(payload);
-      if (response.code === '0000') {
-        Toast.success(modelForm.id ? '模型已更新' : '模型已新增');
-        setModelModalVisible(false);
-        loadData();
-      } else {
-        Toast.error(response.info || '保存模型失败');
-      }
+      await saveModelMutation.mutateAsync({ payload, editing: Boolean(modelForm.id) });
+      Toast.success(modelForm.id ? '模型已更新' : '模型已新增');
+      setModelModalVisible(false);
     } catch (error) {
       console.error('保存模型失败:', error);
-      Toast.error('保存模型失败');
+      Toast.error(error instanceof Error ? error.message : '保存模型失败');
     }
   };
 
   const toggleModelStatus = async (record: AiClientModelResponseDTO) => {
     try {
-      const response = await aiClientModelAdminService.updateAiClientModelById({
-        id: record.id,
-        modelId: record.modelId,
-        modelName: record.modelName,
-        modelType: record.modelType,
-        apiId: record.apiId,
-        modelUsage: record.modelUsage,
-        description: record.description,
-        status: record.status === 1 ? 0 : 1,
+      await saveModelMutation.mutateAsync({
+        editing: true,
+        payload: {
+          id: record.id,
+          modelId: record.modelId,
+          modelName: record.modelName,
+          modelType: record.modelType,
+          apiId: record.apiId,
+          modelUsage: record.modelUsage,
+          description: record.description,
+          status: record.status === 1 ? 0 : 1,
+        },
       });
-      if (response.code === '0000') {
-        Toast.success(record.status === 1 ? '模型已停用' : '模型已启用');
-        loadData();
-      } else {
-        Toast.error(response.info || '更新状态失败');
-      }
+      Toast.success(record.status === 1 ? '模型已停用' : '模型已启用');
     } catch (error) {
-      Toast.error('更新状态失败');
+      Toast.error(error instanceof Error ? error.message : '更新状态失败');
     }
   };
 
@@ -424,7 +377,7 @@ export const ModelApiManagement: React.FC = () => {
             新建 Provider
           </Button>
         )}
-        extra={<Button icon={<IconRefresh />} loading={loading} onClick={loadData}>刷新</Button>}
+        extra={<Button icon={<IconRefresh />} loading={loading} onClick={() => catalogQuery.refetch()}>刷新</Button>}
       />
 
       <OpsTwoColumnGrid>
@@ -599,8 +552,8 @@ export const ModelApiManagement: React.FC = () => {
                             showClear
                             filter
                             style={{ width: '100%' }}
-                            onChange={(value) => setDefaultPolicy((current) => ({
-                              ...current,
+                            onChange={(value) => setPolicyDraft((current) => ({
+                              ...(current || defaultPolicy),
                               [field]: String(value || ''),
                             }))}
                           >
@@ -640,7 +593,7 @@ export const ModelApiManagement: React.FC = () => {
         onCancel={() => setCreateProviderVisible(false)}
         onSuccess={() => {
           setCreateProviderVisible(false);
-          loadData();
+          void catalogQuery.refetch();
         }}
       />
 
@@ -654,7 +607,7 @@ export const ModelApiManagement: React.FC = () => {
         onSuccess={() => {
           setEditProviderVisible(false);
           setEditingProvider(null);
-          loadData();
+          void catalogQuery.refetch();
         }}
       />
 

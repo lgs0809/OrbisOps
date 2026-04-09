@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Button,
   Checkbox,
@@ -24,10 +24,14 @@ import {
   OpsSectionCard,
   TableScroll,
 } from '../components/ops-layout';
+import type { OpsExecutionAdapterTemplate } from '../services/ops-repair-service';
 import {
-  OpsExecutionAdapterTemplate,
-  opsRepairService,
-} from '../services/ops-repair-service';
+  useCopyExecutionAdapterTemplateMutation,
+  useExecutionAdapterTemplateTargetsMutation,
+  useExecutionAdapterTemplatesQuery,
+  useSaveExecutionAdapterTemplateMutation,
+  useToggleExecutionAdapterTemplateMutation,
+} from '../features/execution-targets/api/execution-target-queries';
 import { generatedId } from '../utils/generated-id';
 
 const { Option } = Select;
@@ -98,43 +102,28 @@ const riskColor = (risk?: string) => {
 };
 
 export const ExecutionAdapterTemplatesPage: React.FC = () => {
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [templates, setTemplates] = useState<OpsExecutionAdapterTemplate[]>([]);
   const [formVisible, setFormVisible] = useState(false);
   const [editing, setEditing] = useState<OpsExecutionAdapterTemplate | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
   const [targetsVisible, setTargetsVisible] = useState(false);
-  const [generatedTargets, setGeneratedTargets] = useState<Array<Record<string, unknown>>>([]);
   const [targetTitle, setTargetTitle] = useState('生成记录');
-  const [error, setError] = useState('');
+
+  const templatesQuery = useExecutionAdapterTemplatesQuery();
+  const saveTemplateMutation = useSaveExecutionAdapterTemplateMutation();
+  const copyTemplateMutation = useCopyExecutionAdapterTemplateMutation();
+  const toggleTemplateMutation = useToggleExecutionAdapterTemplateMutation();
+  const targetsMutation = useExecutionAdapterTemplateTargetsMutation();
+
+  const templates = templatesQuery.data || [];
+  const loading = templatesQuery.isFetching;
+  const saving = saveTemplateMutation.isPending;
+  const generatedTargets = targetsMutation.data || [];
+  const error = templatesQuery.error instanceof Error ? templatesQuery.error.message : '';
 
   const enabledCount = useMemo(
     () => templates.filter((item) => String(item.status).toUpperCase() === 'ENABLED').length,
     [templates],
   );
-
-  const loadTemplates = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const response = await opsRepairService.listExecutionAdapterTemplates();
-      if (response.code !== '0000') {
-        throw new Error(response.info || '查询执行目标模板失败');
-      }
-      setTemplates(response.data || []);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : '查询执行目标模板失败';
-      setError(message);
-      Toast.error(message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadTemplates();
-  }, []);
 
   const openCreate = () => {
     setEditing(null);
@@ -159,7 +148,6 @@ export const ExecutionAdapterTemplatesPage: React.FC = () => {
   };
 
   const submitTemplate = async () => {
-    setSaving(true);
     try {
       const defaultConfig = JSON.parse(form.defaultConfig || '{}');
       const payload = {
@@ -176,30 +164,21 @@ export const ExecutionAdapterTemplatesPage: React.FC = () => {
         description: form.description,
         status: form.status,
       };
-      const response = editing
-        ? await opsRepairService.updateExecutionAdapterTemplate(editing.adapterTemplateId, payload)
-        : await opsRepairService.createExecutionAdapterTemplate(payload);
-      if (response.code !== '0000') {
-        throw new Error(response.info || '保存执行目标模板失败');
-      }
+      await saveTemplateMutation.mutateAsync({
+        editingId: editing?.adapterTemplateId,
+        payload,
+      });
       Toast.success(editing ? '模板已更新' : '模板已创建');
       setFormVisible(false);
-      loadTemplates();
     } catch (err) {
       Toast.error(err instanceof Error ? err.message : '保存执行目标模板失败');
-    } finally {
-      setSaving(false);
     }
   };
 
   const copyTemplate = async (template: OpsExecutionAdapterTemplate) => {
     try {
-      const response = await opsRepairService.copyExecutionAdapterTemplate(template.adapterTemplateId);
-      if (response.code !== '0000') {
-        throw new Error(response.info || '复制模板失败');
-      }
+      await copyTemplateMutation.mutateAsync(template.adapterTemplateId);
       Toast.success('模板已复制');
-      loadTemplates();
     } catch (err) {
       Toast.error(err instanceof Error ? err.message : '复制模板失败');
     }
@@ -208,15 +187,11 @@ export const ExecutionAdapterTemplatesPage: React.FC = () => {
   const toggleStatus = async (template: OpsExecutionAdapterTemplate) => {
     try {
       const nextStatus = String(template.status).toUpperCase() === 'ENABLED' ? 'DISABLED' : 'ENABLED';
-      const response = await opsRepairService.updateExecutionAdapterTemplateStatus(
-        template.adapterTemplateId,
-        nextStatus,
-      );
-      if (response.code !== '0000') {
-        throw new Error(response.info || '更新模板状态失败');
-      }
+      await toggleTemplateMutation.mutateAsync({
+        templateId: template.adapterTemplateId,
+        status: nextStatus,
+      });
       Toast.success(nextStatus === 'ENABLED' ? '模板已启用' : '模板已停用');
-      loadTemplates();
     } catch (err) {
       Toast.error(err instanceof Error ? err.message : '更新模板状态失败');
     }
@@ -224,11 +199,7 @@ export const ExecutionAdapterTemplatesPage: React.FC = () => {
 
   const viewTargets = async (template: OpsExecutionAdapterTemplate) => {
     try {
-      const response = await opsRepairService.listExecutionAdapterTemplateTargets(template.adapterTemplateId);
-      if (response.code !== '0000') {
-        throw new Error(response.info || '查询生成记录失败');
-      }
-      setGeneratedTargets(response.data || []);
+      await targetsMutation.mutateAsync(template.adapterTemplateId);
       setTargetTitle(`${template.templateName || template.adapterTemplateId} 的生成记录`);
       setTargetsVisible(true);
     } catch (err) {
@@ -315,7 +286,7 @@ export const ExecutionAdapterTemplatesPage: React.FC = () => {
         description="这里维护的是“执行目标蓝图”。真实可执行目标必须在项目里创建，绑定环境、资源范围和 credentialRef 后，才能进入执行中心审批。"
         primaryAction={<Button theme="solid" icon={<IconPlus />} onClick={openCreate}>新建模板</Button>}
         extra={(
-          <Button icon={<IconRefresh />} onClick={loadTemplates} loading={loading}>
+          <Button icon={<IconRefresh />} onClick={() => templatesQuery.refetch()} loading={loading}>
             刷新
           </Button>
         )}

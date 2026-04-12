@@ -27,12 +27,13 @@ import {
 } from '../components/ops-layout';
 import { WorkflowApprovalPanel } from '../features/execution/components/WorkflowApprovalPanel';
 import { isAdminUser } from '../services/auth-session';
+import type { OpsAnalysisTaskSummary } from '../services/ops-admin-service';
 import {
-  opsAdminService,
-  OpsAnalysisTaskDetail,
-  OpsAnalysisTaskSummary,
-} from '../services/ops-admin-service';
-import { opsProjectService } from '../services/ops-project-service';
+  useAnalysisTaskDetailQuery,
+  useAnalysisTaskFeedbackMutation,
+  useAnalysisTaskProjectsQuery,
+  useAnalysisTasksQuery,
+} from '../features/analysis-tasks/api/analysis-task-queries';
 import { theme } from '../styles/theme';
 
 const { Option } = Select;
@@ -92,8 +93,6 @@ const Meta = styled.dl`
   dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
 `;
 
-type ProjectOption = { projectId: string; name: string };
-
 const statusLabel = (status?: string) => {
   const normalized = String(status || '').toUpperCase();
   return ({
@@ -145,87 +144,58 @@ export const AnalysisTaskCenterPage: React.FC = () => {
   const deepLinkOpened = useRef('');
   const admin = isAdminUser();
   const scope = admin ? 'admin' as const : 'user' as const;
-  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [projectId, setProjectId] = useState('');
   const [source, setSource] = useState('');
   const [status, setStatus] = useState('');
-  const [tasks, setTasks] = useState<OpsAnalysisTaskSummary[]>([]);
-  const [selected, setSelected] = useState<OpsAnalysisTaskDetail | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [detailLoading, setDetailLoading] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<{ projectId: string; runId: string } | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
   const [feedbackComment, setFeedbackComment] = useState('');
-  const [feedbackLoading, setFeedbackLoading] = useState(false);
 
-  const loadProjects = async () => {
-    try {
-      const values = admin
-        ? (await opsProjectService.snapshot()).data?.projects || []
-        : (await opsAdminService.listChatProjects()).data || [];
-      const options = values.map((item: any) => ({ projectId: item.projectId, name: item.name || item.projectId }));
-      setProjects(options);
-      setProjectId((current) => requestedProjectId || current || options[0]?.projectId || '');
-    } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '读取项目失败');
-    }
-  };
+  const projectsQuery = useAnalysisTaskProjectsQuery(scope);
+  const projects = projectsQuery.data || [];
+  const effectiveProjectId = projectId || requestedProjectId || projects[0]?.projectId || '';
+  const tasksQuery = useAnalysisTasksQuery(scope, effectiveProjectId, source, status);
+  const tasks = tasksQuery.data || [];
+  const detailQuery = useAnalysisTaskDetailQuery(
+    scope,
+    selectedTask?.projectId || '',
+    selectedTask?.runId || '',
+    detailVisible,
+  );
+  const feedbackMutation = useAnalysisTaskFeedbackMutation();
+  const selected = detailQuery.data || null;
+  const loading = tasksQuery.isFetching;
+  const detailLoading = detailQuery.isFetching;
+  const feedbackLoading = feedbackMutation.isPending;
+  const listError = projectsQuery.error instanceof Error
+    ? projectsQuery.error.message
+    : tasksQuery.error instanceof Error
+      ? tasksQuery.error.message
+      : '';
+  const detailError = detailQuery.error instanceof Error ? detailQuery.error.message : '';
 
-  const loadTasks = async () => {
-    if (!projectId) {
-      setTasks([]);
-      return;
-    }
-    setLoading(true);
-    try {
-      const response = await opsAdminService.listAnalysisTasks({ projectId, source, status, scope, limit: 200 });
-      setTasks(response.data || []);
-    } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '读取分析任务失败');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const openDetail = async (task: OpsAnalysisTaskSummary) => {
-    setDetailVisible(true);
-    setDetailLoading(true);
-    setSelected(null);
+  const openDetail = (task: OpsAnalysisTaskSummary) => {
+    setSelectedTask({ projectId: task.projectId, runId: task.runId });
     setFeedbackComment('');
-    try {
-      const response = await opsAdminService.getAnalysisTask(task.projectId, task.runId, scope);
-      setSelected(response.data);
-    } catch (error) {
-      setDetailVisible(false);
-      Toast.error(error instanceof Error ? error.message : '读取任务详情失败');
-    } finally {
-      setDetailLoading(false);
-    }
+    setDetailVisible(true);
   };
 
   const sendFeedback = async (feedbackType: 'HELPFUL' | 'INACCURATE' | 'INSUFFICIENT_EVIDENCE') => {
     if (!selected) return;
-    setFeedbackLoading(true);
     try {
-      await opsAdminService.recordAnalysisTaskFeedback(
-        selected.projectId,
-        selected.runId,
+      await feedbackMutation.mutateAsync({
+        projectId: selected.projectId,
+        runId: selected.runId,
         feedbackType,
-        feedbackComment.trim(),
+        comment: feedbackComment.trim(),
         scope,
-      );
-      const refreshed = await opsAdminService.getAnalysisTask(selected.projectId, selected.runId, scope);
-      setSelected(refreshed.data);
+      });
       setFeedbackComment('');
       Toast.success('反馈已记录，并用于后续 Skill 效果评估');
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '记录反馈失败');
-    } finally {
-      setFeedbackLoading(false);
     }
   };
-
-  useEffect(() => { void loadProjects(); }, []);
-  useEffect(() => { void loadTasks(); }, [projectId, source, status]);
   useEffect(() => {
     if (!requestedRunId || deepLinkOpened.current === requestedRunId) return;
     const target = tasks.find((task) => task.runId === requestedRunId);
@@ -245,7 +215,7 @@ export const AnalysisTaskCenterPage: React.FC = () => {
       <OpsPageHeader
         title="分析任务"
         description="统一查看对话、消息渠道、告警和巡检触发的运维分析。每条任务都关联真实证据、工具结果、ChangePackage 和 Skill 使用记录。"
-        primaryAction={<Button onClick={loadTasks}>刷新</Button>}
+        primaryAction={<Button loading={loading} onClick={() => tasksQuery.refetch()}>刷新</Button>}
       />
 
       <OpsResponsiveGrid $min="220px">
@@ -256,7 +226,7 @@ export const AnalysisTaskCenterPage: React.FC = () => {
 
       <OpsSectionCard title="任务列表">
         <Toolbar>
-          <Select value={projectId} placeholder="选择项目" filter style={{ width: 240 }} onChange={(value) => setProjectId(String(value || ''))}>
+          <Select value={effectiveProjectId} placeholder="选择项目" filter style={{ width: 240 }} onChange={(value) => setProjectId(String(value || ''))}>
             {projects.map((project) => <Option key={project.projectId} value={project.projectId}>{project.name}</Option>)}
           </Select>
           <Select value={source} style={{ width: 160 }} onChange={(value) => setSource(String(value || ''))}>
@@ -266,8 +236,9 @@ export const AnalysisTaskCenterPage: React.FC = () => {
             <Option value="">全部状态</Option><Option value="PENDING">等待执行</Option><Option value="RUNNING">执行中</Option><Option value="WAITING_APPROVAL">等待审批</Option><Option value="SUCCEEDED">已完成</Option><Option value="FAILED">失败</Option><Option value="CANCELED">已取消</Option>
           </Select>
         </Toolbar>
+        {listError && <OpsEmptyState title="加载分析任务失败" description={listError} />}
         <Spin spinning={loading}>
-          {tasks.length === 0 ? <OpsEmptyState title="暂无分析任务" description="从 AI 对话、消息渠道、告警或巡检发起一次运维分析后，会在这里形成统一任务记录。" /> : (
+          {!listError && (tasks.length === 0 ? <OpsEmptyState title="暂无分析任务" description="从 AI 对话、消息渠道、告警或巡检发起一次运维分析后，会在这里形成统一任务记录。" /> : (
             <TableScroll>
               <Table
                 rowKey="runId"
@@ -283,13 +254,13 @@ export const AnalysisTaskCenterPage: React.FC = () => {
                 ]}
               />
             </TableScroll>
-          )}
+          ))}
         </Spin>
       </OpsSectionCard>
 
       <Modal title="分析任务详情" visible={detailVisible} footer={null} width={1160} style={{ maxWidth: '96vw' }} onCancel={() => setDetailVisible(false)}>
         <Spin spinning={detailLoading}>
-          {!selected ? <div style={{ minHeight: 160 }} /> : (
+          {detailError ? <OpsEmptyState title="加载任务详情失败" description={detailError} /> : !selected ? <div style={{ minHeight: 160 }} /> : (
             <div style={{ maxHeight: '76vh', overflow: 'auto', paddingRight: 8 }}>
               <DetailColumns>
                 <Space vertical align="start" spacing="medium" style={{ width: '100%', minWidth: 0 }}>
@@ -332,10 +303,8 @@ export const AnalysisTaskCenterPage: React.FC = () => {
                     projectId={selected.projectId}
                     scope={scope}
                     onChanged={() => {
-                      void loadTasks();
-                      void opsAdminService.getAnalysisTask(selected.projectId, selected.runId, scope)
-                        .then((response) => setSelected(response.data))
-                        .catch(() => undefined);
+                      void tasksQuery.refetch();
+                      void detailQuery.refetch();
                     }}
                   />
 

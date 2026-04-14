@@ -1,10 +1,17 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import styled from 'styled-components';
 import { Button, Input, Modal, Select, Space, Table, Tag, Typography, Toast } from '@douyinfe/semi-ui';
 import { IconEyeOpened } from '@douyinfe/semi-icons';
 
 import { ProjectScopeBar } from '../components/project-scope-bar';
-import { OpsAuditPolicy, OpsConfigAuditRecord, opsAdminService } from '../services/ops-admin-service';
+import type { OpsAuditPolicy, OpsConfigAuditRecord } from '../services/ops-admin-service';
+import {
+  useAuditPolicyQuery,
+  useExportAuditMutation,
+  useGovernanceAuditDetailQuery,
+  useGovernanceAuditsQuery,
+  useSaveAuditPolicyMutation,
+} from '../features/governance/api/governance-queries';
 import { theme } from '../styles/theme';
 import { useProjectScope } from '../hooks/use-project-scope';
 import {
@@ -127,8 +134,6 @@ const prettyJson = (value?: string) => {
   }
 };
 
-const mysqlDateTime = (time: number) => new Date(time).toISOString().slice(0, 19).replace('T', ' ');
-
 const policyNumber = (policy: OpsAuditPolicy, camelKey: string, snakeKey: string, fallback: number) => {
   const value = policy[camelKey] ?? policy[snakeKey];
   const parsed = Number(value);
@@ -157,8 +162,6 @@ const normalizePolicy = (policy?: OpsAuditPolicy): OpsAuditPolicy => ({
 
 export const OpsStatusManagementPage: React.FC = () => {
   const projectScope = useProjectScope();
-  const [loading, setLoading] = useState(false);
-  const [audits, setAudits] = useState<OpsConfigAuditRecord[]>([]);
   const [activeTab, setActiveTab] = useState<AuditTabKey>('operation');
   const [moduleFilter, setModuleFilter] = useState('');
   const [userFilter, setUserFilter] = useState('');
@@ -166,62 +169,41 @@ export const OpsStatusManagementPage: React.FC = () => {
   const [riskFilter, setRiskFilter] = useState('');
   const [timeFilter, setTimeFilter] = useState('');
   const [keyword, setKeyword] = useState('');
-  const [detail, setDetail] = useState<OpsConfigAuditRecord | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [auditPolicy, setAuditPolicy] = useState<OpsAuditPolicy>(() => normalizePolicy());
-  const [policyLoading, setPolicyLoading] = useState(false);
-  const [policySaving, setPolicySaving] = useState(false);
+  const [detailRecord, setDetailRecord] = useState<OpsConfigAuditRecord | null>(null);
+  const [policyDraft, setPolicyDraft] = useState<{ scopeKey: string; value: OpsAuditPolicy } | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const now = Date.now();
-      const startTime = timeFilter === '24h'
-        ? mysqlDateTime(now - 24 * 60 * 60 * 1000)
-        : timeFilter === '7d'
-          ? mysqlDateTime(now - 7 * 24 * 60 * 60 * 1000)
-          : undefined;
-      const result = await opsAdminService.listConfigAudits({
-        projectId: projectScope.projectId || undefined,
-        userId: userFilter.trim() || undefined,
-        agentId: agentFilter.trim() || undefined,
-        module: moduleFilter || undefined,
-        riskLevel: riskFilter || undefined,
-        startTime,
-        limit: 200,
-      });
-      setAudits(result.data || []);
-    } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '加载审计记录失败');
-    } finally {
-      setLoading(false);
-    }
-  }, [agentFilter, moduleFilter, projectScope.projectId, riskFilter, timeFilter, userFilter]);
+  const auditFilters = useMemo(() => ({
+    projectId: projectScope.projectId || undefined,
+    userId: userFilter,
+    agentId: agentFilter,
+    module: moduleFilter,
+    riskLevel: riskFilter,
+    timeFilter,
+  }), [agentFilter, moduleFilter, projectScope.projectId, riskFilter, timeFilter, userFilter]);
+  const auditScopeReady = !projectScope.loading && (Boolean(projectScope.projectId) || projectScope.projects.length === 0);
+  const auditsQuery = useGovernanceAuditsQuery(auditFilters, auditScopeReady);
+  const audits = auditsQuery.data || [];
+  const loading = auditsQuery.isFetching;
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const detailAuditId = detailRecord ? (detailRecord.audit_id || String(detailRecord.id)) : '';
+  const detailQuery = useGovernanceAuditDetailQuery(detailAuditId, Boolean(detailRecord));
+  const detail = detailQuery.data || detailRecord;
+  const detailLoading = detailQuery.isFetching;
 
-  const loadPolicy = useCallback(async () => {
-    setPolicyLoading(true);
-    try {
-      const result = await opsAdminService.getAuditPolicy(projectScope.projectId || undefined);
-      if (result.code !== '0000') {
-        throw new Error(result.info || '加载审计策略失败');
-      }
-      setAuditPolicy(normalizePolicy(result.data));
-    } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '加载审计策略失败');
-    } finally {
-      setPolicyLoading(false);
-    }
-  }, [projectScope.projectId]);
-
-  useEffect(() => {
-    if (activeTab === 'policy') {
-      void loadPolicy();
-    }
-  }, [activeTab, loadPolicy]);
+  const policyScopeKey = projectScope.projectId || 'GLOBAL';
+  const policyQuery = useAuditPolicyQuery(projectScope.projectId || undefined, activeTab === 'policy');
+  const policyMutation = useSaveAuditPolicyMutation();
+  const exportMutation = useExportAuditMutation();
+  const policyFromServer = normalizePolicy(policyQuery.data);
+  const auditPolicy = policyDraft?.scopeKey === policyScopeKey ? policyDraft.value : policyFromServer;
+  const policyLoading = policyQuery.isFetching;
+  const policySaving = policyMutation.isPending;
+  const auditError = auditsQuery.error instanceof Error ? auditsQuery.error.message : '';
+  const policyError = policyQuery.error instanceof Error ? policyQuery.error.message : '';
+  const detailError = detailQuery.error instanceof Error ? detailQuery.error.message : '';
+  const updateAuditPolicyDraft = (updater: (current: OpsAuditPolicy) => OpsAuditPolicy) => {
+    setPolicyDraft({ scopeKey: policyScopeKey, value: updater(auditPolicy) });
+  };
 
   const filteredAudits = useMemo(() => {
     const normalized = keyword.trim().toLowerCase();
@@ -233,27 +215,15 @@ export const OpsStatusManagementPage: React.FC = () => {
     });
   }, [activeTab, audits, keyword]);
 
-  const openDetail = async (record: OpsConfigAuditRecord) => {
-    setDetail(record);
-    setDetailLoading(true);
-    try {
-      const result = await opsAdminService.getConfigAudit(record.audit_id || String(record.id));
-      setDetail(result.data || record);
-    } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '加载审计详情失败');
-    } finally {
-      setDetailLoading(false);
-    }
+  const openDetail = (record: OpsConfigAuditRecord) => {
+    setDetailRecord(record);
   };
 
   const exportAudit = async (record: OpsConfigAuditRecord) => {
     try {
       const auditId = record.audit_id || String(record.id);
-      const response = await opsAdminService.exportConfigAudit(auditId);
-      if (response.code !== '0000') {
-        throw new Error(response.info || '导出审计失败');
-      }
-      const blob = new Blob([JSON.stringify(response.data || {}, null, 2)], { type: 'application/json;charset=utf-8' });
+      const exported = await exportMutation.mutateAsync(auditId);
+      const blob = new Blob([JSON.stringify(exported || {}, null, 2)], { type: 'application/json;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
@@ -267,9 +237,8 @@ export const OpsStatusManagementPage: React.FC = () => {
   };
 
   const saveAuditPolicy = async () => {
-    setPolicySaving(true);
     try {
-      const response = await opsAdminService.updateAuditPolicy({
+      const saved = await policyMutation.mutateAsync({
         projectId: projectScope.projectId || 'GLOBAL',
         retentionDays: policyNumber(auditPolicy, 'retentionDays', 'retention_days', 180),
         maskingEnabled: policyBoolean(auditPolicy, 'maskingEnabled', 'masking_enabled'),
@@ -278,16 +247,10 @@ export const OpsStatusManagementPage: React.FC = () => {
         replayEnabled: policyBoolean(auditPolicy, 'replayEnabled', 'replay_enabled'),
         status: auditPolicy.status || 'ENABLED',
       });
-      if (response.code !== '0000') {
-        throw new Error(response.info || '保存审计策略失败');
-      }
-      setAuditPolicy(normalizePolicy(response.data));
+      setPolicyDraft({ scopeKey: policyScopeKey, value: normalizePolicy(saved) });
       Toast.success('审计策略已保存');
-      void load();
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '保存审计策略失败');
-    } finally {
-      setPolicySaving(false);
     }
   };
 
@@ -306,7 +269,7 @@ export const OpsStatusManagementPage: React.FC = () => {
             projectId={projectScope.projectId}
             onChange={projectScope.selectProject}
             loading={projectScope.loading}
-            onRefresh={load}
+            onRefresh={() => void auditsQuery.refetch()}
           />
 
           <AuditTabNav aria-label="审计治理分类">
@@ -393,7 +356,9 @@ export const OpsStatusManagementPage: React.FC = () => {
               <Text type="tertiary">共 {filteredAudits.length} 条项目事件</Text>
             </Toolbar>
             {activeTab === 'policy' ? (
-              <Space vertical align="start" style={{ width: '100%' }}>
+              policyError ? (
+                <OpsEmptyState title="加载审计策略失败" description={policyError} />
+              ) : <Space vertical align="start" style={{ width: '100%' }}>
                 <Text type="tertiary">
                   当前策略作用于 {projectScope.selectedProject?.name || auditPolicy.projectId || '平台默认'}。保存会写入配置审计，用于约束审计保留、脱敏、导出审批和高风险操作确认。
                 </Text>
@@ -402,7 +367,7 @@ export const OpsStatusManagementPage: React.FC = () => {
                     <Text strong>保留天数</Text>
                     <Input
                       value={String(policyNumber(auditPolicy, 'retentionDays', 'retention_days', 180))}
-                      onChange={(value) => setAuditPolicy((current) => ({ ...current, retentionDays: Number(value) || 180 }))}
+                      onChange={(value) => updateAuditPolicyDraft((current) => ({ ...current, retentionDays: Number(value) || 180 }))}
                     />
                   </div>
                   <div>
@@ -410,7 +375,7 @@ export const OpsStatusManagementPage: React.FC = () => {
                     <Select
                       value={policyBoolean(auditPolicy, 'maskingEnabled', 'masking_enabled') ? 'true' : 'false'}
                       style={{ width: '100%' }}
-                      onChange={(value) => setAuditPolicy((current) => ({ ...current, maskingEnabled: value === 'true' }))}
+                      onChange={(value) => updateAuditPolicyDraft((current) => ({ ...current, maskingEnabled: value === 'true' }))}
                     >
                       <Select.Option value="true">启用</Select.Option>
                       <Select.Option value="false">关闭</Select.Option>
@@ -421,7 +386,7 @@ export const OpsStatusManagementPage: React.FC = () => {
                     <Select
                       value={policyBoolean(auditPolicy, 'exportApprovalRequired', 'export_approval_required') ? 'true' : 'false'}
                       style={{ width: '100%' }}
-                      onChange={(value) => setAuditPolicy((current) => ({ ...current, exportApprovalRequired: value === 'true' }))}
+                      onChange={(value) => updateAuditPolicyDraft((current) => ({ ...current, exportApprovalRequired: value === 'true' }))}
                     >
                       <Select.Option value="true">需要审批</Select.Option>
                       <Select.Option value="false">不需要审批</Select.Option>
@@ -432,7 +397,7 @@ export const OpsStatusManagementPage: React.FC = () => {
                     <Select
                       value={policyBoolean(auditPolicy, 'highRiskConfirmationRequired', 'high_risk_confirmation_required') ? 'true' : 'false'}
                       style={{ width: '100%' }}
-                      onChange={(value) => setAuditPolicy((current) => ({ ...current, highRiskConfirmationRequired: value === 'true' }))}
+                      onChange={(value) => updateAuditPolicyDraft((current) => ({ ...current, highRiskConfirmationRequired: value === 'true' }))}
                     >
                       <Select.Option value="true">需要确认</Select.Option>
                       <Select.Option value="false">不需要确认</Select.Option>
@@ -443,7 +408,7 @@ export const OpsStatusManagementPage: React.FC = () => {
                     <Select
                       value={policyBoolean(auditPolicy, 'replayEnabled', 'replay_enabled') ? 'true' : 'false'}
                       style={{ width: '100%' }}
-                      onChange={(value) => setAuditPolicy((current) => ({ ...current, replayEnabled: value === 'true' }))}
+                      onChange={(value) => updateAuditPolicyDraft((current) => ({ ...current, replayEnabled: value === 'true' }))}
                     >
                       <Select.Option value="true">允许</Select.Option>
                       <Select.Option value="false">关闭</Select.Option>
@@ -454,7 +419,7 @@ export const OpsStatusManagementPage: React.FC = () => {
                     <Select
                       value={auditPolicy.status || 'ENABLED'}
                       style={{ width: '100%' }}
-                      onChange={(value) => setAuditPolicy((current) => ({ ...current, status: String(value || 'ENABLED') }))}
+                      onChange={(value) => updateAuditPolicyDraft((current) => ({ ...current, status: String(value || 'ENABLED') }))}
                     >
                       <Select.Option value="ENABLED">启用</Select.Option>
                       <Select.Option value="DISABLED">停用</Select.Option>
@@ -462,8 +427,16 @@ export const OpsStatusManagementPage: React.FC = () => {
                   </div>
                 </OpsResponsiveGrid>
                 <Space wrap>
-                  <Button theme="solid" loading={policySaving} onClick={saveAuditPolicy}>保存审计策略</Button>
-                  <Button loading={policyLoading} onClick={() => void loadPolicy()}>重新加载</Button>
+                  <Button theme="solid" loading={policySaving || policyLoading} onClick={saveAuditPolicy}>保存审计策略</Button>
+                  <Button
+                    loading={policyLoading}
+                    onClick={() => {
+                      setPolicyDraft(null);
+                      void policyQuery.refetch();
+                    }}
+                  >
+                    重新加载
+                  </Button>
                 </Space>
                 <OpsAdvancedPreview title="审计策略高级预览">
                   <JsonBlock>{JSON.stringify(auditPolicy, null, 2)}</JsonBlock>
@@ -480,6 +453,8 @@ export const OpsStatusManagementPage: React.FC = () => {
                   </Space>
                 </OpsDangerZone>
               </Space>
+            ) : auditError ? (
+              <OpsEmptyState title="加载审计记录失败" description={auditError} />
             ) : (
               <TableScroll>
                 <Table
@@ -518,9 +493,10 @@ export const OpsStatusManagementPage: React.FC = () => {
           </AuditPanel>
       </HeaderRow>
 
-      <Modal title="审计详情" visible={Boolean(detail)} footer={null} width={900} onCancel={() => setDetail(null)}>
+      <Modal title="审计详情" visible={Boolean(detailRecord)} footer={null} width={900} onCancel={() => setDetailRecord(null)}>
         <Space vertical align="start" spacing="medium" style={{ width: '100%' }}>
           {detailLoading && <Text type="tertiary">正在加载完整审计记录...</Text>}
+          {detailError && <OpsEmptyState title="加载审计详情失败" description={detailError} />}
           <Text>{moduleLabel(detail?.module_name)} / {detail?.action_name} / {detail?.target_id}</Text>
           <OpsAdvancedPreview title="高级预览：变更前 JSON">
             <JsonBlock>{prettyJson(detail?.before_json)}</JsonBlock>

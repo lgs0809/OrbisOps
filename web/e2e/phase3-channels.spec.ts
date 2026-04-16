@@ -73,3 +73,64 @@ test('Phase 3 Channel setup exposes only implemented Telegram, Discord, and QQ t
   await expect(modal).toContainText('QQ Gateway WebSocket');
   await expect(modal).toContainText('暂不宣称 QQ Guild、附件或原消息更新');
 });
+
+test('Channel detail queries stay on demand and isolate message limits', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('token', 'x');
+    localStorage.setItem('isLoggedIn', 'true');
+    localStorage.setItem('userInfo', JSON.stringify({
+      userId: '10001', username: 'e2e-admin', userRole: 'admin', role: 'admin', token: 'x',
+    }));
+  });
+
+  const messageLimits: number[] = [];
+  let identityRequests = 0;
+  const channel = {
+    channelId: 'channel-1', projectId: 'demo-project', name: 'Telegram Ops', type: 'TELEGRAM',
+    credentialRef: '${env:TELEGRAM_OPS_BOT_TOKEN}', config: { connectionMode: 'LONG_CONNECTION', botUsername: '@orbisops_bot' },
+    executionType: 'NONE', accessPolicy: 'DENY_UNKNOWN', status: 'ACTIVE',
+  };
+
+  await page.route('http://127.0.0.1:8099/**', async (route) => {
+    const url = new URL(route.request().url());
+    const path = url.pathname;
+    if (path.endsWith('/api/v1/admin/ops-projects/snapshot')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: response({
+        projects: [{ projectId: 'demo-project', name: 'Demo Project', defaultAgentId: 'default-react' }],
+      }) });
+    }
+    if (path.includes('/api/v1/admin/ops-agents')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: response([]) });
+    }
+    if (path.endsWith('/api/v1/admin/ops/channels/types')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: response(phase3Types) });
+    }
+    if (path.endsWith('/api/v1/admin/ops/channels')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: response([channel]) });
+    }
+    if (path.endsWith('/api/v1/admin/ops/channels/channel-1/messages')) {
+      messageLimits.push(Number(url.searchParams.get('limit')));
+      return route.fulfill({ status: 200, contentType: 'application/json', body: response([]) });
+    }
+    if (path.endsWith('/api/v1/admin/ops/channels/channel-1/identities')) {
+      identityRequests += 1;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: response([]) });
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: response([]) });
+  });
+
+  await page.goto('/platform/integrations?projectId=demo-project');
+  const row = page.getByRole('row').filter({ hasText: 'Telegram Ops' });
+  await expect(row).toBeVisible();
+  expect(messageLimits).toEqual([]);
+  expect(identityRequests).toBe(0);
+
+  await row.getByRole('button', { name: '消息' }).click();
+  await expect.poll(() => messageLimits).toEqual([100]);
+  expect(identityRequests).toBe(0);
+
+  await page.keyboard.press('Escape');
+  await row.getByRole('button', { name: '身份' }).click();
+  await expect.poll(() => messageLimits).toEqual([100, 200]);
+  await expect.poll(() => identityRequests).toBe(1);
+});

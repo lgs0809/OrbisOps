@@ -1,19 +1,14 @@
 import React, { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Button, Checkbox, Input, Modal, Select, Space, Table, Tag, Toast, Typography } from '@douyinfe/semi-ui';
 import { IconHistory, IconPlus, IconRefresh, IconSend } from '@douyinfe/semi-icons';
 
 import { OpsEmptyState, OpsPageHeader, OpsPageShell, OpsSectionCard, TableScroll } from '../../../components/ops-layout';
 import { ProjectScopeBar } from '../../../components/project-scope-bar';
 import { useProjectScope } from '../../../hooks/use-project-scope';
-import { AdminUserService } from '../../../services/admin-user-service';
 import type { AdminUserResponseDTO } from '../../../services/admin-user-service';
-import { opsAdminService } from '../../../services/ops-admin-service';
 import type { OpsAgentDefinition } from '../../../services/ops-admin-service';
-import { opsProjectService } from '../../../services/ops-project-service';
 import type { OpsProjectMember } from '../../../services/ops-project-service';
 import {
-  opsChannelService,
   type OpsChannel,
   type OpsChannelAccessPolicy,
   type OpsChannelConnectionMode,
@@ -24,12 +19,21 @@ import {
 } from '../../../services/ops-channel-service';
 import { agentDisplayName } from '../../../utils/agent-capabilities';
 import {
+  useBindChannelIdentityMutation,
+  useChannelEnabledUsersQuery,
   useChannelIdentitiesQuery,
   useChannelMessagesQuery,
   useChannelOutboxQuery,
+  useChannelProjectMembersQuery,
   useChannelReadinessQuery,
   useChannelsQuery,
   useChannelTypesQuery,
+  useChannelWorkflowOptionsQuery,
+  useProcessChannelOutboxMutation,
+  useRecoverInboundMutation,
+  useSaveChannelMutation,
+  useSendChannelTestMutation,
+  useUpdateChannelOutboxMutation,
 } from '../api/channel-queries';
 import { ChannelProviderCards } from '../components/ChannelProviderCards';
 import { ChannelReadinessPanel } from '../components/ChannelReadinessPanel';
@@ -121,13 +125,10 @@ export const ChannelManagementPage: React.FC = () => {
   const scope = useProjectScope();
   const channelsQuery = useChannelsQuery(scope.projectId);
   const typesQuery = useChannelTypesQuery();
+  const agentsQuery = useChannelWorkflowOptionsQuery(scope.projectId);
+  const saveChannelMutation = useSaveChannelMutation(scope.projectId);
+  const sendTestMutation = useSendChannelTestMutation(scope.projectId);
   const channels = channelsQuery.data || [];
-  const agentsQuery = useQuery({
-    queryKey: ['channels', 'workflow-options', scope.projectId],
-    enabled: Boolean(scope.projectId),
-    queryFn: async () => ((await opsAdminService.listAgents(scope.projectId)).data || [])
-      .filter((agent) => agent.definitionKind === 'SPECIALIZED_WORKFLOW'),
-  });
   const agents = agentsQuery.data || [];
   const providerCards = useMemo(() => buildChannelProviderCards(typesQuery.data || [], channels), [typesQuery.data, channels]);
   const availableTypes = useMemo(() => new Set((typesQuery.data || []).map((item) => item.type)), [typesQuery.data]);
@@ -138,7 +139,6 @@ export const ChannelManagementPage: React.FC = () => {
   const [editing, setEditing] = useState<OpsChannel | null>(null);
   const [wizardChannel, setWizardChannel] = useState<OpsChannel | null>(null);
   const [form, setForm] = useState<ChannelForm>(() => formFor('GENERIC_WEBHOOK'));
-  const [saving, setSaving] = useState(false);
   const readinessQuery = useChannelReadinessQuery(
     scope.projectId,
     wizardChannel?.channelId || '',
@@ -148,34 +148,26 @@ export const ChannelManagementPage: React.FC = () => {
   const [testChannel, setTestChannel] = useState<OpsChannel | null>(null);
   const [testTarget, setTestTarget] = useState('');
   const [testContent, setTestContent] = useState('这是一条 Channel 连通性测试消息。');
-  const [sending, setSending] = useState(false);
 
   const [messageChannel, setMessageChannel] = useState<OpsChannel | null>(null);
-  const messagesQuery = useChannelMessagesQuery(scope.projectId, messageChannel?.channelId || '', Boolean(messageChannel));
+  const messagesQuery = useChannelMessagesQuery(scope.projectId, messageChannel?.channelId || '', 100, Boolean(messageChannel));
+  const recoverInboundMutation = useRecoverInboundMutation(scope.projectId, messageChannel?.channelId || '');
   const [recoveryMessage, setRecoveryMessage] = useState<OpsChannelMessageRecord | null>(null);
   const [recoveryConfirmed, setRecoveryConfirmed] = useState(false);
-  const [recoveryLoading, setRecoveryLoading] = useState(false);
 
   const [identityChannel, setIdentityChannel] = useState<OpsChannel | null>(null);
   const identitiesQuery = useChannelIdentitiesQuery(scope.projectId, identityChannel?.channelId || '', Boolean(identityChannel));
-  const identityMessagesQuery = useChannelMessagesQuery(scope.projectId, identityChannel?.channelId || '', Boolean(identityChannel));
-  const identityUsersQuery = useQuery({
-    queryKey: ['channels', 'enabled-users'],
-    enabled: Boolean(identityChannel),
-    queryFn: () => AdminUserService.queryEnabledUsers(),
-  });
-  const identityMembersQuery = useQuery({
-    queryKey: ['channels', 'project-members', scope.projectId],
-    enabled: Boolean(identityChannel && scope.projectId),
-    queryFn: async () => (await opsProjectService.listProjectMembers(scope.projectId)).data || [],
-  });
+  const identityMessagesQuery = useChannelMessagesQuery(scope.projectId, identityChannel?.channelId || '', 200, Boolean(identityChannel));
+  const identityUsersQuery = useChannelEnabledUsersQuery(Boolean(identityChannel));
+  const identityMembersQuery = useChannelProjectMembersQuery(scope.projectId, Boolean(identityChannel));
+  const bindIdentityMutation = useBindChannelIdentityMutation(scope.projectId, identityChannel?.channelId || '');
   const [editingIdentity, setEditingIdentity] = useState<OpsChannelIdentity | null>(null);
   const [identityForm, setIdentityForm] = useState({ externalSenderId: '', platformUserId: '', status: 'ACTIVE' as 'ACTIVE' | 'DISABLED' });
-  const [identitySaving, setIdentitySaving] = useState(false);
 
   const [outboxVisible, setOutboxVisible] = useState(false);
   const outboxQuery = useChannelOutboxQuery(scope.projectId, outboxVisible);
-  const [outboxLoading, setOutboxLoading] = useState(false);
+  const processOutboxMutation = useProcessChannelOutboxMutation();
+  const updateOutboxMutation = useUpdateChannelOutboxMutation(scope.projectId);
 
   const openCreate = (type: OpsChannelType = 'GENERIC_WEBHOOK') => {
     setEditing(null);
@@ -240,7 +232,6 @@ export const ChannelManagementPage: React.FC = () => {
 
   const saveAndTest = async () => {
     if (!scope.projectId || !validateConnect() || !validateRoute()) return;
-    setSaving(true);
     try {
       const envName = (form.credentialEnvironmentVariable.trim() || credentialEnvironmentName(form.name, form.providerType)).toUpperCase();
       const secondaryEnvName = (form.secondaryCredentialEnvironmentVariable.trim() || secondaryCredentialEnvironmentName(form.name, form.providerType)).toUpperCase();
@@ -261,19 +252,14 @@ export const ChannelManagementPage: React.FC = () => {
         accessPolicy: form.accessPolicy,
         status: form.status,
       };
-      const response = editing
-        ? await opsChannelService.update(scope.projectId, editing.channelId, payload)
-        : await opsChannelService.create(payload);
+      const response = await saveChannelMutation.mutateAsync({ channelId: editing?.channelId, payload });
       const saved = response.data;
       setEditing(saved);
       setWizardChannel(saved);
       setWizardStep(2);
-      await channelsQuery.refetch();
       Toast.success('Channel 已保存，继续完成真实 readiness 检查');
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '保存 Channel 失败');
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -293,39 +279,37 @@ export const ChannelManagementPage: React.FC = () => {
     if (!scope.projectId || !testChannel || !testTarget.trim() || !testContent.trim()) {
       Toast.warning('请填写通知目标和测试内容'); return;
     }
-    setSending(true);
     try {
-      const result = await opsChannelService.send(scope.projectId, testChannel.channelId, testTarget.trim(), testContent.trim());
+      const result = await sendTestMutation.mutateAsync({
+        channelId: testChannel.channelId,
+        target: testTarget.trim(),
+        content: testContent.trim(),
+      });
       if (result.data?.delivered !== true) throw new Error('Provider 未确认真实投递');
       Toast.success('测试消息已真实投递');
       setTestChannel(null);
-      await channelsQuery.refetch();
-      if (wizardChannel?.channelId === testChannel.channelId) await readinessQuery.refetch();
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '测试投递失败');
-    } finally { setSending(false); }
+    }
   };
 
   const recoverInbound = async () => {
     if (!scope.projectId || !messageChannel || !recoveryMessage?.externalMessageId || !recoveryConfirmed) return;
-    setRecoveryLoading(true);
     try {
-      await opsChannelService.requeueInboundRecovery(scope.projectId, messageChannel.channelId, recoveryMessage.externalMessageId);
+      await recoverInboundMutation.mutateAsync({ externalMessageId: recoveryMessage.externalMessageId, action: 'requeue' });
       Toast.success('消息已重新进入处理队列');
       setRecoveryMessage(null);
       setRecoveryConfirmed(false);
-      await messagesQuery.refetch();
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '重新处理失败');
-    } finally { setRecoveryLoading(false); }
+    }
   };
 
   const cancelInboundRecovery = async (item: OpsChannelMessageRecord) => {
     if (!scope.projectId || !messageChannel || !item.externalMessageId) return;
     try {
-      await opsChannelService.cancelInboundRecovery(scope.projectId, messageChannel.channelId, item.externalMessageId);
+      await recoverInboundMutation.mutateAsync({ externalMessageId: item.externalMessageId, action: 'cancel' });
       Toast.success('已停止该消息，不会再次处理');
-      await messagesQuery.refetch();
     } catch (error) { Toast.error(error instanceof Error ? error.message : '停止处理失败'); }
   };
 
@@ -359,9 +343,8 @@ export const ChannelManagementPage: React.FC = () => {
     }
     const user = projectUserOptions.find((item) => item.userId === identityForm.platformUserId);
     if (!user?.userId || !user.username) { Toast.error('所选平台用户已不可用，请刷新后重试'); return; }
-    setIdentitySaving(true);
     try {
-      await opsChannelService.bindIdentity(scope.projectId, identityChannel.channelId, {
+      await bindIdentityMutation.mutateAsync({
         externalSenderId: identityForm.externalSenderId,
         platformUserId: user.userId,
         username: user.username,
@@ -371,29 +354,21 @@ export const ChannelManagementPage: React.FC = () => {
       Toast.success(editingIdentity ? '身份绑定已更新' : '身份绑定已创建');
       setEditingIdentity(null);
       setIdentityForm({ externalSenderId: '', platformUserId: '', status: 'ACTIVE' });
-      await identitiesQuery.refetch();
-      if (wizardChannel?.channelId === identityChannel.channelId) await readinessQuery.refetch();
     } catch (error) { Toast.error(error instanceof Error ? error.message : '保存身份绑定失败'); }
-    finally { setIdentitySaving(false); }
   };
 
   const processOutbox = async () => {
-    setOutboxLoading(true);
     try {
-      const result = await opsChannelService.processOutbox();
+      const result = await processOutboxMutation.mutateAsync();
       Toast.info(`本次处理 ${Number(result.data?.processed || 0)} 条，成功 ${Number(result.data?.success || 0)} 条`);
-      await outboxQuery.refetch();
     } catch (error) { Toast.error(error instanceof Error ? error.message : '处理投递队列失败'); }
-    finally { setOutboxLoading(false); }
   };
 
   const updateOutbox = async (item: OpsChannelOutboxItem, action: 'requeue' | 'cancel') => {
     if (!scope.projectId) return;
     try {
-      if (action === 'requeue') await opsChannelService.requeueOutbox(scope.projectId, item.id);
-      else await opsChannelService.cancelOutbox(scope.projectId, item.id);
+      await updateOutboxMutation.mutateAsync({ id: item.id, action });
       Toast.success(action === 'requeue' ? '已重新进入投递队列' : '已停止继续投递');
-      await outboxQuery.refetch();
     } catch (error) { Toast.error(error instanceof Error ? error.message : '更新投递任务失败'); }
   };
 
@@ -457,7 +432,7 @@ export const ChannelManagementPage: React.FC = () => {
         width={760}
         footer={<Space>
           {wizardStep > 0 && <Button onClick={() => setWizardStep((wizardStep - 1) as WizardStep)}>Back</Button>}
-          <Button theme="solid" loading={saving} onClick={() => void nextWizard()}>{wizardStep === 0 ? 'Next' : wizardStep === 1 ? 'Save & Test' : 'Done'}</Button>
+          <Button theme="solid" loading={saveChannelMutation.isPending} onClick={() => void nextWizard()}>{wizardStep === 0 ? 'Next' : wizardStep === 1 ? 'Save & Test' : 'Done'}</Button>
         </Space>}
       >
         <Space vertical align="start" style={{ width: '100%' }}>
@@ -562,7 +537,7 @@ export const ChannelManagementPage: React.FC = () => {
         </Space>
       </Modal>
 
-      <Modal title={`测试发送 · ${testChannel?.name || ''}`} visible={Boolean(testChannel)} onCancel={() => setTestChannel(null)} onOk={() => void sendTest()} confirmLoading={sending} width={620}>
+      <Modal title={`测试发送 · ${testChannel?.name || ''}`} visible={Boolean(testChannel)} onCancel={() => setTestChannel(null)} onOk={() => void sendTest()} confirmLoading={sendTestMutation.isPending} width={620}>
         <Space vertical align="start" style={{ width: '100%' }}>
           <div style={{ width: '100%' }}><Text strong>目标会话 / 接收人</Text><Input value={testTarget} placeholder="Provider conversation / chat / user id" onChange={setTestTarget} /></div>
           <div style={{ width: '100%' }}><Text strong>测试内容</Text><Input value={testContent} onChange={setTestContent} /></div>
@@ -583,7 +558,7 @@ export const ChannelManagementPage: React.FC = () => {
         ]} />
       </Modal>
 
-      <Modal title="确认重新处理入站消息" visible={Boolean(recoveryMessage)} onCancel={() => { setRecoveryMessage(null); setRecoveryConfirmed(false); }} onOk={() => void recoverInbound()} okButtonProps={{ disabled: !recoveryConfirmed, loading: recoveryLoading }} width={620}>
+      <Modal title="确认重新处理入站消息" visible={Boolean(recoveryMessage)} onCancel={() => { setRecoveryMessage(null); setRecoveryConfirmed(false); }} onOk={() => void recoverInbound()} okButtonProps={{ disabled: !recoveryConfirmed, loading: recoverInboundMutation.isPending }} width={620}>
         <Space vertical align="start" style={{ width: '100%' }}>
           <Paragraph>平台无法证明上次处理是否已产生外部副作用，因此没有自动重试。</Paragraph>
           <Checkbox checked={recoveryConfirmed} onChange={(event) => setRecoveryConfirmed(Boolean(event.target.checked))}>我已核对审计和外部系统，确认上次处理未产生需要保留的副作用</Checkbox>
@@ -597,7 +572,7 @@ export const ChannelManagementPage: React.FC = () => {
             <div style={{ minWidth: 220, flex: 1 }}><Text strong>外部发送人</Text><Select value={identityForm.externalSenderId || undefined} disabled={Boolean(editingIdentity)} placeholder={senderOptions.length ? '从真实入站消息中选择' : '收到第一条消息后可选择'} style={{ width: '100%' }} onChange={(value) => setIdentityForm({ ...identityForm, externalSenderId: String(value) })}>{senderOptions.map((senderId) => <Select.Option key={senderId} value={senderId}>{senderId}</Select.Option>)}</Select></div>
             <div style={{ minWidth: 220, flex: 1 }}><Text strong>平台用户</Text><Select value={identityForm.platformUserId || undefined} placeholder="选择当前项目成员" style={{ width: '100%' }} onChange={(value) => setIdentityForm({ ...identityForm, platformUserId: String(value) })}>{projectUserOptions.map((user) => <Select.Option key={user.userId} value={user.userId}>{user.username}</Select.Option>)}</Select></div>
             <div style={{ width: 130 }}><Text strong>状态</Text><Select value={identityForm.status} style={{ width: '100%' }} onChange={(value) => setIdentityForm({ ...identityForm, status: String(value) as 'ACTIVE' | 'DISABLED' })}><Select.Option value="ACTIVE">启用</Select.Option><Select.Option value="DISABLED">停用</Select.Option></Select></div>
-            <Button theme="solid" loading={identitySaving} disabled={!identityForm.externalSenderId || !identityForm.platformUserId} onClick={() => void saveIdentity()}>{editingIdentity ? '保存修改' : '添加绑定'}</Button>
+            <Button theme="solid" loading={bindIdentityMutation.isPending} disabled={!identityForm.externalSenderId || !identityForm.platformUserId} onClick={() => void saveIdentity()}>{editingIdentity ? '保存修改' : '添加绑定'}</Button>
             {editingIdentity && <Button onClick={() => { setEditingIdentity(null); setIdentityForm({ externalSenderId: '', platformUserId: '', status: 'ACTIVE' }); }}>取消</Button>}
           </Space>
           <Table rowKey="mappingId" loading={identitiesQuery.isLoading || identityUsersQuery.isLoading || identityMembersQuery.isLoading} dataSource={identitiesQuery.data || []} pagination={false} scroll={{ y: 360 }} empty={<OpsEmptyState title="暂无身份绑定" description="先让外部用户发送一条真实消息，再从上方选择发送人与项目成员。" />} columns={[
@@ -611,8 +586,8 @@ export const ChannelManagementPage: React.FC = () => {
       </Modal>
 
       <Modal title="Channel Outbox" visible={outboxVisible} onCancel={() => setOutboxVisible(false)} footer={null} width={980}>
-        <Space wrap style={{ marginBottom: 12 }}><Button icon={<IconRefresh />} loading={outboxQuery.isFetching} onClick={() => outboxQuery.refetch()}>刷新</Button><Button theme="solid" loading={outboxLoading} onClick={() => void processOutbox()}>处理待投递</Button></Space>
-        <Table rowKey="id" dataSource={outboxQuery.data || []} loading={outboxQuery.isLoading || outboxLoading} pagination={false} scroll={{ x: 1050, y: 480 }} columns={[
+        <Space wrap style={{ marginBottom: 12 }}><Button icon={<IconRefresh />} loading={outboxQuery.isFetching} onClick={() => outboxQuery.refetch()}>刷新</Button><Button theme="solid" loading={processOutboxMutation.isPending || updateOutboxMutation.isPending} onClick={() => void processOutbox()}>处理待投递</Button></Space>
+        <Table rowKey="id" dataSource={outboxQuery.data || []} loading={outboxQuery.isLoading || processOutboxMutation.isPending || updateOutboxMutation.isPending} pagination={false} scroll={{ x: 1050, y: 480 }} columns={[
           { title: 'Channel', dataIndex: 'channelId', width: 160 },
           { title: '目标', dataIndex: 'target', width: 180 },
           { title: '类型', dataIndex: 'messageType', width: 150 },

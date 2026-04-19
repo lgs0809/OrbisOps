@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Button,
   Card,
@@ -19,11 +19,14 @@ import {
 } from '@douyinfe/semi-icons';
 import styled from 'styled-components';
 import { OpsPageHeader, OpsPageShell, TableScroll } from '../../components/ops-layout';
+import type { OpsMcpTemplate, OpsProjectTool } from '../../services/ops-mcp-template-service';
 import {
-  opsMcpTemplateService,
-  OpsMcpTemplate,
-  OpsProjectTool,
-} from '../../services/ops-mcp-template-service';
+  useCopyMcpTemplateMutation,
+  useMcpGeneratedToolsQuery,
+  useMcpTemplatesQuery,
+  useSaveMcpTemplateMutation,
+  useToggleMcpTemplateMutation,
+} from '../../features/tools/api/mcp-template-queries';
 import { theme } from '../../styles/theme';
 import { McpTemplateBoundaryNote } from './McpTemplateBoundaryNote';
 import { McpTemplateFormModal } from './McpTemplateFormModal';
@@ -74,18 +77,19 @@ const TableCard = styled(Card)`
 `;
 
 export const McpToolManagement: React.FC = () => {
-  const [loading, setLoading] = useState(false);
-  const [templates, setTemplates] = useState<OpsMcpTemplate[]>([]);
+  const templatesQuery = useMcpTemplatesQuery();
+  const saveTemplateMutation = useSaveMcpTemplateMutation();
+  const copyTemplateMutation = useCopyMcpTemplateMutation();
+  const toggleTemplateMutation = useToggleMcpTemplateMutation();
+  const templates = templatesQuery.data || [];
   const [searchText, setSearchText] = useState('');
   const [resourceType, setResourceType] = useState('');
   const [status, setStatus] = useState('');
   const [modalMode, setModalMode] = useState<'create' | 'edit' | null>(null);
-  const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState<McpTemplateFormState>(emptyMcpTemplateForm);
   const [selected, setSelected] = useState<OpsMcpTemplate | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
-  const [generatedTools, setGeneratedTools] = useState<OpsProjectTool[]>([]);
-  const [generatedLoading, setGeneratedLoading] = useState(false);
+  const generatedToolsQuery = useMcpGeneratedToolsQuery(selected?.templateId || '', detailVisible && Boolean(selected));
 
   const filteredTemplates = useMemo(() => templates.filter((item) => {
     const keyword = searchText.trim().toLowerCase();
@@ -98,22 +102,6 @@ export const McpToolManagement: React.FC = () => {
     return textMatched && typeMatched && statusMatched;
   }), [templates, searchText, resourceType, status]);
 
-  const fetchTemplates = async () => {
-    setLoading(true);
-    try {
-      const result = await opsMcpTemplateService.listTemplates();
-      if (result.code !== '0000') {
-        throw new Error(result.info || '查询 MCP 接入模板失败');
-      }
-      setTemplates(result.data || []);
-    } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '查询 MCP 接入模板失败');
-      setTemplates([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const openCreate = () => {
     setForm(emptyMcpTemplateForm);
     setModalMode('create');
@@ -124,21 +112,9 @@ export const McpToolManagement: React.FC = () => {
     setModalMode('edit');
   };
 
-  const openDetail = async (template: OpsMcpTemplate) => {
+  const openDetail = (template: OpsMcpTemplate) => {
     setSelected(template);
     setDetailVisible(true);
-    setGeneratedTools(template.generatedTools || []);
-    setGeneratedLoading(true);
-    try {
-      const result = await opsMcpTemplateService.generatedTools(template.templateId);
-      if (result.code === '0000') {
-        setGeneratedTools(result.data || []);
-      }
-    } catch (error) {
-      Toast.error('查询生成记录失败');
-    } finally {
-      setGeneratedLoading(false);
-    }
   };
 
   const submitForm = async () => {
@@ -146,65 +122,41 @@ export const McpToolManagement: React.FC = () => {
       Toast.error('请输入模板名称');
       return;
     }
-    setSubmitting(true);
     try {
       const request = requestFromForm(form);
-      const result = modalMode === 'create'
-        ? await opsMcpTemplateService.createTemplate(request)
-        : await opsMcpTemplateService.updateTemplate(form.templateId, request);
-      if (result.code !== '0000') {
-        throw new Error(result.info || '保存 MCP 接入模板失败');
-      }
+      await saveTemplateMutation.mutateAsync({
+        templateId: modalMode === 'edit' ? form.templateId : undefined,
+        request,
+      });
       Toast.success(modalMode === 'create' ? '模板已创建' : '模板已更新');
       setModalMode(null);
-      await fetchTemplates();
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '保存 MCP 接入模板失败');
-    } finally {
-      setSubmitting(false);
     }
   };
 
   const copySelected = async () => {
     if (!selected) return;
-    setSubmitting(true);
     try {
-      const result = await opsMcpTemplateService.copyTemplate(selected.templateId);
-      if (result.code !== '0000') {
-        throw new Error(result.info || '复制 MCP 接入模板失败');
-      }
+      await copyTemplateMutation.mutateAsync(selected.templateId);
       Toast.success('模板已复制');
       setDetailVisible(false);
-      await fetchTemplates();
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '复制 MCP 接入模板失败');
-    } finally {
-      setSubmitting(false);
     }
   };
 
   const toggleSelectedStatus = async () => {
     if (!selected) return;
     const nextStatus = selected.status === 'ENABLED' ? 'DISABLED' : 'ENABLED';
-    setSubmitting(true);
     try {
-      const result = await opsMcpTemplateService.updateTemplateStatus(selected.templateId, nextStatus);
-      if (result.code !== '0000') {
-        throw new Error(result.info || '更新 MCP 接入模板状态失败');
-      }
+      await toggleTemplateMutation.mutateAsync({ templateId: selected.templateId, status: nextStatus });
       Toast.success(nextStatus === 'ENABLED' ? '模板已启用' : '模板已停用');
       setDetailVisible(false);
-      await fetchTemplates();
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '更新 MCP 接入模板状态失败');
-    } finally {
-      setSubmitting(false);
     }
   };
-
-  useEffect(() => {
-    fetchTemplates();
-  }, []);
 
   return (
     <OpsPageShell selectedKey="mcp-tool-management">
@@ -241,7 +193,7 @@ export const McpToolManagement: React.FC = () => {
               <Option value="ENABLED">启用</Option>
               <Option value="DISABLED">停用</Option>
             </Select>
-            <Button icon={<IconRefresh />} onClick={fetchTemplates} loading={loading}>
+            <Button icon={<IconRefresh />} onClick={() => templatesQuery.refetch()} loading={templatesQuery.isFetching}>
               刷新
             </Button>
           </SearchRow>
@@ -250,7 +202,7 @@ export const McpToolManagement: React.FC = () => {
         <TableCard>
           <McpTemplateTable
             templates={filteredTemplates}
-            loading={loading}
+            loading={templatesQuery.isLoading}
             onView={openDetail}
             onEdit={openEdit}
           />
@@ -259,7 +211,7 @@ export const McpToolManagement: React.FC = () => {
         <McpTemplateFormModal
           mode={modalMode}
           form={form}
-          submitting={submitting}
+          submitting={saveTemplateMutation.isPending}
           onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
           onCancel={() => setModalMode(null)}
           onSubmit={submitForm}
@@ -274,8 +226,8 @@ export const McpToolManagement: React.FC = () => {
           footer={(
             <Space>
               <Button onClick={() => setDetailVisible(false)}>关闭</Button>
-              <Button icon={<IconCopy />} loading={submitting} onClick={copySelected}>复制模板</Button>
-              <Button type={selected?.status === 'ENABLED' ? 'danger' : 'primary'} loading={submitting} onClick={toggleSelectedStatus}>
+              <Button icon={<IconCopy />} loading={copyTemplateMutation.isPending} onClick={copySelected}>复制模板</Button>
+              <Button type={selected?.status === 'ENABLED' ? 'danger' : 'primary'} loading={toggleTemplateMutation.isPending} onClick={toggleSelectedStatus}>
                 {selected?.status === 'ENABLED' ? '停用模板' : '启用模板'}
               </Button>
             </Space>
@@ -308,9 +260,9 @@ export const McpToolManagement: React.FC = () => {
                 <TableScroll>
                   <Table
                     size="small"
-                    loading={generatedLoading}
+                    loading={generatedToolsQuery.isLoading}
                     rowKey="toolId"
-                    dataSource={generatedTools}
+                    dataSource={generatedToolsQuery.data || selected.generatedTools || []}
                     pagination={false}
                     columns={[
                       { title: '项目', dataIndex: 'projectId', width: 120 },

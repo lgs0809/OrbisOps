@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import styled from 'styled-components';
 import { Button, Input, Modal, Select, Space, Table, Tag, TextArea, Toast, Typography } from '@douyinfe/semi-ui';
 import { IconPlus, IconRefresh } from '@douyinfe/semi-icons';
@@ -13,7 +13,11 @@ import {
   OpsSectionCard,
   TableScroll,
 } from '../components/ops-layout';
-import { opsAdminService } from '../services/ops-admin-service';
+import {
+  useArchiveContextMemoryMutation,
+  useContextMemoriesQuery,
+  useSaveContextMemoryMutation,
+} from '../features/memory/api/memory-queries';
 import { theme } from '../styles/theme';
 
 const { Option } = Select;
@@ -62,45 +66,21 @@ const timeText = (record: Record<string, any>) =>
   asText(record.updateTime || record.update_time || record.createTime || record.create_time);
 
 export const MemoryManagementPage: React.FC = () => {
-  const [loading, setLoading] = useState(false);
-  const [memories, setMemories] = useState<Record<string, any>[]>([]);
   const [scopeType, setScopeType] = useState('PROJECT');
   const [scopeId, setScopeId] = useState('');
   const [memoryType, setMemoryType] = useState('');
   const [status, setStatus] = useState('ACTIVE');
   const [keyword, setKeyword] = useState('');
+  const memoriesQuery = useContextMemoriesQuery({ scopeType, scopeId, memoryType, status, keyword, limit: 100 });
+  const saveMemoryMutation = useSaveContextMemoryMutation();
+  const archiveMemoryMutation = useArchiveContextMemoryMutation();
+  const memories = memoriesQuery.data || [];
   const [selected, setSelected] = useState<Record<string, any> | null>(null);
   const [formVisible, setFormVisible] = useState(false);
   const [editing, setEditing] = useState<Record<string, any> | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
 
   const availableTypes = useMemo(() => (form.scopeType === 'USER' ? userTypes : projectTypes), [form.scopeType]);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await opsAdminService.listContextMemories({
-        scopeType,
-        scopeId,
-        memoryType,
-        status,
-        keyword,
-        limit: 100,
-      });
-      if (response.code !== '0000') {
-        throw new Error(response.info || '查询记忆失败');
-      }
-      setMemories(response.data || []);
-    } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '查询记忆失败');
-    } finally {
-      setLoading(false);
-    }
-  }, [keyword, memoryType, scopeId, scopeType, status]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   const openCreate = () => {
     setEditing(null);
@@ -129,15 +109,12 @@ export const MemoryManagementPage: React.FC = () => {
         ...form,
         confidence: Number(form.confidence || 0.8),
       };
-      const response = editing
-        ? await opsAdminService.updateContextMemory(asText(editing.memoryId || editing.memory_id), payload)
-        : await opsAdminService.createContextMemory(payload);
-      if (response.code !== '0000') {
-        throw new Error(response.info || '保存记忆失败');
-      }
+      await saveMemoryMutation.mutateAsync({
+        memoryId: editing ? asText(editing.memoryId || editing.memory_id) : undefined,
+        payload,
+      });
       Toast.success(editing ? '记忆已更新' : '记忆已创建');
       setFormVisible(false);
-      load();
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '保存记忆失败');
     }
@@ -145,15 +122,8 @@ export const MemoryManagementPage: React.FC = () => {
 
   const archive = async (record: Record<string, any>) => {
     try {
-      const response = await opsAdminService.updateContextMemoryStatus(
-        asText(record.memoryId || record.memory_id),
-        'ARCHIVED',
-      );
-      if (response.code !== '0000') {
-        throw new Error(response.info || '归档记忆失败');
-      }
+      await archiveMemoryMutation.mutateAsync(asText(record.memoryId || record.memory_id));
       Toast.success('记忆已归档');
-      load();
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '归档记忆失败');
     }
@@ -223,7 +193,7 @@ export const MemoryManagementPage: React.FC = () => {
         title="记忆管理"
         description="Memory 只保存用户和项目上下文，不保存排障 SOP、硬策略或工具执行细节。运维方法进入 Skill，正式知识进入 RAG，执行过程进入 Trace。"
         primaryAction={<Button theme="solid" icon={<IconPlus />} onClick={openCreate}>新增记忆</Button>}
-        extra={<Button icon={<IconRefresh />} loading={loading} onClick={load}>刷新</Button>}
+        extra={<Button icon={<IconRefresh />} loading={memoriesQuery.isFetching} onClick={() => memoriesQuery.refetch()}>刷新</Button>}
       />
 
       <OpsResponsiveGrid $min="220px">
@@ -256,13 +226,15 @@ export const MemoryManagementPage: React.FC = () => {
             <Option value="ARCHIVED">ARCHIVED</Option>
           </Select>
           <Input placeholder="关键词" value={keyword} onChange={setKeyword} />
-          <Button onClick={load} loading={loading}>查询</Button>
+          <Button onClick={() => memoriesQuery.refetch()} loading={memoriesQuery.isFetching}>查询</Button>
         </FilterBar>
-        {memories.length === 0 && !loading ? (
+        {memoriesQuery.isError ? (
+          <OpsEmptyState title="记忆加载失败" description={memoriesQuery.error instanceof Error ? memoriesQuery.error.message : '请刷新后重试。'} />
+        ) : memories.length === 0 && !memoriesQuery.isLoading ? (
           <OpsEmptyState title="暂无记忆" description="当前筛选条件下没有 Context Memory。可以等待模型抽取，也可以由管理员手工补充项目术语或用户偏好。" />
         ) : (
           <TableScroll>
-            <Table columns={columns} dataSource={memories} loading={loading} rowKey={(record) => asText(record?.memoryId || record?.memory_id || record?.id)} pagination={{ pageSize: 10 }} />
+            <Table columns={columns} dataSource={memories} loading={memoriesQuery.isLoading} rowKey={(record) => asText(record?.memoryId || record?.memory_id || record?.id)} pagination={{ pageSize: 10 }} />
           </TableScroll>
         )}
       </OpsSectionCard>
@@ -281,6 +253,7 @@ export const MemoryManagementPage: React.FC = () => {
         onCancel={() => setFormVisible(false)}
         onOk={submit}
         okText="保存"
+        confirmLoading={saveMemoryMutation.isPending}
       >
         <Space vertical align="start" style={{ width: '100%' }}>
           <Select value={form.scopeType} onChange={(value) => {

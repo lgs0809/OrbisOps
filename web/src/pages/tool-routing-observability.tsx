@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
 import { Button, Modal, Select, Space, Switch, Table, Tag, TextArea, Toast, Typography } from '@douyinfe/semi-ui';
 import { IconRefresh } from '@douyinfe/semi-icons';
@@ -14,8 +14,13 @@ import {
   OpsSectionCard,
   TableScroll,
 } from '../components/ops-layout';
-import { opsAdminService } from '../services/ops-admin-service';
-import { OpsProjectWorkspace, opsProjectService } from '../services/ops-project-service';
+import {
+  useRebuildToolCatalogMutation,
+  useReviewToolPolicyMutation,
+  useSelectToolRouteMutation,
+  useToolRoutingOverviewQuery,
+} from '../features/tool-routing/api/tool-routing-queries';
+import { useProjectScope } from '../hooks/use-project-scope';
 import { theme } from '../styles/theme';
 
 const { Option } = Select;
@@ -188,19 +193,23 @@ const reviewDefaults = (record: Record<string, any>): PolicyReviewDraft => {
 };
 
 export const ToolRoutingObservabilityPage: React.FC = () => {
-  const [projects, setProjects] = useState<OpsProjectWorkspace[]>([]);
-  const [projectId, setProjectId] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [summary, setSummary] = useState<Record<string, any> | null>(null);
-  const [decisions, setDecisions] = useState<Record<string, any>[]>([]);
-  const [calls, setCalls] = useState<Record<string, any>[]>([]);
-  const [snapshots, setSnapshots] = useState<Record<string, any>[]>([]);
-  const [policies, setPolicies] = useState<Record<string, any>[]>([]);
-  const [activations, setActivations] = useState<Record<string, any>[]>([]);
+  const scope = useProjectScope();
+  const projectId = scope.projectId;
+  const projects = scope.projects;
+  const selectedProject = scope.selectedProject;
+  const overviewQuery = useToolRoutingOverviewQuery(projectId);
+  const rebuildMutation = useRebuildToolCatalogMutation(projectId);
+  const selectRouteMutation = useSelectToolRouteMutation(projectId);
+  const reviewPolicyMutation = useReviewToolPolicyMutation(projectId);
+  const summary = overviewQuery.data?.summary || null;
+  const decisions = overviewQuery.data?.decisions || [];
+  const calls = overviewQuery.data?.calls || [];
+  const snapshots = overviewQuery.data?.snapshots || [];
+  const policies = overviewQuery.data?.policies || [];
+  const activations = overviewQuery.data?.activations || [];
   const [selected, setSelected] = useState<Record<string, any> | null>(null);
   const [policyReviewTarget, setPolicyReviewTarget] = useState<Record<string, any> | null>(null);
   const [policyReviewDraft, setPolicyReviewDraft] = useState<PolicyReviewDraft | null>(null);
-  const [policyReviewSaving, setPolicyReviewSaving] = useState(false);
   const [routeForm, setRouteForm] = useState({
     agentId: '',
     nodeId: '',
@@ -208,99 +217,25 @@ export const ToolRoutingObservabilityPage: React.FC = () => {
     userRequest: '',
   });
 
-  const selectedProject = useMemo(() => projects.find((project) => project.projectId === projectId), [projectId, projects]);
-
-  const loadProjects = useCallback(async () => {
-    try {
-      const response = await opsProjectService.snapshot();
-      if (response.code !== '0000') {
-        throw new Error(response.info || '查询项目失败');
-      }
-      const list = response.data?.projects || [];
-      setProjects(list);
-      setProjectId((current) => current || list[0]?.projectId || '');
-    } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '查询项目失败');
-    }
-  }, []);
-
-  const load = useCallback(async () => {
-    if (!projectId) {
-      setSummary(null);
-      setDecisions([]);
-      setCalls([]);
-      setSnapshots([]);
-      setPolicies([]);
-      setActivations([]);
-      return;
-    }
-    setLoading(true);
-    try {
-      const [summaryResponse, decisionsResponse, callsResponse, snapshotsResponse, policiesResponse, activationsResponse] = await Promise.all([
-        opsAdminService.getToolCatalogSummary(projectId),
-        opsAdminService.listToolRoutingDecisions(projectId, { limit: 100 }),
-        opsAdminService.listMcpToolCalls(projectId, { limit: 100 }),
-        opsAdminService.listMcpToolSnapshots(projectId, { limit: 100 }),
-        opsAdminService.listMcpToolPolicies(projectId, { limit: 100 }),
-        opsAdminService.listMcpToolActivations(projectId, { limit: 100 }),
-      ]);
-      if (summaryResponse.code !== '0000') throw new Error(summaryResponse.info || '查询工具目录摘要失败');
-      if (decisionsResponse.code !== '0000') throw new Error(decisionsResponse.info || '查询路由决策失败');
-      if (callsResponse.code !== '0000') throw new Error(callsResponse.info || '查询 MCP 调用失败');
-      if (snapshotsResponse.code !== '0000') throw new Error(snapshotsResponse.info || '查询工具快照失败');
-      if (policiesResponse.code !== '0000') throw new Error(policiesResponse.info || '查询工具策略失败');
-      if (activationsResponse.code !== '0000') throw new Error(activationsResponse.info || '查询工具激活记录失败');
-      setSummary(summaryResponse.data || null);
-      setDecisions(decisionsResponse.data || []);
-      setCalls(callsResponse.data || []);
-      setSnapshots(snapshotsResponse.data || []);
-      setPolicies(policiesResponse.data || []);
-      setActivations(activationsResponse.data || []);
-    } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '查询工具路由失败');
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId]);
-
-  useEffect(() => {
-    loadProjects();
-  }, [loadProjects]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
   const rebuild = async () => {
     if (!projectId) return;
-    setLoading(true);
     try {
-      const response = await opsAdminService.rebuildToolCatalogSummary(projectId);
-      if (response.code !== '0000') {
-        throw new Error(response.info || '重建工具目录摘要失败');
-      }
-      setSummary(response.data || null);
+      await rebuildMutation.mutateAsync();
       Toast.success('工具目录摘要已重建');
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '重建工具目录摘要失败');
-    } finally {
-      setLoading(false);
     }
   };
 
   const selectRoute = async () => {
     if (!projectId) return;
     try {
-      const response = await opsAdminService.selectToolRoute(projectId, {
+      const result = await selectRouteMutation.mutateAsync({
         ...routeForm,
         capability: routeForm.capabilityType,
       });
-      if (response.code !== '0000') {
-        throw new Error(response.info || '工具路由失败');
-      }
-      setSelected(response.data || null);
+      setSelected(result || null);
       Toast.success('已生成工具候选');
-      load();
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '工具路由失败');
     }
@@ -309,15 +244,8 @@ export const ToolRoutingObservabilityPage: React.FC = () => {
   const reviewPolicy = async (policyId: string, action: 'reject' | 'disable') => {
     if (!projectId || !policyId) return;
     try {
-      const payload = { reason: `${action} by admin` };
-      const response = action === 'reject'
-        ? await opsAdminService.rejectMcpToolPolicy(projectId, policyId, payload)
-        : await opsAdminService.disableMcpToolPolicy(projectId, policyId, payload);
-      if (response.code !== '0000') {
-        throw new Error(response.info || '工具策略审核失败');
-      }
+      await reviewPolicyMutation.mutateAsync({ policyId, action, payload: { reason: `${action} by admin` } });
       Toast.success(action === 'reject' ? '策略已驳回' : '策略已停用');
-      load();
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '工具策略审核失败');
     }
@@ -338,28 +266,27 @@ export const ToolRoutingObservabilityPage: React.FC = () => {
       Toast.error('请先明确工具效果、作用范围和可变性');
       return;
     }
-    setPolicyReviewSaving(true);
     try {
       const allowedAction = toolName.replace(/[^a-zA-Z0-9]+/g, '_').toUpperCase();
-      const response = await opsAdminService.approveMcpToolPolicy(projectId, policyId, {
-        ...policyReviewDraft,
-        metadata: {
-          ...(policyReviewTarget.metadata || {}),
-          disclosureTier: policyReviewDraft.disclosureTier,
+      await reviewPolicyMutation.mutateAsync({
+        policyId,
+        action: 'approve',
+        payload: {
+          ...policyReviewDraft,
+          metadata: {
+            ...(policyReviewTarget.metadata || {}),
+            disclosureTier: policyReviewDraft.disclosureTier,
+          },
+          capability: policyReviewDraft.readOnly ? 'READ_ONLY' : 'MUTATING',
+          allowedActions: [allowedAction],
+          argumentPolicy: policyReviewDraft.readOnly ? { maxLimit: 500 } : {},
         },
-        capability: policyReviewDraft.readOnly ? 'READ_ONLY' : 'MUTATING',
-        allowedActions: [allowedAction],
-        argumentPolicy: policyReviewDraft.readOnly ? { maxLimit: 500 } : {},
       });
-      if (response.code !== '0000') throw new Error(response.info || '工具策略审核失败');
       Toast.success('策略已人工审核并发布');
       setPolicyReviewTarget(null);
       setPolicyReviewDraft(null);
-      await load();
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '工具策略审核失败');
-    } finally {
-      setPolicyReviewSaving(false);
     }
   };
 
@@ -581,13 +508,13 @@ export const ToolRoutingObservabilityPage: React.FC = () => {
       <OpsPageHeader
         title="工具权限与调用审计"
         description="这里管理 Agent 能不能用某个外部工具：先看项目授权，再看人工审核过的 Tool Policy，最后记录每次候选选择和实际调用。"
-        primaryAction={<Button theme="solid" onClick={rebuild} loading={loading}>重建目录摘要</Button>}
-        extra={<Button icon={<IconRefresh />} onClick={load} loading={loading}>刷新</Button>}
+        primaryAction={<Button theme="solid" onClick={rebuild} loading={rebuildMutation.isPending}>重建目录摘要</Button>}
+        extra={<Button icon={<IconRefresh />} onClick={() => overviewQuery.refetch()} loading={overviewQuery.isFetching}>刷新</Button>}
       />
 
       <OpsSectionCard title="项目工具目录">
         <Toolbar>
-          <Select placeholder="选择项目" value={projectId} onChange={(value) => setProjectId(String(value || ''))}>
+          <Select placeholder="选择项目" value={projectId} onChange={(value) => scope.selectProject(String(value || ''))}>
             {projects.map((project) => (
               <Option value={project.projectId} key={project.projectId}>{project.name || project.projectId}</Option>
             ))}
@@ -661,51 +588,51 @@ export const ToolRoutingObservabilityPage: React.FC = () => {
       </OpsResponsiveGrid>
 
       <OpsSectionCard title="工具快照">
-        {snapshots.length === 0 && !loading ? (
+        {snapshots.length === 0 && !overviewQuery.isLoading ? (
           <OpsEmptyState title="暂无工具快照" description="Hydrate schema 后会保存 toolName、inputSchema、schemaHash 和元数据完整性。" />
         ) : (
           <TableScroll>
-            <Table columns={snapshotColumns} dataSource={snapshots} loading={loading} rowKey={(record) => asText(record?.snapshotId || record?.snapshot_id || record?.id)} pagination={{ pageSize: 6 }} />
+            <Table columns={snapshotColumns} dataSource={snapshots} loading={overviewQuery.isLoading} rowKey={(record) => asText(record?.snapshotId || record?.snapshot_id || record?.id)} pagination={{ pageSize: 6 }} />
           </TableScroll>
         )}
       </OpsSectionCard>
 
       <OpsSectionCard title="工具策略审核">
-        {policies.length === 0 && !loading ? (
+        {policies.length === 0 && !overviewQuery.isLoading ? (
           <OpsEmptyState title="暂无工具策略" description="系统发现工具后只会生成待审核建议，业务 Agent 只能调用 ACTIVE 且 HUMAN_REVIEWED 的策略。" />
         ) : (
           <TableScroll>
-            <Table columns={policyColumns} dataSource={policies} loading={loading} rowKey={(record) => asText(record?.policyId || record?.policy_id || record?.id)} pagination={{ pageSize: 6 }} />
+            <Table columns={policyColumns} dataSource={policies} loading={overviewQuery.isLoading} rowKey={(record) => asText(record?.policyId || record?.policy_id || record?.id)} pagination={{ pageSize: 6 }} />
           </TableScroll>
         )}
       </OpsSectionCard>
 
       <OpsSectionCard title="路由决策">
-        {decisions.length === 0 && !loading ? (
+        {decisions.length === 0 && !overviewQuery.isLoading ? (
           <OpsEmptyState title="暂无路由决策" description="Agent 或手动验证触发工具选择后会记录。" />
         ) : (
           <TableScroll>
-            <Table columns={decisionColumns} dataSource={decisions} loading={loading} rowKey={(record) => asText(record?.decisionId || record?.decision_id || record?.id)} pagination={{ pageSize: 8 }} />
+            <Table columns={decisionColumns} dataSource={decisions} loading={overviewQuery.isLoading} rowKey={(record) => asText(record?.decisionId || record?.decision_id || record?.id)} pagination={{ pageSize: 8 }} />
           </TableScroll>
         )}
       </OpsSectionCard>
 
       <OpsSectionCard title="MCP 调用记录">
-        {calls.length === 0 && !loading ? (
+        {calls.length === 0 && !overviewQuery.isLoading ? (
           <OpsEmptyState title="暂无 MCP 调用" description="工具执行后会记录脱敏输入、输出摘要、风险等级和耗时。" />
         ) : (
           <TableScroll>
-            <Table columns={callColumns} dataSource={calls} loading={loading} rowKey={(record) => asText(record?.callId || record?.call_id || record?.id)} pagination={{ pageSize: 8 }} />
+            <Table columns={callColumns} dataSource={calls} loading={overviewQuery.isLoading} rowKey={(record) => asText(record?.callId || record?.call_id || record?.id)} pagination={{ pageSize: 8 }} />
           </TableScroll>
         )}
       </OpsSectionCard>
 
       <OpsSectionCard title="按 Work Session 启用记录">
-        {activations.length === 0 && !loading ? (
+        {activations.length === 0 && !overviewQuery.isLoading ? (
           <OpsEmptyState title="暂无按需启用记录" description="扩展工具只有在某次 Work Session 明确需要时才会加载完整参数；启用只对该次 run 生效并自动过期。" />
         ) : (
           <TableScroll>
-            <Table columns={activationColumns} dataSource={activations} loading={loading}
+            <Table columns={activationColumns} dataSource={activations} loading={overviewQuery.isLoading}
               rowKey={(record) => asText(record?.activationId || record?.activation_id || record?.id)} pagination={{ pageSize: 8 }} />
           </TableScroll>
         )}
@@ -761,7 +688,7 @@ export const ToolRoutingObservabilityPage: React.FC = () => {
         visible={Boolean(policyReviewTarget && policyReviewDraft)}
         onCancel={() => { setPolicyReviewTarget(null); setPolicyReviewDraft(null); }}
         onOk={submitPolicyReview}
-        confirmLoading={policyReviewSaving}
+        confirmLoading={reviewPolicyMutation.isPending}
         okText="确认发布"
         cancelText="取消"
         width={720}

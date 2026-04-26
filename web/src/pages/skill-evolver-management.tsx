@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
 import { Button, Input, Pagination, Select, Space, Table, Tag, Toast, Typography } from '@douyinfe/semi-ui';
 import { IconRefresh } from '@douyinfe/semi-icons';
@@ -13,7 +13,10 @@ import {
   OpsSectionCard,
   TableScroll,
 } from '../components/ops-layout';
-import { opsAdminService } from '../services/ops-admin-service';
+import {
+  useRunSkillEvolverMutation,
+  useSkillEvolverOverviewQuery,
+} from '../features/skill-evolver/api/skill-evolver-queries';
 import { theme } from '../styles/theme';
 
 const { Option } = Select;
@@ -273,11 +276,12 @@ const changeItems = (record: Record<string, any> | null) => (
 );
 
 export const SkillEvolverManagementPage: React.FC = () => {
-  const [loading, setLoading] = useState(false);
-  const [jobs, setJobs] = useState<Record<string, any>[]>([]);
-  const [patches, setPatches] = useState<Record<string, any>[]>([]);
   const [status, setStatus] = useState('');
   const [projectId, setProjectId] = useState('');
+  const overviewQuery = useSkillEvolverOverviewQuery({ status, projectId });
+  const runOnceMutation = useRunSkillEvolverMutation();
+  const jobs = overviewQuery.data?.jobs || [];
+  const patches = overviewQuery.data?.patches || [];
   const [selected, setSelected] = useState<Record<string, any> | null>(null);
   const [jobPage, setJobPage] = useState(1);
   const [patchPage, setPatchPage] = useState(1);
@@ -299,43 +303,20 @@ export const SkillEvolverManagementPage: React.FC = () => {
     setSelected(patch ? { ...record, ...patch } : record);
   };
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [jobResponse, patchResponse] = await Promise.all([
-        opsAdminService.listSkillEvolverJobs({ status, projectId, limit: 100 }),
-        opsAdminService.listSkillEvolverPatches({ projectId, limit: 100 }),
-      ]);
-      if (jobResponse.code !== '0000') throw new Error(jobResponse.info || '查询 Evolver job 失败');
-      if (patchResponse.code !== '0000') throw new Error(patchResponse.info || '查询 Evolver patch 失败');
-      setJobs((jobResponse.data || []).filter((job) => !projectId || asText(job.projectId || job.project_id, '') === projectId));
-      setPatches((patchResponse.data || []).filter((patch) => !projectId || asText(patch.projectId || patch.project_id, '') === projectId));
-      setJobPage(1);
-      setPatchPage(1);
-    } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '查询 Skill Evolver 失败');
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId, status]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const refreshOverview = async () => {
+    setJobPage(1);
+    setPatchPage(1);
+    await overviewQuery.refetch();
+  };
 
   const runOnce = async () => {
-    setLoading(true);
     try {
-      const response = await opsAdminService.runSkillEvolverOnce(5);
-      if (response.code !== '0000') {
-        throw new Error(response.info || '触发自动分析失败');
-      }
+      await runOnceMutation.mutateAsync();
+      setJobPage(1);
+      setPatchPage(1);
       Toast.success('已触发一次自动分析扫描');
-      load();
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '触发自动分析失败');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -453,36 +434,53 @@ export const SkillEvolverManagementPage: React.FC = () => {
         description="系统会在有真实工具证据的运维对话完成后自动分析可复用方法；这里用于查看结果、冻结治理和处理失败，不需要人工创建学习任务。"
         extra={
           <Space>
-            <Button onClick={runOnce} loading={loading}>立即分析排队任务</Button>
-            <Button icon={<IconRefresh />} onClick={load} loading={loading}>刷新</Button>
+            <Button onClick={runOnce} loading={runOnceMutation.isPending}>立即分析排队任务</Button>
+            <Button icon={<IconRefresh />} onClick={refreshOverview} loading={overviewQuery.isFetching}>刷新</Button>
           </Space>
         }
       />
 
       <OpsSectionCard title="筛选">
         <FilterBar>
-          <Select placeholder="状态" value={status} onChange={(value) => setStatus(String(value || ''))}>
+          <Select placeholder="状态" value={status} onChange={(value) => {
+            setStatus(String(value || ''));
+            setJobPage(1);
+            setPatchPage(1);
+          }}>
             <Option value="">全部状态</Option>
             <Option value="PENDING">已排队</Option>
             <Option value="RUNNING">分析中</Option>
             <Option value="DONE">已完成</Option>
             <Option value="FAILED">失败</Option>
           </Select>
-          <Input placeholder="按项目过滤，例如 payment-platform" value={projectId} onChange={setProjectId} />
-          <Button onClick={load} loading={loading}>查询</Button>
+          <Input placeholder="按项目过滤，例如 payment-platform" value={projectId} onChange={(value) => {
+            setProjectId(value);
+            setJobPage(1);
+            setPatchPage(1);
+          }} />
+          <Button onClick={refreshOverview} loading={overviewQuery.isFetching}>查询</Button>
         </FilterBar>
         <Text type="tertiary">这里不是执行中心审批。Skill 是长期运维方法，冻结/手动维护在 Skill 管理页面处理；ChangePackage 审批只管生产落地。</Text>
       </OpsSectionCard>
 
+      {overviewQuery.isError && (
+        <OpsSectionCard title="加载失败">
+          <OpsEmptyState
+            title="Skill Evolver 加载失败"
+            description={overviewQuery.error instanceof Error ? overviewQuery.error.message : '请刷新后重试。'}
+          />
+        </OpsSectionCard>
+      )}
+
       <TwoPanels>
         <OpsSectionCard title="待处理的学习任务">
-          {jobs.length === 0 && !loading ? (
+          {jobs.length === 0 && !overviewQuery.isLoading && !overviewQuery.isError ? (
             <OpsEmptyState title="暂无学习任务" description="Agent 完成一次有工具证据和最终结论的运维对话后会自动进入这里。普通聊天和无证据运行不会生成任务。" />
           ) : (
             <>
               <DesktopTable>
                 <TableScroll>
-                  <Table columns={jobColumns} dataSource={jobs} loading={loading} rowKey={(record) => asText(record?.jobId || record?.job_id || record?.id)} pagination={{ pageSize: 8 }} />
+                  <Table columns={jobColumns} dataSource={jobs} loading={overviewQuery.isLoading} rowKey={(record) => asText(record?.jobId || record?.job_id || record?.id)} pagination={{ pageSize: 8 }} />
                 </TableScroll>
               </DesktopTable>
               <MobileRecordList>
@@ -515,13 +513,13 @@ export const SkillEvolverManagementPage: React.FC = () => {
           )}
         </OpsSectionCard>
         <OpsSectionCard title="学习结果">
-          {patches.length === 0 && !loading ? (
+          {patches.length === 0 && !overviewQuery.isLoading && !overviewQuery.isError ? (
             <OpsEmptyState title="暂无学习结果" description="自动分析处理后会记录创建 Skill、更新 Skill、无需变更或跳过原因。" />
           ) : (
             <>
               <DesktopTable>
                 <TableScroll>
-                  <Table columns={patchColumns} dataSource={patches} loading={loading} rowKey={(record) => asText(record?.patchId || record?.patch_id || record?.id)} pagination={{ pageSize: 8 }} />
+                  <Table columns={patchColumns} dataSource={patches} loading={overviewQuery.isLoading} rowKey={(record) => asText(record?.patchId || record?.patch_id || record?.id)} pagination={{ pageSize: 8 }} />
                 </TableScroll>
               </DesktopTable>
               <MobileRecordList>

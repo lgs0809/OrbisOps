@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import {
@@ -28,12 +28,22 @@ import {
   OpsSkillArtifact,
   OpsSkillReference,
   OpsSkillSummary,
-  opsAdminService,
 } from '../services/ops-admin-service';
 import {
-  OpsProjectWorkspace,
-  opsProjectService,
-} from '../services/ops-project-service';
+  useCopyGlobalSkillMutation,
+  useCreateGlobalSkillMutation,
+  useReloadSkillsMutation,
+  useRollbackGlobalSkillMutation,
+  useSaveGlobalSkillMutation,
+  useSkillCatalogQuery,
+  useSkillContextQuery,
+  useSkillCopyProjectsQuery,
+  useSkillDetailQuery,
+  useSkillUsageQuery,
+  useSkillVersionsQuery,
+  useUpdateGlobalSkillModeMutation,
+  useUpdateGlobalSkillStatusMutation,
+} from '../features/skills/api/skill-queries';
 import { generatedId } from '../utils/generated-id';
 import { useResponsiveSidebar } from '../hooks/use-responsive-sidebar';
 
@@ -289,9 +299,6 @@ const hasScopeMetadata = (skill: OpsSkillSummary) => Boolean(skillScopeOf(skill)
 const isProjectScopedSkill = (skill: OpsSkillSummary) =>
   skillScopeOf(skill) === 'PROJECT' || Boolean(skillProjectIdOf(skill));
 
-const globalSkillsFrom = (skills: OpsSkillSummary[]) =>
-  skills.some(hasScopeMetadata) ? skills.filter((skill) => !isProjectScopedSkill(skill)) : skills;
-
 const updateModeOf = (skill: OpsSkillSummary | OpsSkillDetail | null | undefined) =>
   String(skill?.updateMode || skill?.update_mode || 'AUTO').toUpperCase();
 
@@ -378,18 +385,24 @@ const mergeSkillSources = (catalogSkills: OpsSkillSummary[], builtInSkills: OpsS
 export const SkillManagementPage: React.FC = () => {
   const navigate = useNavigate();
   const { collapsed, sidebarCollapsed, toggleSidebar, closeMobileSidebar } = useResponsiveSidebar(false);
-  const [skills, setSkills] = useState<OpsSkillSummary[]>([]);
+  const [sessionReady, setSessionReady] = useState(false);
+  const catalogQuery = useSkillCatalogQuery(sessionReady);
+  const reloadSkillsMutation = useReloadSkillsMutation();
+  const saveSkillMutation = useSaveGlobalSkillMutation();
+  const createSkillMutation = useCreateGlobalSkillMutation();
+  const updateStatusMutation = useUpdateGlobalSkillStatusMutation();
+  const updateModeMutation = useUpdateGlobalSkillModeMutation();
+  const rollbackMutation = useRollbackGlobalSkillMutation();
+  const copySkillMutation = useCopyGlobalSkillMutation();
+  const skills = useMemo(
+    () => mergeSkillSources(catalogQuery.data?.catalogSkills || [], catalogQuery.data?.builtInSkills || []),
+    [catalogQuery.data],
+  );
   const [selectedName, setSelectedName] = useState('');
-  const [detail, setDetail] = useState<OpsSkillDetail | null>(null);
-  const [contextPreview, setContextPreview] = useState('');
   const [searchText, setSearchText] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [contextLoading, setContextLoading] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [draftContent, setDraftContent] = useState('');
   const [draftArtifacts, setDraftArtifacts] = useState<OpsSkillArtifact[]>([]);
-  const [saving, setSaving] = useState(false);
   const [createVisible, setCreateVisible] = useState(false);
   const [createForm, setCreateForm] = useState({
     skillId: '',
@@ -404,11 +417,7 @@ export const SkillManagementPage: React.FC = () => {
     artifacts: [] as OpsSkillArtifact[],
   });
   const [usageVisible, setUsageVisible] = useState(false);
-  const [usageLoading, setUsageLoading] = useState(false);
-  const [usageRecords, setUsageRecords] = useState<OpsSkillReference[]>([]);
   const [copyVisible, setCopyVisible] = useState(false);
-  const [copySaving, setCopySaving] = useState(false);
-  const [projects, setProjects] = useState<OpsProjectWorkspace[]>([]);
   const [copyForm, setCopyForm] = useState({
     projectId: '',
     skillId: '',
@@ -416,9 +425,6 @@ export const SkillManagementPage: React.FC = () => {
     description: '',
   });
   const [versionVisible, setVersionVisible] = useState(false);
-  const [versionLoading, setVersionLoading] = useState(false);
-  const [skillVersions, setSkillVersions] = useState<Record<string, any>[]>([]);
-  const detailRequestSeq = useRef(0);
 
   const handleNavigation = handleNavigationFactory(navigate);
 
@@ -440,6 +446,38 @@ export const SkillManagementPage: React.FC = () => {
     );
   }, [searchText, visibleGlobalSkills]);
 
+  const effectiveSelectedName = selectedName && visibleGlobalSkills.some((skill) => skillIdOf(skill) === selectedName)
+    ? selectedName
+    : skillIdOf(visibleGlobalSkills[0]) || '';
+  const selectedSkill = visibleGlobalSkills.find((skill) => skillIdOf(skill) === effectiveSelectedName);
+  const selectedSourceName = selectedSkill?.name || effectiveSelectedName;
+  const detailQuery = useSkillDetailQuery(selectedSkill ? {
+    skillId: effectiveSelectedName,
+    sourceName: selectedSourceName,
+    catalogManaged: isCatalogManaged(selectedSkill),
+    summary: selectedSkill,
+  } : undefined);
+  const detail = detailQuery.data || null;
+  const contextQuery = useSkillContextQuery(selectedSourceName, Boolean(detail));
+  const usageQuery = useSkillUsageQuery(effectiveSelectedName, usageVisible && Boolean(detail && isCatalogManaged(detail)));
+  const versionsQuery = useSkillVersionsQuery(effectiveSelectedName, versionVisible && Boolean(detail && isCatalogManaged(detail)));
+  const copyProjectsQuery = useSkillCopyProjectsQuery(copyVisible);
+  const projects = copyProjectsQuery.data || [];
+  const usageRecords = usageQuery.data || [];
+  const skillVersions = versionsQuery.data || [];
+  const contextPreview = contextQuery.isError ? 'Skill Context 预览加载失败，请稍后刷新。' : (contextQuery.data || '');
+  const loading = catalogQuery.isLoading || reloadSkillsMutation.isPending;
+  const detailLoading = detailQuery.isLoading;
+  const contextLoading = contextQuery.isLoading || contextQuery.isFetching;
+  const saving = saveSkillMutation.isPending
+    || createSkillMutation.isPending
+    || updateStatusMutation.isPending
+    || updateModeMutation.isPending
+    || rollbackMutation.isPending;
+  const copySaving = copySkillMutation.isPending;
+  const usageLoading = usageQuery.isLoading;
+  const versionLoading = versionsQuery.isLoading;
+
   const loadedMarkdown = useMemo(() => detail?.content || detail?.markdown || '', [detail]);
   const loadedArtifacts = useMemo(() => (detail?.artifacts || []).filter((item) => item.path !== 'SKILL.md'), [detail]);
   const hasUnsavedChanges = editMode && (
@@ -456,167 +494,40 @@ export const SkillManagementPage: React.FC = () => {
     }
     try {
       JSON.parse(storedUserInfo);
+      setSessionReady(true);
     } catch (error) {
       Toast.error('用户信息解析失败');
       navigate('/login');
       return;
     }
-    loadSkills();
   }, [navigate]);
 
   useEffect(() => {
-    if (selectedName) {
-      loadSkillDetail(selectedName);
-    } else {
-      detailRequestSeq.current += 1;
-      setDetailLoading(false);
-      setContextLoading(false);
-      setEditMode(false);
-      setDraftContent('');
-      setDraftArtifacts([]);
-      setDetail(null);
-      setContextPreview('');
+    if (!detail) {
+      if (!detailQuery.isLoading) {
+        setEditMode(false);
+        setDraftContent('');
+        setDraftArtifacts([]);
+      }
+      return;
     }
-  }, [selectedName]);
+    setDraftContent(detail.content || detail.markdown || '');
+    setDraftArtifacts((detail.artifacts || []).filter((item) => item.path !== 'SKILL.md'));
+    setEditMode(false);
+  }, [detail, detailQuery.isLoading, effectiveSelectedName]);
 
-  const loadSkills = async () => {
-    setLoading(true);
-    try {
-      const [catalogResult, builtInResult] = await Promise.all([
-        opsAdminService.listGlobalSkills(),
-        opsAdminService.listSkills(),
-      ]);
-      if (catalogResult.code !== '0000') {
-        throw new Error(catalogResult.info || '查询通用方法库失败');
-      }
-      if (builtInResult.code !== '0000') {
-        throw new Error(builtInResult.info || '查询平台内置方法失败');
-      }
-      const nextSkills = mergeSkillSources(catalogResult.data || [], builtInResult.data || []);
-      const nextVisibleSkills = globalSkillsFrom(nextSkills);
-      setSkills(nextSkills);
-      setSelectedName((current) =>
-        current && nextVisibleSkills.some((skill) => skillIdOf(skill) === current)
-          ? current
-          : skillIdOf(nextVisibleSkills[0]) || '',
-      );
-    } catch (error) {
-      console.error('查询 Skill 失败:', error);
-      Toast.error('查询 Skill 失败');
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    if (!copyVisible || copyForm.projectId || !projects[0]?.projectId) return;
+    setCopyForm((current) => ({ ...current, projectId: projects[0].projectId }));
+  }, [copyForm.projectId, copyVisible, projects]);
 
   const reloadSkills = async () => {
-    setLoading(true);
     try {
-      const [catalogResult, builtInResult] = await Promise.all([
-        opsAdminService.listGlobalSkills(),
-        opsAdminService.reloadSkills(),
-      ]);
-      if (catalogResult.code !== '0000') {
-        throw new Error(catalogResult.info || '刷新通用方法库失败');
-      }
-      if (builtInResult.code !== '0000') {
-        throw new Error(builtInResult.info || '刷新平台内置方法失败');
-      }
-      const nextSkills = mergeSkillSources(catalogResult.data || [], builtInResult.data || []);
-      const nextVisibleSkills = globalSkillsFrom(nextSkills);
-      setSkills(nextSkills);
-      if (!nextVisibleSkills.some((skill) => skillIdOf(skill) === selectedName)) {
-        setSelectedName(skillIdOf(nextVisibleSkills[0]) || '');
-      }
+      await reloadSkillsMutation.mutateAsync();
       Toast.success('Skill 已刷新');
     } catch (error) {
       console.error('刷新 Skill 失败:', error);
-      Toast.error('刷新 Skill 失败');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadSkillDetail = async (name: string) => {
-    const requestSeq = detailRequestSeq.current + 1;
-    detailRequestSeq.current = requestSeq;
-    setDetailLoading(true);
-    setContextLoading(false);
-    setDetail(null);
-    setContextPreview('');
-    try {
-      const selectedSkill = skills.find((skill) => skillIdOf(skill) === name);
-      const catalogManaged = isCatalogManaged(selectedSkill);
-      const sourceName = selectedSkill?.name || name;
-      const detailResult = catalogManaged
-        ? await opsAdminService.getGlobalSkill(name)
-        : await opsAdminService.getSkill(sourceName);
-      if (requestSeq !== detailRequestSeq.current) {
-        return;
-      }
-      if (detailResult.code !== '0000') {
-        throw new Error(detailResult.info || '查询 Skill 详情失败');
-      }
-      const artifactResult = catalogManaged
-        ? await opsAdminService.listGlobalSkillArtifacts(name)
-        : { code: '0000', data: [] as OpsSkillArtifact[], info: '' };
-      if (artifactResult.code !== '0000') {
-        throw new Error(artifactResult.info || '查询 Skill 文件失败');
-      }
-      if (requestSeq !== detailRequestSeq.current) {
-        return;
-      }
-      const nextDetail = detailResult.data
-        ? {
-            ...selectedSkill,
-            ...detailResult.data,
-            catalogManaged,
-            builtIn: !catalogManaged,
-            origin: catalogManaged ? detailResult.data.origin : 'BUILT_IN',
-            updateMode: catalogManaged ? detailResult.data.updateMode : 'MANUAL_ONLY',
-            autoUpdateEnabled: catalogManaged ? detailResult.data.autoUpdateEnabled : false,
-            autoMergeEnabled: catalogManaged ? detailResult.data.autoMergeEnabled : false,
-            artifacts: artifactResult.data || [],
-          }
-        : null;
-      setDetail(nextDetail);
-      setDraftContent(nextDetail?.content || nextDetail?.markdown || '');
-      setDraftArtifacts((nextDetail?.artifacts || []).filter((item) => item.path !== 'SKILL.md'));
-      setEditMode(false);
-      setDetailLoading(false);
-
-      setContextLoading(true);
-      try {
-        const contextResult = await opsAdminService.renderSkillContext([sourceName], 12000);
-        if (requestSeq !== detailRequestSeq.current) {
-          return;
-        }
-        setContextPreview(contextResult.code === '0000' ? contextResult.data?.content || '' : '');
-      } catch (error) {
-        if (requestSeq !== detailRequestSeq.current) {
-          return;
-        }
-        console.error('查询 Skill Context 预览失败:', error);
-        setContextPreview('Skill Context 预览加载失败，请稍后刷新。');
-      } finally {
-        if (requestSeq === detailRequestSeq.current) {
-          setContextLoading(false);
-        }
-      }
-    } catch (error) {
-      if (requestSeq !== detailRequestSeq.current) {
-        return;
-      }
-      console.error('查询 Skill 详情失败:', error);
-      Toast.error('查询 Skill 详情失败');
-      setEditMode(false);
-      setDraftContent('');
-      setDraftArtifacts([]);
-      setDetail(null);
-      setContextPreview('');
-    } finally {
-      if (requestSeq === detailRequestSeq.current) {
-        setDetailLoading(false);
-      }
+      Toast.error(error instanceof Error ? error.message : '刷新 Skill 失败');
     }
   };
 
@@ -626,7 +537,7 @@ export const SkillManagementPage: React.FC = () => {
   };
 
   const selectSkill = (name: string) => {
-    if (name === selectedName) {
+    if (name === effectiveSelectedName) {
       return;
     }
     if (hasUnsavedChanges && !window.confirm('当前 Skill 有未保存修改，切换后会丢失这些修改。确认继续？')) {
@@ -636,63 +547,25 @@ export const SkillManagementPage: React.FC = () => {
   };
 
   const saveSkill = async () => {
-    if (!detail?.name) {
-      return;
-    }
-    setSaving(true);
+    if (!detail?.name) return;
     try {
       const skillId = skillIdOf(detail);
-      const result = await opsAdminService.updateGlobalSkill(skillId, {
-        content: draftContent,
-        name: detail.name,
-        description: detail.description,
-        status: detail.status || 'ENABLED',
-        artifacts: draftArtifacts,
-        evalSuites: draftArtifacts.filter((item) => item.role === 'EVAL').map((item) => item.path),
+      await saveSkillMutation.mutateAsync({
+        skillId,
+        payload: {
+          content: draftContent,
+          name: detail.name,
+          description: detail.description,
+          status: detail.status || 'ENABLED',
+          artifacts: draftArtifacts,
+          evalSuites: draftArtifacts.filter((item) => item.role === 'EVAL').map((item) => item.path),
+        },
       });
-      if (result.code !== '0000') {
-        throw new Error(result.info || '保存 Skill 失败');
-      }
-      const artifactResult = await opsAdminService.listGlobalSkillArtifacts(skillId);
-      if (artifactResult.code !== '0000') {
-        throw new Error(artifactResult.info || 'Skill 已保存，但文件列表重新加载失败');
-      }
-      const nextDetail = { ...result.data, artifacts: artifactResult.data || [] };
-      setDetail(nextDetail);
-      setDraftContent(nextDetail?.content || nextDetail?.markdown || '');
-      setDraftArtifacts((nextDetail.artifacts || []).filter((item) => item.path !== 'SKILL.md'));
       setEditMode(false);
-      setSkills((current) =>
-        current.map((skill) =>
-          skillIdOf(skill) === skillIdOf(nextDetail)
-            ? {
-                ...skill,
-                name: nextDetail.name,
-                skillId: nextDetail.skillId,
-                scope: nextDetail.scope,
-                projectId: nextDetail.projectId,
-                status: nextDetail.status,
-                description: nextDetail.description,
-                frontMatter: nextDetail.frontMatter,
-                contentLength: nextDetail.contentLength,
-                referencedBy: nextDetail.referencedBy,
-              }
-            : skill
-        )
-      );
-      setContextLoading(true);
-      try {
-        const contextResult = await opsAdminService.renderSkillContext([skillIdOf(nextDetail)], 12000);
-        setContextPreview(contextResult.code === '0000' ? contextResult.data?.content || '' : '');
-      } finally {
-        setContextLoading(false);
-      }
       Toast.success('Skill 已保存');
     } catch (error) {
       console.error('保存 Skill 失败:', error);
       Toast.error(error instanceof Error ? error.message : '保存 Skill 失败');
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -709,9 +582,8 @@ export const SkillManagementPage: React.FC = () => {
       Toast.warning('请填写禁用场景');
       return;
     }
-    setSaving(true);
     try {
-      const result = await opsAdminService.createGlobalSkill({
+      const result = await createSkillMutation.mutateAsync({
         skillId: createForm.skillId.trim() || generatedId('skill', createForm.name),
         name: createForm.name.trim(),
         description: createForm.description,
@@ -725,18 +597,12 @@ export const SkillManagementPage: React.FC = () => {
         artifacts: createForm.artifacts,
         evalSuites: createForm.artifacts.filter((item) => item.role === 'EVAL').map((item) => item.path),
       });
-      if (result.code !== '0000') {
-        throw new Error(result.info || '创建通用 Skill 失败');
-      }
       setCreateVisible(false);
       resetCreateForm();
-      await loadSkills();
-      setSelectedName(skillIdOf(result.data));
+      setSelectedName(skillIdOf(result));
       Toast.success('通用 Skill 已创建');
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '创建通用 Skill 失败');
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -779,140 +645,63 @@ export const SkillManagementPage: React.FC = () => {
   const toggleSkillStatus = async () => {
     if (!detail) return;
     const skillId = skillIdOf(detail);
-    const nextStatus = String(detail.status || 'ENABLED').toUpperCase() === 'ENABLED'
-      ? 'DISABLED'
-      : 'ENABLED';
-    if (nextStatus === 'DISABLED' && !window.confirm(`确认停用通用 Skill ${skillId}？`)) {
-      return;
-    }
-    setSaving(true);
+    const nextStatus = String(detail.status || 'ENABLED').toUpperCase() === 'ENABLED' ? 'DISABLED' : 'ENABLED';
+    if (nextStatus === 'DISABLED' && !window.confirm(`确认停用通用 Skill ${skillId}？`)) return;
     try {
-      const result = await opsAdminService.updateGlobalSkillStatus(skillId, nextStatus);
-      if (result.code !== '0000') {
-        throw new Error(result.info || '更新 Skill 状态失败');
-      }
-      setDetail({ ...result.data, artifacts: detail.artifacts || [] });
-      await loadSkills();
+      await updateStatusMutation.mutateAsync({ skillId, status: nextStatus });
       Toast.success(nextStatus === 'ENABLED' ? 'Skill 已启用' : 'Skill 已停用');
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '更新 Skill 状态失败');
-    } finally {
-      setSaving(false);
     }
   };
 
   const updateSkillMode = async (updateMode: 'AUTO' | 'MANUAL_ONLY' | 'FROZEN') => {
     if (!detail) return;
-    setSaving(true);
     try {
-      const result = await opsAdminService.updateGlobalSkillUpdateMode(skillIdOf(detail), {
-        updateMode,
-        autoUpdateEnabled: updateMode === 'AUTO',
-        autoMergeEnabled: updateMode === 'AUTO',
+      await updateModeMutation.mutateAsync({
+        skillId: skillIdOf(detail),
+        payload: {
+          updateMode,
+          autoUpdateEnabled: updateMode === 'AUTO',
+          autoMergeEnabled: updateMode === 'AUTO',
+        },
       });
-      if (result.code !== '0000') {
-        throw new Error(result.info || '更新 Skill 更新策略失败');
-      }
-      setDetail({ ...result.data, artifacts: detail.artifacts || [] });
-      await loadSkills();
       Toast.success(updateMode === 'FROZEN' ? 'Skill 已冻结' : `Skill 更新策略已切换为 ${updateMode}`);
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '更新 Skill 更新策略失败');
-    } finally {
-      setSaving(false);
     }
   };
 
-  const openVersions = async () => {
+  const openVersions = () => {
     if (!detail) return;
     setVersionVisible(true);
-    setVersionLoading(true);
-    try {
-      const result = await opsAdminService.listGlobalSkillVersions(skillIdOf(detail));
-      if (result.code !== '0000') {
-        throw new Error(result.info || '查询 Skill 版本失败');
-      }
-      setSkillVersions(result.data || []);
-    } catch (error) {
-      setSkillVersions([]);
-      Toast.error(error instanceof Error ? error.message : '查询 Skill 版本失败');
-    } finally {
-      setVersionLoading(false);
-    }
   };
 
   const rollbackVersion = async (version: number) => {
-    if (!detail || !window.confirm(`确认回滚 ${skillIdOf(detail)} 到版本 ${version}？`)) {
-      return;
-    }
-    setSaving(true);
+    if (!detail || !window.confirm(`确认回滚 ${skillIdOf(detail)} 到版本 ${version}？`)) return;
     try {
-      const result = await opsAdminService.rollbackGlobalSkillVersion(skillIdOf(detail), version);
-      if (result.code !== '0000') {
-        throw new Error(result.info || '回滚 Skill 版本失败');
-      }
-      const artifactResult = await opsAdminService.listGlobalSkillArtifacts(skillIdOf(detail));
-      setDetail({ ...result.data, artifacts: artifactResult.data || [] });
-      setDraftContent(result.data?.content || result.data?.markdown || '');
-      setDraftArtifacts((artifactResult.data || []).filter((item) => item.path !== 'SKILL.md'));
+      await rollbackMutation.mutateAsync({ skillId: skillIdOf(detail), version });
       setVersionVisible(false);
-      await loadSkills();
       Toast.success('Skill 已回滚');
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '回滚 Skill 版本失败');
-    } finally {
-      setSaving(false);
     }
   };
 
-  const openUsage = async () => {
-    if (!detail) {
-      return;
-    }
+  const openUsage = () => {
+    if (!detail) return;
     setUsageVisible(true);
-    setUsageLoading(true);
-    try {
-      const result = await opsAdminService.listGlobalSkillUsage(skillIdOf(detail));
-      if (result.code !== '0000') {
-        throw new Error(result.info || '查询 Skill 使用位置失败');
-      }
-      setUsageRecords(result.data || []);
-    } catch (error) {
-      setUsageRecords([]);
-      Toast.error(error instanceof Error ? error.message : '查询 Skill 使用位置失败');
-    } finally {
-      setUsageLoading(false);
-    }
   };
 
-  const openCopyToProject = async () => {
-    if (!detail) {
-      return;
-    }
+  const openCopyToProject = () => {
+    if (!detail) return;
     setCopyVisible(true);
     setCopyForm({
-      projectId: '',
+      projectId: projects[0]?.projectId || '',
       skillId: '',
       name: detail.name || skillIdOf(detail),
       description: detail.description || '',
     });
-    if (projects.length > 0) {
-      return;
-    }
-    try {
-      const result = await opsProjectService.snapshot();
-      if (result.code !== '0000') {
-        throw new Error(result.info || '查询项目失败');
-      }
-      const nextProjects = result.data?.projects || [];
-      setProjects(nextProjects);
-      setCopyForm((current) => ({
-        ...current,
-        projectId: current.projectId || nextProjects[0]?.projectId || '',
-      }));
-    } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '查询项目失败');
-    }
   };
 
   const copyToProject = async () => {
@@ -920,23 +709,20 @@ export const SkillManagementPage: React.FC = () => {
       Toast.warning('请选择项目并填写项目 Skill 名称');
       return;
     }
-    setCopySaving(true);
     try {
-      const result = await opsAdminService.copyGlobalSkillToProject(copyForm.projectId, {
-        globalSkillId: skillIdOf(detail),
-        skillId: copyForm.skillId.trim() || generatedId('skill', copyForm.name),
-        name: copyForm.name.trim(),
-        description: copyForm.description.trim(),
+      await copySkillMutation.mutateAsync({
+        projectId: copyForm.projectId,
+        payload: {
+          globalSkillId: skillIdOf(detail),
+          skillId: copyForm.skillId.trim() || generatedId('skill', copyForm.name),
+          name: copyForm.name.trim(),
+          description: copyForm.description.trim(),
+        },
       });
-      if (result.code !== '0000') {
-        throw new Error(result.info || '复制 Skill 到项目失败');
-      }
       setCopyVisible(false);
       Toast.success('已生成项目 Skill');
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '复制 Skill 到项目失败');
-    } finally {
-      setCopySaving(false);
     }
   };
 
@@ -1084,6 +870,9 @@ export const SkillManagementPage: React.FC = () => {
                     />
                   </Space>
                 </Toolbar>
+                {catalogQuery.isError && (
+                  <EmptyDetail>{catalogQuery.error instanceof Error ? catalogQuery.error.message : '通用方法库加载失败，请刷新后重试。'}</EmptyDetail>
+                )}
                 <TableScroll>
                   <Table
                     rowKey="name"
@@ -1098,7 +887,7 @@ export const SkillManagementPage: React.FC = () => {
                           selectSkill(skillIdOf(record));
                         }
                       },
-                      style: { cursor: 'pointer', background: record && skillIdOf(record) === selectedName ? '#eff6ff' : undefined },
+                      style: { cursor: 'pointer', background: record && skillIdOf(record) === effectiveSelectedName ? '#eff6ff' : undefined },
                     })}
                   />
                 </TableScroll>
@@ -1167,8 +956,10 @@ export const SkillManagementPage: React.FC = () => {
                 </PanelHeader>
                 <PanelBody>
                   <Spin spinning={detailLoading}>
-                    {!detail ? (
-                      <EmptyDetail>请选择一个 Skill。</EmptyDetail>
+                    {detailQuery.isError ? (
+                      <EmptyDetail>{detailQuery.error instanceof Error ? detailQuery.error.message : 'Skill 详情加载失败，请刷新后重试。'}</EmptyDetail>
+                    ) : !detail ? (
+                      <EmptyDetail>{effectiveSelectedName ? 'Skill 详情加载中...' : '请选择一个 Skill。'}</EmptyDetail>
                     ) : (
                       <DetailStack>
                         <MetaGrid>
@@ -1342,7 +1133,8 @@ export const SkillManagementPage: React.FC = () => {
             placeholder="选择目标项目"
             style={{ width: '100%' }}
             onChange={(projectId) => setCopyForm((current) => ({ ...current, projectId: String(projectId || '') }))}
-            emptyContent="暂无可用项目"
+            loading={copyProjectsQuery.isLoading}
+            emptyContent={copyProjectsQuery.isError ? '项目加载失败，请稍后重试' : '暂无可用项目'}
           >
             {projects.map((project) => (
               <Select.Option key={project.projectId} value={project.projectId}>
@@ -1398,7 +1190,7 @@ export const SkillManagementPage: React.FC = () => {
                   record.type === 'node' ? `节点：${record.targetId || '-'}` : 'Agent 默认能力',
               },
             ]}
-            empty={<EmptyDetail>当前没有 Agent 或节点显式引用该 Skill。</EmptyDetail>}
+            empty={<EmptyDetail>{usageQuery.isError ? '使用位置加载失败，请稍后重试。' : '当前没有 Agent 或节点显式引用该 Skill。'}</EmptyDetail>}
           />
         </TableScroll>
       </Modal>
@@ -1455,7 +1247,7 @@ export const SkillManagementPage: React.FC = () => {
                 ),
               },
             ]}
-            empty={<EmptyDetail>暂无版本记录。</EmptyDetail>}
+            empty={<EmptyDetail>{versionsQuery.isError ? '版本记录加载失败，请稍后重试。' : '暂无版本记录。'}</EmptyDetail>}
           />
         </TableScroll>
       </Modal>

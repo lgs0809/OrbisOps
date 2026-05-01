@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { Button, Empty, Spin, Typography } from '@douyinfe/semi-ui';
@@ -11,10 +11,10 @@ import {
   buildUserAttentionItems,
   projectNeedsAttention,
 } from '../features/dashboard/attention-center-model';
+import { useDashboardOverviewQuery } from '../features/dashboard/api/dashboard-queries';
 import { isAdminUser } from '../services/auth-session';
-import { OpsAdminDashboardOverview, OpsChangePackage, opsAdminService } from '../services/ops-admin-service';
+import { OpsChangePackage } from '../services/ops-admin-service';
 import { OpsProjectWorkspace } from '../services/ops-project-service';
-import { opsUserService, UserDashboardOverview } from '../services/ops-user-service';
 import { theme } from '../styles/theme';
 
 const { Text, Title } = Typography;
@@ -190,34 +190,13 @@ const attentionLabel = (item: AttentionItem) => ({
 export const OpsDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const admin = isAdminUser();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [adminOverview, setAdminOverview] = useState<OpsAdminDashboardOverview | null>(null);
-  const [userOverview, setUserOverview] = useState<UserDashboardOverview | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    setError('');
-    const request = admin
-      ? opsAdminService.adminDashboardOverview().then((response) => {
-          if (response.code !== '0000') throw new Error(response.info || '管理员工作台加载失败');
-          if (!active) return;
-          setAdminOverview(response.data);
-          setUserOverview(null);
-        })
-      : opsUserService.dashboardOverview().then((response) => {
-          if (!active) return;
-          setUserOverview(response.data);
-          setAdminOverview(null);
-        });
-    request
-      .catch((failure: unknown) => {
-        if (active) setError(failure instanceof Error ? failure.message : '工作台数据加载失败');
-      })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [admin]);
+  const overviewQuery = useDashboardOverviewQuery(admin);
+  const loading = overviewQuery.isLoading;
+  const error = overviewQuery.isError
+    ? (overviewQuery.error instanceof Error ? overviewQuery.error.message : '工作台数据加载失败')
+    : '';
+  const adminOverview = overviewQuery.data?.adminOverview || null;
+  const userOverview = overviewQuery.data?.userOverview || null;
 
   const projects = useMemo(
     () => (adminOverview?.projects || []) as OpsProjectWorkspace[],

@@ -1,11 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import styled from 'styled-components';
 import { Button, Empty, Spin, Table, Tag, Typography } from '@douyinfe/semi-ui';
 import { IconBranch, IconHistory, IconShield } from '@douyinfe/semi-icons';
 import { useNavigate } from 'react-router-dom';
 
 import { OpsPageHeader, OpsPageShell, TableScroll } from '../components/ops-layout';
-import { opsUserService, UserAuditSummary } from '../services/ops-user-service';
+import { useMyAuditsQuery } from '../features/governance/api/user-audit-queries';
+import type { UserAuditSummary } from '../services/ops-user-service';
 import { theme } from '../styles/theme';
 
 const { Text } = Typography;
@@ -54,18 +55,12 @@ const Panel = styled.section`
 
 export const UserAuditRecordsPage: React.FC = () => {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [audits, setAudits] = useState<UserAuditSummary[]>([]);
-
-  useEffect(() => {
-    setLoading(true);
-    setError('');
-    opsUserService.myAudits()
-      .then((response) => setAudits(response.data || []))
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : '我的审计加载失败'))
-      .finally(() => setLoading(false));
-  }, []);
+  const auditsQuery = useMyAuditsQuery();
+  const loading = auditsQuery.isLoading;
+  const error = auditsQuery.isError
+    ? (auditsQuery.error instanceof Error ? auditsQuery.error.message : '我的审计加载失败')
+    : '';
+  const audits = auditsQuery.data || [];
 
   const auditStats = useMemo(() => {
     const textOf = (audit: UserAuditSummary) => `${audit.moduleName || ''} ${audit.actionName || ''}`.toLowerCase();

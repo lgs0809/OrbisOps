@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Layout,
@@ -24,13 +24,17 @@ import {
 import styled from 'styled-components';
 import { theme } from '../styles/theme';
 import { Sidebar, Header, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from '../components/layout';
-import { opsAdminService, OpsAgentDefinition } from '../services/ops-admin-service';
+import type { OpsAgentDefinition } from '../services/ops-admin-service';
+import {
+  useAgentListQuery,
+  useCloneAgentMutation,
+  useDisableAgentMutation,
+} from '../features/agents/api/agent-list-queries';
 import { clearAuthSession } from '../services/auth-session';
 import { ProjectScopeBar } from '../components/project-scope-bar';
 import { useProjectScope } from '../hooks/use-project-scope';
 import { generatedId } from '../utils/generated-id';
 import { useResponsiveSidebar } from '../hooks/use-responsive-sidebar';
-import { AgentReferenceImpact, loadAgentReferenceImpacts } from '../services/ops-agent-reference-impact-service';
 
 const { Content } = Layout;
 const { Title } = Typography;
@@ -195,18 +199,31 @@ export const AgentListPage: React.FC<AgentListPageProps> = ({
     clearAuthSession();
     navigate('/login');
   };
-  const [loading, setLoading] = useState(false);
-  const [dataSource, setDataSource] = useState<OpsAgentDefinition[]>([]);
   const [searchParams, setSearchParams] = useState<{
     configName?: string;
     pageNum?: number;
     pageSize?: number;
   }>({
     pageNum: 1,
-    pageSize: 10
+    pageSize: 10,
   });
-  const [total, setTotal] = useState(0);
-  const [referenceImpacts, setReferenceImpacts] = useState<Record<string, AgentReferenceImpact>>({});
+  const listQuery = useAgentListQuery(projectScope.projectId);
+  const cloneMutation = useCloneAgentMutation();
+  const disableMutation = useDisableAgentMutation(projectScope.projectId);
+  const referenceImpacts = listQuery.data?.referenceImpacts || {};
+  const filteredWorkflows = useMemo(() => {
+    const keyword = (searchParams.configName || '').trim().toLowerCase();
+    return (listQuery.data?.workflows || []).filter((agent) => (
+      !keyword
+      || displayAgentName(agent).toLowerCase().includes(keyword)
+      || displayAgentDescription(agent).toLowerCase().includes(keyword)
+    ));
+  }, [listQuery.data?.workflows, searchParams.configName]);
+  const pageNum = searchParams.pageNum || 1;
+  const pageSize = searchParams.pageSize || 10;
+  const dataSource = filteredWorkflows.slice((pageNum - 1) * pageSize, pageNum * pageSize);
+  const total = filteredWorkflows.length;
+  const loading = listQuery.isLoading || cloneMutation.isPending || disableMutation.isPending;
   const [cloneSource, setCloneSource] = useState<OpsAgentDefinition | null>(null);
   const [cloneForm, setCloneForm] = useState({ projectId: '', agentId: '', name: '' });
 
@@ -310,59 +327,17 @@ export const AgentListPage: React.FC<AgentListPageProps> = ({
     }
   ];
 
-  // 加载数据
-  const loadData = async (params?: typeof searchParams, activeProjectId = projectScope.projectId) => {
-    if (!activeProjectId) {
-      setDataSource([]);
-      setTotal(0);
-      return;
-    }
-    setLoading(true);
-    try {
-      const queryParams = { ...searchParams, ...params };
-      const response = await opsAdminService.listAgents(activeProjectId);
-      const keyword = (queryParams.configName || '').trim().toLowerCase();
-      const filtered = (response.data || []).filter((agent) => {
-        if (agent.definitionKind !== 'SPECIALIZED_WORKFLOW') return false;
-        const matchName = !keyword || displayAgentName(agent).toLowerCase().includes(keyword) || displayAgentDescription(agent).toLowerCase().includes(keyword);
-        return matchName;
-      });
-      const impacts = await loadAgentReferenceImpacts(
-        activeProjectId,
-        filtered.map((agent) => agent.agentId || '').filter(Boolean),
-      );
-      setReferenceImpacts(impacts);
-      const pageNum = queryParams.pageNum || 1;
-      const pageSize = queryParams.pageSize || 10;
-      setDataSource(filtered.slice((pageNum - 1) * pageSize, pageNum * pageSize));
-      setTotal(filtered.length);
-    } catch (error) {
-      Toast.error('加载数据失败');
-      console.error('加载数据失败:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 搜索
+  // 搜索/分页都是已加载项目目录的本地派生，不重复请求后端。
   const handleSearch = () => {
-    const params = { ...searchParams, pageNum: 1 };
-    setSearchParams(params);
-    loadData(params);
+    setSearchParams((current) => ({ ...current, pageNum: 1 }));
   };
 
-  // 重置搜索
   const handleReset = () => {
-    const params = { pageNum: 1, pageSize: 10 };
-    setSearchParams(params);
-    loadData(params);
+    setSearchParams({ pageNum: 1, pageSize: 10 });
   };
 
-  // 分页变化
-  const handlePageChange = (pageNum: number, pageSize: number) => {
-    const params = { ...searchParams, pageNum, pageSize };
-    setSearchParams(params);
-    loadData(params);
+  const handlePageChange = (nextPageNum: number, nextPageSize: number) => {
+    setSearchParams((current) => ({ ...current, pageNum: nextPageNum, pageSize: nextPageSize }));
   };
 
   // 新建
@@ -390,57 +365,32 @@ export const AgentListPage: React.FC<AgentListPageProps> = ({
       return;
     }
     try {
-      setLoading(true);
       const payload = {
         ...cloneForm,
         agentId: cloneForm.agentId.trim() || generatedId('workflow', cloneForm.name),
       };
-      const response = await opsAdminService.cloneAgent(cloneSource.agentId, payload);
-      if (response.code !== '0000' || !response.data) {
-        throw new Error(response.info || '复制失败');
-      }
+      const created = await cloneMutation.mutateAsync({ sourceAgentId: cloneSource.agentId, ...payload });
       Toast.success('专项 Workflow 已复制为目标项目的独立草稿');
       setCloneSource(null);
-      const createdAgentId = response.data.agentId || payload.agentId;
-      if (cloneForm.projectId === projectScope.projectId) {
-        await loadData(undefined, projectScope.projectId);
-      } else {
+      const createdAgentId = created.agentId || payload.agentId;
+      if (cloneForm.projectId !== projectScope.projectId) {
         projectScope.selectProject(cloneForm.projectId);
       }
       navigate(`/agent-config?projectId=${encodeURIComponent(cloneForm.projectId)}&agentId=${encodeURIComponent(createdAgentId)}`);
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '复制失败');
-    } finally {
-      setLoading(false);
     }
   };
 
-  // 停用
   const handleDelete = async (record: OpsAgentDefinition) => {
     try {
-      setLoading(true);
-      const response = await opsAdminService.deleteAgent(record.agentId || '');
-      if (response.code === '0000' && response.data) {
-        Toast.success(`已停用专项 Workflow：${record.name || '未命名'}`);
-        // 重新加载数据
-        await loadData();
-      } else {
-        Toast.error('停用配置失败');
-      }
+      await disableMutation.mutateAsync(record.agentId || '');
+      Toast.success(`已停用专项 Workflow：${record.name || '未命名'}`);
     } catch (error) {
-      Toast.error('停用配置失败');
+      Toast.error(error instanceof Error ? error.message : '停用配置失败');
       console.error('停用配置失败:', error);
-    } finally {
-      setLoading(false);
     }
   };
-
-  // 初始化加载数据
-  useEffect(() => {
-    if (projectScope.projectId) {
-      void loadData({ ...searchParams, pageNum: 1 }, projectScope.projectId);
-    }
-  }, [projectScope.projectId]);
 
   return (
     <AgentListLayout>
@@ -468,7 +418,7 @@ export const AgentListPage: React.FC<AgentListPageProps> = ({
               projectId={projectScope.projectId}
               onChange={projectScope.selectProject}
               loading={projectScope.loading}
-              onRefresh={() => loadData(undefined, projectScope.projectId)}
+              onRefresh={() => listQuery.refetch()}
               actions={<Button type="primary" icon={<IconPlus />} disabled={!projectScope.projectId} onClick={handleCreate}>新建专项 Workflow</Button>}
             />
 

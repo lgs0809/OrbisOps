@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Layout,
@@ -26,19 +26,26 @@ import {
 import styled from 'styled-components';
 import { theme } from '../styles/theme';
 import { Sidebar, Header } from '../components/layout';
-import {
-  taskScheduleAdminService,
+import type {
   TaskExecutionResponseDTO,
   TaskScheduleRequestDTO,
-  TaskScheduleResponseDTO
+  TaskScheduleResponseDTO,
 } from '../services/task-schedule-admin-service';
-import { OpsAgentDefinition, opsAdminService } from '../services/ops-admin-service';
+import type { OpsAgentDefinition } from '../services/ops-admin-service';
+import {
+  useDeleteTaskScheduleMutation,
+  useRunTaskScheduleMutation,
+  useSaveTaskScheduleMutation,
+  useTaskExecutionsQuery,
+  useTaskScheduleOptionsQuery,
+  useTaskSchedulesQuery,
+  useToggleTaskScheduleMutation,
+} from '../features/automations/api/task-schedule-queries';
 import { clearAuthSession } from '../services/auth-session';
 import { ProjectScopeBar } from '../components/project-scope-bar';
 import { useProjectScope } from '../hooks/use-project-scope';
 import { TableScroll } from '../components/ops-layout';
 import { useResponsiveSidebar } from '../hooks/use-responsive-sidebar';
-import { OpsChannel, opsChannelService } from '../services/ops-channel-service';
 
 const { Content } = Layout;
 const { Title } = Typography;
@@ -227,17 +234,33 @@ export const TaskScheduleManagement: React.FC = () => {
   const navigate = useNavigate();
   const { collapsed, sidebarCollapsed, toggleSidebar, closeMobileSidebar } = useResponsiveSidebar();
   const projectScope = useProjectScope();
-  const [loading, setLoading] = useState(false);
-  const [schedules, setSchedules] = useState<TaskScheduleResponseDTO[]>([]);
-  const [executions, setExecutions] = useState<TaskExecutionResponseDTO[]>([]);
+  const schedulesQuery = useTaskSchedulesQuery(projectScope.projectId);
+  const optionsQuery = useTaskScheduleOptionsQuery(projectScope.projectId);
+  const saveScheduleMutation = useSaveTaskScheduleMutation(projectScope.projectId);
+  const toggleScheduleMutation = useToggleTaskScheduleMutation(projectScope.projectId);
+  const deleteScheduleMutation = useDeleteTaskScheduleMutation(projectScope.projectId);
+  const runScheduleMutation = useRunTaskScheduleMutation(projectScope.projectId);
   const [modalVisible, setModalVisible] = useState(false);
   const [executionModalVisible, setExecutionModalVisible] = useState(false);
+  const [selectedScheduleId, setSelectedScheduleId] = useState<number | undefined>();
+  const executionsQuery = useTaskExecutionsQuery(
+    projectScope.projectId,
+    selectedScheduleId,
+    executionModalVisible,
+  );
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [editing, setEditing] = useState<TaskScheduleResponseDTO | null>(null);
   const [selectedExecution, setSelectedExecution] = useState<TaskExecutionResponseDTO | null>(null);
   const [form, setForm] = useState<TaskScheduleRequestDTO>(defaultForm);
-  const [agentDefinitions, setAgentDefinitions] = useState<OpsAgentDefinition[]>([]);
-  const [channels, setChannels] = useState<OpsChannel[]>([]);
+  const schedules = schedulesQuery.data || [];
+  const executions = executionsQuery.data || [];
+  const agentDefinitions = optionsQuery.data?.agents || [];
+  const channels = optionsQuery.data?.channels || [];
+  const loading = schedulesQuery.isLoading
+    || saveScheduleMutation.isPending
+    || toggleScheduleMutation.isPending
+    || deleteScheduleMutation.isPending
+    || runScheduleMutation.isPending;
   const defaultReactAgentId = projectScope.selectedProject?.defaultAgentId || '';
   const workflowDefinitions = useMemo(
     () => agentDefinitions.filter((agent) => agent.definitionKind === 'SPECIALIZED_WORKFLOW'),
@@ -274,52 +297,10 @@ export const TaskScheduleManagement: React.FC = () => {
     }
   };
 
-  const fetchSchedules = async (projectId = projectScope.projectId) => {
-    if (!projectId) {
-      setSchedules([]);
-      return;
-    }
-    setLoading(true);
-    try {
-      const result = await taskScheduleAdminService.list(projectId);
-      if (result.code === '0000') {
-        setSchedules(result.data || []);
-      } else {
-        throw new Error(result.info || '查询失败');
-      }
-    } catch (error) {
-      console.error('获取定时任务失败:', error);
-      Toast.error('获取定时任务失败');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchAgents = async (projectId?: string) => {
-    try {
-      const result = await opsAdminService.listAgents(projectId);
-      if (result.code === '0000') {
-        setAgentDefinitions(result.data || []);
-      }
-    } catch (error) {
-      console.warn('获取 Agent 定义失败:', error);
-    }
-  };
-
-  const fetchExecutions = async (scheduleId?: number) => {
-    try {
-      if (!projectScope.projectId || !scheduleId) return;
-      const result = await taskScheduleAdminService.listExecutions(projectScope.projectId, scheduleId, 30);
-      if (result.code === '0000') {
-        setExecutions(result.data || []);
-        setExecutionModalVisible(true);
-      } else {
-        throw new Error(result.info || '查询失败');
-      }
-    } catch (error) {
-      console.error('获取执行记录失败:', error);
-      Toast.error('获取执行记录失败');
-    }
+  const openExecutions = (scheduleId?: number) => {
+    if (!scheduleId) return;
+    setSelectedScheduleId(scheduleId);
+    setExecutionModalVisible(true);
   };
 
   const openCreate = () => {
@@ -332,7 +313,6 @@ export const TaskScheduleManagement: React.FC = () => {
       agentBindingMode: 'LATEST_PUBLISHED',
       agentVersion: undefined,
     });
-    fetchAgents(project?.projectId);
     setModalVisible(true);
   };
 
@@ -368,7 +348,6 @@ export const TaskScheduleManagement: React.FC = () => {
       minInstanceUpRatio: record.minInstanceUpRatio ?? 1,
     });
     setModalVisible(true);
-    fetchAgents(record.projectId);
   };
 
   const submitForm = async () => {
@@ -425,16 +404,10 @@ export const TaskScheduleManagement: React.FC = () => {
         agentId: form.agentId,
         status: form.status ?? 1,
       };
-      const result = editing
-        ? await taskScheduleAdminService.update(request)
-        : await taskScheduleAdminService.create(request);
-      if (result.code === '0000' && result.data) {
-        Toast.success(editing ? '更新成功' : '创建成功');
-        setModalVisible(false);
-        fetchSchedules(projectScope.projectId);
-      } else {
-        throw new Error(result.info || '保存失败');
-      }
+      const saved = await saveScheduleMutation.mutateAsync({ editing: Boolean(editing), request });
+      if (!saved) throw new Error('保存失败');
+      Toast.success(editing ? '更新成功' : '创建成功');
+      setModalVisible(false);
     } catch (error) {
       console.error('保存定时任务失败:', error);
       Toast.error(error instanceof Error ? error.message : '保存失败');
@@ -444,60 +417,37 @@ export const TaskScheduleManagement: React.FC = () => {
   const toggleStatus = async (record: TaskScheduleResponseDTO) => {
     try {
       const nextStatus = record.status === 1 ? 0 : 1;
-      const result = await taskScheduleAdminService.updateStatus(projectScope.projectId, record.id, nextStatus);
-      if (result.code === '0000' && result.data) {
-        Toast.success(nextStatus === 1 ? '已启用' : '已停用');
-        fetchSchedules(projectScope.projectId);
-      } else {
-        throw new Error(result.info || '操作失败');
-      }
+      const updated = await toggleScheduleMutation.mutateAsync({ id: record.id, status: nextStatus });
+      if (!updated) throw new Error('操作失败');
+      Toast.success(nextStatus === 1 ? '已启用' : '已停用');
     } catch (error) {
       console.error('更新任务状态失败:', error);
-      Toast.error('更新任务状态失败');
+      Toast.error(error instanceof Error ? error.message : '更新任务状态失败');
     }
   };
 
   const runNow = async (record: TaskScheduleResponseDTO) => {
     try {
-      const result = await taskScheduleAdminService.runNow(projectScope.projectId, record.id);
-      if (result.code === '0000') {
-        Toast.success('已开始执行');
-        setTimeout(() => fetchExecutions(record.id), 1200);
-      } else {
-        throw new Error(result.info || '执行失败');
-      }
+      setSelectedScheduleId(record.id);
+      setExecutionModalVisible(true);
+      await runScheduleMutation.mutateAsync(record.id);
+      Toast.success('已开始执行');
     } catch (error) {
       console.error('立即执行失败:', error);
-      Toast.error('立即执行失败');
+      Toast.error(error instanceof Error ? error.message : '立即执行失败');
     }
   };
 
   const deleteSchedule = async (record: TaskScheduleResponseDTO) => {
     try {
-      const result = await taskScheduleAdminService.delete(projectScope.projectId, record.id);
-      if (result.code === '0000' && result.data) {
-        Toast.success('删除成功');
-        fetchSchedules(projectScope.projectId);
-      } else {
-        throw new Error(result.info || '删除失败');
-      }
+      const deleted = await deleteScheduleMutation.mutateAsync(record.id);
+      if (!deleted) throw new Error('删除失败');
+      Toast.success('删除成功');
     } catch (error) {
       console.error('删除定时任务失败:', error);
-      Toast.error('删除定时任务失败');
+      Toast.error(error instanceof Error ? error.message : '删除定时任务失败');
     }
   };
-
-  useEffect(() => {
-    if (projectScope.projectId) {
-      void fetchSchedules(projectScope.projectId);
-      void fetchAgents(projectScope.projectId);
-      void opsChannelService.list(projectScope.projectId).then((result) => setChannels(result.data || []));
-    } else {
-      setSchedules([]);
-      setAgentDefinitions([]);
-      setChannels([]);
-    }
-  }, [projectScope.projectId]);
 
   const columns = [
     {
@@ -544,7 +494,7 @@ export const TaskScheduleManagement: React.FC = () => {
             {record.status === 1 ? '停用' : '启用'}
           </Button>
           <Button size="small" icon={<IconEdit />} onClick={() => openEdit(record)}>编辑</Button>
-          <Button size="small" theme="light" onClick={() => fetchExecutions(record.id)}>记录</Button>
+          <Button size="small" theme="light" onClick={() => openExecutions(record.id)}>记录</Button>
           <Popconfirm
             title="确定删除这个定时任务吗？"
             content="删除后调度会在下一次刷新时停止。"
@@ -631,7 +581,7 @@ export const TaskScheduleManagement: React.FC = () => {
                 projectId={projectScope.projectId}
                 onChange={projectScope.selectProject}
                 loading={projectScope.loading}
-                onRefresh={() => fetchSchedules(projectScope.projectId)}
+                onRefresh={() => { void schedulesQuery.refetch(); void optionsQuery.refetch(); }}
                 actions={<Button type="primary" icon={<IconPlus />} disabled={!projectScope.projectId} onClick={openCreate}>新建巡检</Button>}
               />
             </div>

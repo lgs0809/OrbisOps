@@ -32,15 +32,19 @@ import { ProjectScopeBar } from '../components/project-scope-bar';
 import { theme } from '../styles/theme';
 import { API_CONFIG } from '../config/api';
 import { useProjectScope } from '../hooks/use-project-scope';
-import {
+import type {
   OpsAgentDefinition,
   OpsAlertTriggerEvent,
   OpsAlertTriggerRule,
-  OpsIncident,
-  opsAdminService,
 } from '../services/ops-admin-service';
+import {
+  useAlertTriggerCatalogQuery,
+  useAlertTriggerProjectOptionsQuery,
+  useDeleteAlertTriggerRuleMutation,
+  useSaveAlertTriggerRuleMutation,
+  useToggleAlertTriggerRuleMutation,
+} from '../features/alerts/api/alert-trigger-queries';
 import { useResponsiveSidebar } from '../hooks/use-responsive-sidebar';
-import { OpsChannel, opsChannelService } from '../services/ops-channel-service';
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
@@ -171,17 +175,23 @@ const labelFilterJsonFromText = (value: string) => {
 export const AlertTriggerManagementPage: React.FC = () => {
   const navigate = useNavigate();
   const { collapsed, sidebarCollapsed, toggleSidebar, closeMobileSidebar } = useResponsiveSidebar(false);
-  const [loading, setLoading] = useState(false);
-  const [rules, setRules] = useState<OpsAlertTriggerRule[]>([]);
-  const [events, setEvents] = useState<OpsAlertTriggerEvent[]>([]);
-  const [incidents, setIncidents] = useState<OpsIncident[]>([]);
-  const [agentDefinitions, setAgentDefinitions] = useState<OpsAgentDefinition[]>([]);
-  const [channels, setChannels] = useState<OpsChannel[]>([]);
+  const projectScope = useProjectScope();
+  const catalogQuery = useAlertTriggerCatalogQuery();
+  const optionsQuery = useAlertTriggerProjectOptionsQuery(projectScope.projectId);
+  const saveRuleMutation = useSaveAlertTriggerRuleMutation();
+  const toggleRuleMutation = useToggleAlertTriggerRuleMutation();
+  const deleteRuleMutation = useDeleteAlertTriggerRuleMutation();
+  const rules = catalogQuery.data?.rules || [];
+  const events = catalogQuery.data?.events || [];
+  const incidents = optionsQuery.data?.incidents || [];
+  const agentDefinitions = optionsQuery.data?.agents || [];
+  const channels = optionsQuery.data?.channels || [];
+  const loading = catalogQuery.isLoading || optionsQuery.isLoading
+    || saveRuleMutation.isPending || toggleRuleMutation.isPending || deleteRuleMutation.isPending;
   const [modalVisible, setModalVisible] = useState(false);
   const [editing, setEditing] = useState<OpsAlertTriggerRule | null>(null);
   const [form, setForm] = useState<OpsAlertTriggerRule>(defaultRule);
   const [labelFilterText, setLabelFilterText] = useState('');
-  const projectScope = useProjectScope();
   const defaultReactAgentId = projectScope.selectedProject?.defaultAgentId || '';
   const workflowDefinitions = useMemo(
     () => agentDefinitions.filter((agent) => agent.definitionKind === 'SPECIALIZED_WORKFLOW'),
@@ -196,22 +206,6 @@ export const AlertTriggerManagementPage: React.FC = () => {
     clearAuthSession();
     Toast.success('已退出登录');
     navigate('/login');
-  };
-
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const [ruleResult, eventResult] = await Promise.all([
-        opsAdminService.listAlertTriggerRules(),
-        opsAdminService.listAlertTriggerEvents(50),
-      ]);
-      setRules(ruleResult.data || []);
-      setEvents(eventResult.data || []);
-    } catch (error) {
-      Toast.error('加载告警触发配置失败');
-    } finally {
-      setLoading(false);
-    }
   };
 
   const openCreate = () => {
@@ -229,7 +223,6 @@ export const AlertTriggerManagementPage: React.FC = () => {
       agentVersion: undefined,
     });
     setLabelFilterText('');
-    opsAdminService.listAgents(project.projectId).then((result) => setAgentDefinitions(result.data || []));
     setModalVisible(true);
   };
 
@@ -237,7 +230,6 @@ export const AlertTriggerManagementPage: React.FC = () => {
     setEditing(rule);
     setForm({ ...defaultRule, ...rule });
     setLabelFilterText(labelFilterTextFromJson(rule.matchLabelsJson));
-    opsAdminService.listAgents(rule.projectId).then((result) => setAgentDefinitions(result.data || []));
     setModalVisible(true);
   };
 
@@ -264,19 +256,14 @@ export const AlertTriggerManagementPage: React.FC = () => {
     }
     try {
       const matchLabelsJson = labelFilterJsonFromText(labelFilterText);
-      const result = await opsAdminService.saveAlertTriggerRule({
+      await saveRuleMutation.mutateAsync({
         ...form,
         matchLabelsJson,
         id: editing?.id,
         status: form.status ?? 1,
       });
-      if (result.code === '0000') {
-        Toast.success(editing ? '规则已更新' : '规则已创建');
-        setModalVisible(false);
-        fetchData();
-      } else {
-        throw new Error(result.info || '保存失败');
-      }
+      Toast.success(editing ? '规则已更新' : '规则已创建');
+      setModalVisible(false);
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '保存失败');
     }
@@ -285,19 +272,21 @@ export const AlertTriggerManagementPage: React.FC = () => {
   const toggleRule = async (rule: OpsAlertTriggerRule) => {
     if (!rule.id) return;
     const next = rule.status === 1 ? 0 : 1;
-    const result = await opsAdminService.updateAlertTriggerRuleStatus(rule.id, next);
-    if (result.code === '0000') {
+    try {
+      await toggleRuleMutation.mutateAsync({ id: rule.id, status: next });
       Toast.success(next === 1 ? '规则已启用' : '规则已停用');
-      fetchData();
+    } catch (error) {
+      Toast.error(error instanceof Error ? error.message : '更新规则状态失败');
     }
   };
 
   const deleteRule = async (rule: OpsAlertTriggerRule) => {
     if (!rule.id) return;
-    const result = await opsAdminService.deleteAlertTriggerRule(rule.id);
-    if (result.code === '0000') {
+    try {
+      await deleteRuleMutation.mutateAsync(rule.id);
       Toast.success('规则已删除');
-      fetchData();
+    } catch (error) {
+      Toast.error(error instanceof Error ? error.message : '删除规则失败');
     }
   };
 
@@ -307,37 +296,7 @@ export const AlertTriggerManagementPage: React.FC = () => {
       navigate('/login');
       return;
     }
-    fetchData();
   }, []);
-
-  useEffect(() => {
-    const projectId = projectScope.projectId;
-    if (!projectId) {
-      setAgentDefinitions([]);
-      setChannels([]);
-      setIncidents([]);
-      return;
-    }
-
-    let cancelled = false;
-    Promise.allSettled([
-      opsAdminService.listAgents(projectId),
-      opsChannelService.list(projectId),
-      opsAdminService.listIncidents({ projectId, limit: 200 }),
-    ]).then(([agentResult, channelResult, incidentResult]) => {
-      if (cancelled) return;
-      setAgentDefinitions(agentResult.status === 'fulfilled' ? (agentResult.value.data || []) : []);
-      setChannels(channelResult.status === 'fulfilled' ? (channelResult.value.data || []) : []);
-      setIncidents(incidentResult.status === 'fulfilled' ? (incidentResult.value.data || []) : []);
-      if (incidentResult.status === 'rejected') {
-        Toast.warning('关联事件暂时加载失败，告警规则和触发事件仍可继续使用');
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [projectScope.projectId]);
 
   const visibleRules = useMemo(
     () => rules.filter((rule) => rule.projectId === projectScope.projectId),
@@ -494,7 +453,7 @@ export const AlertTriggerManagementPage: React.FC = () => {
               <Card>
                 <Space style={{ width: '100%', justifyContent: 'space-between' }}>
                   <Space>
-                    <Button icon={<IconRefresh />} onClick={fetchData}>刷新</Button>
+                    <Button icon={<IconRefresh />} onClick={() => { void catalogQuery.refetch(); void optionsQuery.refetch(); }}>刷新</Button>
                   </Space>
                   <Text type="tertiary">去重窗口内同一 rule + fingerprint 只触发一次分析。</Text>
                 </Space>
@@ -533,7 +492,6 @@ export const AlertTriggerManagementPage: React.FC = () => {
                         projectId,
                         agentDefinitionId: project?.defaultAgentId || '',
                       });
-                      opsAdminService.listAgents(projectId).then((result) => setAgentDefinitions(result.data || []));
                     }}
                   >
                     {projectScope.projects.map((project) => (

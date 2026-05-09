@@ -1,0 +1,25 @@
+-- Retrospective review facts are additive; no historical success/safety is backfilled.
+CREATE TABLE IF NOT EXISTS ai_ops_skill_canary_review (
+  review_id CHAR(64) PRIMARY KEY,
+  project_id VARCHAR(128) NOT NULL,
+  release_id VARCHAR(80) NOT NULL,
+  episode_id VARCHAR(80) NOT NULL,
+  input_hash CHAR(64) NOT NULL,
+  input_json MEDIUMTEXT NOT NULL,
+  status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+  attempt_count INT NOT NULL DEFAULT 0,
+  lease_token VARCHAR(80) NOT NULL DEFAULT '',
+  lease_until BIGINT NOT NULL DEFAULT 0,
+  next_attempt_at BIGINT NOT NULL DEFAULT 0,
+  safety VARCHAR(32) NOT NULL DEFAULT 'UNKNOWN',
+  attribution VARCHAR(32) NOT NULL DEFAULT 'UNKNOWN',
+  result_json TEXT NULL,
+  result_hash CHAR(64) NOT NULL DEFAULT '',
+  reviewer_model VARCHAR(80) NOT NULL DEFAULT '',
+  reviewer_version VARCHAR(80) NOT NULL DEFAULT '',
+  reason_code VARCHAR(128) NOT NULL DEFAULT '',
+  created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  KEY idx_canary_review_due(status,next_attempt_at,lease_until),
+  KEY idx_canary_review_task(project_id,release_id,episode_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import styled from 'styled-components';
 import { Button, Checkbox, Empty, Select, Space, Spin, Table, Tag, TextArea, Toast, Typography } from '@douyinfe/semi-ui';
@@ -17,14 +17,17 @@ import { ChangePackageSummaryCard } from '../features/changes/components/ChangeP
 import { toChangePackageSummary } from '../features/changes/model/change-package-summary';
 import { IncidentWorkspaceTabs, type IncidentWorkspaceTab } from '../features/incidents/components/IncidentWorkspaceTabs';
 import { isAdminUser } from '../services/auth-session';
-import {
+import type {
   OpsIncident,
-  OpsIncidentDetail,
   OpsIncidentTimelineItem,
-  opsAdminService,
 } from '../services/ops-admin-service';
-import { opsProjectService } from '../services/ops-project-service';
-import { readProjectContextId, writeProjectContextId } from '../utils/project-context';
+import {
+  useIncidentCommandMutation,
+  useIncidentDetailQuery,
+  useIncidentMembersQuery,
+  useIncidentsQuery,
+} from '../features/incidents/api/incident-queries';
+import { useProjectScope } from '../hooks/use-project-scope';
 import { theme } from '../styles/theme';
 
 const { Option } = Select;
@@ -144,66 +147,37 @@ const timelineLabel = (item: OpsIncidentTimelineItem) => ({
 export const IncidentCenterPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [loading, setLoading] = useState(false);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [verificationLoading, setVerificationLoading] = useState(false);
-  const [feedbackLoading, setFeedbackLoading] = useState(false);
-  const [ownerSaving, setOwnerSaving] = useState(false);
-  const [collaborationSaving, setCollaborationSaving] = useState(false);
   const [commentDraft, setCommentDraft] = useState('');
   const [watcherCandidate, setWatcherCandidate] = useState('');
   const [relatedCandidate, setRelatedCandidate] = useState('');
   const [workspaceTab, setWorkspaceTab] = useState<IncidentWorkspaceTab>('overview');
-  const [members, setMembers] = useState<Array<{ value: string; label: string }>>([]);
-  const [incidents, setIncidents] = useState<OpsIncident[]>([]);
-  const [detail, setDetail] = useState<OpsIncidentDetail | null>(null);
   const [view, setView] = useState<'current' | 'history'>((searchParams.get('view') as 'current' | 'history') || 'current');
-  const [projectId, setProjectId] = useState(searchParams.get('projectId') || readProjectContextId());
+  const projectScope = useProjectScope();
+  const projectId = projectScope.projectId;
+  const [selectedIncidentId, setSelectedIncidentId] = useState(searchParams.get('incidentId') || '');
   const [severity, setSeverity] = useState('');
   const [sourceType, setSourceType] = useState('');
   const [ownershipFilter, setOwnershipFilter] = useState<'all' | 'unowned'>('all');
   const [actionOnly, setActionOnly] = useState(false);
-  const [projects, setProjects] = useState<Array<{ projectId: string; name: string }>>([]);
   const incidentScope: 'admin' | 'user' = isAdminUser() ? 'admin' : 'user';
-
-  const load = async () => {
-    setLoading(true);
-    try {
-      if (!projectId) {
-        const projectResponse = isAdminUser() ? await opsProjectService.snapshot() : await opsAdminService.listChatProjects();
-        const projectItems = Array.isArray(projectResponse.data)
-          ? projectResponse.data
-          : projectResponse.data?.projects || [];
-        setProjects(projectItems.map((item: { projectId: string; name: string }) => ({ projectId: item.projectId, name: item.name })));
-        setIncidents([]);
-        if (projectItems[0]?.projectId) setProjectId(projectItems[0].projectId);
-        return;
-      }
-      const [incidentResponse, projectResponse] = await Promise.all([
-        opsAdminService.listIncidents({ projectId, limit: 200, scope: incidentScope }),
-        isAdminUser() ? opsProjectService.snapshot() : opsAdminService.listChatProjects(),
-      ]);
-      setIncidents(incidentResponse.data || []);
-      const projectItems = Array.isArray(projectResponse.data)
-        ? projectResponse.data
-        : projectResponse.data?.projects || [];
-      setProjects(projectItems.map((item: { projectId: string; name: string }) => ({ projectId: item.projectId, name: item.name })));
-    } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '事件加载失败');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    writeProjectContextId(projectId);
-    void load();
-  }, [projectId]);
-
-  useEffect(() => {
-    const incidentId = searchParams.get('incidentId');
-    if (incidentId) void openDetail(incidentId);
-  }, []);
+  const projects = projectScope.projects;
+  const incidentsQuery = useIncidentsQuery(projectId, incidentScope);
+  const incidents = incidentsQuery.data || [];
+  const detailQuery = useIncidentDetailQuery(selectedIncidentId, incidentScope);
+  const detail = detailQuery.data || null;
+  const membersQuery = useIncidentMembersQuery(
+    detail?.incident?.projectId || '',
+    isAdminUser() && Boolean(detail),
+  );
+  const members = membersQuery.data || [];
+  const commandMutation = useIncidentCommandMutation(incidentScope);
+  const loading = projectScope.loading || incidentsQuery.isLoading;
+  const detailLoading = detailQuery.isLoading;
+  const verificationLoading = commandMutation.isPending && commandMutation.variables?.kind === 'verify';
+  const feedbackLoading = commandMutation.isPending && commandMutation.variables?.kind === 'feedback';
+  const ownerSaving = commandMutation.isPending && commandMutation.variables?.kind === 'assign-owner';
+  const collaborationSaving = commandMutation.isPending
+    && ['comment', 'watcher', 'relation'].includes(commandMutation.variables?.kind || '');
 
   const visible = useMemo(() => incidents.filter((item) => {
     if (!(view === 'current' ? CURRENT : HISTORY).has(String(item.status || '').toUpperCase())) return false;
@@ -223,97 +197,52 @@ export const IncidentCenterPage: React.FC = () => {
       && !relatedIds.has(item.incidentId));
   }, [detail, incidents]);
 
-  const openDetail = async (incidentId: string) => {
-    setDetailLoading(true);
-    try {
-      const response = await opsAdminService.getIncidentDetail(incidentId, incidentScope);
-      const nextDetail = response.data || null;
-      if (detail?.incident?.incidentId !== incidentId) setWorkspaceTab('overview');
-      setDetail(nextDetail);
-      if (isAdminUser() && nextDetail?.incident?.projectId) {
-        try {
-          const memberResponse = await opsProjectService.listProjectMembers(nextDetail.incident.projectId);
-          setMembers((memberResponse.data || []).map((member) => {
-            const value = String(member.userId || member.user_id || member.username || '').trim();
-            const role = String(member.memberRole || member.member_role || '').trim();
-            return { value, label: `${member.username || value}${role ? ` · ${role}` : ''}` };
-          }).filter((item) => item.value));
-        } catch {
-          setMembers([]);
-        }
-      } else {
-        setMembers([]);
-      }
-      const next = new URLSearchParams(searchParams);
-      next.set('incidentId', incidentId);
-      if (projectId) next.set('projectId', projectId);
-      next.set('view', view);
-      setSearchParams(next, { replace: true });
-    } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '事件详情加载失败');
-    } finally {
-      setDetailLoading(false);
-    }
+  const openDetail = (incidentId: string) => {
+    if (selectedIncidentId !== incidentId) setWorkspaceTab('overview');
+    setSelectedIncidentId(incidentId);
+    const next = new URLSearchParams(searchParams);
+    next.set('incidentId', incidentId);
+    if (projectId) next.set('projectId', projectId);
+    next.set('view', view);
+    setSearchParams(next, { replace: true });
   };
 
   const closeIncident = async (helpful = false) => {
     if (!detail?.incident?.incidentId) return;
     try {
-      if (helpful) {
-        await opsAdminService.confirmIncidentHelpful(detail.incident.incidentId, incidentScope);
-      }
-      await opsAdminService.updateIncidentStatus(
-        detail.incident.incidentId,
-        'CLOSED',
-        'user',
-        helpful ? '用户确认有帮助并关闭事件' : '用户确认恢复结果并关闭事件',
-        incidentScope,
-      );
+      await commandMutation.mutateAsync({ kind: 'close', incidentId: detail.incident.incidentId, helpful });
       Toast.success('事件已关闭');
-      await load();
-      await openDetail(detail.incident.incidentId);
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '关闭事件失败');
     }
   };
 
   const submitDiagnosisFeedback = async (feedbackType: 'HELPFUL' | 'INACCURATE' | 'INSUFFICIENT_EVIDENCE') => {
-    if (!detail?.incident?.projectId) return;
+    if (!detail?.incident?.projectId || !detail.incident.incidentId) return;
     const runId = String(detail.runs?.[0]?.runId || '');
     if (!runId) {
       Toast.warning('当前事件还没有可反馈的诊断运行');
       return;
     }
-    setFeedbackLoading(true);
     try {
-      await opsAdminService.recordAnalysisTaskFeedback(
-        detail.incident.projectId,
+      await commandMutation.mutateAsync({
+        kind: 'feedback',
+        incidentId: detail.incident.incidentId,
+        projectId: detail.incident.projectId,
         runId,
         feedbackType,
-        '',
-        incidentScope,
-      );
+      });
       Toast.success('诊断反馈已记录');
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '诊断反馈记录失败');
-    } finally {
-      setFeedbackLoading(false);
     }
   };
 
   const reopenIncident = async () => {
     if (!detail?.incident?.incidentId) return;
     try {
-      await opsAdminService.updateIncidentStatus(
-        detail.incident.incidentId,
-        'OPEN',
-        'user',
-        '用户确认问题再次发生，重新打开事件',
-        incidentScope,
-      );
+      await commandMutation.mutateAsync({ kind: 'reopen', incidentId: detail.incident.incidentId });
       Toast.success('事件已重新打开');
-      await load();
-      await openDetail(detail.incident.incidentId);
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '重新打开事件失败');
     }
@@ -321,112 +250,101 @@ export const IncidentCenterPage: React.FC = () => {
 
   const assignOwner = async (ownerUserId = '') => {
     if (!detail?.incident?.incidentId) return;
-    setOwnerSaving(true);
     try {
-      await opsAdminService.assignIncidentOwner(
-        detail.incident.incidentId,
-        ownerUserId,
-        incidentScope,
-      );
+      await commandMutation.mutateAsync({ kind: 'assign-owner', incidentId: detail.incident.incidentId, ownerUserId });
       Toast.success(isAdminUser() ? (ownerUserId ? '事件责任人已更新' : '事件责任人已清空') : '事件已认领');
-      await load();
-      await openDetail(detail.incident.incidentId);
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '更新事件责任人失败');
-    } finally {
-      setOwnerSaving(false);
     }
   };
 
   const addComment = async () => {
     if (!detail?.incident?.incidentId || !commentDraft.trim()) return;
-    setCollaborationSaving(true);
     try {
-      await opsAdminService.addIncidentComment(detail.incident.incidentId, commentDraft.trim(), incidentScope);
+      await commandMutation.mutateAsync({ kind: 'comment', incidentId: detail.incident.incidentId, content: commentDraft.trim() });
       setCommentDraft('');
       Toast.success('评论已记录');
-      await openDetail(detail.incident.incidentId);
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '评论记录失败');
-    } finally {
-      setCollaborationSaving(false);
     }
   };
 
   const toggleWatch = async () => {
     if (!detail?.incident?.incidentId) return;
-    setCollaborationSaving(true);
     try {
-      if (detail.currentUserWatching) {
-        await opsAdminService.removeIncidentWatcher(detail.incident.incidentId, '', incidentScope);
-        Toast.success('已取消关注');
-      } else {
-        await opsAdminService.addIncidentWatcher(detail.incident.incidentId, '', incidentScope);
-        Toast.success('已关注事件');
-      }
-      await openDetail(detail.incident.incidentId);
+      await commandMutation.mutateAsync({
+        kind: 'watcher',
+        incidentId: detail.incident.incidentId,
+        action: detail.currentUserWatching ? 'remove' : 'add',
+        userId: '',
+      });
+      Toast.success(detail.currentUserWatching ? '已取消关注' : '已关注事件');
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '更新关注状态失败');
-    } finally {
-      setCollaborationSaving(false);
     }
   };
 
   const addWatcher = async () => {
     if (!detail?.incident?.incidentId || !watcherCandidate) return;
-    setCollaborationSaving(true);
     try {
-      await opsAdminService.addIncidentWatcher(detail.incident.incidentId, watcherCandidate, 'admin');
+      await commandMutation.mutateAsync({
+        kind: 'watcher',
+        incidentId: detail.incident.incidentId,
+        action: 'add',
+        userId: watcherCandidate,
+        adminOverride: true,
+      });
       setWatcherCandidate('');
       Toast.success('关注人已添加');
-      await openDetail(detail.incident.incidentId);
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '添加关注人失败');
-    } finally {
-      setCollaborationSaving(false);
     }
   };
 
   const removeWatcher = async (userId: string) => {
     if (!detail?.incident?.incidentId) return;
-    setCollaborationSaving(true);
     try {
-      await opsAdminService.removeIncidentWatcher(detail.incident.incidentId, userId, 'admin');
+      await commandMutation.mutateAsync({
+        kind: 'watcher',
+        incidentId: detail.incident.incidentId,
+        action: 'remove',
+        userId,
+        adminOverride: true,
+      });
       Toast.success('关注人已移除');
-      await openDetail(detail.incident.incidentId);
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '移除关注人失败');
-    } finally {
-      setCollaborationSaving(false);
     }
   };
 
   const addRelation = async () => {
     if (!detail?.incident?.incidentId || !relatedCandidate) return;
-    setCollaborationSaving(true);
     try {
-      await opsAdminService.relateIncident(detail.incident.incidentId, relatedCandidate, incidentScope);
+      await commandMutation.mutateAsync({
+        kind: 'relation',
+        incidentId: detail.incident.incidentId,
+        action: 'add',
+        relatedIncidentId: relatedCandidate,
+      });
       setRelatedCandidate('');
       Toast.success('相关事件已关联');
-      await openDetail(detail.incident.incidentId);
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '关联事件失败');
-    } finally {
-      setCollaborationSaving(false);
     }
   };
 
   const removeRelation = async (relatedIncidentId: string) => {
     if (!detail?.incident?.incidentId) return;
-    setCollaborationSaving(true);
     try {
-      await opsAdminService.unrelateIncident(detail.incident.incidentId, relatedIncidentId, incidentScope);
+      await commandMutation.mutateAsync({
+        kind: 'relation',
+        incidentId: detail.incident.incidentId,
+        action: 'remove',
+        relatedIncidentId,
+      });
       Toast.success('相关事件已解除');
-      await openDetail(detail.incident.incidentId);
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '解除关联失败');
-    } finally {
-      setCollaborationSaving(false);
     }
   };
 
@@ -437,23 +355,17 @@ export const IncidentCenterPage: React.FC = () => {
       Toast.warning('当前事件没有已落地的处置方案，无法运行恢复验证');
       return;
     }
-    setVerificationLoading(true);
     try {
-      const response = await opsAdminService.verifyIncident(
-        detail.incident.incidentId,
-        landed.packageId,
-        incidentScope,
-      );
-      const result = response.data;
+      const result = await commandMutation.mutateAsync({
+        kind: 'verify',
+        incidentId: detail.incident.incidentId,
+        packageId: landed.packageId,
+      });
       if (result?.status === 'PASSED') Toast.success(result.summary || '恢复验证通过');
       else if (result?.status === 'FAILED') Toast.error(result.summary || '恢复验证失败，需要人工介入');
       else Toast.warning(result?.summary || '恢复验证证据不足，事件保持验证中');
-      await load();
-      await openDetail(detail.incident.incidentId);
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '恢复验证执行失败');
-    } finally {
-      setVerificationLoading(false);
     }
   };
 
@@ -494,7 +406,7 @@ export const IncidentCenterPage: React.FC = () => {
       <OpsPageHeader
         title="事件中心"
         description="以 Incident → Diagnosis → Remediation 为主线查看真实证据、诊断结论、安全处置与恢复证明。"
-        extra={<Button onClick={() => void load()}>刷新</Button>}
+        extra={<Button onClick={() => { void projectScope.reloadProjects(); void incidentsQuery.refetch(); }}>刷新</Button>}
       />
 
       <OpsSectionCard title="事件视图">
@@ -504,7 +416,7 @@ export const IncidentCenterPage: React.FC = () => {
             <Option value="current">当前事件</Option>
             <Option value="history">历史事件</Option>
           </Select>
-          <Select value={projectId} onChange={(value) => setProjectId(String(value || ''))} style={{ width: 240 }} placeholder="全部项目">
+          <Select value={projectId} onChange={(value) => projectScope.selectProject(String(value || ''))} style={{ width: 240 }} placeholder="全部项目">
             <Option value="">全部项目</Option>
             {projects.map((project) => <Option key={project.projectId} value={project.projectId}>{project.name || project.projectId}</Option>)}
           </Select>
@@ -527,7 +439,12 @@ export const IncidentCenterPage: React.FC = () => {
         </Space>
         <div style={{ marginTop: 16 }}>
           <Spin spinning={loading}>
-            {visible.length ? (
+            {projectScope.error || incidentsQuery.isError ? (
+              <OpsEmptyState
+                title="事件加载失败"
+                description={projectScope.error || (incidentsQuery.error instanceof Error ? incidentsQuery.error.message : '请刷新后重试。')}
+              />
+            ) : visible.length ? (
               <TableScroll><Table rowKey="incidentId" columns={columns} dataSource={visible} pagination={false} /></TableScroll>
             ) : <OpsEmptyState title={view === 'current' ? '当前没有进行中的事件' : '还没有历史事件'} description="告警、巡检异常或人工诊断可以进入同一 Incident 主线。" />}
           </Spin>
@@ -536,7 +453,12 @@ export const IncidentCenterPage: React.FC = () => {
 
       <div style={{ height: 16 }} />
       <Spin spinning={detailLoading}>
-        {!detail ? (
+        {detailQuery.isError ? (
+          <OpsEmptyState
+            title="事件详情加载失败"
+            description={detailQuery.error instanceof Error ? detailQuery.error.message : '请刷新后重试。'}
+          />
+        ) : !detail ? (
           <Empty title="选择一个事件查看完整调查与处置链路" />
         ) : (
           <Stack>

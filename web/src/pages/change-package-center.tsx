@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import styled from 'styled-components';
 import {
@@ -27,12 +26,12 @@ import {
   OpsSectionCard,
   TableScroll,
 } from '../components/ops-layout';
-import { opsChangePackageService } from '../services/ops-change-package-service';
-import type {
-  OpsChangePackage,
-  OpsChangePackageEvent,
-  OpsLandingOperationRun,
-} from '../services/ops-change-package-types';
+import type { OpsChangePackage, OpsLandingOperationRun } from '../services/ops-change-package-types';
+import {
+  useChangePackageActionMutation,
+  useChangePackageDetailQuery,
+  useChangePackagesQuery,
+} from '../features/changes/api/change-package-queries';
 import { useProjectScope } from '../hooks/use-project-scope';
 import { getStoredUserInfo, isAdminUser } from '../services/auth-session';
 import { ExecutionQueue, PackageCapability, packageCapability, packagesForQueue } from '../features/execution/execution-center-model';
@@ -283,10 +282,8 @@ export const ChangePackageCenterPage: React.FC = () => {
   const storedPrincipal = getStoredUserInfo();
   const principalKey = storedPrincipal.userId || storedPrincipal.username || 'anonymous';
   const requestedPackageAppliedRef = useRef('');
-  const [selected, setSelected] = useState<OpsChangePackage | null>(null);
+  const [selectedPackageId, setSelectedPackageId] = useState('');
   const [detailVisible, setDetailVisible] = useState(false);
-  const [events, setEvents] = useState<OpsChangePackageEvent[]>([]);
-  const [landingOperations, setLandingOperations] = useState<OpsLandingOperationRun[]>([]);
   const [status, setStatus] = useState('');
   const [queue, setQueue] = useState<ExecutionQueue>('pending');
   const [workView, setWorkView] = useState<'mine' | 'all'>(() => admin ? 'all' : 'mine');
@@ -294,7 +291,7 @@ export const ChangePackageCenterPage: React.FC = () => {
   const setProjectId = projectScope.selectProject;
   const [actionMode, setActionMode] = useState<'validate' | 'submitReview' | 'approve' | 'reject' | 'land' | 'cleanup' | null>(null);
   const [comment, setComment] = useState('');
-  const [actionLoading, setActionLoading] = useState(false);
+  const actionMutation = useChangePackageActionMutation(apiScope);
 
   const query = useMemo(() => ({
     status: status || undefined,
@@ -304,42 +301,29 @@ export const ChangePackageCenterPage: React.FC = () => {
     limit: 100,
   }), [apiScope, projectId, searchParams, status]);
 
-  const packageQuery = useQuery({
-    queryKey: ['execution-center', principalKey, apiScope, query.projectId || '', query.status || '', query.incidentId || ''],
-    queryFn: async () => {
-      const response = await opsChangePackageService.list(query);
-      const requestedIncidentId = query.incidentId;
-      return (response.data || []).filter((item) => (
-        !requestedIncidentId || apiScope === 'admin' || item.incidentId === requestedIncidentId
-      ));
-    },
+  const packageQuery = useChangePackagesQuery({
+    principalKey,
+    scope: apiScope,
+    params: query,
     enabled: admin || Boolean(query.projectId),
   });
   const packages = packageQuery.data || [];
   const loading = packageQuery.isFetching;
+  const selectedSummary = packages.find((item) => item.packageId === selectedPackageId) || null;
+  const detailQuery = useChangePackageDetailQuery(selectedPackageId, apiScope, detailVisible);
+  const selected = detailQuery.data?.package || selectedSummary;
+  const events = detailQuery.data?.events || [];
+  const landingOperations = detailQuery.data?.landingOperations || [];
+  const actionLoading = actionMutation.isPending;
 
   const loadPackages = async () => {
     if (!admin && !query.projectId) return;
     await packageQuery.refetch();
   };
 
-  const openDetail = async (record: OpsChangePackage) => {
-    setSelected(record);
+  const openDetail = (record: OpsChangePackage) => {
+    setSelectedPackageId(record.packageId);
     setDetailVisible(true);
-    setEvents([]);
-    setLandingOperations([]);
-    try {
-      const [detailResponse, eventsResponse, operationResponse] = await Promise.all([
-        opsChangePackageService.get(record.packageId, apiScope),
-        opsChangePackageService.listEvents(record.packageId, apiScope, 100),
-        opsChangePackageService.listLandingOperationRuns(record.packageId, apiScope, 200),
-      ]);
-      setSelected(detailResponse.data || record);
-      setEvents(eventsResponse.data || []);
-      setLandingOperations(operationResponse.data || []);
-    } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '详情加载失败');
-    }
   };
 
   useEffect(() => {
@@ -360,23 +344,8 @@ export const ChangePackageCenterPage: React.FC = () => {
     }, { replace: true });
   }, [packages, searchParams, setSearchParams]);
 
-  useEffect(() => {
-    if (!packageQuery.error) return;
-    Toast.error(packageQuery.error instanceof Error ? packageQuery.error.message : 'ChangePackage 加载失败');
-  }, [packageQuery.error]);
-
-  useEffect(() => {
-    if (loading || !selected) return;
-    if (packages.some((item) => item.packageId === selected.packageId)) return;
-    setSelected(null);
-    setEvents([]);
-    setLandingOperations([]);
-  }, [loading, packages, selected]);
-
   const submitAction = async () => {
-    if (!selected || !actionMode) {
-      return;
-    }
+    if (!selected || !actionMode) return;
     const requiredCapability: Record<NonNullable<typeof actionMode>, PackageCapability> = {
       validate: 'canRevise',
       submitReview: 'canSubmitReview',
@@ -389,23 +358,39 @@ export const ChangePackageCenterPage: React.FC = () => {
       Toast.error('当前账号没有执行该动作的项目权限');
       return;
     }
-    setActionLoading(true);
     try {
       if (actionMode === 'validate') {
-        await opsChangePackageService.validate(selected.packageId, { reason: comment.trim() }, apiScope);
+        await actionMutation.mutateAsync({
+          kind: 'validate',
+          packageId: selected.packageId,
+          reason: comment.trim(),
+        });
         Toast.success('已触发审核前验证');
       } else if (actionMode === 'submitReview') {
-        await opsChangePackageService.submitReview(selected.packageId, { summary: comment.trim() }, apiScope);
+        await actionMutation.mutateAsync({
+          kind: 'submit-review',
+          packageId: selected.packageId,
+          summary: comment.trim(),
+        });
         Toast.success('已提交人工审核');
       } else if (actionMode === 'approve') {
         if (!selected.packageHash) {
           Toast.error('当前版本缺少 packageHash，不能审批');
           return;
         }
-        await opsChangePackageService.approve(selected.packageId, selected.version, selected.packageHash, apiScope);
+        await actionMutation.mutateAsync({
+          kind: 'approve',
+          packageId: selected.packageId,
+          version: selected.version,
+          packageHash: selected.packageHash,
+        });
         Toast.success('ChangePackage 已审批');
       } else if (actionMode === 'reject') {
-        await opsChangePackageService.reject(selected.packageId, { reason: comment.trim(), comment: comment.trim() }, apiScope);
+        await actionMutation.mutateAsync({
+          kind: 'reject',
+          packageId: selected.packageId,
+          reason: comment.trim(),
+        });
         Toast.success('ChangePackage 已驳回');
       } else if (actionMode === 'land') {
         const approvedVersion = selected.approvedVersion || selected.version;
@@ -414,24 +399,26 @@ export const ChangePackageCenterPage: React.FC = () => {
           Toast.error('缺少已审批版本或 approvedPackageHash，不能落地');
           return;
         }
-        await opsChangePackageService.land(selected.packageId, {
+        await actionMutation.mutateAsync({
+          kind: 'land',
+          packageId: selected.packageId,
           version: approvedVersion,
           packageHash: approvedPackageHash,
           approvedPackageHash,
-        }, apiScope);
+        });
         Toast.success('生产处置已提交到独立安全执行环境');
       } else if (actionMode === 'cleanup') {
-        await opsChangePackageService.cleanup(selected.packageId, { reason: comment.trim() }, apiScope);
+        await actionMutation.mutateAsync({
+          kind: 'cleanup',
+          packageId: selected.packageId,
+          reason: comment.trim(),
+        });
         Toast.success('清理请求已提交');
       }
       setActionMode(null);
       setComment('');
-      await loadPackages();
-      await openDetail(selected);
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '操作失败');
-    } finally {
-      setActionLoading(false);
     }
   };
 
@@ -518,7 +505,12 @@ export const ChangePackageCenterPage: React.FC = () => {
           <Text type="tertiary">列表只展示业务状态；版本、哈希和执行证明请在详情的高级安全证明中查看。</Text>
         </Toolbar>
         <Spin spinning={loading}>
-          {visiblePackages.length === 0 ? (
+          {packageQuery.isError ? (
+            <OpsEmptyState
+              title="ChangePackage 加载失败"
+              description={packageQuery.error instanceof Error ? packageQuery.error.message : '请刷新后重试。'}
+            />
+          ) : visiblePackages.length === 0 ? (
             <Empty title="当前队列暂无 ChangePackage" description="切换上方待审批、执行中、需介入或历史队列查看其他执行包。" />
           ) : (
             <TableScroll>
@@ -617,7 +609,13 @@ export const ChangePackageCenterPage: React.FC = () => {
         style={{ maxWidth: '96vw' }}
         onCancel={() => setDetailVisible(false)}
       >
-        {selected && (
+        <Spin spinning={detailQuery.isFetching}>
+          {detailQuery.isError ? (
+            <OpsEmptyState
+              title="执行包详情加载失败"
+              description={detailQuery.error instanceof Error ? detailQuery.error.message : '请刷新后重试。'}
+            />
+          ) : selected ? (
         <div style={{ maxHeight: '72vh', overflow: 'auto', paddingRight: 8 }}>
         <DetailGrid>
           <OpsSectionCard title="Approval Cockpit">
@@ -916,7 +914,10 @@ export const ChangePackageCenterPage: React.FC = () => {
           </Space>
         </DetailGrid>
         </div>
-        )}
+          ) : (
+            <Empty title="选择一个执行包查看完整详情" />
+          )}
+        </Spin>
       </Modal>
 
       <Modal

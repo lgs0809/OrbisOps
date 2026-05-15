@@ -12,11 +12,12 @@ import { useLocation, useSearchParams } from 'react-router-dom';
 
 import { getStoredUserInfo, isAdminUser, isAuthenticated } from '../services/auth-session';
 import { opsAdminService } from '../services/ops-admin-service';
-import { OpsProjectWorkspace, opsProjectService } from '../services/ops-project-service';
+import { OpsProjectResourceTemplate, OpsProjectWorkspace, opsProjectService } from '../services/ops-project-service';
 import { readProjectContextId, writeProjectContextId } from '../utils/project-context';
 
 export interface ProjectScopeState {
   projects: OpsProjectWorkspace[];
+  templates: OpsProjectResourceTemplate[];
   selectedProject?: OpsProjectWorkspace;
   projectId: string;
   loading: boolean;
@@ -29,11 +30,24 @@ const ProjectScopeContext = createContext<ProjectScopeState | null>(null);
 
 const requestedProjectId = (search: string) => new URLSearchParams(search).get('projectId') || '';
 
-const loadAccessibleProjects = async (): Promise<OpsProjectWorkspace[]> => {
-  const response = isAdminUser()
-    ? await opsProjectService.snapshot()
-    : await opsAdminService.listChatProjects();
-  return Array.isArray(response.data) ? response.data : response.data?.projects || [];
+interface AccessibleProjectSnapshot {
+  projects: OpsProjectWorkspace[];
+  templates: OpsProjectResourceTemplate[];
+}
+
+const loadAccessibleProjects = async (): Promise<AccessibleProjectSnapshot> => {
+  if (isAdminUser()) {
+    const response = await opsProjectService.snapshot();
+    return {
+      projects: response.data?.projects || [],
+      templates: response.data?.templates || [],
+    };
+  }
+  const response = await opsAdminService.listChatProjects();
+  return {
+    projects: Array.isArray(response.data) ? response.data : [],
+    templates: [],
+  };
 };
 
 export const ProjectScopeProvider: React.FC<PropsWithChildren> = ({ children }) => {
@@ -50,7 +64,8 @@ export const ProjectScopeProvider: React.FC<PropsWithChildren> = ({ children }) 
     queryFn: loadAccessibleProjects,
     enabled: authenticated,
   });
-  const projects = authenticated ? (projectQuery.data || []) : [];
+  const projects = authenticated ? (projectQuery.data?.projects || []) : [];
+  const templates = authenticated ? (projectQuery.data?.templates || []) : [];
 
   const persistSelection = useCallback((nextProjectId: string) => {
     setProjectId(nextProjectId);
@@ -111,13 +126,14 @@ export const ProjectScopeProvider: React.FC<PropsWithChildren> = ({ children }) 
 
   const value = useMemo<ProjectScopeState>(() => ({
     projects,
+    templates,
     selectedProject,
     projectId: selectedProject?.projectId || '',
     loading: projectQuery.isFetching,
     error: projectQuery.error instanceof Error ? projectQuery.error.message : projectQuery.error ? '项目列表加载失败' : undefined,
     selectProject,
     reloadProjects,
-  }), [projectId, projectQuery.error, projectQuery.isFetching, projects, reloadProjects, selectProject, selectedProject]);
+  }), [projectId, projectQuery.error, projectQuery.isFetching, projects, reloadProjects, selectProject, selectedProject, templates]);
 
   return React.createElement(ProjectScopeContext.Provider, { value }, children);
 };

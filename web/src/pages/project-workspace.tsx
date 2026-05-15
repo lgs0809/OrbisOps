@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import {
@@ -32,12 +32,15 @@ import { ProjectWorkspaceAccessSection } from '../features/projects/components/P
 import { ProjectWorkspaceAdvancedTabs } from '../features/projects/components/ProjectWorkspaceAdvancedTabs';
 import { ProjectWorkspaceOverviewSection } from '../features/projects/components/ProjectWorkspaceOverviewSection';
 import { ProjectWorkspaceRuntimeSection } from '../features/projects/components/ProjectWorkspaceRuntimeSection';
+import {
+  useProjectWorkspaceCapabilitiesQuery,
+  useProjectWorkspaceRuntimeQuery,
+} from '../features/projects/api/project-workspace-queries';
 import type { ProjectWorkspaceAdvancedTab } from '../features/projects/model/project-workspace-tabs';
 import { clearAuthSession } from '../services/auth-session';
-import { AdminUserResponseDTO, AdminUserService } from '../services/admin-user-service';
+import { AdminUserService } from '../services/admin-user-service';
 import {
   OpsDiagnosticScenario,
-  OpsProjectMember,
   OpsProjectResource,
   OpsProjectResourcePermission,
   OpsProjectResourceSchemaObject,
@@ -63,11 +66,11 @@ import {
 import {
   OpsExecutionResource,
   OpsProjectService,
-  OpsSourceRepository,
   opsRepairService,
 } from '../services/ops-repair-service';
 import { theme } from '../styles/theme';
 import { generatedId } from '../utils/generated-id';
+import { useProjectScope } from '../hooks/use-project-scope';
 import { useResponsiveSidebar } from '../hooks/use-responsive-sidebar';
 
 const { Content } = Layout;
@@ -335,11 +338,13 @@ const projectKnowledgeIds = (project?: OpsProjectWorkspace) => {
 export const ProjectWorkspacePage: React.FC = () => {
   const navigate = useNavigate();
   const { collapsed, sidebarCollapsed, toggleSidebar, closeMobileSidebar } = useResponsiveSidebar();
-  const [loading, setLoading] = useState(false);
-  const [projects, setProjects] = useState<OpsProjectWorkspace[]>([]);
+  const projectScope = useProjectScope();
+  const projects = projectScope.projects;
+  const templates = projectScope.templates;
+  const selectedProjectId = projectScope.projectId;
+  const setSelectedProjectId = projectScope.selectProject;
+  const loading = projectScope.loading;
   const [activeFeatureTab, setActiveFeatureTab] = useState<ProjectWorkspaceAdvancedTab>('overview');
-  const [templates, setTemplates] = useState<OpsProjectResourceTemplate[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState('');
   const [projectModalVisible, setProjectModalVisible] = useState(false);
   const [projectSettingsVisible, setProjectSettingsVisible] = useState(false);
   const [resourceModalVisible, setResourceModalVisible] = useState(false);
@@ -351,18 +356,12 @@ export const ProjectWorkspacePage: React.FC = () => {
   const [permissionDraft, setPermissionDraft] = useState<OpsProjectResourcePermission | null>(null);
   const [projectForm, setProjectForm] = useState({ name: '', projectId: '', owner: 'ops', description: '' });
   const [agentOptions, setAgentOptions] = useState<OpsAgentDefinition[]>([]);
-  const [skillOptions, setSkillOptions] = useState<OpsSkillSummary[]>([]);
-  const [projectSkillDetails, setProjectSkillDetails] = useState<OpsSkillSummary[]>([]);
   const [projectSkillUsageVisible, setProjectSkillUsageVisible] = useState(false);
   const [projectSkillUsageLoading, setProjectSkillUsageLoading] = useState(false);
   const [projectSkillUsageRecords, setProjectSkillUsageRecords] = useState<OpsSkillReference[]>([]);
   const [projectSkillUsageTitle, setProjectSkillUsageTitle] = useState('');
-  const [projectKnowledgeDetails, setProjectKnowledgeDetails] = useState<RagKnowledgeBaseSummary[]>([]);
   const [knowledgeOptions, setKnowledgeOptions] = useState<RagKnowledgeBaseSummary[]>([]);
   const [sharedMcpOptions, setSharedMcpOptions] = useState<AiClientToolMcpResponseDTO[]>([]);
-  const [repositories, setRepositories] = useState<OpsSourceRepository[]>([]);
-  const [projectServices, setProjectServices] = useState<OpsProjectService[]>([]);
-  const [executionResources, setExecutionResources] = useState<OpsExecutionResource[]>([]);
   const [repositoryModalVisible, setRepositoryModalVisible] = useState(false);
   const [serviceModalVisible, setServiceModalVisible] = useState(false);
   const [executionResourceModalVisible, setExecutionResourceModalVisible] = useState(false);
@@ -457,8 +456,6 @@ export const ProjectWorkspacePage: React.FC = () => {
     files: [] as File[],
   });
   const [capabilitySaving, setCapabilitySaving] = useState(false);
-  const [projectMembers, setProjectMembers] = useState<OpsProjectMember[]>([]);
-  const [accountOptions, setAccountOptions] = useState<AdminUserResponseDTO[]>([]);
   const [memberModalVisible, setMemberModalVisible] = useState(false);
   const [memberDrafts, setMemberDrafts] = useState<Array<{
     userId: string;
@@ -471,10 +468,17 @@ export const ProjectWorkspacePage: React.FC = () => {
     userRole: 'user',
   });
 
-  const selectedProject = useMemo(
-    () => projects.find((item) => item.projectId === selectedProjectId) || projects[0],
-    [projects, selectedProjectId],
-  );
+  const selectedProject = projectScope.selectedProject || projects[0];
+  const capabilitiesQuery = useProjectWorkspaceCapabilitiesQuery(selectedProject?.projectId || '');
+  const runtimeQuery = useProjectWorkspaceRuntimeQuery(selectedProject?.projectId || '');
+  const skillOptions = capabilitiesQuery.data?.globalSkills || [];
+  const projectSkillDetails = capabilitiesQuery.data?.projectSkills || [];
+  const projectKnowledgeDetails = capabilitiesQuery.data?.knowledgeBases || [];
+  const projectMembers = capabilitiesQuery.data?.members || [];
+  const accountOptions = capabilitiesQuery.data?.accounts || [];
+  const repositories = runtimeQuery.data?.repositories || [];
+  const projectServices = runtimeQuery.data?.services || [];
+  const executionResources = runtimeQuery.data?.executionResources || [];
   const skillOptionMap = useMemo(() => {
     const entries = [...skillOptions, ...projectSkillDetails].flatMap((skill) => {
       const value = skillValueOf(skill);
@@ -509,86 +513,6 @@ export const ProjectWorkspacePage: React.FC = () => {
     [selectedProject],
   );
 
-  const loadSnapshot = async () => {
-    setLoading(true);
-    try {
-      const response = await opsProjectService.snapshot();
-      const nextProjects = response.data?.projects || [];
-      setProjects(nextProjects);
-      setTemplates(response.data?.templates || []);
-      if (!selectedProjectId && nextProjects.length) {
-        setSelectedProjectId(nextProjects[0].projectId);
-      }
-    } catch (error) {
-      Toast.error('加载业务系统空间失败');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadSnapshot();
-  }, []);
-
-  useEffect(() => {
-    if (!selectedProject?.projectId) {
-      setProjectSkillDetails([]);
-      setProjectKnowledgeDetails([]);
-      setProjectMembers([]);
-      return;
-    }
-    let canceled = false;
-    Promise.all([
-      opsAdminService.listProjectSkills(selectedProject.projectId),
-      opsAdminService.listGlobalSkills(),
-      aiClientRagOrderAdminService.listAuthorizedKnowledgeBases(selectedProject.projectId),
-      opsProjectService.listProjectMembers(selectedProject.projectId),
-      AdminUserService.queryEnabledUsers(),
-    ])
-      .then(([skillResponse, globalSkillResponse, knowledgeResponse, memberResponse, accountResponse]) => {
-        if (!canceled) {
-          setProjectSkillDetails(skillResponse.data || []);
-          setSkillOptions(globalSkillResponse.data || []);
-          setProjectKnowledgeDetails(knowledgeResponse.data || []);
-          setProjectMembers(memberResponse.data || []);
-          setAccountOptions(accountResponse || []);
-        }
-      })
-      .catch(() => {
-        if (!canceled) {
-          setProjectSkillDetails([]);
-          setSkillOptions([]);
-          setProjectKnowledgeDetails([]);
-          setProjectMembers([]);
-        }
-      });
-    return () => {
-      canceled = true;
-    };
-  }, [selectedProject?.projectId]);
-
-  useEffect(() => {
-    if (!selectedProjectId) {
-      setRepositories([]);
-      setProjectServices([]);
-      setExecutionResources([]);
-      return;
-    }
-    Promise.all([
-      opsRepairService.listRepositories(selectedProjectId),
-      opsRepairService.listServices(selectedProjectId),
-      opsRepairService.listExecutionResources(selectedProjectId),
-    ]).then(([repositoryResponse, serviceResponse, executionResourceResponse]) => {
-      setRepositories(repositoryResponse.data || []);
-      setProjectServices(serviceResponse.data || []);
-      setExecutionResources(executionResourceResponse.data || []);
-    }).catch(() => {
-      setRepositories([]);
-      setProjectServices([]);
-      setExecutionResources([]);
-    });
-  }, [selectedProjectId]);
-
   const handleNavigation = (path: string) => {
     navigate(path.startsWith('/') ? path : `/${path}`);
   };
@@ -605,7 +529,7 @@ export const ProjectWorkspacePage: React.FC = () => {
         projectId: projectForm.projectId || generatedId('project', projectForm.name),
       };
       const response = await opsProjectService.createProject(payload);
-      await loadSnapshot();
+      await projectScope.reloadProjects();
       setSelectedProjectId(response.data.projectId);
       setProjectModalVisible(false);
       setProjectForm({ name: '', projectId: '', owner: 'ops', description: '' });
@@ -618,17 +542,16 @@ export const ProjectWorkspacePage: React.FC = () => {
   const openProjectSettings = async () => {
     if (!selectedProject) return;
     try {
-      const [agents, skills, knowledgeBases, sharedMcps] = await Promise.all([
+      const [agents, knowledgeBases, sharedMcps] = await Promise.all([
         opsAdminService.listAgents(selectedProject.projectId),
-        opsAdminService.listGlobalSkills(),
         Promise.all([
           aiClientRagOrderAdminService.listAuthorizedKnowledgeBases(selectedProject.projectId),
           aiClientRagOrderAdminService.listGlobalKnowledgeBases(),
         ]),
         aiClientToolMcpAdminService.queryEnabledAiClientToolMcps(),
       ]);
+      await capabilitiesQuery.refetch();
       setAgentOptions(agents.data || []);
-      setSkillOptions(skills.data || []);
       const knowledgeMap = new Map<string, RagKnowledgeBaseSummary>();
       [...(knowledgeBases[0].data || []), ...(knowledgeBases[1].data || [])].forEach((knowledge) => {
         const id = knowledge.kbId || knowledge.knowledgeTag || knowledge.ragId;
@@ -660,13 +583,11 @@ export const ProjectWorkspacePage: React.FC = () => {
           projectSettings.knowledgeBaseId,
         );
       }
-      const response = await opsProjectService.updateProject({
+      await opsProjectService.updateProject({
         projectId: selectedProject.projectId,
         ...projectSettings,
       });
-      setProjects((items) => items.map((item) => (
-        item.projectId === response.data.projectId ? response.data : item
-      )));
+      await projectScope.reloadProjects();
       setProjectSettingsVisible(false);
       Toast.success('业务系统能力配置已更新');
     } catch (error) {
@@ -682,9 +603,7 @@ export const ProjectWorkspacePage: React.FC = () => {
       if (response.code !== '0000') {
         throw new Error(response.info || '修复默认 Agent 失败');
       }
-      setProjects((items) => items.map((item) => (
-        item.projectId === response.data.projectId ? response.data : item
-      )));
+      await projectScope.reloadProjects();
       Toast.success('默认 Agent 已创建并发布，可以开始新会话');
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '修复默认 Agent 失败');
@@ -695,14 +614,12 @@ export const ProjectWorkspacePage: React.FC = () => {
 
   const reloadProjectSkills = async () => {
     if (!selectedProject) return;
-    const response = await opsAdminService.listProjectSkills(selectedProject.projectId);
-    setProjectSkillDetails(response.data || []);
+    await capabilitiesQuery.refetch();
   };
 
   const reloadProjectKnowledgeBases = async () => {
     if (!selectedProject) return;
-    const response = await aiClientRagOrderAdminService.listAuthorizedKnowledgeBases(selectedProject.projectId);
-    setProjectKnowledgeDetails(response.data || []);
+    await capabilitiesQuery.refetch();
   };
 
   const openCreateProjectSkill = () => {
@@ -712,9 +629,8 @@ export const ProjectWorkspacePage: React.FC = () => {
 
   const openCopyProjectSkill = async () => {
     try {
-      const response = await opsAdminService.listGlobalSkills();
-      const globals = response.data || [];
-      setSkillOptions(globals);
+      const refreshed = await capabilitiesQuery.refetch();
+      const globals = refreshed.data?.globalSkills || skillOptions;
       setProjectSkillForm({
         skillId: '',
         globalSkillId: skillValueOf(globals[0]) || '',
@@ -1019,8 +935,8 @@ export const ProjectWorkspacePage: React.FC = () => {
         userRole: newAccountForm.userRole,
         status: 1,
       });
-      const accounts = await AdminUserService.queryEnabledUsers();
-      setAccountOptions(accounts);
+      const refreshed = await capabilitiesQuery.refetch();
+      const accounts = refreshed.data?.accounts || [];
       const created = accounts.find((item) => item.username === newAccountForm.username.trim());
       if (created) {
         setMemberDrafts((current) => [
@@ -1052,7 +968,7 @@ export const ProjectWorkspacePage: React.FC = () => {
       if (response.code !== '0000') {
         throw new Error(response.info || '保存项目成员失败');
       }
-      setProjectMembers(response.data || []);
+      await capabilitiesQuery.refetch();
       setMemberModalVisible(false);
       Toast.success('项目成员授权已更新');
     } catch (error) {
@@ -1065,11 +981,11 @@ export const ProjectWorkspacePage: React.FC = () => {
   const addResource = async () => {
     if (!selectedProject) return;
     try {
-      const response = await opsProjectService.addResource({
+      await opsProjectService.addResource({
         ...resourceForm,
         projectId: selectedProject.projectId,
       });
-      setProjects((items) => items.map((item) => (item.projectId === response.data.projectId ? response.data : item)));
+      await projectScope.reloadProjects();
       setResourceModalVisible(false);
       setResourceForm({ type: 'mysql', name: '', environment: 'prod', endpoint: '', username: '', passwordRef: '' });
       Toast.success('资源已扫描并加入业务系统');
@@ -1094,12 +1010,12 @@ export const ProjectWorkspacePage: React.FC = () => {
   const saveResource = async () => {
     if (!selectedProject || !selectedResource) return;
     try {
-      const response = await opsProjectService.updateResource({
+      await opsProjectService.updateResource({
         ...resourceEditForm,
         projectId: selectedProject.projectId,
         resourceId: selectedResource.resourceId,
       });
-      setProjects((items) => items.map((item) => (item.projectId === response.data.projectId ? response.data : item)));
+      await projectScope.reloadProjects();
       setResourceEditModalVisible(false);
       Toast.success('资源配置已更新');
     } catch (error) {
@@ -1120,12 +1036,12 @@ export const ProjectWorkspacePage: React.FC = () => {
   const savePermission = async () => {
     if (!selectedProject || !selectedResource || !permissionDraft) return;
     try {
-      const response = await opsProjectService.updatePermission({
+      await opsProjectService.updatePermission({
         projectId: selectedProject.projectId,
         resourceId: selectedResource.resourceId,
         permission: permissionDraft,
       });
-      setProjects((items) => items.map((item) => (item.projectId === response.data.projectId ? response.data : item)));
+      await projectScope.reloadProjects();
       setPermissionModalVisible(false);
       Toast.success('权限策略已更新');
     } catch (error) {
@@ -1149,7 +1065,7 @@ export const ProjectWorkspacePage: React.FC = () => {
       if (response.code !== '0000') {
         throw new Error(response.info || '生成项目工具失败');
       }
-      await loadSnapshot();
+      await projectScope.reloadProjects();
       Toast.success('项目工具已生成');
     } catch (error) {
       Toast.error(error instanceof Error ? error.message : '生成项目工具失败');
@@ -1175,8 +1091,7 @@ export const ProjectWorkspacePage: React.FC = () => {
         repositoryId: repositoryForm.repositoryId.trim() || generatedId('repo', repositoryForm.name || repositoryForm.localPath),
         projectId: selectedProject.projectId,
       });
-      const response = await opsRepairService.listRepositories(selectedProject.projectId);
-      setRepositories(response.data || []);
+      await runtimeQuery.refetch();
       setRepositoryModalVisible(false);
       setRepositoryForm({ repositoryId: '', name: '', localPath: '', defaultRevision: 'HEAD' });
       Toast.success('代码仓库已登记');
@@ -1194,8 +1109,7 @@ export const ProjectWorkspacePage: React.FC = () => {
         projectId: selectedProject.projectId,
         smokeUrls: serviceForm.smokeUrls.split(',').map((item) => item.trim()).filter(Boolean),
       });
-      const response = await opsRepairService.listServices(selectedProject.projectId);
-      setProjectServices(response.data || []);
+      await runtimeQuery.refetch();
       setServiceModalVisible(false);
       setServiceForm({
         serviceId: '',
@@ -1253,8 +1167,7 @@ export const ProjectWorkspacePage: React.FC = () => {
           .filter(Boolean),
         configuration,
       });
-      const response = await opsRepairService.listExecutionResources(selectedProject.projectId);
-      setExecutionResources(response.data || []);
+      await runtimeQuery.refetch();
       setExecutionResourceModalVisible(false);
       Toast.success('执行资源已保存，Worker 将自动拉取最新配置');
     } catch (error) {
@@ -1357,7 +1270,7 @@ export const ProjectWorkspacePage: React.FC = () => {
               projectId={selectedProject?.projectId || selectedProjectId}
               loading={loading}
               onChange={setSelectedProjectId}
-              onRefresh={loadSnapshot}
+              onRefresh={() => { void projectScope.reloadProjects(); void capabilitiesQuery.refetch(); void runtimeQuery.refetch(); }}
               actions={(
                 <Button theme="solid" icon={<IconPlus />} onClick={() => setProjectModalVisible(true)}>
                   新建项目

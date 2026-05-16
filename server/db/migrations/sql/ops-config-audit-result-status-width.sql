@@ -1,0 +1,2 @@
+ALTER TABLE ai_ops_config_audit
+  MODIFY COLUMN result_status VARCHAR(32) NOT NULL DEFAULT 'SUCCESS' COMMENT '执行结果';

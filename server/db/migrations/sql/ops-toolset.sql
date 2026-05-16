@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS `ai_ops_toolset` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `toolset_id` VARCHAR(128) NOT NULL,
+  `project_id` VARCHAR(128) NOT NULL,
+  `name` VARCHAR(256) NOT NULL DEFAULT '',
+  `description` TEXT NULL,
+  `prerequisites` TEXT NULL,
+  `tags_json` TEXT NULL,
+  `source_type` VARCHAR(32) NOT NULL,
+  `adapter_type` VARCHAR(48) NOT NULL,
+  `enabled` TINYINT NOT NULL DEFAULT 1,
+  `read_only_default` TINYINT NOT NULL DEFAULT 1,
+  `tools_json` MEDIUMTEXT NULL,
+  `create_by` VARCHAR(128) NOT NULL DEFAULT '',
+  `update_by` VARCHAR(128) NOT NULL DEFAULT '',
+  `create_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_toolset_project` (`project_id`, `toolset_id`),
+  KEY `idx_toolset_project_update` (`project_id`, `update_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='运维 Toolset 定义';

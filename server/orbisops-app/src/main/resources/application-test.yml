@@ -1,0 +1,373 @@
+server:
+  port: 8091
+
+# 线程池配置
+orbisops:
+  thread:
+    pool:
+      executor:
+        config:
+          core-pool-size: 20
+          max-pool-size: 50
+          keep-alive-time: 5000
+          block-queue-size: 5000
+          policy: CallerRunsPolicy
+
+  # 简化配置，禁用数据库自动配置
+
+  admin:
+    auth:
+      jwt-secret: ${ORBISOPS_ADMIN_JWT_SECRET:dev-only-change-me}
+      jwt-ttl-hours: ${ORBISOPS_ADMIN_JWT_TTL_HOURS:12}
+      service-token: ${ORBISOPS_ADMIN_SERVICE_TOKEN:}
+      revocation:
+        jdbc-enabled: ${ORBISOPS_ADMIN_AUTH_REVOCATION_JDBC_ENABLED:false}
+        auto-init: ${ORBISOPS_ADMIN_AUTH_REVOCATION_AUTO_INIT:false}
+
+  safety:
+    allow-in-memory-evidence-store: ${ORBISOPS_SAFETY_ALLOW_IN_MEMORY_EVIDENCE_STORE:false}
+  intent:
+    llm-classifier:
+      enabled: ${ORBISOPS_INTENT_LLM_CLASSIFIER_ENABLED:false}
+      min-confidence: ${ORBISOPS_INTENT_LLM_MIN_CONFIDENCE:0.65}
+      context-message-limit: ${ORBISOPS_INTENT_CONTEXT_MESSAGE_LIMIT:6}
+      context-max-chars: ${ORBISOPS_INTENT_CONTEXT_MAX_CHARS:4000}
+  memory:
+    auto-init: ${ORBISOPS_MEMORY_AUTO_INIT:false}
+    max-injection-count: ${ORBISOPS_MEMORY_MAX_INJECTION_COUNT:8}
+    default-ttl: ${ORBISOPS_MEMORY_DEFAULT_TTL:PT24H}
+  evidence:
+    auto-init: ${ORBISOPS_EVIDENCE_AUTO_INIT:false}
+  task-context:
+    auto-init: ${ORBISOPS_TASK_CONTEXT_AUTO_INIT:true}
+  context-memory:
+    auto-init: ${ORBISOPS_CONTEXT_MEMORY_AUTO_INIT:true}
+  change-package:
+    auto-init: ${ORBISOPS_CHANGE_PACKAGE_AUTO_INIT:false}
+  approved-landing:
+    enabled: ${ORBISOPS_APPROVED_LANDING_ENABLED:false}
+    operation-lease-seconds: ${ORBISOPS_LANDING_OPERATION_LEASE_SECONDS:300}
+    operation-heartbeat-seconds: ${ORBISOPS_LANDING_OPERATION_HEARTBEAT_SECONDS:30}
+    recovery:
+      enabled: ${ORBISOPS_LANDING_RECOVERY_ENABLED:false}
+      fixed-delay-ms: ${ORBISOPS_LANDING_RECOVERY_FIXED_DELAY_MS:30000}
+      batch-size: ${ORBISOPS_LANDING_RECOVERY_BATCH_SIZE:20}
+  progressive-mcp:
+    enforce-project-managed: ${ORBISOPS_PROGRESSIVE_MCP_ENFORCE_PROJECT_MANAGED:true}
+    disclosure:
+      enabled: ${ORBISOPS_PROGRESSIVE_MCP_DISCLOSURE_ENABLED:true}
+  skill-evolver:
+    auto-init: ${ORBISOPS_SKILL_EVOLVER_AUTO_INIT:true}
+    trigger:
+      enabled: ${ORBISOPS_SKILL_EVOLVER_TRIGGER_ENABLED:true}
+    worker:
+      enabled: ${ORBISOPS_SKILL_EVOLVER_WORKER_ENABLED:false}
+      fixed-delay-ms: ${ORBISOPS_SKILL_EVOLVER_WORKER_FIXED_DELAY_MS:60000}
+      batch-size: ${ORBISOPS_SKILL_EVOLVER_WORKER_BATCH_SIZE:5}
+      max-attempts: ${ORBISOPS_SKILL_EVOLVER_WORKER_MAX_ATTEMPTS:3}
+  skill-evolution:
+    enabled: ${ORBISOPS_SKILL_EVOLUTION_ENABLED:true}
+    shadow:
+      enabled: ${ORBISOPS_SKILL_EVOLUTION_SHADOW_ENABLED:true}
+      min-score: ${ORBISOPS_SKILL_EVOLUTION_SHADOW_MIN_SCORE:0.80}
+    canary:
+      enabled: ${ORBISOPS_SKILL_EVOLUTION_CANARY_ENABLED:true}
+    canary-percent: ${ORBISOPS_SKILL_EVOLUTION_CANARY_PERCENT:10}
+    min-sample-size: ${ORBISOPS_SKILL_EVOLUTION_MIN_SAMPLE_SIZE:2}
+    similarity-threshold: ${ORBISOPS_SKILL_EVOLUTION_SIMILARITY_THRESHOLD:0.72}
+    rollback-thresholds:
+      blocked-tool-rate: ${ORBISOPS_SKILL_EVOLUTION_MAX_BLOCKED_RATE:0.25}
+      needs-replan-rate: ${ORBISOPS_SKILL_EVOLUTION_MAX_REPLAN_RATE:0.30}
+      negative-feedback-rate: ${ORBISOPS_SKILL_EVOLUTION_MAX_NEGATIVE_FEEDBACK_RATE:0.20}
+      success-rate-drop: ${ORBISOPS_SKILL_EVOLUTION_MAX_SUCCESS_RATE_DROP:0.15}
+      evidence-rate-drop: ${ORBISOPS_SKILL_EVOLUTION_MAX_EVIDENCE_RATE_DROP:0.15}
+      tool-call-increase-rate: ${ORBISOPS_SKILL_EVOLUTION_MAX_TOOL_CALL_INCREASE_RATE:0.50}
+  skill-runtime:
+    retrieval:
+      endpoint: ${ORBISOPS_SKILL_RETRIEVAL_ENDPOINT:}
+      api-key: ${ORBISOPS_SKILL_RETRIEVAL_API_KEY:}
+      embedding-revision: ${ORBISOPS_SKILL_EMBEDDING_REVISION:}
+      reranker-revision: ${ORBISOPS_SKILL_RERANKER_REVISION:}
+    catalog-candidate-limit: ${ORBISOPS_SKILL_RUNTIME_CATALOG_LIMIT:20}
+    selected-limit: ${ORBISOPS_SKILL_RUNTIME_SELECTED_LIMIT:3}
+    max-explicit-skills: ${ORBISOPS_SKILL_RUNTIME_MAX_EXPLICIT:3}
+    min-relevance-score: ${ORBISOPS_SKILL_RUNTIME_MIN_RELEVANCE:0.12}
+    similar-suppression-threshold: ${ORBISOPS_SKILL_RUNTIME_SIMILAR_THRESHOLD:0.88}
+    semantic-enabled: ${ORBISOPS_SKILL_RUNTIME_SEMANTIC_ENABLED:false}
+    semantic-candidate-limit: ${ORBISOPS_SKILL_RUNTIME_SEMANTIC_CANDIDATE_LIMIT:64}
+    semantic-recall-limit: ${ORBISOPS_SKILL_RUNTIME_SEMANTIC_RECALL_LIMIT:20}
+    semantic-weight: ${ORBISOPS_SKILL_RUNTIME_SEMANTIC_WEIGHT:0.42}
+    category-boost: ${ORBISOPS_SKILL_RUNTIME_CATEGORY_BOOST:0.12}
+    negative-penalty-weight: ${ORBISOPS_SKILL_RUNTIME_NEGATIVE_PENALTY_WEIGHT:0.65}
+    llm-rerank-enabled: ${ORBISOPS_SKILL_RUNTIME_LLM_RERANK_ENABLED:false}
+    llm-rerank-candidate-limit: ${ORBISOPS_SKILL_RUNTIME_LLM_RERANK_CANDIDATE_LIMIT:20}
+    llm-rerank-weight: ${ORBISOPS_SKILL_RUNTIME_LLM_RERANK_WEIGHT:0.35}
+    embedding-cache-size: ${ORBISOPS_SKILL_RUNTIME_EMBEDDING_CACHE_SIZE:256}
+    catalog-summary-max-chars: ${ORBISOPS_SKILL_RUNTIME_CATALOG_SUMMARY_MAX_CHARS:2500}
+    max-single-skill-chars: ${ORBISOPS_SKILL_RUNTIME_MAX_SINGLE_SKILL_CHARS:4000}
+  ai:
+    model-calls-enabled: ${ORBISOPS_AI_MODEL_CALLS_ENABLED:true}
+    placeholder-api-key: ${ORBISOPS_AI_PLACEHOLDER_API_KEY:dev-placeholder-key}
+    local-model-readiness-cache-ms: ${ORBISOPS_AI_LOCAL_MODEL_READINESS_CACHE_MS:10000}
+    local-model-readiness-timeout-ms: ${ORBISOPS_AI_LOCAL_MODEL_READINESS_TIMEOUT_MS:500}
+  agent:
+    action-mode: ${ORBISOPS_AGENT_ACTION_MODE:analysis-only}
+    enforce-read-only-tools: ${ORBISOPS_AGENT_ENFORCE_READ_ONLY_TOOLS:true}
+  multi-agent:
+    planner-mode: ${ORBISOPS_MULTI_AGENT_PLANNER_MODE:smart}
+    max-task-executions: ${ORBISOPS_MULTI_AGENT_MAX_TASK_EXECUTIONS:8}
+    max-adjustments: ${ORBISOPS_MULTI_AGENT_MAX_ADJUSTMENTS:3}
+    fail-on-llm-degradation: ${ORBISOPS_FAIL_ON_LLM_DEGRADATION:false}
+    json-repair-retry-enabled: ${ORBISOPS_JSON_REPAIR_RETRY_ENABLED:true}
+    json-response-format-enabled: ${ORBISOPS_JSON_RESPONSE_FORMAT_ENABLED:true}
+    json-max-completion-tokens: ${ORBISOPS_JSON_MAX_COMPLETION_TOKENS:1200}
+    json-skill-context-retry-enabled: ${ORBISOPS_JSON_SKILL_CONTEXT_RETRY_ENABLED:true}
+    json-skill-context-retry-max-chars: ${ORBISOPS_JSON_SKILL_CONTEXT_RETRY_MAX_CHARS:16000}
+    model-call-timeout-seconds: ${ORBISOPS_MODEL_CALL_TIMEOUT_SECONDS:2}
+    final-report-llm-enabled: ${ORBISOPS_FINAL_REPORT_LLM_ENABLED:false}
+    final-report-max-chars: ${ORBISOPS_FINAL_REPORT_MAX_CHARS:8000}
+    executor:
+      core-pool-size: ${ORBISOPS_SUB_AGENT_CORE_POOL_SIZE:3}
+      max-pool-size: ${ORBISOPS_SUB_AGENT_MAX_POOL_SIZE:6}
+      queue-capacity: ${ORBISOPS_SUB_AGENT_QUEUE_CAPACITY:32}
+      keep-alive-seconds: ${ORBISOPS_SUB_AGENT_KEEP_ALIVE_SECONDS:30}
+      rejection-policy: ${ORBISOPS_SUB_AGENT_REJECTION_POLICY:CallerRunsPolicy}
+    run-executor:
+      core-pool-size: ${ORBISOPS_RUN_CORE_POOL_SIZE:2}
+      max-pool-size: ${ORBISOPS_RUN_MAX_POOL_SIZE:4}
+      queue-capacity: ${ORBISOPS_RUN_QUEUE_CAPACITY:32}
+      keep-alive-seconds: ${ORBISOPS_RUN_KEEP_ALIVE_SECONDS:30}
+      rejection-policy: ${ORBISOPS_RUN_REJECTION_POLICY:CallerRunsPolicy}
+    model-call-executor:
+      core-pool-size: ${ORBISOPS_MODEL_CALL_CORE_POOL_SIZE:2}
+      max-pool-size: ${ORBISOPS_MODEL_CALL_MAX_POOL_SIZE:4}
+      queue-capacity: ${ORBISOPS_MODEL_CALL_QUEUE_CAPACITY:8}
+      keep-alive-seconds: ${ORBISOPS_MODEL_CALL_KEEP_ALIVE_SECONDS:5}
+      rejection-policy: ${ORBISOPS_MODEL_CALL_REJECTION_POLICY:AbortPolicy}
+  chat:
+    stream:
+      timeout-ms: ${ORBISOPS_CHAT_STREAM_TIMEOUT_MS:360000}
+    memory:
+      enabled: ${ORBISOPS_CHAT_MEMORY_ENABLED:true}
+      jdbc-enabled: ${ORBISOPS_CHAT_MEMORY_JDBC_ENABLED:false}
+      auto-init: ${ORBISOPS_CHAT_MEMORY_AUTO_INIT:false}
+      hot-store: ${ORBISOPS_CHAT_MEMORY_HOT_STORE:memory}
+      hot-max-messages: ${ORBISOPS_CHAT_MEMORY_HOT_MAX_MESSAGES:12}
+      hot-buffer-messages: ${ORBISOPS_CHAT_MEMORY_HOT_BUFFER_MESSAGES:24}
+      hot-ttl-minutes: ${ORBISOPS_CHAT_MEMORY_HOT_TTL_MINUTES:30}
+      item-match-limit: ${ORBISOPS_CHAT_MEMORY_ITEM_MATCH_LIMIT:8}
+      semantic-enabled: ${ORBISOPS_CHAT_MEMORY_SEMANTIC_ENABLED:true}
+      semantic-top-k: ${ORBISOPS_CHAT_MEMORY_SEMANTIC_TOP_K:8}
+      context-max-chars: ${ORBISOPS_CHAT_MEMORY_CONTEXT_MAX_CHARS:8000}
+      assemble-timeout-millis: ${ORBISOPS_CHAT_MEMORY_ASSEMBLE_TIMEOUT_MILLIS:1200}
+      recency-aware-enabled: ${ORBISOPS_CHAT_MEMORY_RECENCY_AWARE_ENABLED:true}
+      recency-half-life-turns: ${ORBISOPS_CHAT_MEMORY_RECENCY_HALF_LIFE_TURNS:6}
+      extraction-enabled: ${ORBISOPS_CHAT_MEMORY_EXTRACTION_ENABLED:true}
+      llm-extraction-enabled: ${ORBISOPS_CHAT_MEMORY_LLM_EXTRACTION_ENABLED:true}
+      llm-extraction-max-input-chars: ${ORBISOPS_CHAT_MEMORY_LLM_EXTRACTION_MAX_INPUT_CHARS:4000}
+      extraction-max-items-per-message: ${ORBISOPS_CHAT_MEMORY_EXTRACTION_MAX_ITEMS_PER_MESSAGE:6}
+      compression-enabled: ${ORBISOPS_CHAT_MEMORY_COMPRESSION_ENABLED:true}
+      compression-hot-threshold-messages: ${ORBISOPS_CHAT_MEMORY_COMPRESSION_HOT_THRESHOLD_MESSAGES:20}
+      compression-keep-recent: ${ORBISOPS_CHAT_MEMORY_COMPRESSION_KEEP_RECENT:8}
+      compression-llm-enabled: ${ORBISOPS_CHAT_MEMORY_COMPRESSION_LLM_ENABLED:true}
+      compression-llm-max-input-chars: ${ORBISOPS_CHAT_MEMORY_COMPRESSION_LLM_MAX_INPUT_CHARS:6000}
+      executor:
+        core-pool-size: ${ORBISOPS_CHAT_MEMORY_CORE_POOL_SIZE:3}
+        max-pool-size: ${ORBISOPS_CHAT_MEMORY_MAX_POOL_SIZE:5}
+        queue-capacity: ${ORBISOPS_CHAT_MEMORY_QUEUE_CAPACITY:64}
+        keep-alive-seconds: ${ORBISOPS_CHAT_MEMORY_KEEP_ALIVE_SECONDS:30}
+        rejection-policy: ${ORBISOPS_CHAT_MEMORY_REJECTION_POLICY:CallerRunsPolicy}
+  elasticsearch-timeout-seconds: ${ORBISOPS_ES_TIMEOUT_SECONDS:5}
+  elasticsearch-sample-size: ${ORBISOPS_ES_SAMPLE_SIZE:8}
+  prometheus-job: ${ORBISOPS_PROMETHEUS_JOB:test-app}
+  prometheus-timeout-seconds: ${ORBISOPS_PROMETHEUS_TIMEOUT_SECONDS:5}
+  allowed-origin-patterns: ${ORBISOPS_ALLOWED_ORIGIN_PATTERNS:http://127.0.0.1:3000,http://localhost:3000}
+  audit:
+    max-records: ${ORBISOPS_AUDIT_MAX_RECORDS:200}
+    jdbc-enabled: ${ORBISOPS_AUDIT_JDBC_ENABLED:false}
+    auto-init: ${ORBISOPS_AUDIT_AUTO_INIT:false}
+  runs:
+    max-memory-records: ${ORBISOPS_RUN_MAX_MEMORY_RECORDS:200}
+    jdbc-enabled: ${ORBISOPS_RUN_JDBC_ENABLED:false}
+    auto-init: ${ORBISOPS_RUN_AUTO_INIT:false}
+    reject-when-queue-full: ${ORBISOPS_RUN_REJECT_WHEN_QUEUE_FULL:true}
+    allow-in-memory-fallback: ${ORBISOPS_RUN_ALLOW_IN_MEMORY_FALLBACK:false}
+  source-repository:
+    enabled: ${ORBISOPS_SOURCE_REPOSITORY_ENABLED:false}
+    jdbc-enabled: ${ORBISOPS_SOURCE_REPOSITORY_JDBC_ENABLED:false}
+    auto-init: ${ORBISOPS_SOURCE_REPOSITORY_AUTO_INIT:false}
+    allowed-local-roots: ${ORBISOPS_SOURCE_ALLOWED_LOCAL_ROOTS:}
+    git-binary: ${ORBISOPS_SOURCE_GIT_BINARY:git}
+    command-timeout-seconds: ${ORBISOPS_SOURCE_COMMAND_TIMEOUT_SECONDS:8}
+    max-file-bytes: ${ORBISOPS_SOURCE_MAX_FILE_BYTES:1048576}
+    max-command-output-bytes: ${ORBISOPS_SOURCE_MAX_COMMAND_OUTPUT_BYTES:2097152}
+  execution-resource:
+    enabled: ${ORBISOPS_EXECUTION_RESOURCE_ENABLED:true}
+    jdbc-enabled: ${ORBISOPS_EXECUTION_RESOURCE_JDBC_ENABLED:false}
+    auto-init: ${ORBISOPS_EXECUTION_RESOURCE_AUTO_INIT:false}
+  model-api-bootstrap:
+    enabled: ${ORBISOPS_MODEL_API_BOOTSTRAP_ENABLED:false}
+    api-id: ${ORBISOPS_MODEL_API_BOOTSTRAP_API_ID:1001}
+  repair:
+    enabled: ${ORBISOPS_REPAIR_ENABLED:false}
+    jdbc-enabled: ${ORBISOPS_REPAIR_JDBC_ENABLED:false}
+    auto-init: ${ORBISOPS_REPAIR_AUTO_INIT:false}
+    worktree-root: ${ORBISOPS_REPAIR_WORKTREE_ROOT:${ORBISOPS_REPAIR_SANDBOX_ROOT:${java.io.tmpdir}/orbisops-repair-test/worktrees}}
+    artifact-root: ${ORBISOPS_REPAIR_ARTIFACT_ROOT:${java.io.tmpdir}/orbisops-repair-test/artifacts}
+    release-root: ${ORBISOPS_REPAIR_RELEASE_ROOT:${java.io.tmpdir}/orbisops-repair-test/releases}
+    runner: ${ORBISOPS_REPAIR_RUNNER:host}
+    github:
+      enabled: false
+  alert-triggers:
+    auto-init: ${ORBISOPS_ALERT_TRIGGER_AUTO_INIT:false}
+    signature-max-skew-seconds: ${ORBISOPS_ALERT_TRIGGER_SIGNATURE_MAX_SKEW_SECONDS:300}
+    aggregation:
+      debounce-seconds: ${ORBISOPS_ALERT_AGGREGATION_DEBOUNCE_SECONDS:1}
+      max-wait-seconds: ${ORBISOPS_ALERT_AGGREGATION_MAX_WAIT_SECONDS:2}
+    project-queue:
+      max-queued: ${ORBISOPS_ALERT_PROJECT_MAX_QUEUED:20}
+      max-running: ${ORBISOPS_ALERT_PROJECT_MAX_RUNNING:2}
+    outbox:
+      enabled: ${ORBISOPS_ALERT_TRIGGER_OUTBOX_ENABLED:false}
+      fixed-delay-ms: ${ORBISOPS_ALERT_TRIGGER_OUTBOX_FIXED_DELAY_MS:30000}
+      batch-size: ${ORBISOPS_ALERT_TRIGGER_OUTBOX_BATCH_SIZE:20}
+      max-attempts: ${ORBISOPS_ALERT_TRIGGER_OUTBOX_MAX_ATTEMPTS:8}
+      lock-timeout-seconds: ${ORBISOPS_ALERT_TRIGGER_OUTBOX_LOCK_TIMEOUT_SECONDS:120}
+  channel:
+    inbound:
+      max-message-chars: ${ORBISOPS_CHANNEL_INBOUND_MAX_MESSAGE_CHARS:12000}
+      max-metadata-chars: ${ORBISOPS_CHANNEL_INBOUND_MAX_METADATA_CHARS:8192}
+    outbound:
+      max-message-chars: ${ORBISOPS_CHANNEL_OUTBOUND_MAX_MESSAGE_CHARS:20000}
+    auto-init: ${ORBISOPS_CHANNEL_AUTO_INIT:true}
+    webhook:
+      max-clock-skew-seconds: ${ORBISOPS_CHANNEL_WEBHOOK_MAX_CLOCK_SKEW_SECONDS:300}
+      allow-loopback: ${ORBISOPS_CHANNEL_WEBHOOK_ALLOW_LOOPBACK:true}
+      allowed-hosts: ${ORBISOPS_CHANNEL_WEBHOOK_ALLOWED_HOSTS:}
+    notification:
+      max-message-chars: ${ORBISOPS_CHANNEL_NOTIFICATION_MAX_MESSAGE_CHARS:12000}
+      outbox:
+        auto-init: ${ORBISOPS_CHANNEL_NOTIFICATION_OUTBOX_AUTO_INIT:true}
+        scheduler-enabled: ${ORBISOPS_CHANNEL_NOTIFICATION_OUTBOX_SCHEDULER_ENABLED:false}
+        batch-size: ${ORBISOPS_CHANNEL_NOTIFICATION_OUTBOX_BATCH_SIZE:20}
+        fixed-delay-ms: ${ORBISOPS_CHANNEL_NOTIFICATION_OUTBOX_FIXED_DELAY_MS:60000}
+        max-attempts: ${ORBISOPS_CHANNEL_NOTIFICATION_OUTBOX_MAX_ATTEMPTS:3}
+        lease-seconds: ${ORBISOPS_CHANNEL_NOTIFICATION_OUTBOX_LEASE_SECONDS:30}
+  rag:
+    vector-table-name: ${ORBISOPS_RAG_VECTOR_TABLE_NAME:vector_store_qwen_vl_2048}
+    vector-index:
+      auto-init: ${ORBISOPS_RAG_VECTOR_INDEX_AUTO_INIT:false}
+    query-rewrite:
+      mode: ${ORBISOPS_RAG_QUERY_REWRITE_MODE:hybrid}
+      llm-enabled: ${ORBISOPS_RAG_QUERY_REWRITE_LLM_ENABLED:true}
+      base-url: ${ORBISOPS_RAG_QUERY_REWRITE_BASE_URL:${spring.ai.openai.base-url:}}
+      api-key: ${ORBISOPS_RAG_QUERY_REWRITE_API_KEY:${spring.ai.openai.api-key:}}
+      path: ${ORBISOPS_RAG_QUERY_REWRITE_PATH:v1/chat/completions}
+      model: ${ORBISOPS_RAG_QUERY_REWRITE_MODEL:${spring.ai.openai.chat.options.model:gpt-5.4-mini}}
+      max-queries: ${ORBISOPS_RAG_QUERY_REWRITE_MAX_QUERIES:4}
+      timeout-seconds: ${ORBISOPS_RAG_QUERY_REWRITE_TIMEOUT_SECONDS:10}
+      min-chars: ${ORBISOPS_RAG_QUERY_REWRITE_MIN_CHARS:18}
+      on-low-recall: ${ORBISOPS_RAG_QUERY_REWRITE_ON_LOW_RECALL:true}
+      low-recall-min-candidates: ${ORBISOPS_RAG_QUERY_REWRITE_LOW_RECALL_MIN_CANDIDATES:2}
+    ttft:
+      optimize-streaming: ${ORBISOPS_RAG_TTFT_OPTIMIZE_STREAMING:true}
+      disable-rerank-on-stream: ${ORBISOPS_RAG_TTFT_DISABLE_RERANK_ON_STREAM:true}
+      vector-top-k: ${ORBISOPS_RAG_TTFT_VECTOR_TOP_K:4}
+      bm25-top-k: ${ORBISOPS_RAG_TTFT_BM25_TOP_K:6}
+      final-top-k: ${ORBISOPS_RAG_TTFT_FINAL_TOP_K:4}
+      query-rewrite-enabled: ${ORBISOPS_RAG_TTFT_QUERY_REWRITE_ENABLED:true}
+    multimodal:
+      enabled: ${ORBISOPS_RAG_MULTIMODAL_ENABLED:false}
+      provider: ${ORBISOPS_RAG_MULTIMODAL_PROVIDER:qwen-vl}
+      base-url: ${ORBISOPS_RAG_MULTIMODAL_BASE_URL:http://127.0.0.1:8110}
+      api-key: ${ORBISOPS_RAG_MULTIMODAL_API_KEY:local-rag-models}
+      path: ${ORBISOPS_RAG_MULTIMODAL_PATH:v1/multimodalembeddings}
+      model: ${ORBISOPS_RAG_MULTIMODAL_MODEL:Qwen/Qwen3-VL-Embedding-2B}
+      table-name: ${ORBISOPS_RAG_MULTIMODAL_TABLE_NAME:vector_store_qwen_vl_multimodal}
+      dimension: ${ORBISOPS_RAG_MULTIMODAL_DIMENSION:2048}
+      auto-init: ${ORBISOPS_RAG_MULTIMODAL_AUTO_INIT:true}
+      index-text-documents: ${ORBISOPS_RAG_MULTIMODAL_INDEX_TEXT_DOCUMENTS:false}
+      index-original-media: ${ORBISOPS_RAG_MULTIMODAL_INDEX_ORIGINAL_MEDIA:true}
+      index-pdf-page-images: ${ORBISOPS_RAG_MULTIMODAL_INDEX_PDF_PAGE_IMAGES:true}
+      max-pdf-pages: ${ORBISOPS_RAG_MULTIMODAL_MAX_PDF_PAGES:3}
+      pdf-render-dpi: ${ORBISOPS_RAG_MULTIMODAL_PDF_RENDER_DPI:144}
+      max-image-bytes: ${ORBISOPS_RAG_MULTIMODAL_MAX_IMAGE_BYTES:20971520}
+      max-text-chars: ${ORBISOPS_RAG_MULTIMODAL_MAX_TEXT_CHARS:3000}
+      search-top-k: ${ORBISOPS_RAG_MULTIMODAL_SEARCH_TOP_K:8}
+      timeout-seconds: ${ORBISOPS_RAG_MULTIMODAL_TIMEOUT_SECONDS:30}
+      max-retries: ${ORBISOPS_RAG_MULTIMODAL_MAX_RETRIES:1}
+    parse:
+      max-chunk-chars: ${ORBISOPS_RAG_PARSE_MAX_CHUNK_CHARS:3000}
+      visual-min-text-chars: ${ORBISOPS_RAG_PARSE_VISUAL_MIN_TEXT_CHARS:120}
+      media-storage-dir: ${ORBISOPS_RAG_PARSE_MEDIA_STORAGE_DIR:data/rag-media}
+      max-pdf-images: ${ORBISOPS_RAG_PARSE_MAX_PDF_IMAGES:20}
+      visual:
+        enabled: ${ORBISOPS_RAG_VISUAL_ENABLED:false}
+        high-value-only: ${ORBISOPS_RAG_VISUAL_HIGH_VALUE_ONLY:true}
+        provider: ${ORBISOPS_RAG_VISUAL_PROVIDER:openai}
+        base-url: ${ORBISOPS_RAG_VISUAL_BASE_URL:${spring.ai.openai.base-url:}}
+        api-key: ${ORBISOPS_RAG_VISUAL_API_KEY:${spring.ai.openai.api-key:}}
+        path: ${ORBISOPS_RAG_VISUAL_PATH:v1/chat/completions}
+        model: ${ORBISOPS_RAG_VISUAL_MODEL:gpt-5.4-mini}
+        detail: ${ORBISOPS_RAG_VISUAL_DETAIL:low}
+        timeout-seconds: ${ORBISOPS_RAG_VISUAL_TIMEOUT_SECONDS:30}
+        max-completion-tokens: ${ORBISOPS_RAG_VISUAL_MAX_COMPLETION_TOKENS:1200}
+        token-limit-field: ${ORBISOPS_RAG_VISUAL_TOKEN_LIMIT_FIELD:max_completion_tokens}
+        response-format: ${ORBISOPS_RAG_VISUAL_RESPONSE_FORMAT:json_schema}
+        max-retries: ${ORBISOPS_RAG_VISUAL_MAX_RETRIES:1}
+        max-images-per-document: ${ORBISOPS_RAG_VISUAL_MAX_IMAGES_PER_DOCUMENT:3}
+        max-image-bytes: ${ORBISOPS_RAG_VISUAL_MAX_IMAGE_BYTES:4194304}
+        pdf-render-dpi: ${ORBISOPS_RAG_VISUAL_PDF_RENDER_DPI:144}
+
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisReactiveAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+      - org.mybatis.spring.boot.autoconfigure.MybatisAutoConfiguration
+      - org.springframework.ai.vectorstore.pgvector.autoconfigure.PgVectorStoreAutoConfiguration
+  ai:
+    retry:
+      max-attempts: ${ORBISOPS_SPRING_AI_RETRY_MAX_ATTEMPTS:1}
+      backoff:
+        initial-interval: ${ORBISOPS_SPRING_AI_RETRY_BACKOFF_INITIAL_INTERVAL:100ms}
+        max-interval: ${ORBISOPS_SPRING_AI_RETRY_BACKOFF_MAX_INTERVAL:500ms}
+        multiplier: ${ORBISOPS_SPRING_AI_RETRY_BACKOFF_MULTIPLIER:2}
+    openai:
+      base-url: ${ORBISOPS_OPENAI_BASE_URL:https://api.openai.com}
+      api-key: ${ORBISOPS_OPENAI_API_KEY:dev-placeholder-key}
+      embedding:
+        base-url: ${ORBISOPS_OPENAI_EMBEDDING_BASE_URL:http://127.0.0.1:8110}
+        api-key: ${ORBISOPS_OPENAI_EMBEDDING_API_KEY:local-rag-models}
+        options:
+          model: ${ORBISOPS_OPENAI_EMBEDDING_MODEL:Qwen/Qwen3-VL-Embedding-2B}
+          dimensions: ${ORBISOPS_OPENAI_EMBEDDING_DIMENSIONS:2048}
+      chat:
+        connect-timeout-seconds: ${ORBISOPS_OPENAI_CHAT_CONNECT_TIMEOUT_SECONDS:5}
+        read-timeout-seconds: ${ORBISOPS_OPENAI_CHAT_READ_TIMEOUT_SECONDS:240}
+        options:
+          model: ${ORBISOPS_OPENAI_CHAT_MODEL:gpt-5.4-mini}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  metrics:
+    tags:
+      application: orbisops
+
+# 日志
+logging:
+  level:
+    root: info
+    cn.lgs.orbisops: debug
+  config: classpath:logback-spring.xml

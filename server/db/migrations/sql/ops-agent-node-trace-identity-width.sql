@@ -1,0 +1,3 @@
+ALTER TABLE ai_ops_agent_node_trace
+  MODIFY COLUMN agent VARCHAR(256) NULL COMMENT 'Agent',
+  MODIFY COLUMN source VARCHAR(256) NULL COMMENT '数据源';

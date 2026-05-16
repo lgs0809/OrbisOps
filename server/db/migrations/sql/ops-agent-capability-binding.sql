@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS `ai_ops_agent_capability_binding` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增ID',
+  `agent_id` VARCHAR(80) NOT NULL COMMENT 'Agent定义ID',
+  `version` INT NOT NULL DEFAULT 0 COMMENT 'Agent版本',
+  `lifecycle` VARCHAR(32) NOT NULL DEFAULT 'DRAFT' COMMENT '版本生命周期',
+  `project_id` VARCHAR(80) NOT NULL DEFAULT '' COMMENT '项目ID',
+  `owner_type` VARCHAR(32) NOT NULL COMMENT '绑定对象类型：AGENT/NODE/AGENTSCOPE',
+  `node_id` VARCHAR(128) NOT NULL DEFAULT '' COMMENT '节点或子Agent ID，Agent级为空',
+  `capability_type` VARCHAR(48) NOT NULL COMMENT '能力类型：skill/project_tool/knowledge_base/inline_mcp_server',
+  `capability_id` VARCHAR(256) NOT NULL COMMENT '能力ID',
+  `capability_scope` VARCHAR(48) NOT NULL DEFAULT 'PROJECT' COMMENT '能力范围',
+  `bind_config_json` TEXT NULL COMMENT '绑定配置JSON',
+  `create_by` VARCHAR(80) NULL COMMENT '创建人',
+  `create_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_agent_capability` (`agent_id`, `version`, `owner_type`, `node_id`, `capability_type`, `capability_id`),
+  KEY `idx_agent_version` (`agent_id`, `version`),
+  KEY `idx_project_type` (`project_id`, `capability_type`),
+  KEY `idx_capability` (`capability_type`, `capability_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='运维Agent统一能力绑定表';

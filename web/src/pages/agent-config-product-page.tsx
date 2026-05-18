@@ -1,14 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Button, Card, Space, Spin, Tag, Typography } from '@douyinfe/semi-ui';
 import { IconAlertTriangle } from '@douyinfe/semi-icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import styled from 'styled-components';
 
 import { AgentConfigPage } from './agent-config';
-import {
-  AgentReferenceImpact,
-  loadAgentReferenceImpacts,
-} from '../services/ops-agent-reference-impact-service';
+import type { AgentReferenceImpact } from '../services/ops-agent-reference-impact-service';
+import { useAgentReferenceImpactQuery } from '../features/agents/api/agent-list-queries';
 import { theme } from '../styles/theme';
 
 const { Paragraph, Text } = Typography;
@@ -50,20 +48,9 @@ export const AgentConfigProductPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const projectId = searchParams.get('projectId') || '';
   const agentId = searchParams.get('agentId') || '';
-  const [loading, setLoading] = useState(false);
-  const [impact, setImpact] = useState<AgentReferenceImpact>(() => emptyImpact(agentId));
-
-  useEffect(() => {
-    if (!projectId || !agentId) {
-      setImpact(emptyImpact(agentId));
-      return;
-    }
-    setLoading(true);
-    loadAgentReferenceImpacts(projectId, [agentId])
-      .then((items) => setImpact(items[agentId] || emptyImpact(agentId)))
-      .catch(() => setImpact(emptyImpact(agentId)))
-      .finally(() => setLoading(false));
-  }, [agentId, projectId]);
+  const impactQuery = useAgentReferenceImpactQuery(projectId, agentId);
+  const loading = impactQuery.isFetching;
+  const impact = impactQuery.data || emptyImpact(agentId);
 
   return (
     <>

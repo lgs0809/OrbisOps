@@ -35,24 +35,12 @@ import { Header, Sidebar, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from '../comp
 import { OpsAgentCanvas } from '../components/ops-agent-canvas';
 import { theme } from '../styles/theme';
 import { useResponsiveSidebar } from '../hooks/use-responsive-sidebar';
-import {
-  AiClientToolMcpResponseDTO,
-  aiClientToolMcpAdminService,
-} from '../services/ai-client-tool-mcp-admin-service';
-import {
-  RagKnowledgeBaseSummary,
-  aiClientRagOrderAdminService,
-} from '../services/ai-client-rag-order-admin-service';
-import { AiClientModelResponseDTO, AiClientModelService } from '../services/ai-client-model-service';
-import {
-  OpsGeneratedMcp,
-  OpsProjectWorkspace,
-  opsProjectService,
-} from '../services/ops-project-service';
+
+import type { RagKnowledgeBaseSummary } from '../services/ai-client-rag-order-admin-service';
+import type { OpsGeneratedMcp } from '../services/ops-project-service';
 import {
   ApiRequestError,
   OpsAgentCapabilityBinding,
-  OpsAgentCapabilitySet,
   OpsAgentDefinition,
   OpsGraphEdge,
   OpsLoopPolicy,
@@ -60,9 +48,13 @@ import {
   OpsRuntimeEvent,
   OpsSkillSummary,
   OpsWorkflowNode,
-  opsAdminService,
 } from '../services/ops-admin-service';
 import { opsAgentDefinitionService } from '../services/ops-agent-definition-service';
+import {
+  useAgentBuilderCapabilitiesQuery,
+  useAgentBuilderLibrariesQuery,
+} from '../features/agents/api/agent-builder-queries';
+import { useProjectScope } from '../hooks/use-project-scope';
 import { AgentBuilderGuide } from '../features/agents/components/AgentBuilderGuide';
 import { AgentBuilderModeSwitch } from '../features/agents/components/AgentBuilderModeSwitch';
 import { AgentBuilderPropertyPanel } from '../features/agents/components/AgentBuilderPropertyPanel';
@@ -970,20 +962,23 @@ export const AgentConfigPage: React.FC = () => {
   const routeProjectId = searchParams.get('projectId') || '';
   const { collapsed, sidebarCollapsed, toggleSidebar, closeMobileSidebar } = useResponsiveSidebar();
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+  const projectScope = useProjectScope();
+  const librariesQuery = useAgentBuilderLibrariesQuery(Boolean(userInfo));
+  const projects = projectScope.projects;
+  const mcpOptions = librariesQuery.data?.mcps || [];
+  const knowledgeBases = librariesQuery.data?.knowledgeBases || [];
+  const modelOptions = librariesQuery.data?.models || [];
+  const skillOptions = librariesQuery.data?.skills || [];
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [agents, setAgents] = useState<OpsAgentDefinition[]>([]);
   const [agentVersions, setAgentVersions] = useState<OpsAgentDefinition[]>([]);
-  const [mcpOptions, setMcpOptions] = useState<AiClientToolMcpResponseDTO[]>([]);
-  const [projects, setProjects] = useState<OpsProjectWorkspace[]>([]);
-  const [knowledgeBases, setKnowledgeBases] = useState<RagKnowledgeBaseSummary[]>([]);
-  const [agentCapabilities, setAgentCapabilities] = useState<OpsAgentCapabilitySet | null>(null);
   const [agentBindings, setAgentBindings] = useState<OpsAgentCapabilityBinding[]>([]);
-  const [modelOptions, setModelOptions] = useState<AiClientModelResponseDTO[]>([]);
-  const [skillOptions, setSkillOptions] = useState<OpsSkillSummary[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
   const [definition, setDefinition] = useState<OpsAgentDefinition>(createDefaultDefinition);
+  const capabilitiesQuery = useAgentBuilderCapabilitiesQuery(definition.projectId || '', Boolean(userInfo));
+  const agentCapabilities = capabilitiesQuery.data || null;
   const [selectedNodeId, setSelectedNodeId] = useState<string>('start');
   const [selectedEdgeIndex, setSelectedEdgeIndex] = useState<number | null>(null);
   const [activePanel, setActivePanel] = useState<PanelKey>('node');
@@ -1380,53 +1375,20 @@ export const AgentConfigPage: React.FC = () => {
     }
   }, [handleAuthExpired, loadAgentVersions, navigate, refreshAgentBindings, routeProjectId]);
 
-  const refreshLibraries = useCallback(async () => {
-    const [mcpResult, projectResult, knowledgeResult, models, skills] = await Promise.allSettled([
-      aiClientToolMcpAdminService.queryEnabledAiClientToolMcps(),
-      opsProjectService.snapshot(),
-      aiClientRagOrderAdminService.listGlobalKnowledgeBases(),
-      AiClientModelService.queryEnabledAiClientModels(),
-      opsAdminService.listGlobalSkills(),
-    ]);
-    setMcpOptions(mcpResult.status === 'fulfilled' ? mcpResult.value.data || [] : []);
-    setProjects(projectResult.status === 'fulfilled' ? projectResult.value.data?.projects || [] : []);
-    setKnowledgeBases(knowledgeResult.status === 'fulfilled' ? knowledgeResult.value.data || [] : []);
-    setModelOptions(models.status === 'fulfilled' ? models.value || [] : []);
-    setSkillOptions(skills.status === 'fulfilled' ? skills.value.data || [] : []);
-  }, []);
-
   useEffect(() => {
     if (userInfo) {
       refreshAgents(routeAgentId);
-      refreshLibraries();
     }
-  }, [refreshAgents, refreshLibraries, routeAgentId, userInfo]);
+  }, [refreshAgents, routeAgentId, userInfo]);
 
   useEffect(() => {
-    if (!userInfo || !definition.projectId) {
-      setAgentCapabilities(null);
+    if (!capabilitiesQuery.error) return;
+    if (isUnauthorizedError(capabilitiesQuery.error)) {
+      handleAuthExpired();
       return;
     }
-    let canceled = false;
-    opsAgentDefinitionService.getProjectAgentCapabilities(definition.projectId)
-      .then((response) => {
-        if (!canceled) {
-          setAgentCapabilities(response.data || null);
-        }
-      })
-      .catch((error: unknown) => {
-        if (canceled) return;
-        setAgentCapabilities(null);
-        if (isUnauthorizedError(error)) {
-          handleAuthExpired();
-          return;
-        }
-        Toast.warning(`项目可绑定能力加载失败，将仅使用项目快照兜底：${errorMessageOf(error)}`);
-      });
-    return () => {
-      canceled = true;
-    };
-  }, [definition.projectId, handleAuthExpired, userInfo]);
+    Toast.warning(`项目可绑定能力加载失败，将仅使用项目快照兜底：${errorMessageOf(capabilitiesQuery.error)}`);
+  }, [capabilitiesQuery.error, handleAuthExpired]);
 
   const updateDefinition = useCallback((updater: (current: OpsAgentDefinition) => OpsAgentDefinition) => {
     setDefinition((current) => updater(current));

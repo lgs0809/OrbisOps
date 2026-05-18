@@ -14,6 +14,7 @@ export interface AgentListData {
 export const agentListQueryKeys = {
   all: ['specialized-workflows'] as const,
   project: (projectId: string) => [...agentListQueryKeys.all, projectId] as const,
+  impact: (projectId: string, agentId: string) => [...agentListQueryKeys.all, 'impact', projectId, agentId] as const,
 };
 
 export const useAgentListQuery = (projectId: string) => useQuery({
@@ -28,6 +29,15 @@ export const useAgentListQuery = (projectId: string) => useQuery({
       workflows.map((agent) => agent.agentId || '').filter(Boolean),
     );
     return { workflows, referenceImpacts };
+  },
+});
+
+export const useAgentReferenceImpactQuery = (projectId: string, agentId: string) => useQuery({
+  queryKey: agentListQueryKeys.impact(projectId, agentId),
+  enabled: Boolean(projectId && agentId),
+  queryFn: async (): Promise<AgentReferenceImpact | undefined> => {
+    const impacts = await loadAgentReferenceImpacts(projectId, [agentId]);
+    return impacts[agentId];
   },
 });
 

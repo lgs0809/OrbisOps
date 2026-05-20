@@ -1577,10 +1577,31 @@ Knowledge 子阶段验收：
 - Chrome Playwright：11/11 全量 E2E 通过，新增 Knowledge search/context 隔离验收；
 - feature boundary contract：2/2 通过，页面无 direct service / `useEffect` / 手工 polling server state。
 
-继续推进：
+### Phase 3 前端产品化 / Server State 收敛状态：已完成
 
-- Platform settings 重组；
-- TanStack Query 继续覆盖其他主要 server state。
+在 Knowledge 子阶段之后继续完成了 Platform IA 与主要页面 server-state 收敛。本轮原则不是追求“零 `useEffect`”，而是消除页面自维护的 GET 数据副本、手工 reload/polling 与重复请求；URL 深链、流式 Run、编辑草稿同步、编辑器 hydration 等真正的 UI / 生命周期协调继续保留。
+
+已完成：
+
+- Platform Settings 从 12 个扁平入口重组为 Integrations / Intelligence / Execution & Governance / Advanced，并保留旧 canonical deep links；
+- Models、Execution Targets、Analysis Tasks、Governance / Audit Policy 全部迁入 TanStack Query / Mutation；
+- Channel Management 的列表、详情、消息、身份、Outbox 与写操作迁入 Query / Mutation；修复 100 条消息历史与 200 条身份候选复用同一 Query Key 导致的缓存污染；
+- Tools / MCP、Memory、Tool Routing、Skill Evolver、Skills、Dashboard / My Audit、Workflow Catalog、Inspection Schedules、Alert Triggers 全部完成 server-state 边界收敛；
+- Incident Center 的列表、详情、成员与协作命令收敛到 Query / command mutation，并复用全局 Project Scope，消除管理员重复 Project Snapshot；
+- Change Center 的 ChangePackage 列表、详情、Events、Landing Operation Runs 与 validate / submit review / approve / reject / land / cleanup 收敛到 Query / Mutation；保留 capability gate、version/hash 与 Landing 安全校验；
+- Project Workspace 复用全局 Project Scope 的 `projects + templates` snapshot，项目 Skills / Knowledge / Members / Accounts 与 Code / Runtime 数据进入项目级 Query，移除页面三组 `useEffect(load)` 与第二份项目快照；
+- Agent Builder 的 MCP / Knowledge / Model / Skill catalog、Project Capability 与发布引用影响进入 Query；Workflow 读取后的编辑器初始化继续作为 UI hydration 生命周期处理，不把本地草稿误当成 server state；
+- 最终残余检查确认：Alert 登录校验、Analysis / Change 深链、Chat 流式会话、Skills 草稿/弹窗同步、Agent Builder 草稿与 editor hydration 等剩余 effect 均不是页面级 GET server-state。
+
+最终前端验收基线（2026-08-17）：
+
+- `npm run verify`：release hygiene、typecheck、**105/105 Vitest**、production build 全部通过；
+- `npm run test:e2e`：**30/30 Chrome Playwright** 全量通过；
+- Project Workspace 浏览器验收确认：admin snapshot 首次仅请求 1 次，显式刷新才重新请求；
+- Channel / Knowledge / Models / Execution Targets / Analysis Tasks / Governance / Tools / Memory / Tool Routing / Skills / Automations / Incidents / Changes 等 Query boundary 均有 contract 或 E2E 防回归；
+- Phase 3 后端此前完整 `mvn -q -pl orbisops-app -am test` 已通过（Spring ApplicationContext、Testcontainers MySQL、MCP stdio）；本轮后续提交仅涉及前端与文档，未修改后端实现。
+
+Phase 3 至此收口，后续进入 Phase 4。
 
 ---
 

@@ -1599,7 +1599,7 @@ Knowledge 子阶段验收：
 - `npm run test:e2e`：**30/30 Chrome Playwright** 全量通过；
 - Project Workspace 浏览器验收确认：admin snapshot 首次仅请求 1 次，显式刷新才重新请求；
 - Channel / Knowledge / Models / Execution Targets / Analysis Tasks / Governance / Tools / Memory / Tool Routing / Skills / Automations / Incidents / Changes 等 Query boundary 均有 contract 或 E2E 防回归；
-- Phase 3 后端此前完整 `mvn -q -pl orbisops-app -am test` 已通过（Spring ApplicationContext、Testcontainers MySQL、MCP stdio）；本轮后续提交仅涉及前端与文档，未修改后端实现。
+- 最终再次执行 Backend `mvn -q -pl orbisops-app -am test`：exit 0，包含真实 Spring ApplicationContext、Testcontainers MySQL 与 MCP stdio 链路；本轮后续未修改后端实现。
 
 Phase 3 至此收口，后续进入 Phase 4。
 

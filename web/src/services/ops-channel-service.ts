@@ -28,6 +28,7 @@ export interface OpsChannelConfig {
   requireMention?: boolean;
   respondToMentionAll?: boolean;
   verificationTokenRef?: string;
+  encodingAesKeyRef?: string;
   encryptKeyRef?: string;
   appCredentialRef?: string;
 }

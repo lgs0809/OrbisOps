@@ -4,6 +4,7 @@ import { IconHistory, IconPlus, IconRefresh, IconSend } from '@douyinfe/semi-ico
 
 import { OpsEmptyState, OpsPageHeader, OpsPageShell, OpsSectionCard, TableScroll } from '../../../components/ops-layout';
 import { ProjectScopeBar } from '../../../components/project-scope-bar';
+import { API_CONFIG } from '../../../config/api';
 import { useProjectScope } from '../../../hooks/use-project-scope';
 import type { AdminUserResponseDTO } from '../../../services/admin-user-service';
 import type { OpsAgentDefinition } from '../../../services/ops-admin-service';
@@ -40,9 +41,11 @@ import { ChannelReadinessPanel } from '../components/ChannelReadinessPanel';
 import {
   credentialEnvironmentName,
   defaultConnectionMode,
+  encodingAesKeyEnvironmentName,
   providerConfigPayload,
   secondaryCredentialEnvironmentName,
   validateProviderConfig,
+  verificationTokenEnvironmentName,
 } from '../model/channel-provider-config';
 import { buildChannelProviderCards } from '../model/channel-model';
 
@@ -57,6 +60,8 @@ interface ChannelForm {
   providerType: OpsChannelType;
   credentialEnvironmentVariable: string;
   secondaryCredentialEnvironmentVariable: string;
+  verificationTokenEnvironmentVariable: string;
+  encodingAesKeyEnvironmentVariable: string;
   appId: string;
   botId: string;
   botUsername: string;
@@ -82,6 +87,8 @@ const formFor = (type: OpsChannelType): ChannelForm => ({
   providerType: type,
   credentialEnvironmentVariable: '',
   secondaryCredentialEnvironmentVariable: '',
+  verificationTokenEnvironmentVariable: '',
+  encodingAesKeyEnvironmentVariable: '',
   appId: '',
   botId: '',
   botUsername: '',
@@ -186,6 +193,8 @@ export const ChannelManagementPage: React.FC = () => {
       providerType: channel.type,
       credentialEnvironmentVariable: environmentVariableFromRef(channel.credentialRef),
       secondaryCredentialEnvironmentVariable: environmentVariableFromRef(channel.config?.appCredentialRef),
+      verificationTokenEnvironmentVariable: environmentVariableFromRef(channel.config?.verificationTokenRef),
+      encodingAesKeyEnvironmentVariable: environmentVariableFromRef(channel.config?.encodingAesKeyRef),
       appId: channel.config?.clientId || channel.config?.appId || '',
       botId: channel.config?.botId || '',
       botUsername: channel.config?.botUsername || '',
@@ -219,6 +228,12 @@ export const ChannelManagementPage: React.FC = () => {
       const secondaryEnvName = (form.secondaryCredentialEnvironmentVariable.trim() || secondaryCredentialEnvironmentName(form.name, form.providerType)).toUpperCase();
       if (!/^[A-Z_][A-Z0-9_]*$/.test(secondaryEnvName)) { Toast.warning('Slack App-level credential 环境变量格式不合法'); return false; }
     }
+    if (form.providerType === 'WECHAT') {
+      const verifyEnv = (form.verificationTokenEnvironmentVariable.trim() || verificationTokenEnvironmentName(form.name)).toUpperCase();
+      const aesEnv = (form.encodingAesKeyEnvironmentVariable.trim() || encodingAesKeyEnvironmentName(form.name)).toUpperCase();
+      if (!/^[A-Z_][A-Z0-9_]*$/.test(verifyEnv)) { Toast.warning('WeChat Verification Token 环境变量格式不合法'); return false; }
+      if (!/^[A-Z_][A-Z0-9_]*$/.test(aesEnv)) { Toast.warning('WeChat EncodingAESKey 环境变量格式不合法'); return false; }
+    }
     return true;
   };
 
@@ -235,8 +250,14 @@ export const ChannelManagementPage: React.FC = () => {
     try {
       const envName = (form.credentialEnvironmentVariable.trim() || credentialEnvironmentName(form.name, form.providerType)).toUpperCase();
       const secondaryEnvName = (form.secondaryCredentialEnvironmentVariable.trim() || secondaryCredentialEnvironmentName(form.name, form.providerType)).toUpperCase();
+      const verificationEnvName = (form.verificationTokenEnvironmentVariable.trim() || verificationTokenEnvironmentName(form.name)).toUpperCase();
+      const aesEnvName = (form.encodingAesKeyEnvironmentVariable.trim() || encodingAesKeyEnvironmentName(form.name)).toUpperCase();
       const providerConfig = {
-        ...providerConfigPayload(form),
+        ...providerConfigPayload({
+          ...form,
+          verificationTokenRef: form.providerType === 'WECHAT' ? environmentReference(verificationEnvName) : undefined,
+          encodingAesKeyRef: form.providerType === 'WECHAT' ? environmentReference(aesEnvName) : undefined,
+        }),
         ...(form.providerType === 'SLACK' ? { appCredentialRef: environmentReference(secondaryEnvName) } : {}),
       };
       const payload = {
@@ -419,7 +440,7 @@ export const ChannelManagementPage: React.FC = () => {
       </OpsSectionCard>
 
       <OpsSectionCard title={`Channels · ${activeCount} active`} actions={[<Button key="refresh" icon={<IconRefresh />} loading={channelsQuery.isFetching} onClick={() => channelsQuery.refetch()}>刷新</Button>]}>
-        <Paragraph type="tertiary">Generic Webhook 使用签名回调；原生 IM Provider 使用各自受认证的长连接、Stream、Socket Mode 或 Bot API long polling。所有入站最终进入同一 durable queue、identity/access policy 和 ReAct / Workflow runtime。</Paragraph>
+        <Paragraph type="tertiary">Generic Webhook 使用签名回调；原生 Provider 使用各自受认证的长连接、Stream、Socket Mode、Bot API long polling 或官方 Secure Webhook。所有入站最终进入同一 durable queue、identity/access policy 和 ReAct / Workflow runtime。</Paragraph>
         <TableScroll>
           <Table rowKey="channelId" columns={columns} dataSource={channels} loading={channelsQuery.isLoading || typesQuery.isLoading || agentsQuery.isLoading} pagination={false} scroll={{ x: 1300 }} empty={<OpsEmptyState title="暂无 Channel" description="从上方 Provider 卡片开始连接。" />} />
         </TableScroll>
@@ -502,6 +523,15 @@ export const ChannelManagementPage: React.FC = () => {
               <Paragraph type="tertiary">当前原生能力覆盖 QQ C2C 私聊、群 @Bot 消息、主动/回复发送和 Inline Keyboard 审批；暂不宣称 QQ Guild、附件或原消息更新。</Paragraph>
               <Paragraph type="tertiary">按钮点击先向 QQ Open Platform ACK，再进入 OrbisOps 统一 opaque action token、RBAC、过期与重放保护；QQ Provider 本身不决定审批结果。</Paragraph>
             </>}
+
+            {form.providerType === 'WECHAT' && <>
+              <div style={{ width: '100%' }}><Text strong>WeChat Official Account AppID</Text><Input value={form.appId} placeholder="wx..." onChange={(appId) => setForm({ ...form, appId })} /></div>
+              <div style={{ width: '100%' }}><Text strong>Callback Verification Token 环境变量</Text><Input value={form.verificationTokenEnvironmentVariable} placeholder={verificationTokenEnvironmentName(form.name)} onChange={(verificationTokenEnvironmentVariable) => setForm({ ...form, verificationTokenEnvironmentVariable })} /><Paragraph type="tertiary">只保存环境变量引用；回调必须使用微信安全模式签名与 AES 加密。</Paragraph></div>
+              <div style={{ width: '100%' }}><Text strong>EncodingAESKey 环境变量</Text><Input value={form.encodingAesKeyEnvironmentVariable} placeholder={encodingAesKeyEnvironmentName(form.name)} onChange={(encodingAesKeyEnvironmentVariable) => setForm({ ...form, encodingAesKeyEnvironmentVariable })} /></div>
+              <div style={{ width: '100%' }}><Text strong>Connection</Text><Select value={form.connectionMode} disabled style={{ width: '100%' }}><Select.Option value="WEBHOOK">Official Account Secure Webhook</Select.Option></Select></div>
+              <Paragraph type="tertiary">当前原生能力仅覆盖公众号文本私聊入站，以及微信允许窗口内的客服文本回复。暂不宣称群聊、附件、卡片审批、原消息更新或无限制主动推送。</Paragraph>
+              <Paragraph type="tertiary">不支持个人微信号 QR 注入或非官方 Session Bridge。</Paragraph>
+            </>}
           </>}
 
           {wizardStep === 1 && <>
@@ -527,6 +557,7 @@ export const ChannelManagementPage: React.FC = () => {
 
           {wizardStep === 2 && <>
             <ChannelReadinessPanel readiness={readinessQuery.data} loading={readinessQuery.isFetching} onRefresh={() => readinessQuery.refetch()} />
+            {form.providerType === 'WECHAT' && testableChannel && <div style={{ width: '100%' }}><Text strong>Callback URL</Text><Input readOnly value={`${API_CONFIG.BASE_DOMAIN}/api/v1/channels/${testableChannel.channelId}/wechat/callback`} /><Paragraph type="tertiary">在公众号后台将消息加解密方式设为安全模式，并使用 Connect 步骤配置的 Verification Token 与 EncodingAESKey。</Paragraph></div>}
             {testableChannel && <Space wrap>
               <Button onClick={() => { setTestChannel(testableChannel); setTestTarget(''); }}>Test outbound</Button>
               <Button onClick={() => openIdentities(testableChannel)}>Identity / Access</Button>

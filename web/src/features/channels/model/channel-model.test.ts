@@ -74,6 +74,27 @@ describe('channel provider cards', () => {
     expect(qq?.capabilities.find((item) => item.key === 'UPDATE')?.fallback).toContain('new messages');
   });
 
+  it('treats WeChat as an installed secure-webhook adapter without inventing unsupported capabilities', () => {
+    const cards = buildChannelProviderCards([
+      {
+        type: 'WECHAT', displayName: 'WeChat', supportsInbound: true, supportsOutbound: true,
+        connectionModes: ['WEBHOOK'],
+        capabilitySet: { capabilities: ['INBOUND', 'OUTBOUND', 'DIRECT_MESSAGES', 'WEBHOOK', 'REPLY_TO_INBOUND'] },
+      },
+    ], []);
+
+    const wechat = cards.find((item) => item.type === 'WECHAT');
+    expect(wechat?.adapterAvailable).toBe(true);
+    expect(wechat?.connectionMode).toBe('WEBHOOK');
+    expect(wechat?.readiness).toBe('ACTION_REQUIRED');
+    expect(wechat?.capabilities.find((item) => item.key === 'INBOUND')?.supported).toBe(true);
+    expect(wechat?.capabilities.find((item) => item.key === 'OUTBOUND')?.supported).toBe(true);
+    expect(wechat?.capabilities.find((item) => item.key === 'APPROVAL')?.supported).toBe(false);
+    expect(wechat?.capabilities.find((item) => item.key === 'UPDATE')?.supported).toBe(false);
+    expect(wechat?.capabilities.find((item) => item.key === 'ATTACHMENTS')?.supported).toBe(false);
+    expect(wechat?.capabilities.find((item) => item.key === 'PROACTIVE')?.supported).toBe(false);
+  });
+
   it('keeps all capability dimensions unavailable when the provider adapter is absent', () => {
     const telegram = buildChannelProviderCards([], []).find((item) => item.type === 'TELEGRAM');
     expect(telegram?.capabilities).toHaveLength(6);

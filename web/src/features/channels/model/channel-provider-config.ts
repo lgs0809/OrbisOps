@@ -13,6 +13,8 @@ export interface ChannelProviderFormConfig {
   robotCode?: string;
   cardTemplateId?: string;
   secondaryCredentialEnvironmentVariable?: string;
+  verificationTokenRef?: string;
+  encodingAesKeyRef?: string;
   connectionMode: OpsChannelConnectionMode;
   requireMention: boolean;
   respondToMentionAll: boolean;
@@ -21,7 +23,7 @@ export interface ChannelProviderFormConfig {
 }
 
 export const defaultConnectionMode = (type: OpsChannelType): OpsChannelConnectionMode => (
-  type === 'GENERIC_WEBHOOK' ? 'WEBHOOK' : 'LONG_CONNECTION'
+  type === 'GENERIC_WEBHOOK' || type === 'WECHAT' ? 'WEBHOOK' : 'LONG_CONNECTION'
 );
 
 export const credentialEnvironmentName = (name: string, type: OpsChannelType): string => {
@@ -40,13 +42,25 @@ export const credentialEnvironmentName = (name: string, type: OpsChannelType): s
               ? 'DISCORD_BOT_CREDENTIAL'
               : type === 'QQ'
                 ? 'QQ_APP_CREDENTIAL'
-                : 'WEBHOOK_CREDENTIAL';
+                : type === 'WECHAT'
+                  ? 'WECHAT_APP_SECRET'
+                  : 'WEBHOOK_CREDENTIAL';
   return `${base}_${suffix}`;
 };
 
 export const secondaryCredentialEnvironmentName = (name: string, type: OpsChannelType): string => {
   const base = (name || 'OPS_CHANNEL').toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
   return type === 'SLACK' ? `${base}_SLACK_APP_CREDENTIAL` : `${base}_SECONDARY_CREDENTIAL`;
+};
+
+export const verificationTokenEnvironmentName = (name: string): string => {
+  const base = (name || 'OPS_CHANNEL').toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  return `${base}_WECHAT_VERIFY_TOKEN`;
+};
+
+export const encodingAesKeyEnvironmentName = (name: string): string => {
+  const base = (name || 'OPS_CHANNEL').toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  return `${base}_WECHAT_ENCODING_AES_KEY`;
 };
 
 export const providerConfigPayload = (config: ChannelProviderFormConfig): Record<string, unknown> => {
@@ -99,6 +113,14 @@ export const providerConfigPayload = (config: ChannelProviderFormConfig): Record
       connectionMode: config.connectionMode,
     };
   }
+  if (config.providerType === 'WECHAT') {
+    return {
+      appId: config.appId.trim(),
+      connectionMode: config.connectionMode,
+      verificationTokenRef: (config.verificationTokenRef || '').trim(),
+      encodingAesKeyRef: (config.encodingAesKeyRef || '').trim(),
+    };
+  }
   return {
     outboundUrl: config.outboundUrl.trim(),
     timeoutSeconds: Number(config.timeoutSeconds) || 15,
@@ -123,5 +145,7 @@ export const validateProviderConfig = (config: ChannelProviderFormConfig): strin
   if (config.providerType === 'DISCORD' && !config.requireMention && !config.messageContentIntent) return '不要求 @Bot 时必须启用 Discord MESSAGE_CONTENT privileged intent';
   if (config.providerType === 'QQ' && !config.appId.trim()) return '请填写 QQ Bot AppID';
   if (config.providerType === 'QQ' && config.connectionMode !== 'LONG_CONNECTION') return 'QQ 当前仅支持 Gateway 长连接';
+  if (config.providerType === 'WECHAT' && !config.appId.trim()) return '请填写 WeChat Official Account AppID';
+  if (config.providerType === 'WECHAT' && config.connectionMode !== 'WEBHOOK') return 'WeChat Official Account 当前仅支持 Secure Webhook';
   return null;
 };

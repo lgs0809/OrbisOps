@@ -708,7 +708,7 @@ BLOCKED / FAILED   red
 | Telegram | Long Polling + optional Webhook | bot DM/group、inline keyboard、文件 | P2 |
 | Discord | Gateway WebSocket | DM/guild、thread、button/component、附件 | P2 |
 | QQ | WebSocket / callback | DM/群能力按平台限制降级 | P2 |
-| WeChat | 长轮询 / 可维护的合法桥接模式 | 私聊为主、媒体按能力降级 | P3 |
+| WeChat | Official Account Secure Webhook + 客服消息 API | 文本私聊入站、回复窗口内文本发送 | P3 |
 
 说明：
 
@@ -827,8 +827,9 @@ ChannelConnectionDriver
 - Slack Socket Mode；
 - Discord Gateway；
 - Telegram Long Poll；
-- QQ WebSocket；
-- WeChat polling。
+- QQ WebSocket。
+
+WeChat 不进入常驻连接 Driver：官方公众号使用 Secure Webhook callback，由 Provider callback ingress 验签/解密后进入统一 Channel durable pipeline。
 
 不要让 Application Service 自己管理 WebSocket thread。
 
@@ -1244,11 +1245,15 @@ Inbound Execution
 
 ### 21.8 WeChat（P3）
 
-- 按可维护、可合法部署的官方/桥接方式实现；
-- 长轮询/bridge 生命周期独立；
-- 默认只做私聊；
-- QR/token 等授权材料绝不进入普通 Channel config 明文；
-- Provider 可用性不足时明确标记 DEGRADED / UNSUPPORTED，不伪装生产可用。
+- 已按 **WeChat Official Account 官方 Secure Webhook** 实现，不使用个人微信号 QR 注入或非官方 Session Bridge；
+- callback 使用 `msg_signature + timestamp + nonce + Encrypt` 校验，AES 安全模式解密后才进入 OrbisOps；
+- 当前能力仅声明 `INBOUND / OUTBOUND / DIRECT_MESSAGES / WEBHOOK / REPLY_TO_INBOUND`；
+- 仅接受文本私聊进入 Runtime；图片/语音/视频等当前安全 ACK 后忽略，不伪装已支持；
+- 出站使用官方客服文本 API，并受微信平台自身发送窗口/权限限制，因此不声明无限制 `PROACTIVE_PUSH`；
+- 不声明 Group、Attachment、Interactive Approval、Message Update；这些能力在 capability matrix 中明确 unsupported；
+- App Secret、Callback Verification Token、EncodingAESKey 全部只保存 credential ref / env ref，原始 secret 不进入 Channel config；
+- `preflight` 即使 API credential 校验成功，也只返回 `UNKNOWN / WECHAT_CALLBACK_EXTERNAL_VERIFICATION_REQUIRED`，必须有真实 callback / outbound 事实后才允许 readiness 收口；
+- callback endpoint：`/api/v1/channels/{channelId}/wechat/callback`，GET 用于安全模式 URL 验证，POST 用于加密消息回调。
 
 ---
 
@@ -1607,7 +1612,28 @@ Phase 3 至此收口，后续进入 Phase 4。
 
 ## 29. Phase 4 — WeChat + Advanced Governance + 产品抛光
 
-- WeChat provider；
+### 29.1 WeChat Provider：已完成
+
+- Native Provider：WeChat Official Account Secure Webhook；
+- 公众号安全模式 SHA-1 signature + AES-CBC / PKCS#7 解密；
+- AppID binding 校验，拒绝跨 App callback；
+- text DM 进入既有 `ReceiveChannelMessageUseCase.receiveProvider` durable / identity / access / execution pipeline；
+- 非文本、DISABLED、Outbound-only Channel 安全 ACK，不误触发 Runtime；
+- 客服文本 API access token provider-local cache，不持久化、不日志输出；
+- Setup Wizard 已支持 AppID + 三类 env ref，并在保存后的 Test 步骤直接展示 Callback URL；
+- capability truthfulness：无 Group / Approval button / Attachment / Message Update / unrestricted Proactive Push；
+- 未配置真实凭据或尚未产生真实消息时 readiness 保持 Blocked / Action Required，不制造 PASS。
+
+Phase 4 WeChat 验收（2026-08-17）：
+
+- WeChat Provider / secure codec / API client / webhook service 定向后端测试全绿；
+- `ArchitectureTests` 全绿；
+- Backend `mvn -q -pl orbisops-app -am test`：**exit 0**，真实 Spring Context、Testcontainers MySQL、MCP stdio 均通过；
+- `npm run verify`：release hygiene、typecheck、**106/106 Vitest**、production build 全绿；
+- `npm run test:e2e`：**31/31 Chrome Playwright** 全绿，包含 WeChat Setup Wizard / env ref / Callback URL / readiness 浏览器验收。
+
+继续 Phase 4：
+
 - Channel compatibility matrix；
 - Global Search / Command Palette；
 - Advanced Governance；

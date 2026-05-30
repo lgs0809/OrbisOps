@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildChannelProviderCards } from './channel-model';
+import { buildChannelCompatibilityMatrix, buildChannelProviderCards } from './channel-model';
 
 describe('channel provider cards', () => {
   it('never presents an unavailable native provider as ready', () => {
@@ -116,5 +116,38 @@ describe('channel provider cards', () => {
       },
     ]);
     expect(cards.find((item) => item.type === 'GENERIC_WEBHOOK')?.readiness).toBe('ACTION_REQUIRED');
+  });
+
+  it('builds the compatibility matrix exclusively from backend adapter capability facts', () => {
+    const rows = buildChannelCompatibilityMatrix([
+      {
+        type: 'WECHAT', displayName: 'WeChat', supportsInbound: true, supportsOutbound: true,
+        connectionModes: ['WEBHOOK'],
+        capabilitySet: { capabilities: ['INBOUND', 'OUTBOUND', 'DIRECT_MESSAGES', 'WEBHOOK', 'REPLY_TO_INBOUND'] },
+      },
+      {
+        type: 'DISCORD', displayName: 'Discord', supportsInbound: true, supportsOutbound: true,
+        connectionModes: ['LONG_CONNECTION'],
+        capabilitySet: { capabilities: ['INBOUND', 'OUTBOUND', 'DIRECT_MESSAGES', 'GROUP_MESSAGES', 'INTERACTIVE_ACTIONS', 'MESSAGE_UPDATE'] },
+      },
+    ]);
+
+    const wechat = rows.find((item) => item.type === 'WECHAT');
+    expect(wechat?.installed).toBe(true);
+    expect(wechat?.connectionMode).toBe('WEBHOOK');
+    expect(wechat?.capabilities.DIRECT_MESSAGES).toBe(true);
+    expect(wechat?.capabilities.REPLY_TO_INBOUND).toBe(true);
+    expect(wechat?.capabilities.GROUP_MESSAGES).toBe(false);
+    expect(wechat?.capabilities.INTERACTIVE_ACTIONS).toBe(false);
+    expect(wechat?.capabilities.PROACTIVE_PUSH).toBe(false);
+
+    const discord = rows.find((item) => item.type === 'DISCORD');
+    expect(discord?.capabilities.GROUP_MESSAGES).toBe(true);
+    expect(discord?.capabilities.INTERACTIVE_ACTIONS).toBe(true);
+    expect(discord?.capabilities.MESSAGE_UPDATE).toBe(true);
+
+    const slack = rows.find((item) => item.type === 'SLACK');
+    expect(slack?.installed).toBe(false);
+    expect(Object.values(slack?.capabilities || {}).every((value) => value === false)).toBe(true);
   });
 });

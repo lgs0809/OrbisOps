@@ -36,6 +36,7 @@ import {
   useSendChannelTestMutation,
   useUpdateChannelOutboxMutation,
 } from '../api/channel-queries';
+import { ChannelCompatibilityMatrix } from '../components/ChannelCompatibilityMatrix';
 import { ChannelProviderCards } from '../components/ChannelProviderCards';
 import { ChannelReadinessPanel } from '../components/ChannelReadinessPanel';
 import {
@@ -47,7 +48,7 @@ import {
   validateProviderConfig,
   verificationTokenEnvironmentName,
 } from '../model/channel-provider-config';
-import { buildChannelProviderCards } from '../model/channel-model';
+import { buildChannelCompatibilityMatrix, buildChannelProviderCards } from '../model/channel-model';
 
 const { Paragraph, Text } = Typography;
 
@@ -138,6 +139,7 @@ export const ChannelManagementPage: React.FC = () => {
   const channels = channelsQuery.data || [];
   const agents = agentsQuery.data || [];
   const providerCards = useMemo(() => buildChannelProviderCards(typesQuery.data || [], channels), [typesQuery.data, channels]);
+  const compatibilityRows = useMemo(() => buildChannelCompatibilityMatrix(typesQuery.data || []), [typesQuery.data]);
   const availableTypes = useMemo(() => new Set((typesQuery.data || []).map((item) => item.type)), [typesQuery.data]);
   const activeCount = useMemo(() => channels.filter((item) => item.status === 'ACTIVE').length, [channels]);
 
@@ -437,6 +439,10 @@ export const ChannelManagementPage: React.FC = () => {
           if (existing) openEdit(existing);
           else openCreate(type);
         }} />
+      </OpsSectionCard>
+
+      <OpsSectionCard title="Provider Compatibility Matrix">
+        <ChannelCompatibilityMatrix rows={compatibilityRows} />
       </OpsSectionCard>
 
       <OpsSectionCard title={`Channels · ${activeCount} active`} actions={[<Button key="refresh" icon={<IconRefresh />} loading={channelsQuery.isFetching} onClick={() => channelsQuery.refetch()}>刷新</Button>]}>

@@ -28,6 +28,25 @@ export interface ChannelProviderCardModel {
   actionRequired?: string;
 }
 
+export type ChannelCompatibilityCapability =
+  | 'INBOUND'
+  | 'OUTBOUND'
+  | 'DIRECT_MESSAGES'
+  | 'GROUP_MESSAGES'
+  | 'REPLY_TO_INBOUND'
+  | 'INTERACTIVE_ACTIONS'
+  | 'MESSAGE_UPDATE'
+  | 'ATTACHMENTS'
+  | 'PROACTIVE_PUSH';
+
+export interface ChannelCompatibilityRow {
+  type: OpsChannelType;
+  name: string;
+  installed: boolean;
+  connectionMode: string;
+  capabilities: Record<ChannelCompatibilityCapability, boolean>;
+}
+
 export const CHANNEL_ACCESS_POLICY_OPTIONS: Array<{
   value: OpsChannelAccessPolicy;
   label: string;
@@ -64,6 +83,37 @@ const providers: Array<{ type: OpsChannelType; name: string; phase: 0 | 1 | 2 | 
   { type: 'WECHAT', name: 'WeChat', phase: 4 },
   { type: 'GENERIC_WEBHOOK', name: 'Generic Webhook', phase: 0 },
 ];
+
+const compatibilityCapabilities: ChannelCompatibilityCapability[] = [
+  'INBOUND',
+  'OUTBOUND',
+  'DIRECT_MESSAGES',
+  'GROUP_MESSAGES',
+  'REPLY_TO_INBOUND',
+  'INTERACTIVE_ACTIONS',
+  'MESSAGE_UPDATE',
+  'ATTACHMENTS',
+  'PROACTIVE_PUSH',
+];
+
+export const buildChannelCompatibilityMatrix = (
+  descriptors: OpsChannelProtocolDescriptor[],
+): ChannelCompatibilityRow[] => {
+  const descriptorByType = new Map(descriptors.map((item) => [item.type, item]));
+  return providers.map((provider) => {
+    const descriptor = descriptorByType.get(provider.type);
+    const supported = new Set(descriptor?.capabilitySet?.capabilities || []);
+    return {
+      type: provider.type,
+      name: provider.name,
+      installed: Boolean(descriptor),
+      connectionMode: descriptor?.connectionModes?.join(' / ') || 'Not installed',
+      capabilities: Object.fromEntries(
+        compatibilityCapabilities.map((capability) => [capability, Boolean(descriptor && supported.has(capability))]),
+      ) as Record<ChannelCompatibilityCapability, boolean>,
+    };
+  });
+};
 
 export const buildChannelProviderCards = (
   descriptors: OpsChannelProtocolDescriptor[],

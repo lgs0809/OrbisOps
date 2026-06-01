@@ -7,6 +7,7 @@ import { IconActivity, IconExit, IconMenu, IconShield } from '@douyinfe/semi-ico
 import { theme } from '../../styles/theme';
 import { AdminUserService } from '../../services';
 import { getStoredUserInfo, isAdminUser, roleLabel } from '../../services/auth-session';
+import { GlobalCommandPalette } from '../../features/search/components/GlobalCommandPalette';
 
 const { Text } = Typography;
 
@@ -183,6 +184,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onLogout }) => 
       </HeaderLeft>
 
       <HeaderRight>
+        <GlobalCommandPalette />
         <StatusRail>
           <StatusPill>
             <IconShield />

@@ -1,0 +1,37 @@
+import { describe, expect, it } from 'vitest';
+
+import { APP_ROUTES } from '../../../app/navigation/route-metadata';
+import { buildCommandPaletteItems, filterCommandPaletteItems } from './command-palette-model';
+
+describe('global command palette model', () => {
+  it('uses route metadata as the navigation source of truth and respects roles', () => {
+    const adminItems = buildCommandPaletteItems(APP_ROUTES, 'admin', [{ projectId: 'p1', name: 'Payments' }], 'p1');
+    const userItems = buildCommandPaletteItems(APP_ROUTES, 'user', [{ projectId: 'p1', name: 'Payments' }], 'p1');
+
+    expect(adminItems.some((item) => item.id === 'route:channels')).toBe(true);
+    expect(adminItems.some((item) => item.id === 'route:models')).toBe(true);
+    expect(userItems.some((item) => item.id === 'route:channels')).toBe(false);
+    expect(userItems.some((item) => item.id === 'route:diagnosis')).toBe(true);
+  });
+
+  it('adds project switch and current-project actions without a second project catalog', () => {
+    const items = buildCommandPaletteItems(
+      APP_ROUTES,
+      'admin',
+      [{ projectId: 'p1', name: 'Payments' }, { projectId: 'p2', name: 'Orders' }],
+      'p2',
+    );
+
+    expect(items.find((item) => item.id === 'project:p2')?.description).toBe('Current project');
+    expect(items.find((item) => item.id === 'action:start-diagnosis')?.path).toBe('/work/diagnosis?projectId=p2');
+    expect(items.find((item) => item.id === 'action:project-advanced')?.path).toBe('/projects/advanced?projectId=p2');
+  });
+
+  it('ranks labels before keyword/description matches and supports legacy route terms', () => {
+    const items = buildCommandPaletteItems(APP_ROUTES, 'admin', [], '');
+
+    expect(filterCommandPaletteItems(items, 'models')[0]?.id).toBe('route:models');
+    expect(filterCommandPaletteItems(items, 'mcp').some((item) => item.id === 'route:tools')).toBe(true);
+    expect(filterCommandPaletteItems(items, 'channel-management')[0]?.id).toBe('route:channels');
+  });
+});

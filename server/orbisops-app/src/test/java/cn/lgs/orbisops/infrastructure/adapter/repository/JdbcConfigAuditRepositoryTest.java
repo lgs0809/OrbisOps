@@ -97,6 +97,24 @@ class JdbcConfigAuditRepositoryTest {
         assertEquals("DEGRADED_MEMORY", repository.readiness().status());
     }
 
+    @Test
+    void memoryFallbackAppliesTheSameTimeWindowAsJdbcSearch() {
+        ObjectProvider<JdbcTemplate> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(null);
+        JdbcConfigAuditRepository repository = new JdbcConfigAuditRepository(provider, true, true, "test");
+        repository.append(draft("audit-memory"));
+
+        assertEquals(1, repository.search(new ConfigAuditCriteria(
+                "project-1", "", "", "", "", "",
+                "2026-07-01 00:00:00", "2026-07-31 23:59:59", 100)).size());
+        assertEquals(0, repository.search(new ConfigAuditCriteria(
+                "project-1", "", "", "", "", "",
+                "2026-08-01 00:00:00", "", 100)).size());
+        assertEquals(0, repository.search(new ConfigAuditCriteria(
+                "project-1", "", "", "", "", "",
+                "", "2026-07-01 00:00:00", 100)).size());
+    }
+
     private ConfigAuditDraft draft(String auditId) {
         return new ConfigAuditDraft(
                 auditId, "project-1", "agent-1", "skill", "delete", "skill", "skill-1",

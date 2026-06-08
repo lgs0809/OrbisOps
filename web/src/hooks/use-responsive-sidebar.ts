@@ -35,6 +35,8 @@ export const useResponsiveSidebar = (defaultCollapsed?: boolean) => {
   const closeMobileSidebar = useCallback(() => setMobileOpen(false), []);
 
   return {
+    mobile,
+    mobileOpen,
     collapsed: desktopCollapsed,
     sidebarCollapsed: mobile ? !mobileOpen : desktopCollapsed,
     toggleSidebar,

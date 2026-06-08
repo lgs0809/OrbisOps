@@ -65,6 +65,10 @@ const SidebarContainer = styled.div<{ $collapsed: boolean }>`
     transition: transform ${theme.animation.duration.normal} ${theme.animation.easing.cubic};
     box-shadow: ${(props) => (props.$collapsed ? 'none' : theme.shadows.lg)};
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
 `;
 
 const SidebarBackdrop = styled.button<{ $visible: boolean }>`
@@ -397,7 +401,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         $visible={!collapsed}
         onClick={onMobileClose}
       />
-      <SidebarContainer $collapsed={collapsed}>
+      <SidebarContainer id="orbisops-sidebar" role="complementary" aria-label="Application navigation" $collapsed={collapsed}>
       <SidebarHeader $collapsed={collapsed}>
         <Logo>
           <IconBranch />
@@ -410,6 +414,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       <SidebarContent>
         <StyledNav
+          aria-label="Primary navigation"
           $collapsed={collapsed}
           selectedKeys={[activeSelection]}
           isCollapsed={collapsed}

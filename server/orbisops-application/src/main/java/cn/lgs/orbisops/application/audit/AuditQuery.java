@@ -37,6 +37,11 @@ public record AuditQuery(String projectId,
                 startTime, endTime, nextLimit);
     }
 
+    public AuditQuery withStartTime(String nextStartTime) {
+        return new AuditQuery(projectId, userId, agentId, module, action, riskLevel,
+                nextStartTime, endTime, limit);
+    }
+
     public ConfigAuditCriteria toCriteria() {
         return new ConfigAuditCriteria(projectId, userId, agentId, module, action,
                 riskLevel, startTime, endTime, limit);

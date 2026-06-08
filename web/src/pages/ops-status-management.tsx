@@ -12,6 +12,12 @@ import {
   useGovernanceAuditsQuery,
   useSaveAuditPolicyMutation,
 } from '../features/governance/api/governance-queries';
+import {
+  auditPolicySavePayload,
+  auditRetentionDays,
+  auditRetentionDirty,
+  effectiveAuditControls,
+} from '../features/governance/model/audit-policy-governance';
 import { theme } from '../styles/theme';
 import { useProjectScope } from '../hooks/use-project-scope';
 import {
@@ -196,6 +202,8 @@ export const OpsStatusManagementPage: React.FC = () => {
   const exportMutation = useExportAuditMutation();
   const policyFromServer = normalizePolicy(policyQuery.data);
   const auditPolicy = policyDraft?.scopeKey === policyScopeKey ? policyDraft.value : policyFromServer;
+  const effectiveControls = effectiveAuditControls(auditPolicy);
+  const policyDirty = policyDraft?.scopeKey === policyScopeKey && auditRetentionDirty(policyFromServer, policyDraft.value);
   const policyLoading = policyQuery.isFetching;
   const policySaving = policyMutation.isPending;
   const auditError = auditsQuery.error instanceof Error ? auditsQuery.error.message : '';
@@ -238,19 +246,15 @@ export const OpsStatusManagementPage: React.FC = () => {
 
   const saveAuditPolicy = async () => {
     try {
-      const saved = await policyMutation.mutateAsync({
-        projectId: projectScope.projectId || 'GLOBAL',
-        retentionDays: policyNumber(auditPolicy, 'retentionDays', 'retention_days', 180),
-        maskingEnabled: policyBoolean(auditPolicy, 'maskingEnabled', 'masking_enabled'),
-        exportApprovalRequired: policyBoolean(auditPolicy, 'exportApprovalRequired', 'export_approval_required'),
-        highRiskConfirmationRequired: policyBoolean(auditPolicy, 'highRiskConfirmationRequired', 'high_risk_confirmation_required'),
-        replayEnabled: policyBoolean(auditPolicy, 'replayEnabled', 'replay_enabled'),
-        status: auditPolicy.status || 'ENABLED',
-      });
+      const saved = await policyMutation.mutateAsync(auditPolicySavePayload(
+        auditPolicy,
+        projectScope.projectId || 'GLOBAL',
+        auditRetentionDays(auditPolicy),
+      ));
       setPolicyDraft({ scopeKey: policyScopeKey, value: normalizePolicy(saved) });
-      Toast.success('审计策略已保存');
+      Toast.success('审计保留策略已保存');
     } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '保存审计策略失败');
+      Toast.error(error instanceof Error ? error.message : '保存审计保留策略失败');
     }
   };
 
@@ -360,74 +364,42 @@ export const OpsStatusManagementPage: React.FC = () => {
                 <OpsEmptyState title="加载审计策略失败" description={policyError} />
               ) : <Space vertical align="start" style={{ width: '100%' }}>
                 <Text type="tertiary">
-                  当前策略作用于 {projectScope.selectedProject?.name || auditPolicy.projectId || '平台默认'}。保存会写入配置审计，用于约束审计保留、脱敏、导出审批和高风险操作确认。
+                  当前治理范围：{projectScope.selectedProject?.name || auditPolicy.projectId || '平台默认'}。只有已经接入后端执行器的控制项才允许修改；未激活能力不会以“可配置”形式误导用户。
                 </Text>
                 <OpsResponsiveGrid $min="220px">
-                  <div>
-                    <Text strong>保留天数</Text>
-                    <Input
-                      value={String(policyNumber(auditPolicy, 'retentionDays', 'retention_days', 180))}
-                      onChange={(value) => updateAuditPolicyDraft((current) => ({ ...current, retentionDays: Number(value) || 180 }))}
-                    />
-                  </div>
-                  <div>
-                    <Text strong>敏感字段脱敏</Text>
-                    <Select
-                      value={policyBoolean(auditPolicy, 'maskingEnabled', 'masking_enabled') ? 'true' : 'false'}
-                      style={{ width: '100%' }}
-                      onChange={(value) => updateAuditPolicyDraft((current) => ({ ...current, maskingEnabled: value === 'true' }))}
-                    >
-                      <Select.Option value="true">启用</Select.Option>
-                      <Select.Option value="false">关闭</Select.Option>
-                    </Select>
-                  </div>
-                  <div>
-                    <Text strong>导出审批</Text>
-                    <Select
-                      value={policyBoolean(auditPolicy, 'exportApprovalRequired', 'export_approval_required') ? 'true' : 'false'}
-                      style={{ width: '100%' }}
-                      onChange={(value) => updateAuditPolicyDraft((current) => ({ ...current, exportApprovalRequired: value === 'true' }))}
-                    >
-                      <Select.Option value="true">需要审批</Select.Option>
-                      <Select.Option value="false">不需要审批</Select.Option>
-                    </Select>
-                  </div>
-                  <div>
-                    <Text strong>高风险二次确认</Text>
-                    <Select
-                      value={policyBoolean(auditPolicy, 'highRiskConfirmationRequired', 'high_risk_confirmation_required') ? 'true' : 'false'}
-                      style={{ width: '100%' }}
-                      onChange={(value) => updateAuditPolicyDraft((current) => ({ ...current, highRiskConfirmationRequired: value === 'true' }))}
-                    >
-                      <Select.Option value="true">需要确认</Select.Option>
-                      <Select.Option value="false">不需要确认</Select.Option>
-                    </Select>
-                  </div>
-                  <div>
-                    <Text strong>允许审计回放</Text>
-                    <Select
-                      value={policyBoolean(auditPolicy, 'replayEnabled', 'replay_enabled') ? 'true' : 'false'}
-                      style={{ width: '100%' }}
-                      onChange={(value) => updateAuditPolicyDraft((current) => ({ ...current, replayEnabled: value === 'true' }))}
-                    >
-                      <Select.Option value="true">允许</Select.Option>
-                      <Select.Option value="false">关闭</Select.Option>
-                    </Select>
-                  </div>
-                  <div>
-                    <Text strong>策略状态</Text>
-                    <Select
-                      value={auditPolicy.status || 'ENABLED'}
-                      style={{ width: '100%' }}
-                      onChange={(value) => updateAuditPolicyDraft((current) => ({ ...current, status: String(value || 'ENABLED') }))}
-                    >
-                      <Select.Option value="ENABLED">启用</Select.Option>
-                      <Select.Option value="DISABLED">停用</Select.Option>
-                    </Select>
-                  </div>
+                  {effectiveControls.map((control) => (
+                    <div key={control.key}>
+                      <Space vertical align="start" spacing="tight" style={{ width: '100%' }}>
+                        <Space wrap>
+                          <Text strong>{control.title}</Text>
+                          <Tag color={control.status === 'ENFORCED' || control.status === 'PLATFORM_INVARIANT' ? 'green' : control.status === 'DELEGATED' ? 'blue' : 'grey'}>
+                            {control.status}
+                          </Tag>
+                        </Space>
+                        <Text type="tertiary" size="small">{control.summary}</Text>
+                        {control.key === 'retention' && (
+                          <Input
+                            aria-label="Audit retention days"
+                            value={String(auditRetentionDays(auditPolicy))}
+                            onChange={(value) => updateAuditPolicyDraft((current) => ({
+                              ...current,
+                              retentionDays: Math.max(7, Math.min(3650, Number(value) || 180)),
+                            }))}
+                          />
+                        )}
+                      </Space>
+                    </div>
+                  ))}
                 </OpsResponsiveGrid>
                 <Space wrap>
-                  <Button theme="solid" loading={policySaving || policyLoading} onClick={saveAuditPolicy}>保存审计策略</Button>
+                  <Button
+                    theme="solid"
+                    disabled={!policyDirty || policyLoading}
+                    loading={policySaving}
+                    onClick={saveAuditPolicy}
+                  >
+                    保存保留策略
+                  </Button>
                   <Button
                     loading={policyLoading}
                     onClick={() => {
@@ -435,10 +407,16 @@ export const OpsStatusManagementPage: React.FC = () => {
                       void policyQuery.refetch();
                     }}
                   >
-                    重新加载
+                    放弃修改并重新加载
                   </Button>
+                  <Text type="tertiary" size="small">
+                    {policyDirty ? '有未保存的保留期修改' : '当前保留期已与服务端一致'}
+                  </Text>
                 </Space>
-                <OpsAdvancedPreview title="审计策略高级预览">
+                <OpsAdvancedPreview title="Stored policy snapshot · Advanced">
+                  <Text type="tertiary" size="small" style={{ display: 'block', marginBottom: 8 }}>
+                    兼容字段仍保留在存储模型中，但只有上方标记 ENFORCED / PLATFORM_INVARIANT 的控制由当前 Audit Policy 直接执行。
+                  </Text>
                   <JsonBlock>{JSON.stringify(auditPolicy, null, 2)}</JsonBlock>
                 </OpsAdvancedPreview>
                 <OpsDangerZone

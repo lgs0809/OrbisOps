@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { Layout, Toast } from '@douyinfe/semi-ui';
@@ -14,6 +14,25 @@ const PageLayout = styled(Layout)`
   width: 100%;
   background: ${theme.colors.bg.secondary};
   overflow-x: hidden;
+`;
+
+const SkipLink = styled.a`
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 2000;
+  transform: translateY(-160%);
+  padding: 8px 12px;
+  border-radius: ${theme.borderRadius.base};
+  background: ${theme.colors.bg.primary};
+  color: ${theme.colors.primary};
+  box-shadow: ${theme.shadows.md};
+
+  &:focus {
+    transform: translateY(0);
+    outline: 2px solid ${theme.colors.primary};
+    outline-offset: 2px;
+  }
 `;
 
 const MainContent = styled.div<{ $collapsed: boolean }>`
@@ -32,6 +51,10 @@ const MainContent = styled.div<{ $collapsed: boolean }>`
   transition:
     width ${theme.animation.duration.normal} ${theme.animation.easing.cubic},
     margin-left ${theme.animation.duration.normal} ${theme.animation.easing.cubic};
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
 
   @media (max-width: ${theme.breakpoints.md}) {
     width: 100vw;
@@ -73,8 +96,20 @@ export const OpsPageShell: React.FC<OpsPageShellProps> = ({
   onLogout,
 }) => {
   const navigate = useNavigate();
-  const { collapsed, sidebarCollapsed, toggleSidebar, closeMobileSidebar } =
+  const { mobile, mobileOpen, collapsed, sidebarCollapsed, toggleSidebar, closeMobileSidebar } =
     useResponsiveSidebar(defaultCollapsed);
+
+  useEffect(() => {
+    if (!mobile || !mobileOpen) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeMobileSidebar();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [closeMobileSidebar, mobile, mobileOpen]);
 
   const handleNavigation = (key: string) => {
     closeMobileSidebar();
@@ -97,6 +132,7 @@ export const OpsPageShell: React.FC<OpsPageShellProps> = ({
 
   return (
     <PageLayout>
+      <SkipLink href="#main-content">Skip to main content</SkipLink>
       <Sidebar
         selectedKey={selectedKey}
         onSelect={handleNavigation}
@@ -105,7 +141,7 @@ export const OpsPageShell: React.FC<OpsPageShellProps> = ({
       />
       <MainContent $collapsed={collapsed} data-ops-scroll-region="true">
         <Header collapsed={sidebarCollapsed} onToggleSidebar={toggleSidebar} onLogout={handleLogout} />
-        <ContentArea $maxWidth={maxWidth} $padding={padding}>{children}</ContentArea>
+        <ContentArea id="main-content" tabIndex={-1} $maxWidth={maxWidth} $padding={padding}>{children}</ContentArea>
       </MainContent>
     </PageLayout>
   );

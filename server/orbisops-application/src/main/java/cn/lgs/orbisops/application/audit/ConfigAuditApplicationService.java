@@ -12,11 +12,16 @@ import cn.lgs.orbisops.domain.audit.service.ConfigAuditRiskPolicy;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 public final class ConfigAuditApplicationService {
+
+    private static final DateTimeFormatter MYSQL_DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final IConfigAuditRepository audits;
     private final IConfigAuditPolicyRepository policies;
@@ -72,17 +77,35 @@ public final class ConfigAuditApplicationService {
 
     public List<ConfigAuditEntry> search(AuditQuery query) {
         if (query == null) throw new IllegalArgumentException("AUDIT_QUERY_REQUIRED");
-        return audits.search(query.withLimit(Math.min(query.limit(), 500)).toCriteria());
+        int requestedLimit = Math.min(query.limit(), 500);
+        Map<String, LocalDateTime> cutoffs = new HashMap<>();
+        if (!query.projectId().isBlank()) {
+            AuditQuery effective = clampRetention(query.withLimit(requestedLimit), query.projectId(), cutoffs);
+            return audits.search(effective.toCriteria()).stream()
+                    .filter(entry -> visibleWithinRetention(entry, cutoffs))
+                    .limit(requestedLimit)
+                    .toList();
+        }
+        return audits.search(query.withLimit(500).toCriteria()).stream()
+                .filter(entry -> visibleWithinRetention(entry, cutoffs))
+                .limit(requestedLimit)
+                .toList();
     }
 
     public Optional<ConfigAuditEntry> detail(String auditId) {
         String normalized = required(auditId, "AUDIT_ID_REQUIRED");
-        return audits.find(normalized);
+        Map<String, LocalDateTime> cutoffs = new HashMap<>();
+        return audits.find(normalized).filter(entry -> visibleWithinRetention(entry, cutoffs));
     }
 
     public List<ConfigAuditEntry> listForOperator(String operator, int limit) {
         String normalized = required(operator, "AUDIT_OPERATOR_REQUIRED");
-        return audits.listForOperator(normalized, Math.max(1, Math.min(limit, 200)));
+        int requestedLimit = Math.max(1, Math.min(limit, 200));
+        Map<String, LocalDateTime> cutoffs = new HashMap<>();
+        return audits.listForOperator(normalized, 200).stream()
+                .filter(entry -> visibleWithinRetention(entry, cutoffs))
+                .limit(requestedLimit)
+                .toList();
     }
 
     public ConfigAuditPolicySnapshot policy(String projectId) {
@@ -99,7 +122,15 @@ public final class ConfigAuditApplicationService {
         if (!policies.persistent()) {
             throw new IllegalStateException("审计策略持久化能力未初始化");
         }
-        return policies.save(policy);
+        AuditPolicy safePolicy = new AuditPolicy(
+                policy.projectId(),
+                policy.retentionDays(),
+                true,
+                policy.exportApprovalRequired(),
+                policy.highRiskConfirmationRequired(),
+                policy.replayEnabled(),
+                policy.status());
+        return policies.save(safePolicy);
     }
 
     public ConfigAuditReadiness readiness() {
@@ -118,6 +149,49 @@ public final class ConfigAuditApplicationService {
                 new AuditPolicy(projectId, 180, true, true, true, true, AuditPolicyStatus.ENABLED),
                 policies.persistent(),
                 "");
+    }
+
+    private AuditQuery clampRetention(
+            AuditQuery query,
+            String projectId,
+            Map<String, LocalDateTime> cutoffs) {
+        LocalDateTime cutoff = retentionCutoff(projectId, cutoffs);
+        String requested = value(query.startTime());
+        if (requested.isBlank()) return query.withStartTime(MYSQL_DATE_TIME.format(cutoff));
+        LocalDateTime parsed = parseDateTime(requested);
+        if (parsed == null || parsed.isBefore(cutoff)) {
+            return query.withStartTime(MYSQL_DATE_TIME.format(cutoff));
+        }
+        return query;
+    }
+
+    private boolean visibleWithinRetention(
+            ConfigAuditEntry entry,
+            Map<String, LocalDateTime> cutoffs) {
+        if (entry == null || entry.createTime() == null) return false;
+        return !entry.createTime().isBefore(retentionCutoff(entry.projectId(), cutoffs));
+    }
+
+    private LocalDateTime retentionCutoff(String projectId, Map<String, LocalDateTime> cutoffs) {
+        String normalized = policyProjectId(projectId);
+        return cutoffs.computeIfAbsent(normalized, key -> {
+            int retentionDays = policy(key).policy().retentionDays();
+            return LocalDateTime.now().minusDays(retentionDays);
+        });
+    }
+
+    private LocalDateTime parseDateTime(String input) {
+        String normalized = value(input);
+        if (normalized.isBlank()) return null;
+        try {
+            return LocalDateTime.parse(normalized, MYSQL_DATE_TIME);
+        } catch (RuntimeException ignored) {
+            try {
+                return LocalDateTime.parse(normalized);
+            } catch (RuntimeException invalid) {
+                return null;
+            }
+        }
     }
 
     private String policyProjectId(String projectId) {

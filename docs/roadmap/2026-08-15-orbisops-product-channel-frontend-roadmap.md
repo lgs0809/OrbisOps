@@ -1632,11 +1632,41 @@ Phase 4 WeChat 验收（2026-08-17）：
 - `npm run verify`：release hygiene、typecheck、**106/106 Vitest**、production build 全绿；
 - `npm run test:e2e`：**31/31 Chrome Playwright** 全绿，包含 WeChat Setup Wizard / env ref / Callback URL / readiness 浏览器验收。
 
+### 29.2 Channel Compatibility Matrix：已完成
+
+- Matrix 不维护第二套手工 Provider 能力表，直接消费后端 `ChannelProtocolDescriptor.capabilitySet`；
+- 展示 Connection、Inbound、Outbound、DM、Group、Reply、Approval、Message Update、Files、Proactive Push；
+- 未安装 Provider 与 unsupported capability 明确显示为不可用，并在 tooltip 中给出 fallback；
+- WeChat 等能力受限 Provider 不因“已配置”而被推断为支持更多平台能力。
+
+### 29.3 Global Search / Command Palette：已完成
+
+- Header 全局入口 + `⌘K` / `Ctrl+Shift+K`；
+- 页面目录直接复用 `APP_ROUTES` Route Metadata，不维护第二套 navigation catalog；
+- Project 快速切换直接复用 `ProjectScope` snapshot，不重复加载项目目录；
+- 支持 Page / Action / Project 搜索、上下键选择、Enter 打开、Esc 关闭；
+- route navigation 自动保留当前 `projectId`，并提供 Start Diagnosis / Open Incidents / Current Project Advanced 等上下文动作。
+
+### 29.4 Advanced Governance：已完成当前真实执行边界
+
+- Audit retention 已从“持久化字段”升级为 Application 层真实可见性边界；
+- project audit search 自动 clamp 到 retention cutoff，detail / operator audit 也不能通过其他读取入口绕过过期策略；
+- 多项目审计读取使用 request-local project cutoff cache，避免逐条读取 policy 的 N+1；
+- JDBC 与 dev/test memory fallback 都执行 start/end time window，避免测试环境和 MySQL 语义分叉；
+- sensitive field masking 被提升为平台安全不变量，后端拒绝通过 policy request 将其关闭；
+- `exportApprovalRequired / highRiskConfirmationRequired / replayEnabled` 等当前未由 Audit Policy 执行器消费的兼容字段，不再在产品 UI 伪装为已生效开关；
+- 高风险执行确认继续由既有 `ChangePackage → Approval → Landing` 权威治理链负责；
+- Governance UI 只允许修改真正生效的 retention，并用 `ENFORCED / PLATFORM_INVARIANT / DELEGATED / NOT_ACTIVATED / UNAVAILABLE` 表达真实控制状态。
+
+Phase 4 最新验收（2026-08-17）：
+
+- Backend `mvn -q -pl orbisops-app -am test`：**exit 0**；Spring Context、Testcontainers MySQL、MCP stdio、ArchUnit 全绿；
+- Frontend `npm run verify`：release hygiene、typecheck、**113/113 Vitest**、production build 全绿；
+- Frontend `npm run test:e2e`：**33/33 Chrome Playwright** 全绿；
+- Advanced Governance 定向后端、model/contract、Chrome E2E 均全绿。
+
 继续 Phase 4：
 
-- Channel compatibility matrix；
-- Global Search / Command Palette；
-- Advanced Governance；
 - Accessibility；
 - Responsive；
 - GitHub Hero screenshot / demo GIF；

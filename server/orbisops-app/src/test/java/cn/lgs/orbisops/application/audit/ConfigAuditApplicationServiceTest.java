@@ -125,15 +125,55 @@ class ConfigAuditApplicationServiceTest {
         assertTrue(saved.persistent());
     }
 
+    @Test
+    void retentionClampsProjectSearchAndHidesExpiredDetailsAndOperatorRows() {
+        FakeAuditRepository audits = new FakeAuditRepository();
+        FakePolicyRepository policies = new FakePolicyRepository(true);
+        policies.save(policy("project-1", 30));
+        ConfigAuditApplicationService service = new ConfigAuditApplicationService(audits, policies);
+        ConfigAuditEntry recent = audits.append(draft("recent", LocalDateTime.now().minusDays(5)));
+        ConfigAuditEntry expired = audits.append(draft("expired", LocalDateTime.now().minusDays(45)));
+
+        List<ConfigAuditEntry> visible = service.search(new AuditQuery(
+                "project-1", "", "", "", "", "", "", "", 100));
+
+        assertEquals(List.of(recent), visible);
+        LocalDateTime clamped = LocalDateTime.parse(audits.criteria.startTime().replace(' ', 'T'));
+        assertTrue(clamped.isAfter(LocalDateTime.now().minusDays(31)));
+        assertTrue(service.detail("recent").isPresent());
+        assertTrue(service.detail("expired").isEmpty());
+        assertEquals(List.of(recent), service.listForOperator("alice", 100));
+        assertFalse(service.listForOperator("alice", 100).contains(expired));
+    }
+
+    @Test
+    void maskingCannotBeDisabledByStoredAuditPolicy() {
+        FakePolicyRepository policies = new FakePolicyRepository(true);
+        ConfigAuditApplicationService service = new ConfigAuditApplicationService(
+                new FakeAuditRepository(), policies);
+
+        ConfigAuditPolicySnapshot saved = service.updatePolicy(new AuditPolicy(
+                "project-1", 90, false, false, false, false, AuditPolicyStatus.DISABLED));
+
+        assertTrue(saved.policy().maskingEnabled());
+        assertFalse(saved.policy().exportApprovalRequired());
+        assertFalse(saved.policy().highRiskConfirmationRequired());
+        assertFalse(saved.policy().replayEnabled());
+    }
+
     private AuditPolicy policy(String projectId, int retentionDays) {
         return new AuditPolicy(projectId, retentionDays, true, true, true, true, AuditPolicyStatus.ENABLED);
     }
 
     private ConfigAuditDraft draft(String auditId) {
+        return draft(auditId, LocalDateTime.now());
+    }
+
+    private ConfigAuditDraft draft(String auditId, LocalDateTime createTime) {
         return new ConfigAuditDraft(
                 auditId, "project-1", "agent-1", "skill", "update", "skill", "skill-1",
                 "MEDIUM", "SUCCESS", "u1", "alice", "admin", "127.0.0.1", "trace-1",
-                "{}", "{}", LocalDateTime.now());
+                "{}", "{}", createTime);
     }
 
     private static final class FakeAuditRepository implements IConfigAuditRepository {

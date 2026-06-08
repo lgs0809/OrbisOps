@@ -17,7 +17,7 @@ interface HeaderProps {
   collapsed?: boolean;
 }
 
-const HeaderContainer = styled.div`
+const HeaderContainer = styled.header`
   height: 72px;
   background: ${theme.colors.bg.primary};
   border-bottom: 1px solid ${theme.colors.border.secondary};
@@ -30,6 +30,10 @@ const HeaderContainer = styled.div`
   z-index: 100;
   box-shadow: ${theme.shadows.sm};
   flex-shrink: 0;
+
+  @media (max-width: ${theme.breakpoints.md}) {
+    padding: 0 12px;
+  }
 `;
 
 const HeaderLeft = styled.div`
@@ -44,6 +48,7 @@ const ToggleButton = styled(Button)`
   height: 40px;
   border-radius: ${theme.borderRadius.base};
   border: 1px solid ${theme.colors.border.primary};
+  flex-shrink: 0;
 
   &:hover {
     border-color: ${theme.colors.primary};
@@ -56,6 +61,11 @@ const HeaderRight = styled.div`
   align-items: center;
   gap: ${theme.spacing.base};
   min-width: 0;
+  flex-shrink: 0;
+
+  @media (max-width: ${theme.breakpoints.sm}) {
+    gap: ${theme.spacing.xs};
+  }
 `;
 
 const ProductScope = styled.div`
@@ -70,6 +80,8 @@ const ProductScope = styled.div`
     font-weight: ${theme.typography.fontWeight.semibold};
     line-height: 1.2;
     margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
@@ -118,17 +130,30 @@ const StatusPill = styled.div`
   }
 `;
 
-const UserDropdown = styled.div`
+const UserDropdown = styled.button`
   display: flex;
   align-items: center;
   gap: ${theme.spacing.sm};
   padding: ${theme.spacing.sm} ${theme.spacing.base};
+  border: 0;
   border-radius: ${theme.borderRadius.base};
+  background: transparent;
+  color: inherit;
+  font: inherit;
   cursor: pointer;
   transition: all ${theme.animation.duration.normal} ${theme.animation.easing.cubic};
 
   &:hover {
     background: ${theme.colors.bg.tertiary};
+  }
+
+  &:focus-visible {
+    outline: 2px solid ${theme.colors.primary};
+    outline-offset: 2px;
+  }
+
+  @media (max-width: ${theme.breakpoints.sm}) {
+    padding: ${theme.spacing.xs};
   }
 `;
 
@@ -155,7 +180,7 @@ const UserInfo = styled.div`
   }
 `;
 
-export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onLogout }) => {
+export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onLogout, collapsed = false }) => {
   const userInfo = getStoredUserInfo();
   const admin = isAdminUser();
 
@@ -173,7 +198,14 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onLogout }) => 
   return (
     <HeaderContainer>
       <HeaderLeft>
-        <ToggleButton theme="borderless" icon={<IconMenu />} onClick={onToggleSidebar} />
+        <ToggleButton
+          theme="borderless"
+          icon={<IconMenu />}
+          aria-label={collapsed ? 'Open navigation menu' : 'Collapse navigation menu'}
+          aria-controls="orbisops-sidebar"
+          aria-expanded={!collapsed}
+          onClick={onToggleSidebar}
+        />
 
         <ProductScope>
           <Text className="title">运维 AI 控制台</Text>
@@ -197,7 +229,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onLogout }) => 
         </StatusRail>
 
         <Dropdown trigger="click" position="bottomRight" menu={userMenuItems}>
-          <UserDropdown>
+          <UserDropdown type="button" aria-label={`Open user menu for ${userInfo.username || 'user'}`}>
             <UserInfo>
               <Text className="username">{userInfo.username || '用户'}</Text>
               <Text className="role">{roleLabel(userInfo.userRole || userInfo.role)}</Text>

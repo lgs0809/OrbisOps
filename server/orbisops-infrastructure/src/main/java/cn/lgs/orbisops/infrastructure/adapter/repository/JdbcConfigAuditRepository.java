@@ -15,6 +15,8 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -23,6 +25,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 @Repository
 public class JdbcConfigAuditRepository implements IConfigAuditRepository {
+
+    private static final DateTimeFormatter MYSQL_DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private static final String SELECT_COLUMNS = """
             SELECT id, audit_id, project_id, agent_id, module_name, action_name, target_type, target_id,
@@ -99,6 +103,8 @@ public class JdbcConfigAuditRepository implements IConfigAuditRepository {
                     .filter(row -> safe.moduleName().isBlank() || row.moduleName().equals(safe.moduleName()))
                     .filter(row -> safe.actionName().isBlank() || row.actionName().equals(safe.actionName()))
                     .filter(row -> safe.riskLevel().isBlank() || row.riskLevel().equalsIgnoreCase(safe.riskLevel()))
+                    .filter(row -> afterOrEqual(row.createTime(), safe.startTime()))
+                    .filter(row -> beforeOrEqual(row.createTime(), safe.endTime()))
                     .limit(safe.limit())
                     .toList();
         }
@@ -218,6 +224,32 @@ public class JdbcConfigAuditRepository implements IConfigAuditRepository {
         if (value != null && !value.isBlank()) {
             sql.append(" AND ").append(column).append("=?");
             args.add(value.trim());
+        }
+    }
+
+    private boolean afterOrEqual(LocalDateTime value, String startTime) {
+        if (startTime == null || startTime.isBlank()) return true;
+        LocalDateTime threshold = parseDateTime(startTime);
+        return threshold == null || (value != null && !value.isBefore(threshold));
+    }
+
+    private boolean beforeOrEqual(LocalDateTime value, String endTime) {
+        if (endTime == null || endTime.isBlank()) return true;
+        LocalDateTime threshold = parseDateTime(endTime);
+        return threshold == null || (value != null && !value.isAfter(threshold));
+    }
+
+    private LocalDateTime parseDateTime(String value) {
+        String normalized = value == null ? "" : value.trim();
+        if (normalized.isBlank()) return null;
+        try {
+            return LocalDateTime.parse(normalized, MYSQL_DATE_TIME);
+        } catch (RuntimeException ignored) {
+            try {
+                return LocalDateTime.parse(normalized);
+            } catch (RuntimeException invalid) {
+                return null;
+            }
         }
     }
 

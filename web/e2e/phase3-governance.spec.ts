@@ -20,10 +20,14 @@ test('Governance loads audit details and policy only when their UI is opened', a
   let auditListRequests = 0;
   let detailRequests = 0;
   let policyRequests = 0;
+  let policySaveRequests = 0;
+  let savedPolicyPayload: Record<string, unknown> | null = null;
+  let storedRetentionDays = 180;
 
   await page.route('http://127.0.0.1:8099/**', async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname;
+    const method = route.request().method();
     let data: unknown = [];
 
     if (path.endsWith('/api/v1/admin/ops-projects/snapshot')) {
@@ -32,16 +36,29 @@ test('Governance loads audit details and policy only when their UI is opened', a
         templates: [],
       };
     } else if (path.endsWith('/api/v1/admin/ops/config-audits/policy')) {
-      policyRequests += 1;
-      data = {
-        projectId: 'project-1',
-        retentionDays: 180,
-        maskingEnabled: true,
-        exportApprovalRequired: true,
-        highRiskConfirmationRequired: true,
-        replayEnabled: true,
-        status: 'ENABLED',
-      };
+      if (method === 'PUT') {
+        policySaveRequests += 1;
+        savedPolicyPayload = route.request().postDataJSON() as Record<string, unknown>;
+        storedRetentionDays = Number(savedPolicyPayload?.retentionDays || storedRetentionDays);
+        data = {
+          ...(savedPolicyPayload || {}),
+          projectId: 'project-1',
+          retentionDays: storedRetentionDays,
+          maskingEnabled: true,
+          persistence: true,
+        };
+      } else {
+        policyRequests += 1;
+        data = {
+          projectId: 'project-1',
+          retentionDays: storedRetentionDays,
+          maskingEnabled: true,
+          exportApprovalRequired: true,
+          highRiskConfirmationRequired: true,
+          replayEnabled: true,
+          status: 'ENABLED',
+        };
+      }
     } else if (path.endsWith('/api/v1/admin/ops/config-audits/audit-1')) {
       detailRequests += 1;
       data = {
@@ -100,6 +117,23 @@ test('Governance loads audit details and policy only when their UI is opened', a
 
   await page.getByRole('button', { name: '审计策略' }).click();
   await expect.poll(() => policyRequests).toBe(1);
-  await expect(page.getByText('保留天数', { exact: true })).toBeVisible();
-  await expect(page.locator('input').filter({ hasValue: '180' }).first()).toBeVisible();
+  await expect(page.getByText('Audit visibility retention', { exact: true })).toBeVisible();
+  await expect(page.getByText('Sensitive field masking', { exact: true })).toBeVisible();
+  await expect(page.getByText('Always on · requests cannot disable masking', { exact: true })).toBeVisible();
+  await expect(page.getByText('Audit replay', { exact: true })).toBeVisible();
+  await expect(page.getByText('UNAVAILABLE', { exact: true })).toBeVisible();
+
+  const retentionInput = page.getByRole('textbox', { name: 'Audit retention days' });
+  const saveButton = page.getByRole('button', { name: '保存保留策略' });
+  await expect(retentionInput).toHaveValue('180');
+  await expect(saveButton).toBeDisabled();
+  await retentionInput.fill('90');
+  await expect(saveButton).toBeEnabled();
+  await saveButton.click();
+
+  await expect.poll(() => policySaveRequests).toBe(1);
+  expect(savedPolicyPayload?.retentionDays).toBe(90);
+  expect(savedPolicyPayload?.maskingEnabled).toBe(true);
+  await expect(retentionInput).toHaveValue('90');
+  await expect(saveButton).toBeDisabled();
 });

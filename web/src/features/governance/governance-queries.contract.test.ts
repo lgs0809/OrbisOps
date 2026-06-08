@@ -23,6 +23,11 @@ describe('Governance query boundary', () => {
 
     expect(pageSource).toContain("const policyScopeKey = projectScope.projectId || 'GLOBAL';");
     expect(pageSource).toContain('policyDraft?.scopeKey === policyScopeKey');
+    expect(pageSource).toContain('effectiveAuditControls(auditPolicy)');
+    expect(pageSource).toContain('auditPolicySavePayload(');
+    expect(pageSource).not.toContain('onChange={(value) => updateAuditPolicyDraft((current) => ({ ...current, replayEnabled:');
+    expect(pageSource).not.toContain('onChange={(value) => updateAuditPolicyDraft((current) => ({ ...current, exportApprovalRequired:');
+    expect(pageSource).not.toContain('onChange={(value) => updateAuditPolicyDraft((current) => ({ ...current, highRiskConfirmationRequired:');
     expect(querySource).toContain('queryClient.invalidateQueries({ queryKey: governanceQueryKeys.policy(projectId) })');
     expect(querySource).toContain('queryClient.invalidateQueries({ queryKey: governanceQueryKeys.auditLists() })');
     expect(querySource).toContain('useExportAuditMutation');

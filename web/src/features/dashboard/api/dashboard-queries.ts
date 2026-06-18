@@ -6,6 +6,7 @@ import { opsUserService, type UserDashboardOverview } from '../../../services/op
 export interface DashboardOverviewData {
   adminOverview: OpsAdminDashboardOverview | null;
   userOverview: UserDashboardOverview | null;
+  productMetrics: Record<string, any> | null;
 }
 
 export const dashboardQueryKeys = {
@@ -17,13 +18,19 @@ export const useDashboardOverviewQuery = (admin: boolean) => useQuery({
   queryKey: dashboardQueryKeys.overview(admin),
   queryFn: async (): Promise<DashboardOverviewData> => {
     if (admin) {
-      const response = await opsAdminService.adminDashboardOverview();
-      if (response.code !== '0000') throw new Error(response.info || '管理员工作台加载失败');
-      return { adminOverview: response.data, userOverview: null };
+      const [overviewResponse, metricsResult] = await Promise.all([
+        opsAdminService.adminDashboardOverview(),
+        opsAdminService.productMetrics().catch(() => null),
+      ]);
+      if (overviewResponse.code !== '0000') throw new Error(overviewResponse.info || '管理员工作台加载失败');
+      const productMetrics = metricsResult?.code === '0000' && metricsResult.data && !Array.isArray(metricsResult.data)
+        ? metricsResult.data
+        : null;
+      return { adminOverview: overviewResponse.data, userOverview: null, productMetrics };
     }
     const response = await opsUserService.dashboardOverview();
     if (response.code !== '0000') throw new Error(response.info || '工作台数据加载失败');
-    return { adminOverview: null, userOverview: response.data };
+    return { adminOverview: null, userOverview: response.data, productMetrics: null };
   },
   staleTime: 15_000,
 });

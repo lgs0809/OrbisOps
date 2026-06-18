@@ -1658,19 +1658,45 @@ Phase 4 WeChat 验收（2026-08-17）：
 - 高风险执行确认继续由既有 `ChangePackage → Approval → Landing` 权威治理链负责；
 - Governance UI 只允许修改真正生效的 retention，并用 `ENFORCED / PLATFORM_INVARIANT / DELEGATED / NOT_ACTIVATED / UNAVAILABLE` 表达真实控制状态。
 
-Phase 4 最新验收（2026-08-17）：
+### 29.5 Accessibility + Responsive：已完成全局壳基线
+
+- 全局增加 keyboard skip-link，并提供稳定的 `#main-content` focus target；
+- Header / Sidebar 补齐明确的 landmark、navigation label、menu button `aria-expanded / aria-controls`；
+- 用户菜单从不可键盘操作的 `div` 改为原生 button trigger；
+- mobile sidebar 支持 `Escape` 关闭；
+- Header 在 390px 下收紧 padding/gap 并允许产品标题安全 ellipsis；
+- Sidebar / shell transition 尊重 `prefers-reduced-motion`，并修复 mobile transition 覆盖 reduced-motion 的 CSS 顺序问题；
+- 新增 390px Chrome 实机门禁：skip navigation、main focus、mobile drawer、user menu、reduced-motion、document no-overflow；
+- Channel Compatibility Matrix 在 390px 下保持内部滚动，不把 document 撑出 viewport。
+
+### 29.6 Onboarding / Activation Telemetry：已完成
+
+- 复用已有 `/api/v1/admin/ops/product-metrics`，没有新增第三方 analytics、localStorage click counter 或第二套 telemetry 服务；
+- Activation 直接基于权威 `ProjectWorkspace onboarding/readiness` projection 聚合；
+- Activated 定义固定为：`Project 创建 + live Evidence + real query-proof + published default Agent` 四个 required onboarding fact 全完成；
+- 同时单列 `evidenceConnectedProjects / queryProofVerifiedProjects / defaultAgentReadyProjects / diagnosisReadyProjects`，不把瞬时平台 readiness 混入 activation 定义；
+- 输出 aggregate count/rate，不使用 `projectId/userId` Micrometer 高基数 label；
+- Home 管理员视图增加 `Project Activation` funnel；Product Metrics 临时失败不会拖垮主 Dashboard Overview；
+- Dashboard 继续保持一个 TanStack Query server-state boundary，内部并行获取 overview + optional product metrics。
+
+### 29.7 GitHub Hero / Demo Assets：已完成
+
+- README 顶部接入真实 OrbisOps Chrome Dashboard Hero，不使用设计稿或生成图冒充产品界面；
+- Quick UI tour 使用同一真实页面的 command-palette / project-search 浏览器帧生成 GIF；
+- fixture 仅使用通用、可公开的 deterministic demo data，不包含真实业务名、账号、路径或 secret；
+- 新增独立 `playwright.capture.config.ts` 与 `capture/readme-assets.spec.ts`，普通 `npm run test:e2e` 不执行 docs capture；
+- `npm run capture:readme` 可重复生成 `docs/assets/orbisops-dashboard.png` 与 `docs/assets/orbisops-demo.gif`；
+- GIF 由 docs-only Pillow helper 构建，产品 install/build/test/runtime 不增加 Python/Pillow 依赖；
+- 当前 GIF 约 328 KB，README 不引入大体积视频产物。
+
+### Phase 4 最终验收（2026-08-17）：完成
 
 - Backend `mvn -q -pl orbisops-app -am test`：**exit 0**；Spring Context、Testcontainers MySQL、MCP stdio、ArchUnit 全绿；
-- Frontend `npm run verify`：release hygiene、typecheck、**113/113 Vitest**、production build 全绿；
-- Frontend `npm run test:e2e`：**33/33 Chrome Playwright** 全绿；
-- Advanced Governance 定向后端、model/contract、Chrome E2E 均全绿。
-
-继续 Phase 4：
-
-- Accessibility；
-- Responsive；
-- GitHub Hero screenshot / demo GIF；
-- onboarding / activation telemetry。
+- Frontend `npm run verify`：release hygiene、typecheck、**117/117 Vitest**、production build 全绿；
+- Frontend `npm run test:e2e`：**35/35 Chrome Playwright** 全绿；
+- Docs capture `npm run capture:readme`：**1/1 Chrome PASS**，PNG + GIF 可重复生成；
+- WeChat、Compatibility Matrix、Command Palette、Advanced Governance、Accessibility、Responsive、Activation telemetry、README Demo 素材均已按真实能力边界收口；
+- Phase 4 不再保留未完成产品项。
 
 ---
 

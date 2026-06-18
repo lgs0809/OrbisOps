@@ -12,6 +12,7 @@ import {
   projectNeedsAttention,
 } from '../features/dashboard/attention-center-model';
 import { useDashboardOverviewQuery } from '../features/dashboard/api/dashboard-queries';
+import { activationRateLabel, productActivationMetrics } from '../features/dashboard/activation-metrics-model';
 import { isAdminUser } from '../services/auth-session';
 import { OpsChangePackage } from '../services/ops-admin-service';
 import { OpsProjectWorkspace } from '../services/ops-project-service';
@@ -197,6 +198,10 @@ export const OpsDashboardPage: React.FC = () => {
     : '';
   const adminOverview = overviewQuery.data?.adminOverview || null;
   const userOverview = overviewQuery.data?.userOverview || null;
+  const activation = useMemo(
+    () => productActivationMetrics(overviewQuery.data?.productMetrics),
+    [overviewQuery.data?.productMetrics],
+  );
 
   const projects = useMemo(
     () => (adminOverview?.projects || []) as OpsProjectWorkspace[],
@@ -373,6 +378,23 @@ export const OpsDashboardPage: React.FC = () => {
                 ) : <Empty title="暂无最近会话" />
               )}
             </OpsSectionCard>
+
+            {admin && activation && (
+              <div data-testid="project-activation">
+                <OpsSectionCard title="Project Activation">
+                  <HealthRow><Text>Projects</Text><Title heading={6} style={{ margin: 0 }}>{activation.projectCount}</Title></HealthRow>
+                  <HealthRow><Text>Evidence connected</Text><Title heading={6} style={{ margin: 0 }}>{activation.evidenceConnectedProjects}</Title></HealthRow>
+                  <HealthRow><Text>Real query proof</Text><Title heading={6} style={{ margin: 0 }}>{activation.queryProofVerifiedProjects}</Title></HealthRow>
+                  <HealthRow><Text>Default Agent ready</Text><Title heading={6} style={{ margin: 0 }}>{activation.defaultAgentReadyProjects}</Title></HealthRow>
+                  <HealthRow><Text>Activated</Text><Title heading={6} style={{ margin: 0 }}>{activation.activatedProjects}</Title></HealthRow>
+                  <HealthRow><Text>Diagnosis ready now</Text><Title heading={6} style={{ margin: 0 }}>{activation.diagnosisReadyProjects}</Title></HealthRow>
+                  <HealthRow><Text>Activation rate</Text><Title heading={6} style={{ margin: 0 }}>{activationRateLabel(activation)}</Title></HealthRow>
+                  <Text type="tertiary" size="small">
+                    Activated 只在 Project 的所有必选 onboarding 事实均完成时计数；不使用前端点击或 projectId/userId 高基数埋点。
+                  </Text>
+                </OpsSectionCard>
+              </div>
+            )}
 
             {admin && (
               <OpsSectionCard title="Platform Health">

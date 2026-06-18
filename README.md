@@ -18,6 +18,10 @@ It combines ReAct, durable workflows, MCP, Skills, RAG, memory, evidence, and co
   <img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-blue.svg">
 </p>
 
+<img alt="OrbisOps operations dashboard" src="./docs/assets/orbisops-dashboard.png" width="100%">
+
+<sub>Real OrbisOps UI captured in Chrome with deterministic demo data.</sub>
+
 </div>
 
 ---
@@ -54,6 +58,12 @@ That separation is the core design principle of OrbisOps.
 | Production changes | `ChangePackage → Approval → Landing → Verification / Rollback` |
 | Trust | Evidence, Tool Results, Trusted Proofs, audit facts and immutable run snapshots |
 | Extensibility | Agent capability binding instead of proliferating special workflow node types |
+
+<details>
+<summary><strong>Quick UI tour</strong></summary>
+<br>
+<img alt="OrbisOps command palette demo" src="./docs/assets/orbisops-demo.gif" width="960">
+</details>
 
 ## Two execution models, one runtime
 

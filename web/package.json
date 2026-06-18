@@ -61,6 +61,7 @@
     "test": "vitest run",
     "test:cov": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "capture:readme": "playwright test --config=playwright.capture.config.ts && python3 scripts/build-readme-demo-gif.py",
     "typecheck": "tsc --noEmit",
     "verify": "npm run release:hygiene && npm run typecheck && npm run test && npm run build",
     "verify:full": "npm run verify && npm run test:e2e",

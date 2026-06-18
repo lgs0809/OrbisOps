@@ -19,6 +19,7 @@ const login = async (page: Page, role: 'admin' | 'user') => {
 test('Home dashboard loads one role-scoped overview query', async ({ page }) => {
   await login(page, 'admin');
   let overviewRequests = 0;
+  let productMetricsRequests = 0;
 
   await page.route('http://127.0.0.1:8099/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
@@ -41,12 +42,34 @@ test('Home dashboard loads one role-scoped overview query', async ({ page }) => 
         projects: [],
       }) });
     }
+    if (path === '/api/v1/admin/ops/product-metrics') {
+      productMetricsRequests += 1;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: response({
+        activation: {
+          projectCount: 5,
+          evidenceConnectedProjects: 4,
+          queryProofVerifiedProjects: 3,
+          defaultAgentReadyProjects: 4,
+          activatedProjects: 2,
+          diagnosisReadyProjects: 1,
+          activationRate: 0.4,
+          definition: 'required onboarding complete',
+          source: 'ProjectWorkspace projection',
+          highCardinalityLabels: false,
+        },
+      }) });
+    }
     return route.fulfill({ status: 200, contentType: 'application/json', body: response([]) });
   });
 
   await page.goto('/home');
   await expect(page.getByRole('heading', { name: 'Attention & Action' })).toBeVisible();
   await expect.poll(() => overviewRequests).toBe(1);
+  await expect.poll(() => productMetricsRequests).toBe(1);
+  const activation = page.getByTestId('project-activation');
+  await expect(activation.getByText('Project Activation', { exact: true })).toBeVisible();
+  await expect(activation).toContainText('40%');
+  await expect(activation).toContainText('Real query proof');
 });
 
 test('My Audit loads personal audit records through one query boundary', async ({ page }) => {

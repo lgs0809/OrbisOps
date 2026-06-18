@@ -12,6 +12,9 @@ describe('Dashboard and personal audit query boundaries', () => {
     expect(source).not.toContain('setAdminOverview(');
     expect(source).not.toContain('setUserOverview(');
     expect(source).toContain('useDashboardOverviewQuery(admin)');
+    const querySource = readFileSync(resolve(process.cwd(), 'src/features/dashboard/api/dashboard-queries.ts'), 'utf8');
+    expect(querySource).toContain('opsAdminService.productMetrics()');
+    expect(querySource).toContain('productMetrics');
   });
 
   it('keeps my-audits server state out of the page', () => {

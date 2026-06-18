@@ -10,24 +10,29 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
- * Product metrics backed by authoritative Incident/Timeline event projections.
- * The service intentionally avoids bounded Incident-detail scans: metrics that
- * do not yet have a durable projection stay explicitly uncollected.
+ * Product metrics backed by authoritative Incident/Timeline events, ChangePackage facts,
+ * and ProjectWorkspace onboarding/readiness projections. The service intentionally avoids
+ * bounded detail scans and client-side click inference: metrics that do not yet have a
+ * durable or authoritative projection stay explicitly uncollected.
  */
 @Service
 public class OpsProductMetricsService {
 
     private final IncidentQueryApplicationService incidents;
     private final ChangePackageQueryService changePackages;
+    private final OpsProjectWorkspaceService projects;
 
     public OpsProductMetricsService(
             IncidentQueryApplicationService incidents,
-            ChangePackageQueryService changePackages) {
+            ChangePackageQueryService changePackages,
+            OpsProjectWorkspaceService projects) {
         this.incidents = incidents;
         this.changePackages = changePackages;
+        this.projects = projects;
     }
 
     public Map<String, Object> snapshot() {
@@ -47,6 +52,7 @@ public class OpsProductMetricsService {
                 "weeklyHelpfulResolvedIncidents", projection.weeklyHelpfulResolvedIncidents(),
                 "definition", "最近 7 天当前 occurrence 内恢复验证成功且由用户明确确认有帮助的 Incident 数",
                 "events", java.util.List.of("VERIFICATION_SUCCEEDED", "USER_CONFIRMED_HELPFUL")));
+        root.put("activation", activation());
         root.put("firstValue", firstValue());
         root.put("diagnosis", diagnosis(projection));
         root.put("tool", toolMetrics());
@@ -56,6 +62,44 @@ public class OpsProductMetricsService {
                 "commentCount", projection.commentCount(),
                 "source", "COMMENT Incident timeline events"));
         return root;
+    }
+
+    private Map<String, Object> activation() {
+        Map<String, Object> snapshot = projects == null ? Map.of() : projects.snapshot();
+        List<Map<String, Object>> projectViews = maps(snapshot.get("projects"));
+        long evidenceConnected = 0L;
+        long queryProofVerified = 0L;
+        long defaultAgentReady = 0L;
+        long onboardingComplete = 0L;
+        long diagnosisReady = 0L;
+
+        for (Map<String, Object> project : projectViews) {
+            List<Map<String, Object>> onboarding = maps(project.get("onboarding"));
+            if (stepCompleted(onboarding, "evidence")) evidenceConnected++;
+            if (stepCompleted(onboarding, "query-proof")) queryProofVerified++;
+            if (stepCompleted(onboarding, "agent")) defaultAgentReady++;
+            boolean requiredComplete = !onboarding.isEmpty() && onboarding.stream()
+                    .filter(step -> !bool(step.get("optional")))
+                    .allMatch(step -> bool(step.get("completed")));
+            if (requiredComplete) onboardingComplete++;
+            Map<String, Object> readiness = map(project.get("diagnosisReadiness"));
+            if (bool(readiness.get("ready"))) diagnosisReady++;
+        }
+
+        long projectCount = projectViews.size();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("projectCount", projectCount);
+        result.put("evidenceConnectedProjects", evidenceConnected);
+        result.put("queryProofVerifiedProjects", queryProofVerified);
+        result.put("defaultAgentReadyProjects", defaultAgentReady);
+        result.put("onboardingCompleteProjects", onboardingComplete);
+        result.put("activatedProjects", onboardingComplete);
+        result.put("diagnosisReadyProjects", diagnosisReady);
+        result.put("activationRate", rate(onboardingComplete, projectCount));
+        result.put("definition", "Activated = all required Project onboarding steps complete: project + live evidence + real query proof + published default Agent");
+        result.put("source", "authoritative ProjectWorkspace onboarding/readiness projection");
+        result.put("highCardinalityLabels", false);
+        return result;
     }
 
     private Map<String, Object> firstValue() {
@@ -125,6 +169,31 @@ public class OpsProductMetricsService {
     private Object rate(long numerator, long denominator) {
         if (denominator <= 0) return Map.of("status", "NO_SAMPLES");
         return Math.round((numerator * 10000.0d) / denominator) / 10000.0d;
+    }
+
+    private boolean stepCompleted(List<Map<String, Object>> onboarding, String key) {
+        return onboarding.stream()
+                .anyMatch(step -> key.equals(String.valueOf(step.getOrDefault("key", "")))
+                        && bool(step.get("completed")));
+    }
+
+    private boolean bool(Object value) {
+        if (value instanceof Boolean bool) return bool;
+        if (value instanceof Number number) return number.intValue() != 0;
+        return "true".equalsIgnoreCase(String.valueOf(value)) || "1".equals(String.valueOf(value));
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> map(Object value) {
+        return value instanceof Map<?, ?> source ? (Map<String, Object>) source : Map.of();
+    }
+
+    private List<Map<String, Object>> maps(Object value) {
+        if (!(value instanceof List<?> values)) return List.of();
+        return values.stream()
+                .filter(Map.class::isInstance)
+                .map(this::map)
+                .toList();
     }
 
     private Map<String, Object> uncollected(String reason) {

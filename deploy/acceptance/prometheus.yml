@@ -1,0 +1,8 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+scrape_configs:
+  - job_name: ops-workflow-target
+    static_configs:
+      - targets: ["workflow-target:8280"]
+    metrics_path: /metrics

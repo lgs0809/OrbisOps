@@ -1,0 +1,445 @@
+# Used only with scripts/local-acceptance.py. Persistent, loopback-only test stack.
+services:
+  platform-closure-mcp:
+    profiles: ["platform-closure"]
+    image: orbisops/mcp-acceptance:1.0.0
+    restart: unless-stopped
+    entrypoint: ["python", "/eval/closure-mcp.py"]
+    environment:
+      MCP_ACCEPTANCE_TOKEN: "${OPS_ACCEPTANCE_MCP_TOKEN:?initialize acceptance credentials}"
+      PREPARE_CONTROL_TOKEN: "${OPS_ACCEPTANCE_PREPARE_CONTROL_TOKEN:?initialize acceptance credentials}"
+      PROD_CONTROL_TOKEN: "${OPS_ACCEPTANCE_PROD_CONTROL_TOKEN:?initialize acceptance credentials}"
+    network_mode: "service:backend"
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - ./scripts/fixtures/platform-closure-mcp.py:/eval/closure-mcp.py:ro
+      - platform-closure-mcp-data:/state
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    cpus: 0.5
+  platform-closure-test:
+    profiles: ["platform-closure"]
+    image: orbisops/mcp-acceptance:1.0.0
+    restart: unless-stopped
+    entrypoint: ["python", "/eval/resource.py", "--environment", "test", "--port", "8993", "--database", "/state/resource.sqlite"]
+    environment:
+      CLOSURE_CONTROL_TOKEN: "${OPS_ACCEPTANCE_PREPARE_CONTROL_TOKEN:?initialize acceptance credentials}"
+    network_mode: "service:backend"
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - ./scripts/fixtures/platform-closure-resource.py:/eval/resource.py:ro
+      - platform-closure-test-data:/state
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    cpus: 0.5
+  platform-closure-prod:
+    profiles: ["platform-closure"]
+    image: orbisops/mcp-acceptance:1.0.0
+    restart: unless-stopped
+    entrypoint: ["python", "/eval/resource.py", "--environment", "prod", "--port", "8994", "--database", "/state/resource.sqlite"]
+    environment:
+      CLOSURE_CONTROL_TOKEN: "${OPS_ACCEPTANCE_PROD_CONTROL_TOKEN:?initialize acceptance credentials}"
+    network_mode: "service:backend"
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - ./scripts/fixtures/platform-closure-resource.py:/eval/resource.py:ro
+      - platform-closure-prod-data:/state
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    cpus: 0.5
+  platform-skill-mcp:
+    profiles: ["platform-eval"]
+    image: orbisops/mcp-acceptance:1.0.0
+    restart: unless-stopped
+    entrypoint: ["python", "/eval/server.py", "--kind", "skill", "--facts", "/eval/facts.json", "--database", "/state/platform-eval.sqlite", "--host", "127.0.0.1", "--port", "8981"]
+    environment:
+      MCP_ACCEPTANCE_TOKEN: "${OPS_ACCEPTANCE_MCP_TOKEN:?initialize acceptance credentials}"
+    network_mode: "service:backend"
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - ./scripts/fixtures/platform-eval-mcp.py:/eval/server.py:ro
+      - ./deploy/.acceptance-private/platform-skill-governance-v1/facts.json:/eval/facts.json:ro
+      - platform-skill-data:/state
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8981/ready', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  platform-comparison-mcp:
+    profiles: ["platform-eval"]
+    image: orbisops/mcp-acceptance:1.0.0
+    restart: unless-stopped
+    entrypoint: ["python", "/eval/server.py", "--facts", "/eval/facts.json", "--database", "/state/platform-eval.sqlite", "--host", "127.0.0.1", "--port", "8881"]
+    environment:
+      MCP_ACCEPTANCE_TOKEN: "${OPS_ACCEPTANCE_MCP_TOKEN:?initialize acceptance credentials}"
+    network_mode: "service:backend"
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - ./scripts/fixtures/platform-eval-mcp.py:/eval/server.py:ro
+      - ./deploy/.acceptance-private/platform-inspection-v2/facts.json:/eval/facts.json:ro
+      - platform-comparison-data:/state
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8881/ready', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  platform-contract-mcp:
+    profiles: ["platform-eval"]
+    image: orbisops/mcp-acceptance:1.0.0
+    restart: unless-stopped
+    entrypoint: ["python", "/eval/server.py", "--facts", "/eval/facts.json", "--database", "/state/platform-mcp.sqlite", "--port", "8781", "--sink-port", "8782"]
+    environment:
+      MCP_ACCEPTANCE_TOKEN: "${OPS_ACCEPTANCE_MCP_TOKEN:?initialize acceptance credentials}"
+    network_mode: "service:backend"
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - ./scripts/fixtures/platform-mcp-contract-peer.py:/eval/server.py:ro
+      - ./deploy/.acceptance-private/platform-mcp-v3/facts.json:/eval/facts.json:ro
+      - platform-contract-data:/state
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8781/ready', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  platform-investigation-mcp:
+    profiles: ["platform-eval"]
+    image: orbisops/mcp-acceptance:1.0.0
+    restart: unless-stopped
+    entrypoint: ["python", "/eval/server.py", "--kind", "investigation", "--facts", "/eval/facts.json", "--database", "/state/platform-eval.sqlite", "--host", "127.0.0.1", "--port", "8681"]
+    environment:
+      MCP_ACCEPTANCE_TOKEN: "${OPS_ACCEPTANCE_MCP_TOKEN:?initialize acceptance credentials}"
+    network_mode: "service:backend"
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - ./scripts/fixtures/platform-eval-mcp.py:/eval/server.py:ro
+      - ./deploy/.acceptance-private/platform-investigation-v1/facts.json:/eval/facts.json:ro
+      - platform-investigation-data:/state
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8681/ready', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  platform-eval-mcp:
+    profiles: ["platform-eval"]
+    image: orbisops/mcp-acceptance:1.0.0
+    restart: unless-stopped
+    entrypoint: ["python", "/eval/server.py", "--facts", "/eval/facts.json", "--database", "/state/platform-eval.sqlite", "--host", "127.0.0.1", "--port", "8581"]
+    environment:
+      MCP_ACCEPTANCE_TOKEN: "${OPS_ACCEPTANCE_MCP_TOKEN:?initialize acceptance credentials}"
+    network_mode: "service:backend"
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - ./scripts/fixtures/platform-eval-mcp.py:/eval/server.py:ro
+      - ./deploy/.acceptance-private/platform-inspection-v1/facts.json:/eval/facts.json:ro
+      - platform-eval-data:/state
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8581/ready', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  observability-mcp:
+    image: orbisops/observability-mcp:1.0.0
+    restart: unless-stopped
+    profiles: ["business"]
+    build:
+      context: .
+      dockerfile: deploy/acceptance/observability-mcp.Dockerfile
+    environment:
+      OBSERVABILITY_MCP_TOKEN: "${OPS_ACCEPTANCE_OBSERVABILITY_TOKEN:-}"
+      OBSERVABILITY_MYSQL_PASSWORD: "${OPS_ACCEPTANCE_DB_A_PASSWORD:-}"
+      OBSERVABILITY_NATIVE_VIEWER_USERNAME: "${OPS_ACCEPTANCE_NATIVE_VIEWER_USERNAME:-}"
+      OBSERVABILITY_NATIVE_VIEWER_PASSWORD: "${OPS_ACCEPTANCE_NATIVE_VIEWER_PASSWORD:-}"
+      OBSERVABILITY_NATIVE_PACKAGE_BINDING: "${OPS_ACCEPTANCE_NATIVE_PACKAGE_BINDING:-}"
+    network_mode: "service:backend"
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes: ["observability-mcp-data:/state"]
+    read_only: true
+    tmpfs: ["/tmp"]
+    mem_limit: 256m
+    cpus: 1.0
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8281/ready', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  workflow-target:
+    image: orbisops/workflow-target:1.0.0
+    restart: unless-stopped
+    profiles: ["business"]
+    build:
+      context: .
+      dockerfile: deploy/acceptance/workflow-target.Dockerfile
+    environment:
+      TARGET_MYSQL_PASSWORD: "${OPS_ACCEPTANCE_TARGET_DB_PASSWORD:-}"
+      TARGET_CONTROL_TOKEN: "${OPS_ACCEPTANCE_PROD_CONTROL_TOKEN:-}"
+      TARGET_CONTROL_SERVICES: "ops-acc-a-service-2"
+    volumes:
+      - workflow-target-data:/state
+    ports: ["127.0.0.1:18262:8280"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+    read_only: true
+    tmpfs: ["/tmp"]
+    mem_limit: 256m
+    cpus: 1.0
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8280/ready', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  prometheus-acceptance:
+    image: prom/prometheus:v2.53.0
+    restart: unless-stopped
+    profiles: ["business"]
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus", "--storage.tsdb.retention.time=7d"]
+    volumes:
+      - ./deploy/acceptance/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-acceptance-data:/prometheus
+    ports: ["127.0.0.1:19062:9090"]
+    mem_limit: 512m
+    cpus: 1.0
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+  elasticsearch-acceptance:
+    image: elasticsearch:7.17.28
+    restart: unless-stopped
+    user: "1000:0"
+    profiles: ["business"]
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms384m -Xmx384m"
+    volumes:
+      - elasticsearch-acceptance-data:/usr/share/elasticsearch/data
+    ports: ["127.0.0.1:19262:9200"]
+    mem_limit: 1g
+    cpus: 1.0
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+  mcp-discovery:
+    profiles: ["discovery"]
+    restart: unless-stopped
+    image: orbisops/mcp-discovery:1.0.0
+    build:
+      context: .
+      dockerfile: deploy/mcp-acceptance.Dockerfile
+    entrypoint: ["python", "/app/server.py", "--database", "/state/discovery.sqlite", "--host", "127.0.0.1", "--port", "8481", "--discovery-tools", "24"]
+    environment:
+      MCP_ACCEPTANCE_TOKEN: "${OPS_ACCEPTANCE_MCP_TOKEN:?initialize acceptance credentials}"
+    network_mode: "service:backend"
+    volumes: ["mcp-discovery-data:/state"]
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8481/ready', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  mcp-acceptance:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: deploy/mcp-acceptance.Dockerfile
+    image: orbisops/mcp-acceptance:1.0.0
+    environment:
+      MCP_ACCEPTANCE_TOKEN: "${OPS_ACCEPTANCE_MCP_TOKEN:?initialize acceptance credentials}"
+    network_mode: "service:backend"
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - mcp-acceptance-data:/state
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8181/ready', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  landing-mcp:
+    image: orbisops/landing-mcp:1.0.0
+    restart: unless-stopped
+    profiles: ["landing"]
+    build:
+      context: .
+      dockerfile: deploy/acceptance/landing-mcp.Dockerfile
+    environment:
+      LANDING_MCP_TOKEN: "${OPS_ACCEPTANCE_LANDING_MCP_TOKEN:-}"
+      PREPARE_CONTROL_TOKEN: "${OPS_ACCEPTANCE_PREPARE_CONTROL_TOKEN:-}"
+      PROD_CONTROL_TOKEN: "${OPS_ACCEPTANCE_PROD_CONTROL_TOKEN:-}"
+    network_mode: "service:backend"
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes: ["landing-mcp-data:/state"]
+    read_only: true
+    tmpfs: ["/tmp"]
+    mem_limit: 256m
+    cpus: 1.0
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8381/ready', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  prepare-target:
+    image: orbisops/workflow-target:1.0.0
+    restart: unless-stopped
+    profiles: ["landing"]
+    environment:
+      TARGET_MYSQL_PASSWORD: "${OPS_ACCEPTANCE_PREPARE_DB_PASSWORD:-}"
+      TARGET_DATABASE: ops_acceptance_business_prepare
+      TARGET_DATABASE_USER: ops_workflow_prepare
+      TARGET_ENVIRONMENT: test
+      TARGET_LOG_INDEX: ops08-prepare-orders
+      TARGET_CONTROL_TOKEN: "${OPS_ACCEPTANCE_PREPARE_CONTROL_TOKEN:-}"
+      TARGET_CONTROL_SERVICES: "ops-acc-a-service-2"
+    volumes: ["prepare-target-data:/state"]
+    ports: ["127.0.0.1:18263:8280"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+    read_only: true
+    tmpfs: ["/tmp"]
+    mem_limit: 256m
+    cpus: 1.0
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8280/ready', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  mysql:
+    ports: !override
+      - "127.0.0.1:${ORBISOPS_MYSQL_PORT}:3306"
+  pgvector:
+    ports: !override
+      - "127.0.0.1:${ORBISOPS_PGVECTOR_PORT}:5432"
+  redis:
+    ports: !override
+      - "127.0.0.1:${ORBISOPS_REDIS_PORT}:6379"
+  backend:
+    env_file: !reset []
+    mem_limit: "${ORBISOPS_ACCEPTANCE_BACKEND_MEMORY_LIMIT:-2g}"
+    cpus: "${ORBISOPS_ACCEPTANCE_BACKEND_CPUS:-2.0}"
+    environment:
+      JAVA_OPTS: "${ORBISOPS_ACCEPTANCE_JAVA_OPTS:--Xms128m -Xmx1024m -XX:ActiveProcessorCount=2}"
+      ORBISOPS_AI_MODEL_CALLS_ENABLED: "${ORBISOPS_AI_MODEL_CALLS_ENABLED:-false}"
+      ORBISOPS_APPROVED_LANDING_ENABLED: "${ORBISOPS_APPROVED_LANDING_ENABLED:-false}"
+      ORBISOPS_OPENAI_CHAT_CONNECT_TIMEOUT_SECONDS: "${ORBISOPS_OPENAI_CHAT_CONNECT_TIMEOUT_SECONDS:-5}"
+      ORBISOPS_OPENAI_CHAT_READ_TIMEOUT_SECONDS: "${ORBISOPS_OPENAI_CHAT_READ_TIMEOUT_SECONDS:-120}"
+      ORBISOPS_MODEL_CALL_TIMEOUT_SECONDS: "${ORBISOPS_MODEL_CALL_TIMEOUT_SECONDS:-660}"
+      ORBISOPS_SKILL_RETRIEVAL_ENDPOINT: "${ORBISOPS_SKILL_RETRIEVAL_ENDPOINT:-}"
+      ORBISOPS_SKILL_RETRIEVAL_API_KEY: "${ORBISOPS_SKILL_RETRIEVAL_API_KEY:-}"
+      ORBISOPS_SKILL_EMBEDDING_REVISION: "${ORBISOPS_SKILL_EMBEDDING_REVISION:-}"
+      ORBISOPS_SKILL_RERANKER_REVISION: "${ORBISOPS_SKILL_RERANKER_REVISION:-}"
+      ORBISOPS_SKILL_EVOLVER_WORKER_ENABLED: "${ORBISOPS_SKILL_EVOLVER_WORKER_ENABLED:-true}"
+      ORBISOPS_SKILL_EVOLUTION_ENABLED: "${ORBISOPS_SKILL_EVOLUTION_ENABLED:-true}"
+      ORBISOPS_CHAT_MEMORY_SEMANTIC_ENABLED: "false"
+      ORBISOPS_CHAT_MEMORY_LLM_EXTRACTION_ENABLED: "false"
+      ORBISOPS_CHAT_MEMORY_COMPRESSION_LLM_ENABLED: "false"
+      ORBISOPS_WORKFLOW_TYPED_MODE: "GUARDED"
+      ORBISOPS_WORKFLOW_TYPED_SCOPE: "DURABLE_ONLY"
+      ORBISOPS_CHANGE_VERIFICATION_ENABLED: "true"
+      ORBISOPS_CHANGE_VERIFICATION_BINDINGS: '{"ops-acceptance-a":"ops-business-change-c"}'
+      OPS_ACCEPTANCE_DB_A_PASSWORD: "${OPS_ACCEPTANCE_DB_A_PASSWORD:-}"
+      OPS_ACCEPTANCE_DB_B_PASSWORD: "${OPS_ACCEPTANCE_DB_B_PASSWORD:-}"
+      OPS_ACCEPTANCE_MCP_TOKEN: "${OPS_ACCEPTANCE_MCP_TOKEN}"
+      OPS_ACCEPTANCE_OBSERVABILITY_TOKEN: "${OPS_ACCEPTANCE_OBSERVABILITY_TOKEN:-}"
+      OPS_ACCEPTANCE_LANDING_MCP_TOKEN: "${OPS_ACCEPTANCE_LANDING_MCP_TOKEN:-}"
+      ORBISOPS_MCP_ALLOWED_SSE_HOSTS: "127.0.0.1,localhost,mcp-acceptance"
+      SPRING_APPLICATION_JSON: '{"orbisops":{"capability-import":{"allow-loopback":true,"allowed-hosts":"127.0.0.1"}}}'
+    ports: !override
+      - "127.0.0.1:${ORBISOPS_SERVER_PORT}:8099"
+      - "127.0.0.1:18861:8181"
+      - "127.0.0.1:18862:8281"
+  web:
+    ports: !override
+      - "127.0.0.1:${ORBISOPS_WEB_PORT}:3002"
+volumes:
+  platform-closure-mcp-data:
+  platform-closure-test-data:
+  platform-closure-prod-data:
+  platform-skill-data:
+  platform-comparison-data:
+  platform-contract-data:
+  platform-investigation-data:
+  platform-eval-data:
+  mcp-discovery-data:
+  observability-mcp-data:
+  mcp-acceptance-data:
+  prometheus-acceptance-data:
+  elasticsearch-acceptance-data:
+  workflow-target-data:
+  prepare-target-data:
+  landing-mcp-data:

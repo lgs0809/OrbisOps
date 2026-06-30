@@ -85,6 +85,50 @@ class OpsChannelInboundProtocolAdapterTest {
     }
 
     @Test
+    void inboundSafetyLimitsFailClosedBeforeEncryption() {
+        OpsSecretResolver secrets = mock(OpsSecretResolver.class);
+        ChannelPayloadCipherPort cipher = mock(ChannelPayloadCipherPort.class);
+        OpsChannelInboundProtocolAdapter adapter = adapter(secrets, cipher);
+        long timestamp = Instant.now().getEpochSecond();
+
+        ChannelModels.InboundMessage oversizedMessage = new ChannelModels.InboundMessage(
+                "external-1", "conversation-1", "sender-1", "x".repeat(12_001), timestamp,
+                Map.of(), "TEXT", List.of(), null);
+        assertEquals("CHANNEL_INBOUND_MESSAGE_TOO_LARGE", assertThrows(IllegalArgumentException.class,
+                () -> adapter.protectTrusted(channel(), oversizedMessage)).getMessage());
+
+        ChannelModels.InboundMessage oversizedMetadata = new ChannelModels.InboundMessage(
+                "external-2", "conversation-1", "sender-1", "analyze", timestamp,
+                Map.of("bulk", "x".repeat(8_192)), "TEXT", List.of(), null);
+        assertEquals("CHANNEL_INBOUND_METADATA_TOO_LARGE", assertThrows(IllegalArgumentException.class,
+                () -> adapter.protectTrusted(channel(), oversizedMetadata)).getMessage());
+
+        List<ChannelModels.Attachment> tooManyAttachments = java.util.stream.IntStream.range(0, 9)
+                .mapToObj(index -> attachment("attachment-" + index, 128))
+                .toList();
+        ChannelModels.InboundMessage attachmentFlood = new ChannelModels.InboundMessage(
+                "external-3", "conversation-1", "sender-1", "analyze", timestamp,
+                Map.of(), "TEXT", tooManyAttachments, null);
+        assertEquals("CHANNEL_TOO_MANY_ATTACHMENTS", assertThrows(IllegalArgumentException.class,
+                () -> adapter.protectTrusted(channel(), attachmentFlood)).getMessage());
+
+        ChannelModels.InboundMessage oversizedAttachment = new ChannelModels.InboundMessage(
+                "external-4", "conversation-1", "sender-1", "analyze", timestamp,
+                Map.of(), "TEXT", List.of(attachment("attachment-large", 50L * 1024 * 1024 + 1)), null);
+        assertEquals("CHANNEL_ATTACHMENT_SIZE_OUT_OF_RANGE", assertThrows(IllegalArgumentException.class,
+                () -> adapter.protectTrusted(channel(), oversizedAttachment)).getMessage());
+
+        ChannelModels.InboundMessage oversizedAction = new ChannelModels.InboundMessage(
+                "external-5", "conversation-1", "sender-1", "", timestamp,
+                Map.of(), "ACTION", List.of(),
+                new ChannelModels.Action("action-1", "ACK", "x".repeat(2_001), Map.of()));
+        assertEquals("CHANNEL_ACTION_VALUE_TOO_LONG", assertThrows(IllegalArgumentException.class,
+                () -> adapter.protectTrusted(channel(), oversizedAction)).getMessage());
+
+        verify(cipher, never()).encrypt(anyString(), anyString());
+    }
+
+    @Test
     void verifiedPayloadRoundTripsWithoutPersistingPlaintextSecret() {
         OpsSecretResolver secrets = mock(OpsSecretResolver.class);
         when(secrets.resolve("credential-ref")).thenReturn("secret");
@@ -125,6 +169,12 @@ class OpsChannelInboundProtocolAdapterTest {
         return new ChannelModels.InboundMessage(
                 "external-1", "conversation-1", "sender-1", "investigate", timestamp,
                 Map.of(), "TEXT", List.of(), null);
+    }
+
+    private ChannelModels.Attachment attachment(String id, long sizeBytes) {
+        return new ChannelModels.Attachment(
+                id, id + ".log", "text/plain", sizeBytes,
+                "object://channel/11111111-1111-1111-1111-111111111111", "a".repeat(64));
     }
 
     private String signature(ChannelModels.InboundMessage message) {

@@ -3,6 +3,13 @@ import { expect, test } from '@playwright/test';
 const response = (data: unknown) => JSON.stringify({ code: '0000', info: 'success', data });
 
 test('Global command palette supports keyboard navigation, route search, and project switching', async ({ page }) => {
+  const unexpectedPageErrors: string[] = [];
+  page.on('pageerror', (error) => {
+    if (!error.message.includes('ResizeObserver loop completed with undelivered notifications')) {
+      unexpectedPageErrors.push(error.message);
+    }
+  });
+
   await page.addInitScript(() => {
     localStorage.setItem('token', 'x');
     localStorage.setItem('isLoggedIn', 'true');
@@ -35,20 +42,21 @@ test('Global command palette supports keyboard navigation, route search, and pro
   await search.fill('mcp');
   const results = page.getByRole('listbox', { name: 'Search results' });
   await expect(results.getByRole('option').filter({ hasText: 'Tools / MCP' })).toBeVisible();
-  await search.press('Enter');
+  await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/platform\/tools\?projectId=payments$/);
 
   await page.getByRole('button', { name: 'Open global search' }).click();
   await search.fill('orders');
   await expect(results.getByRole('option').filter({ hasText: 'Switch project · Orders' })).toBeVisible();
-  await search.press('Enter');
+  await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/platform\/tools\?projectId=orders$/);
 
   await expect(trigger).toBeVisible();
   await page.keyboard.press('Meta+K');
   await search.fill('start diagnosis');
-  await search.press('ArrowDown');
-  await search.press('ArrowUp');
-  await search.press('Enter');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/work\/diagnosis\?projectId=orders$/);
+  expect(unexpectedPageErrors).toEqual([]);
 });

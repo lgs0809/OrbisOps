@@ -1,0 +1,8 @@
+**
+!orbisops-app/
+!orbisops-app/Dockerfile
+!orbisops-app/target/
+!orbisops-app/target/orbisops-app.jar
+!scripts/
+!scripts/mcp/
+!scripts/mcp/*.mjs

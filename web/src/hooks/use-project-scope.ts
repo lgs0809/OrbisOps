@@ -5,7 +5,6 @@ import React, {
   useContext,
   useEffect,
   useMemo,
-  useState,
 } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation, useSearchParams } from 'react-router-dom';
@@ -57,7 +56,6 @@ export const ProjectScopeProvider: React.FC<PropsWithChildren> = ({ children }) 
   const roleScope = isAdminUser() ? 'admin' : 'user';
   const storedPrincipal = getStoredUserInfo();
   const principalKey = authenticated ? (storedPrincipal.userId || storedPrincipal.username || 'authenticated-user') : 'anonymous';
-  const [projectId, setProjectId] = useState(() => requestedProjectId(location.search) || readProjectContextId());
 
   const projectQuery = useQuery({
     queryKey: ['project-scope', roleScope, principalKey],
@@ -67,53 +65,46 @@ export const ProjectScopeProvider: React.FC<PropsWithChildren> = ({ children }) 
   const projects = authenticated ? (projectQuery.data?.projects || []) : [];
   const templates = authenticated ? (projectQuery.data?.templates || []) : [];
 
-  const persistSelection = useCallback((nextProjectId: string) => {
-    setProjectId(nextProjectId);
-    writeProjectContextId(nextProjectId);
-  }, []);
+  const fromUrl = requestedProjectId(location.search);
+  const rememberedProjectId = readProjectContextId();
+  const projectId = useMemo(() => {
+    if (!authenticated || projectQuery.isPending || projectQuery.isError || projects.length === 0) return '';
+    if (fromUrl && projects.some((project) => project.projectId === fromUrl)) return fromUrl;
+    if (rememberedProjectId && projects.some((project) => project.projectId === rememberedProjectId)) {
+      return rememberedProjectId;
+    }
+    return projects[0]?.projectId || '';
+  }, [authenticated, fromUrl, projectQuery.isError, projectQuery.isPending, projects, rememberedProjectId]);
 
   const selectProject = useCallback((nextProjectId: string) => {
-    persistSelection(nextProjectId);
+    writeProjectContextId(nextProjectId);
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
       if (nextProjectId) next.set('projectId', nextProjectId);
       else next.delete('projectId');
       return next;
     }, { replace: true });
-  }, [persistSelection, setSearchParams]);
+  }, [setSearchParams]);
 
   useEffect(() => {
     if (!authenticated) {
-      if (projectId) persistSelection('');
+      if (readProjectContextId()) writeProjectContextId('');
       return;
     }
     if (projectQuery.isPending || projectQuery.isError) return;
 
-    const fromUrl = requestedProjectId(location.search);
-    const remembered = readProjectContextId();
-    const preferred = fromUrl || projectId || remembered;
-    const nextProjectId = projects.some((project) => project.projectId === preferred)
-      ? preferred
-      : projects[0]?.projectId || '';
-    if (nextProjectId !== projectId) persistSelection(nextProjectId);
+    if (projectId && readProjectContextId() !== projectId) writeProjectContextId(projectId);
 
     // A copied/deep-linked project must never leave an inaccessible project id in the address bar.
-    if (fromUrl && fromUrl !== nextProjectId) {
+    if (fromUrl && fromUrl !== projectId) {
       setSearchParams((current) => {
         const next = new URLSearchParams(current);
-        if (nextProjectId) next.set('projectId', nextProjectId);
+        if (projectId) next.set('projectId', projectId);
         else next.delete('projectId');
         return next;
       }, { replace: true });
     }
-  }, [authenticated, location.search, persistSelection, projectId, projectQuery.isError, projectQuery.isPending, projects, setSearchParams]);
-
-  // Browser back/forward changes the URL independently from local state; keep the global context in lockstep.
-  useEffect(() => {
-    const fromUrl = requestedProjectId(location.search);
-    if (!fromUrl || fromUrl === projectId || projects.length === 0) return;
-    if (projects.some((project) => project.projectId === fromUrl)) persistSelection(fromUrl);
-  }, [location.search, persistSelection, projectId, projects]);
+  }, [authenticated, fromUrl, projectId, projectQuery.isError, projectQuery.isPending, setSearchParams]);
 
   const selectedProject = useMemo(
     () => projects.find((project) => project.projectId === projectId),

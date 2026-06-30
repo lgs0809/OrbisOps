@@ -19,6 +19,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -74,6 +75,23 @@ class ChannelManagementApplicationServiceTest {
         verify(protocols).validateConfiguration(record.getValue());
         verify(audit).record("project-1", "channel", "create", "channel-1", null, storedView);
         assertEquals(storedView, result);
+    }
+
+    @Test
+    void providerValidationFailureNeverPersistsOrAuditsCandidate() {
+        doThrow(new IllegalArgumentException("CHANNEL_CREDENTIAL_MUST_USE_REFERENCE"))
+                .when(protocols).validateConfiguration(any());
+
+        IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                () -> service.create(configuration(
+                        "", "",
+                        supplied("project-1"), supplied("channel-secret"), supplied(ExecutionType.REACT), absentText(),
+                        absentVersionPolicy(), absentInteger(), supplied("Unsafe"), supplied("GENERIC_WEBHOOK"),
+                        supplied("plaintext-secret"), absentMap(), absentStatus())));
+
+        assertEquals("CHANNEL_CREDENTIAL_MUST_USE_REFERENCE", failure.getMessage());
+        verify(repository, never()).create(any());
+        verify(audit, never()).record(any(), any(), any(), any(), any(), any());
     }
 
     @Test

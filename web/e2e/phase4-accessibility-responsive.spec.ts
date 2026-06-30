@@ -106,3 +106,19 @@ test('390px integrations keeps the compatibility matrix inside an internal scrol
   const matrixScrollWidth = await matrix.evaluate((element) => element.scrollWidth);
   expect(matrixScrollWidth).toBeGreaterThan(0);
 });
+
+test('820px tablet layout keeps navigation, provider cards, and compatibility matrix usable without document overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 820, height: 1180 });
+  await authenticateAdmin(page);
+  await routeCommonBackend(page);
+
+  await page.goto('/platform/integrations?projectId=mobile-project');
+  await expect(page.getByRole('complementary', { name: 'Application navigation' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Open navigation menu' })).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByTestId('channel-compatibility-matrix')).toBeVisible();
+  await expectNoDocumentOverflow(page);
+
+  const providerGrid = page.getByTestId('channel-provider-cards');
+  const gridColumns = await providerGrid.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(' ').filter(Boolean).length);
+  expect(gridColumns).toBe(2);
+});

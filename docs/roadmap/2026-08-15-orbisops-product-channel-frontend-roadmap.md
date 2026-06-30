@@ -1845,6 +1845,82 @@ Ready
 
 不允许“保存配置成功”冒充“Channel 可用”。
 
+## 33.1 Part E 最终验收账本（2026-08-17）
+
+### Channel Contract / Security：通过
+
+Channel Contract 继续由共享 Provider contract、Provider-specific protocol tests、Inbound Process Manager、Outbox/Readiness/Approval tests 共同执行；新增发布门禁补齐了过去只有实现、缺少直接回归断言的安全边界。
+
+Security Acceptance 14 项均有可执行证据：
+
+1. **Secret 不落普通字段/日志/审计 payload**：`SensitiveDataRedactionPolicyTest`、`OpsChannelInboundProtocolAdapterTest`、各 Provider credential-ref tests；新增 `ChannelManagementApplicationServiceTest.providerValidationFailureNeverPersistsOrAuditsCandidate`，明确证明 Provider validation 失败时 repository/audit 均不会执行；
+2. **可信 callback / connection**：`OpsChannelInboundProtocolAdapterTest`、WeChat secure callback codec / service tests、各 native Provider connection tests；
+3. **unknown sender 默认不能进入调查**：`ChannelInboundProcessManagerTest` 在 execution resolution 前 fail closed；
+4. **未绑定身份不能审批**：`OpsChannelApprovalActionServiceTest`；
+5. **Channel Approval 不绕 RBAC / membership**：`OpsChannelApprovalActionServiceTest` 覆盖 wrong role / removed membership；
+6. **不绕 ChangePackage version/state**：同一测试覆盖 stale version / stale state / duplicate actor；
+7. **Channel 不直接获得生产 mutation**：`OpsRuntimeToolAuthorityPolicyTest`、`OpsChannelToolProviderTest`；
+8. **Landing 才能 trusted `PROD_FULL`**：`OpsLandingAgentRunAuthorizationServiceTest` 与 Landing runtime authority tests；
+9. **duplicate / replay 不重复执行**：`ChannelInboundProcessManagerTest`、Approval idempotency / duplicate click tests；
+10. **SSRF**：`OpsOutboundUrlPolicyTest` 默认拒绝 loopback/private/embedded credential，仅允许受信公网目标；
+11. **payload/body/file 大小限制**：新增 `OpsChannelInboundProtocolAdapterTest.inboundSafetyLimitsFailClosedBeforeEncryption`，直接锁定 message / metadata / attachment count / 50MB file / action value 上限，且失败发生在 encryption/persistence 前；
+12. **媒体 content-type / size / path traversal**：`OpsSlackAttachmentServiceTest`、`FileChannelAttachmentAssetAdapterTest`；
+13. **不可信附件不能进入可执行 workspace**：新增 `ChannelAttachmentExecutionIsolationArchitectureTest`，Channel 只允许 opaque `bridge://` / `object://` asset ref，并禁止 Channel source tree 依赖 RepairWorkspace / ProcessBuilder / Runtime process launch；
+14. **Provider 异常隔离**：`OpsChannelConnectionSupervisorTest` 证明单 Provider start/reconcile failure 不拖垮其他 Channel lifecycle。
+
+Part E security/product proof suite 已单独实跑 **exit 0**；完整 backend reactor 再次实跑 **exit 0**，包含 Spring Context、Testcontainers MySQL、MCP stdio 与全部 ArchUnit 门禁。
+
+### Frontend Architecture：通过
+
+- Route / Sidebar / RBAC：`APP_ROUTES` 单一 metadata 源 + `route-metadata.test.ts`；
+- Feature / Query boundary：Knowledge、Channel、Incident、Change、Project、Models、Tools、Skills、Memory、Governance、Automations 等均有 feature API/model/component 或 contract tests；
+- Approval permission/state matrix：`approval-cockpit-model.test.ts`；
+- Workflow Builder：Agent Builder mode/contract tests + backend graph validator/compiler tests；
+- Channel provider config：`channel-provider-config.test.ts` + `channel-model.test.ts`；
+- Responsive：Chrome 已覆盖 **390px mobile / 820px tablet / desktop**，并验证 document no-overflow、Provider cards 与 compatibility matrix；
+- Keyboard / focus / modal：skip-link、main focus、mobile drawer Esc、user menu、Command Palette keyboard flow 均进入 Chrome E2E；
+- Frontend `npm run verify`：**117/117 Vitest** + release hygiene + typecheck + production build 全绿；
+- Frontend `npm run test:e2e`：**36/36 Chrome Playwright** 全绿。
+
+### Product Acceptance：通过本地权威链路
+
+**First Value**：
+
+- Project onboarding/readiness 由 `ProjectProductReadinessApplicationServiceTest` 等测试约束；
+- `OpsProjectFirstValueEvidenceAdapterTest` 明确要求成功 ReAct run + bound evidence fact 才允许 query-proof / first-value；
+- Chat / Diagnosis / Project Workspace 浏览器链路已纳入全量 E2E；
+- Activation telemetry 直接按 `Project + live Evidence + real query-proof + published default Agent` 四个 required fact 聚合，不使用前端点击冒充完成。
+
+**Incident Resolution**：
+
+- Incident / Change 浏览器工作台、ChangePackage approval/landing authority、Landing operation proof、Verification 均进入现有 unit/integration/E2E；
+- `OpsIncidentChangePackageVerificationAdapterTest` 明确拒绝自然语言伪 verification，只有 authoritative landing post-check facts 可通过；
+- unknown / insufficient verification 不会被错误标记为 resolved。
+
+**Channel First Value**：
+
+- `OpsChannelProviderReadinessServiceTest` 明确要求 `Credentials + Connection + Inbound + Outbound + Identity/Access` 五类事实全部满足才 `ready=true`；
+- configured-but-untested 永远不是 Ready；
+- unresolved external credential 明确 `BLOCKED_EXTERNAL`；
+- Phase 3 Channel、WeChat、Compatibility Matrix 浏览器 E2E 全绿。
+
+### Release Gate：通过
+
+顶层新增：
+
+```bash
+make acceptance
+```
+
+其语义为：`make verify` 后继续执行完整 Chrome Product Acceptance。由于当前连接器对单次长命令存在约 100 秒执行窗口，本轮将同一门禁拆分为四段实跑并全部通过：
+
+- `server/scripts/release-hygiene.py`：PASS；
+- backend full reactor：**exit 0**；
+- frontend `npm run verify`：**117/117 Vitest**；
+- frontend `npm run test:e2e`：**36/36 Chrome**。
+
+外部真实 Provider smoke 仍遵守既定原则：只有存在真实平台凭据/回调/网络环境时才可标记真实平台 PASS；本地 contract/mock/E2E 不得冒充真实 Feishu / WeCom / DingTalk / Slack / Telegram / Discord / QQ / WeChat 平台联调。无外部条件时应明确记为 `SKIP / BLOCKED_EXTERNAL`，不影响本地代码与产品 acceptance 结论。
+
 ---
 
 # Part F：明确不做的事情

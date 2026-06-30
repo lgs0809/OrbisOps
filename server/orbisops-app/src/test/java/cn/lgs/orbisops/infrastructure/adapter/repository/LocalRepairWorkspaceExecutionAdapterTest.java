@@ -70,8 +70,31 @@ class LocalRepairWorkspaceExecutionAdapterTest {
         assertFalse(cleanup.removed());
     }
 
+    @Test
+    void disabledRepairDoesNotInitializeWorkspaceDirectories() {
+        Path worktrees = tempDir.resolve("disabled-worktrees");
+        Path artifacts = tempDir.resolve("disabled-artifacts");
+        LocalRepairWorkspaceExecutionAdapter adapter = new LocalRepairWorkspaceExecutionAdapter(
+                false,
+                worktrees.toString(),
+                artifacts.toString(),
+                30,
+                64 * 1024,
+                "host",
+                "docker",
+                "maven:test",
+                "node:test",
+                "make:test");
+
+        adapter.initialize();
+
+        assertFalse(Files.exists(worktrees));
+        assertFalse(Files.exists(artifacts));
+    }
+
     private LocalRepairWorkspaceExecutionAdapter adapter() {
         return new LocalRepairWorkspaceExecutionAdapter(
+                true,
                 tempDir.resolve("sandboxes").toString(),
                 tempDir.resolve("artifacts").toString(),
                 30,

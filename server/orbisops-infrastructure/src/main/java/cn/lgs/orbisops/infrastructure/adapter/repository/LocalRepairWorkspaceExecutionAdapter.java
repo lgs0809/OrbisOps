@@ -41,6 +41,7 @@ public class LocalRepairWorkspaceExecutionAdapter implements RepairWorkspaceExec
 
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
+    private final boolean enabled;
     private final String worktreeRoot;
     private final String artifactRoot;
     private final int commandTimeoutSeconds;
@@ -54,6 +55,7 @@ public class LocalRepairWorkspaceExecutionAdapter implements RepairWorkspaceExec
     private final ProjectServicePolicy servicePolicy = new ProjectServicePolicy();
 
     public LocalRepairWorkspaceExecutionAdapter(
+            @Value("${ops.repair.enabled:false}") boolean enabled,
             @Value("${ops.repair.worktree-root:${ops.repair.sandbox-root:${java.io.tmpdir}/ai-agent-repair/worktrees}}") String worktreeRoot,
             @Value("${ops.repair.artifact-root:${java.io.tmpdir}/ai-agent-repair/artifacts}") String artifactRoot,
             @Value("${ops.repair.command-timeout-seconds:900}") int commandTimeoutSeconds,
@@ -63,6 +65,7 @@ public class LocalRepairWorkspaceExecutionAdapter implements RepairWorkspaceExec
             @Value("${ops.repair.docker.maven-image:maven:3.9.9-eclipse-temurin-17}") String dockerMavenImage,
             @Value("${ops.repair.docker.node-image:node:20-bookworm-slim}") String dockerNodeImage,
             @Value("${ops.repair.docker.make-image:buildpack-deps:bookworm}") String dockerMakeImage) {
+        this.enabled = enabled;
         this.worktreeRoot = worktreeRoot;
         this.artifactRoot = artifactRoot;
         this.commandTimeoutSeconds = commandTimeoutSeconds;
@@ -76,6 +79,7 @@ public class LocalRepairWorkspaceExecutionAdapter implements RepairWorkspaceExec
 
     @PostConstruct
     public void initialize() {
+        if (!enabled) return;
         try {
             Files.createDirectories(root(worktreeRoot));
             Files.createDirectories(root(artifactRoot));

@@ -1,6 +1,9 @@
-.PHONY: verify verify-server verify-web build build-server build-web test-server install-web clean
+.PHONY: verify acceptance verify-server verify-web build build-server build-web test-server install-web clean
 
 verify: verify-server verify-web
+
+acceptance: verify
+	cd web && npm run test:e2e
 
 verify-server:
 	cd server && python3 scripts/release-hygiene.py

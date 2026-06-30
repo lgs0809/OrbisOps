@@ -291,6 +291,14 @@ make verify
 
 This runs backend release hygiene + Maven tests and the frontend hygiene + typecheck + Vitest + production build pipeline.
 
+For a release candidate, also run the browser product acceptance gate:
+
+```bash
+make acceptance
+```
+
+`make acceptance` runs `make verify` first, then the full Playwright Chrome E2E suite across the governed product paths and responsive breakpoints.
+
 ### 2. Configure local dependencies
 
 The backend includes a dependency-only Compose stack for MySQL, PostgreSQL/pgvector, and Redis. No default production credential is embedded in the repository.
@@ -384,7 +392,8 @@ OrbisOps defaults to fail-closed behavior:
 The repository currently carries a large executable architecture and behavior suite:
 
 - **4,000+ backend tests** covering domain policy, application use cases, runtime behavior, architecture boundaries, persistence, Testcontainers and MCP integration;
-- **30 frontend unit/contract tests** plus TypeScript checking and production compilation;
+- **117 frontend Vitest tests** plus TypeScript checking and production compilation;
+- **36 Chrome Playwright acceptance scenarios**, including 390px mobile, 820px tablet, and desktop coverage;
 - architecture gates for DDD layer direction, bounded-context imports, cross-context application coupling, runtime authority, workflow/tool boundaries and retired compatibility paths;
 - migration checksum verification;
 - backend and frontend release-hygiene scanners;
@@ -393,7 +402,8 @@ The repository currently carries a large executable architecture and behavior su
 Useful commands:
 
 ```bash
-make verify          # full repository verification
+make verify          # backend + frontend verification
+make acceptance      # verify + full Chrome product acceptance
 make build           # production build
 make test-server     # backend test suite
 make clean

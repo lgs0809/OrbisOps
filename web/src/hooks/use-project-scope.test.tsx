@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, useLocation } from 'react-router-dom';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   listChatProjects: vi.fn(),
@@ -31,7 +31,14 @@ import { writeProjectContextId } from '../utils/project-context';
 
 const ScopeProbe = () => {
   const scope = useProjectScope();
-  return <div data-testid="project-id">{scope.projectId}</div>;
+  const location = useLocation();
+  return (
+    <>
+      <div data-testid="project-id">{scope.projectId}</div>
+      <div data-testid="project-search">{location.search}</div>
+      <button type="button" onClick={() => scope.selectProject('project-two')}>select project two</button>
+    </>
+  );
 };
 
 const deferred = <T,>() => {
@@ -43,10 +50,43 @@ const deferred = <T,>() => {
 };
 
 describe('ProjectScopeProvider', () => {
+  afterEach(() => cleanup());
+
   beforeEach(() => {
     localStorage.clear();
     mocks.listChatProjects.mockReset();
     mocks.snapshot.mockReset();
+  });
+
+  it('switches project through URL and remembered context without racing back to the previous selection', async () => {
+    mocks.listChatProjects.mockResolvedValue({
+      data: [
+        { projectId: 'project-one', name: 'Project one' },
+        { projectId: 'project-two', name: 'Project two' },
+      ],
+    });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/executions?projectId=project-one']}>
+          <ProjectScopeProvider>
+            <ScopeProbe />
+          </ProjectScopeProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('project-id')).toHaveTextContent('project-one'));
+    fireEvent.click(screen.getByRole('button', { name: 'select project two' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('project-id')).toHaveTextContent('project-two');
+      expect(screen.getByTestId('project-search')).toHaveTextContent('?projectId=project-two');
+    });
+    expect(localStorage.getItem('ops:selected-project-id')).toBe('project-two');
   });
 
   it('does not expose a remembered project until the current account catalog validates it', async () => {

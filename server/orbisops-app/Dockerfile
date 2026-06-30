@@ -10,16 +10,17 @@ RUN apt-get update \
     && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main" \
        > /etc/apt/sources.list.d/nodesource.list \
     && apt-get update \
-    && apt-get install -y --no-install-recommends nodejs \
+    && apt-get install -y --no-install-recommends nodejs git default-mysql-client postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --system --gid 10001 orbisops \
     && useradd --system --uid 10001 --gid orbisops --home-dir /opt/orbisops --create-home orbisops \
-    && mkdir -p /opt/orbisops/data \
-    && chown -R orbisops:orbisops /opt/orbisops
+    && mkdir -p /opt/orbisops/data /var/lib/orbisops/repair \
+    && chown -R orbisops:orbisops /opt/orbisops /var/lib/orbisops
 
 WORKDIR /opt/orbisops
-COPY --chown=orbisops:orbisops target/orbisops-app.jar /opt/orbisops/orbisops.jar
+COPY --chown=orbisops:orbisops orbisops-app/target/orbisops-app.jar /opt/orbisops/orbisops.jar
+COPY --chown=orbisops:orbisops scripts/mcp/ /opt/orbisops/scripts/mcp/
 
 USER orbisops
 EXPOSE 8099

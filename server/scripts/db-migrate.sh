@@ -20,12 +20,12 @@ sha256_file() {
 }
 
 mysql_exec() {
-  local auth=()
   if [[ -n "${MYSQL_DEFAULTS_FILE}" ]]; then
     [[ -f "${MYSQL_DEFAULTS_FILE}" ]] || { echo "MYSQL_DEFAULTS_FILE does not exist" >&2; exit 2; }
-    auth+=("--defaults-extra-file=${MYSQL_DEFAULTS_FILE}")
+    mysql --defaults-extra-file="${MYSQL_DEFAULTS_FILE}" --host="${MYSQL_HOST}" --port="${MYSQL_PORT}" --protocol=TCP "$@"
+    return
   fi
-  mysql "${auth[@]}" --host="${MYSQL_HOST}" --port="${MYSQL_PORT}" --protocol=TCP "$@"
+  mysql --host="${MYSQL_HOST}" --port="${MYSQL_PORT}" --protocol=TCP "$@"
 }
 
 mysql_exec -e "CREATE DATABASE IF NOT EXISTS \`${MYSQL_DATABASE}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"

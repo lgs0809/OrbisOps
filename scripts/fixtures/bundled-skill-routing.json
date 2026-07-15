@@ -1,0 +1,77 @@
+{
+  "purpose": "Update only exact unmodified bundled copies through the normal file Skill API",
+  "skills": [
+    {
+      "name": "change-package-preparer",
+      "legacySha256": [
+        "012717e371faab2f350d0b418492e4a5b2f308261790662be0b5c8c3583b07a9",
+        "299e56677eca4c17d4322b5972bd96345fa1766dfe759359f4f6cf223b85237f"
+      ],
+      "sourceSha256": "5bf461a90ca66240ac4b9a109c22bb61c7186bd46354e600929a78e0dea832c1"
+    },
+    {
+      "name": "mcp-onboarding",
+      "legacySha256": [
+        "815b9a055e992c18f5e4d6a1440af86c2c0bfc79b48614f3d5c1fd11dfb0b466",
+        "d38b5e7d3b40d9cc8b71cb2da932cfe2aec6a0a8924168c4652b3ad0c96f5a23"
+      ],
+      "sourceSha256": "3022664bbfbc7c1afd6144a1c261b51ace4d8d407231116ac9e25a28156ca9e0"
+    },
+    {
+      "name": "es-log-agent",
+      "legacySha256": [
+        "2c5535f084ecc5223aa2d4916cdadcadfc50da2a3fa78419c09b67c4e378ecbc",
+        "7d89fa97a806ff3224891adc9a31eb0f10f8407a1270b92dfc80020558c22024"
+      ],
+      "sourceSha256": "4a8bacaf2414792312448918c2ddec24a6c18ee4c3b72934ea14752bf924c7ce"
+    },
+    {
+      "name": "mysql-slow-sql-agent",
+      "legacySha256": [
+        "416aa1f23fcb2bb0d01fe8c0e8723cf75a05ea4fd5857ccd288c77d008cbb3de",
+        "4631eeb7409451440c6d7d7226371d93a214ee96cab5b755c9fcdbbdb6b1d224"
+      ],
+      "sourceSha256": "92bd7ee78db209bd2395f115e9dbce773772fb59875518e54c34c75d9a3daf2f"
+    },
+    {
+      "name": "ops-main-agent-router",
+      "legacySha256": [
+        "8d6f606e8790512f687cc45c921384ac858d2c331de7187b6b15c4cff1ae617c",
+        "b70d0d4a166c0f73ac22e77b3db390eb94ce3b32cee2cb74266cc491853bc59a"
+      ],
+      "sourceSha256": "49959595a79c0893fed7224ef92caff2170bd5e16bef11ff38a207dc1e307734"
+    },
+    {
+      "name": "prometheus-agent",
+      "legacySha256": [
+        "8e7da58229d2c730e05bbcd480318a600ae4884f004dc9eec8c0764890d57e19",
+        "8d8994d31a885126b1eea0f6a5648c2e41f3798d2cffe9372c3cf169f7749f78"
+      ],
+      "sourceSha256": "3317b0c4688efc2630469f9dafc50046ac99ec18d880977f0506156a18c487ea"
+    },
+    {
+      "name": "rag-knowledge-agent",
+      "legacySha256": [
+        "84e0b4686da68aa89f56d1c3c3a5e47046f3ad33186355f1d99c48b3fb63d140",
+        "cc23d37ada6628ecf90ea09b9f676149adbf783787c6ccc59fd159e1665a5a2a"
+      ],
+      "sourceSha256": "a6342ca3a3dade25a39bfb8368806ecbb12342e0f2e52f946ad12fb30837d33f"
+    },
+    {
+      "name": "skill-creator",
+      "legacySha256": [
+        "cab6806a73b5a7c6ec9f145a6a10d390fa97f12506f6a17f382749fb2e42cc1f",
+        "693999aa1ad79d71239748806060cc71531077e62df68a5c5bddade3e41c4c52"
+      ],
+      "sourceSha256": "b12acdf8c24e0e7088b2cf729f678244715ec0e998eb758528f18e611d659ec5"
+    },
+    {
+      "name": "skill-installer",
+      "legacySha256": [
+        "f28fdaf53ba2edb8246afc19a12290d90c34a806311f8c119547eb968df5ff26",
+        "406b2af0911a3d48bbc245beb43fcdca73638b8b49ce7cb55b58c1a2a9e44ff4"
+      ],
+      "sourceSha256": "3765686a923ee69fa8000049f216eab455892415e6884ce62927ff81dbf26149"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "scope": "CURATED_DIAGNOSTIC_CASES_NOT_HOLDOUT_OR_HISTORICAL_TASKS",
+  "queries": [
+    {"id":"paraphrase-cache-connections","text":"缓存客户端一直借不到可用的会话，工作线程全卡在等待资源，怎么定位？","expected":"redis-pool","exclusive":true},
+    {"id":"paraphrase-cycle-waits","text":"两个数据库事务分别拿住一把锁，又互相等对方释放，业务更新都不动了。","expected":"mysql-deadlock","exclusive":true},
+    {"id":"paraphrase-follower-stale","text":"主节点刚写入的记录，在只读副本过了很久还查不到，怎么确认追赶进度？","expected":"mysql-replica","exclusive":true},
+    {"id":"paraphrase-memory-kill","text":"容器总在内存触顶时被系统杀掉，重建后又重现，如何核对原因？","expected":"k8s-oom","exclusive":true},
+    {"id":"paraphrase-inode","text":"磁盘还剩很多空间，却无法再创建任何小文件，文件编号似乎耗尽了。","expected":"disk-inode","exclusive":true},
+    {"id":"negative-formatting","text":"只调整静态页面字体颜色，不调查任何服务器。","expected":null},
+    {"id":"negative-unrelated","text":"请给一段关于秋天的诗歌，不涉及系统排查。","expected":null}
+  ]
+}

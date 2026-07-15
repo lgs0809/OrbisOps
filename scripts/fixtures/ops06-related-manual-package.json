@@ -1,0 +1,58 @@
+{
+  "fixtureOrigin": "MANUAL_BROWSER_ACCEPTANCE",
+  "globalV1": {
+    "skillId": "skill-ops06-related-manual-fixture",
+    "name": "ops06-related-manual-fixture",
+    "description": "人工浏览器验收：只读调查完整方法包，非模型生成",
+    "category": "GENERAL",
+    "whenToUse": [
+      "本地验收项目 service 1 的只读调查",
+      "核对工作流回执与实际资源状态"
+    ],
+    "whenNotToUse": [
+      "生产写操作",
+      "将工具调用成功视为业务已验收"
+    ],
+    "keywords": [
+      "只读调查",
+      "回执",
+      "acceptance",
+      "service1"
+    ],
+    "content": "# 本地只读调查方法\n\n来源：MANUAL_BROWSER_ACCEPTANCE；这是人工验收夹具，不是模型沉淀或已验证成功经验。\n\n## 适用范围\n仅供 ops-acceptance-a 的本地 service 1 验收；工作流 ops-acceptance-episode-read，目标版本 fixture-1。\n\n## 调查步骤\n1. 先记录项目、服务和调查时间窗。\n2. 运行已发布的只读工作流，核对 metrics_window、logs_window、sql_window 和 target_version 的原始回执。\n3. 将回执 SHA 与工具账本、业务数据库和目标版本交叉核对。\n\n## 边界\n不因 HTTP 200 或 completed 宣告成功。没有实际业务验收时保留 UNVERIFIED；不授予生产写权限。\n\n资源：resources/acceptance-target.json。\n",
+    "artifacts": [
+      {
+        "mediaType": "application/json; charset=utf-8",
+        "role": "RESOURCE",
+        "contentHash": "25482c755bc73739da11ff6c51422dda1d543bdcc358fd78182782187b241b6e",
+        "sizeBytes": 256,
+        "path": "resources/acceptance-target.json",
+        "content": "{\n  \"fixtureOrigin\": \"MANUAL_BROWSER_ACCEPTANCE\",\n  \"projectId\": \"ops-acceptance-a\",\n  \"serviceId\": \"ops-acc-a-service-1\",\n  \"workflowId\": \"ops-acceptance-episode-read\",\n  \"expectedVersion\": \"fixture-1\",\n  \"environment\": \"acceptance\",\n  \"readOnly\": true\n}\n",
+        "encoding": "UTF8"
+      }
+    ],
+    "status": "ENABLED",
+    "updateMode": "MANUAL_ONLY"
+  },
+  "globalV2": {
+    "content": "# 本地只读调查方法\n\n来源：MANUAL_BROWSER_ACCEPTANCE；这是人工验收夹具，不是模型沉淀或已验证成功经验。\n\n## 适用范围\n仅供 ops-acceptance-a 的本地 service 1 验收；工作流 ops-acceptance-episode-read，目标版本 fixture-1。\n\n## 调查步骤\n1. 先记录项目、服务和调查时间窗。\n2. 运行已发布的只读工作流，核对 metrics_window、logs_window、sql_window 和 target_version 的原始回执。\n3. 将回执 SHA 与工具账本、业务数据库和目标版本交叉核对。\n\n## 边界\n不因 HTTP 200 或 completed 宣告成功。没有实际业务验收时保留 UNVERIFIED；不授予生产写权限。\n\n资源：resources/acceptance-target.json。\n\n## 第二版：证据冲突\n当工具账本、数据库或目标版本不一致时，保留原始回执并停止成功判定；只读复查期间不扩大权限。\n",
+    "artifacts": [
+      {
+        "mediaType": "application/json; charset=utf-8",
+        "role": "RESOURCE",
+        "contentHash": "25482c755bc73739da11ff6c51422dda1d543bdcc358fd78182782187b241b6e",
+        "sizeBytes": 256,
+        "path": "resources/acceptance-target.json",
+        "content": "{\n  \"fixtureOrigin\": \"MANUAL_BROWSER_ACCEPTANCE\",\n  \"projectId\": \"ops-acceptance-a\",\n  \"serviceId\": \"ops-acc-a-service-1\",\n  \"workflowId\": \"ops-acceptance-episode-read\",\n  \"expectedVersion\": \"fixture-1\",\n  \"environment\": \"acceptance\",\n  \"readOnly\": true\n}\n",
+        "encoding": "UTF8"
+      }
+    ]
+  },
+  "projectId": "ops-acceptance-a",
+  "projectCopy": {
+    "globalSkillId": "skill-ops06-related-manual-fixture",
+    "skillId": "skill-ops06-related-project-fixture",
+    "name": "ops06-related-project-fixture",
+    "description": "MANUAL_BROWSER_ACCEPTANCE：项目 A 只读调查，完整复制 V2 正文和资源"
+  }
+}

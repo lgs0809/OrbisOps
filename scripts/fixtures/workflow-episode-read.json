@@ -1,0 +1,27 @@
+{
+  "agentId": "ops-acceptance-episode-read",
+  "name": "OPS-05 会话分段验收 · 目标版本只读核验",
+  "description": "独立的跨轮归属验收来源：每轮实际调用本地目标的 target_version；不调用主模型，不制造任务归属或成功经验。",
+  "scopeType": "PROJECT",
+  "projectId": "ops-acceptance-a",
+  "engine": "GRAPH",
+  "schemaVersion": 1,
+  "definitionKind": "SPECIALIZED_WORKFLOW",
+  "workflowInvocationMode": "MANUAL_ONLY",
+  "workflowAutoSelectEnabled": false,
+  "queryRewriteEnabled": false,
+  "ragEnabled": false,
+  "startNodeId": "start",
+  "instruction": "执行定义中的本地只读版本核验，保留完整 MCP 回执。",
+  "nodes": [
+    {"nodeId": "start", "type": "START", "outputKey": "query", "config": {"maxRealToolCalls": 2}},
+    {"nodeId": "version", "type": "AGENT", "agent": "version", "mode": "direct", "outputKey": "answer", "mcpIds": ["$observabilityMcpId"], "config": {
+      "mode": "direct", "actions": [{"mcpId": "$observabilityMcpId", "remoteToolName": "target_version", "argumentBindings": {"window": "input.window"}, "structuredOutputKey": "version", "outputMode": "MCP_EVIDENCE_REFERENCE"}]
+    }},
+    {"nodeId": "end", "type": "END", "outputKey": "final_output", "config": {"outputKeys": ["answer"]}}
+  ],
+  "edges": [
+    {"from": "start", "to": "version", "conditionType": "always", "condition": "always"},
+    {"from": "version", "to": "end", "conditionType": "always", "condition": "always"}
+  ]
+}

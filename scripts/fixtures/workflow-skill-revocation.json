@@ -1,0 +1,120 @@
+{
+  "agentId": "ops-acceptance-skill-revocation",
+  "name": "OPS-07 Skill 撤权与工作流恢复验收",
+  "description": "隔离验收：真实只读版本核验→人工继续关口→第二次核验；观察冻结 Skill 在等待期间被停用后是否停止加载。非模型能力评测。",
+  "scopeType": "PROJECT",
+  "projectId": "ops-acceptance-a",
+  "engine": "GRAPH",
+  "schemaVersion": 1,
+  "definitionKind": "SPECIALIZED_WORKFLOW",
+  "workflowInvocationMode": "MANUAL_ONLY",
+  "workflowAutoSelectEnabled": false,
+  "queryRewriteEnabled": false,
+  "ragEnabled": false,
+  "startNodeId": "start",
+  "instruction": "执行定义中的本地只读版本核验，保留完整 MCP 回执。",
+  "nodes": [
+    {
+      "nodeId": "start",
+      "type": "START",
+      "outputKey": "query",
+      "config": {
+        "maxRealToolCalls": 4
+      }
+    },
+    {
+      "nodeId": "version-before",
+      "type": "AGENT",
+      "agent": "version-before",
+      "mode": "direct",
+      "outputKey": "before",
+      "mcpIds": [
+        "$observabilityMcpId"
+      ],
+      "config": {
+        "mode": "direct",
+        "actions": [
+          {
+            "mcpId": "$observabilityMcpId",
+            "remoteToolName": "target_version",
+            "argumentBindings": {
+              "window": "input.window"
+            },
+            "structuredOutputKey": "version",
+            "outputMode": "MCP_EVIDENCE_REFERENCE"
+          }
+        ]
+      }
+    },
+    {
+      "nodeId": "review",
+      "type": "HUMAN_APPROVAL",
+      "description": "仅批准继续本地只读核验。此关口不授予生产写权限，Skill 被撤权时必须停止加载。",
+      "outputKey": "reviewResult",
+      "config": {
+        "timeoutSeconds": 3600
+      }
+    },
+    {
+      "nodeId": "version-after",
+      "type": "AGENT",
+      "agent": "version-after",
+      "mode": "direct",
+      "outputKey": "after",
+      "mcpIds": [
+        "$observabilityMcpId"
+      ],
+      "config": {
+        "mode": "direct",
+        "actions": [
+          {
+            "mcpId": "$observabilityMcpId",
+            "remoteToolName": "target_version",
+            "argumentBindings": {
+              "window": "input.window"
+            },
+            "structuredOutputKey": "version",
+            "outputMode": "MCP_EVIDENCE_REFERENCE"
+          }
+        ]
+      }
+    },
+    {
+      "nodeId": "end",
+      "type": "END",
+      "outputKey": "final_output",
+      "config": {
+        "outputKeys": [
+          "before",
+          "after"
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "start",
+      "to": "version-before",
+      "conditionType": "always",
+      "condition": "always"
+    },
+    {
+      "from": "version-before",
+      "to": "review",
+      "conditionType": "always",
+      "condition": "always"
+    },
+    {
+      "from": "review",
+      "to": "version-after",
+      "conditionType": "always",
+      "condition": "always"
+    },
+    {
+      "from": "version-after",
+      "to": "end",
+      "conditionType": "always",
+      "condition": "always"
+    }
+  ]
+}

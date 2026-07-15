@@ -1,0 +1,129 @@
+{
+  "agentId": "ops-acceptance-skill-binding",
+  "name": "OPS-07 显式 Skill 绑定验收",
+  "description": "隔离只读工作流：显式绑定来自工作流与节点；同一个 Skill 去重并冻结。实际审批和两次 MCP 回执核验。非模型评测。",
+  "scopeType": "PROJECT",
+  "projectId": "ops-acceptance-a",
+  "engine": "GRAPH",
+  "schemaVersion": 1,
+  "definitionKind": "SPECIALIZED_WORKFLOW",
+  "workflowInvocationMode": "MANUAL_ONLY",
+  "workflowAutoSelectEnabled": false,
+  "queryRewriteEnabled": false,
+  "ragEnabled": false,
+  "startNodeId": "start",
+  "instruction": "执行定义中的本地只读版本核验，保留完整 MCP 回执。",
+  "nodes": [
+    {
+      "nodeId": "start",
+      "type": "START",
+      "outputKey": "query",
+      "config": {
+        "maxRealToolCalls": 4
+      }
+    },
+    {
+      "nodeId": "version-before",
+      "type": "AGENT",
+      "agent": "version-before",
+      "mode": "direct",
+      "outputKey": "before",
+      "mcpIds": [
+        "$observabilityMcpId"
+      ],
+      "config": {
+        "mode": "direct",
+        "actions": [
+          {
+            "mcpId": "$observabilityMcpId",
+            "remoteToolName": "target_version",
+            "argumentBindings": {
+              "window": "input.window"
+            },
+            "structuredOutputKey": "version",
+            "outputMode": "MCP_EVIDENCE_REFERENCE"
+          }
+        ]
+      },
+      "skills": [
+        "skill-ops06-related-project-fixture"
+      ]
+    },
+    {
+      "nodeId": "review",
+      "type": "HUMAN_APPROVAL",
+      "description": "仅批准继续本地只读核验。此关口不授予生产写权限，Skill 被撤权时必须停止加载。",
+      "outputKey": "reviewResult",
+      "config": {
+        "timeoutSeconds": 3600
+      }
+    },
+    {
+      "nodeId": "version-after",
+      "type": "AGENT",
+      "agent": "version-after",
+      "mode": "direct",
+      "outputKey": "after",
+      "mcpIds": [
+        "$observabilityMcpId"
+      ],
+      "config": {
+        "mode": "direct",
+        "actions": [
+          {
+            "mcpId": "$observabilityMcpId",
+            "remoteToolName": "target_version",
+            "argumentBindings": {
+              "window": "input.window"
+            },
+            "structuredOutputKey": "version",
+            "outputMode": "MCP_EVIDENCE_REFERENCE"
+          }
+        ]
+      },
+      "skills": [
+        "skill-ops06-related-project-fixture"
+      ]
+    },
+    {
+      "nodeId": "end",
+      "type": "END",
+      "outputKey": "final_output",
+      "config": {
+        "outputKeys": [
+          "before",
+          "after"
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "start",
+      "to": "version-before",
+      "conditionType": "always",
+      "condition": "always"
+    },
+    {
+      "from": "version-before",
+      "to": "review",
+      "conditionType": "always",
+      "condition": "always"
+    },
+    {
+      "from": "review",
+      "to": "version-after",
+      "conditionType": "always",
+      "condition": "always"
+    },
+    {
+      "from": "version-after",
+      "to": "end",
+      "conditionType": "always",
+      "condition": "always"
+    }
+  ],
+  "skills": [
+    "skill-ops06-related-project-fixture"
+  ]
+}

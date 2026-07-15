@@ -1,0 +1,443 @@
+{
+  "agentId": "ops-business-alert-b",
+  "schemaVersion": 1,
+  "name": "B · 告警关联定位（真实只读证据）",
+  "projectId": "ops-acceptance-a",
+  "engine": "HYBRID",
+  "description": "自然语言入口，内部解析授权目标；必要信息缺失时自然追问。B 业务图：固定指标→日志→按慢 SQL 线索分支→证据评审→有界 EXPLAIN 补查。真实工具派发上限 12（含重试），本版固定补查最多 1 轮；不修改业务资源。模型调查另受凭据门槛约束，未执行模型不宣称根因确认。",
+  "instruction": "按发布图收集当前项目真实证据，完整保留受限结论。禁止把 FOUND 或报告完成当成根因确认。",
+  "definitionKind": "SPECIALIZED_WORKFLOW",
+  "workflowInvocationMode": "MANUAL_ONLY",
+  "workflowAutoSelectEnabled": false,
+  "queryRewriteEnabled": false,
+  "ragEnabled": false,
+  "startNodeId": "start",
+  "nodes": [
+    {
+      "nodeId": "start",
+      "type": "START",
+      "config": {
+        "inputKeys": [
+          "query"
+        ],
+        "maxRealToolCalls": 12,
+        "position": {
+          "x": 40,
+          "y": 40
+        }
+      }
+    },
+    {
+      "nodeId": "resolve_request",
+      "type": "AGENT",
+      "mode": "REACT",
+      "agent": "ops-request-resolver",
+      "modelId": "ops-acceptance-luna",
+      "outputKey": "resolvedRequest",
+      "mcpIds": [
+        "$observabilityMcpId"
+      ],
+      "instruction": "你是工作流内部的输入解析节点。用户只需要自然语言。根据原始问题、可信项目上下文与已授权资源目录识别目标；必须先读取相关 MCP 工具的完整参数说明（enable_mcp_tool），核对 schema 中项目、环境、服务的准确取值，再决定是否缺信息；压缩工具目录尚未显示字段，不代表字段不可发现。授权 schema 对某个必填字段只有一个合法候选时自动使用它，不得再向用户询问；通过名称映射唯一匹配的服务也自动使用。只有完整说明仍显示多个无法区分的实际候选时才询问。不要执行业务查询或任何写操作。不得根据主机名猜项目 ID，不得把用户声明当作授权。只输出符合下方 JSON Schema 的 JSON 对象，不加代码围栏；这是系统内部输出，不让用户填写字段。信息足够则 status=READY；确实无法唯一确定目标才 status=NEED_INFO 并给出简短自然语言 question，询问服务名称或现象，不索要 JSON 或内部 ID。这是告警调查，必须从用户消息或上游真实告警输入取得发生时间与现象；“刚刚”可以用可信当前时间，未给时间且无法确定则询问。保留上游已经明确的目标与告警时间。输出契约：{\"type\": \"object\", \"properties\": {\"status\": {\"type\": \"string\", \"enum\": [\"READY\", \"NEED_INFO\"]}, \"projectId\": {\"type\": \"string\"}, \"environment\": {\"type\": \"string\"}, \"serviceId\": {\"type\": \"string\"}, \"question\": {\"type\": \"string\"}, \"alertTime\": {\"type\": \"string\"}, \"alertContent\": {\"type\": \"string\"}}, \"additionalProperties\": false, \"oneOf\": [{\"properties\": {\"status\": {\"const\": \"READY\"}}, \"required\": [\"status\", \"projectId\", \"environment\", \"serviceId\", \"alertTime\", \"alertContent\"]}, {\"properties\": {\"status\": {\"const\": \"NEED_INFO\"}}, \"required\": [\"status\", \"question\"]}]}",
+      "description": "理解自然语言并在内部匹配授权资源；真正缺信息时自然追问",
+      "config": {
+        "inheritProjectCapabilities": true,
+        "outputContract": {
+          "format": "JSON",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "READY",
+                  "NEED_INFO"
+                ]
+              },
+              "projectId": {
+                "type": "string"
+              },
+              "environment": {
+                "type": "string"
+              },
+              "serviceId": {
+                "type": "string"
+              },
+              "question": {
+                "type": "string"
+              },
+              "alertTime": {
+                "type": "string"
+              },
+              "alertContent": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "oneOf": [
+              {
+                "properties": {
+                  "status": {
+                    "const": "READY"
+                  }
+                },
+                "required": [
+                  "status",
+                  "projectId",
+                  "environment",
+                  "serviceId",
+                  "alertTime",
+                  "alertContent"
+                ]
+              },
+              {
+                "properties": {
+                  "status": {
+                    "const": "NEED_INFO"
+                  }
+                },
+                "required": [
+                  "status",
+                  "question"
+                ]
+              }
+            ]
+          }
+        },
+        "position": {
+          "x": 40,
+          "y": -280
+        }
+      }
+    },
+    {
+      "nodeId": "route_request",
+      "type": "ROUTER",
+      "config": {
+        "inputKey": "resolvedRequest",
+        "inputFormat": "JSON",
+        "routeMode": "single",
+        "position": {
+          "x": 390,
+          "y": -280
+        }
+      },
+      "agent": "ops-observability-rules"
+    },
+    {
+      "nodeId": "clarify_request",
+      "type": "ROUTER",
+      "description": "向用户显示自然语言追问",
+      "config": {
+        "inputKey": "question",
+        "routeMode": "single",
+        "position": {
+          "x": 740,
+          "y": -280
+        }
+      },
+      "agent": "ops-observability-rules"
+    },
+    {
+      "nodeId": "window",
+      "type": "ROUTER",
+      "agent": "ops-observability-rules",
+      "description": "冻结已产生的告警前后窗口",
+      "config": {
+        "observability": {
+          "operation": "WINDOW_ALERT",
+          "outputKey": "window"
+        },
+        "routeMode": "single",
+        "position": {
+          "x": 390,
+          "y": 40
+        },
+        "requestInputKey": "resolvedRequest"
+      }
+    },
+    {
+      "nodeId": "metrics",
+      "type": "AGENT",
+      "mode": "DIRECT",
+      "agent": "ops-observability-reader",
+      "mcpIds": [
+        "$observabilityMcpId"
+      ],
+      "description": "采集真实 Prometheus 计数器、up 和直方图",
+      "config": {
+        "actions": [
+          {
+            "mcpId": "$observabilityMcpId",
+            "remoteToolName": "metrics_window",
+            "argumentBindings": {
+              "window": "nodeOutput.workflowData_window.queryScope"
+            },
+            "structuredOutputKey": "metrics",
+            "outputMode": "MCP_EVIDENCE_REFERENCE"
+          }
+        ],
+        "position": {
+          "x": 740,
+          "y": 40
+        }
+      }
+    },
+    {
+      "nodeId": "logs",
+      "type": "AGENT",
+      "mode": "DIRECT",
+      "agent": "ops-observability-reader",
+      "mcpIds": [
+        "$observabilityMcpId"
+      ],
+      "description": "按项目、服务与冻结窗口查询真实 Elasticsearch 日志",
+      "config": {
+        "actions": [
+          {
+            "mcpId": "$observabilityMcpId",
+            "remoteToolName": "logs_window",
+            "argumentBindings": {
+              "window": "nodeOutput.workflowData_window.queryScope"
+            },
+            "structuredOutputKey": "logs",
+            "outputMode": "MCP_EVIDENCE_REFERENCE"
+          }
+        ],
+        "position": {
+          "x": 740,
+          "y": 240
+        }
+      }
+    },
+    {
+      "nodeId": "review",
+      "type": "ROUTER",
+      "agent": "ops-observability-rules",
+      "description": "核对真实证据、缺口及只读数据库分支",
+      "config": {
+        "observability": {
+          "operation": "REVIEW_ALERT",
+          "outputKey": "report",
+          "windowKey": "window",
+          "metricsKey": "metrics",
+          "logsKey": "logs",
+          "sqlKey": "sql",
+          "explainKey": "explain"
+        },
+        "routeMode": "single",
+        "position": {
+          "x": 390,
+          "y": 240
+        }
+      }
+    },
+    {
+      "nodeId": "sql",
+      "type": "AGENT",
+      "mode": "DIRECT",
+      "agent": "ops-observability-reader",
+      "mcpIds": [
+        "$observabilityMcpId"
+      ],
+      "description": "存在慢 SQL 线索时查询实际请求账本",
+      "config": {
+        "actions": [
+          {
+            "mcpId": "$observabilityMcpId",
+            "remoteToolName": "sql_window",
+            "argumentBindings": {
+              "window": "nodeOutput.workflowData_window.queryScope"
+            },
+            "structuredOutputKey": "sql",
+            "outputMode": "MCP_EVIDENCE_REFERENCE"
+          }
+        ],
+        "position": {
+          "x": 40,
+          "y": 440
+        }
+      }
+    },
+    {
+      "nodeId": "sql-review",
+      "type": "ROUTER",
+      "agent": "ops-observability-rules",
+      "description": "核对真实证据、缺口及只读数据库分支",
+      "config": {
+        "observability": {
+          "operation": "REVIEW_ALERT",
+          "outputKey": "report",
+          "windowKey": "window",
+          "metricsKey": "metrics",
+          "logsKey": "logs",
+          "sqlKey": "sql",
+          "explainKey": "explain"
+        },
+        "routeMode": "single",
+        "position": {
+          "x": 390,
+          "y": 440
+        }
+      }
+    },
+    {
+      "nodeId": "explain",
+      "type": "AGENT",
+      "mode": "DIRECT",
+      "agent": "ops-observability-reader",
+      "mcpIds": [
+        "$observabilityMcpId"
+      ],
+      "description": "第 1 轮补查：仅对已发现的订单读模板执行只读 EXPLAIN",
+      "config": {
+        "actions": [
+          {
+            "mcpId": "$observabilityMcpId",
+            "remoteToolName": "sql_explain",
+            "argumentBindings": {
+              "window": "nodeOutput.workflowData_window.queryScope",
+              "orderId": "nodeOutput.workflowData_sql.normalizedContent.firstSlowOrderId"
+            },
+            "structuredOutputKey": "explain",
+            "outputMode": "MCP_EVIDENCE_REFERENCE"
+          }
+        ],
+        "position": {
+          "x": 740,
+          "y": 440
+        }
+      }
+    },
+    {
+      "nodeId": "report",
+      "type": "ROUTER",
+      "agent": "ops-observability-rules",
+      "description": "核对真实证据、缺口及只读数据库分支",
+      "config": {
+        "observability": {
+          "operation": "REVIEW_ALERT",
+          "outputKey": "report",
+          "windowKey": "window",
+          "metricsKey": "metrics",
+          "logsKey": "logs",
+          "sqlKey": "sql",
+          "explainKey": "explain"
+        },
+        "routeMode": "single",
+        "position": {
+          "x": 740,
+          "y": 640
+        }
+      }
+    },
+    {
+      "nodeId": "end",
+      "type": "END",
+      "config": {
+        "outputKeys": [
+          "workflowData_report"
+        ],
+        "position": {
+          "x": 390,
+          "y": 640
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "start",
+      "to": "resolve_request",
+      "conditionType": "always",
+      "condition": "always"
+    },
+    {
+      "from": "window",
+      "to": "metrics",
+      "conditionType": "always",
+      "condition": "always"
+    },
+    {
+      "from": "metrics",
+      "to": "logs",
+      "conditionType": "always",
+      "condition": "always"
+    },
+    {
+      "from": "logs",
+      "to": "review",
+      "conditionType": "always",
+      "condition": "always"
+    },
+    {
+      "from": "sql",
+      "to": "sql-review",
+      "conditionType": "always",
+      "condition": "always"
+    },
+    {
+      "from": "explain",
+      "to": "report",
+      "conditionType": "always",
+      "condition": "always"
+    },
+    {
+      "from": "report",
+      "to": "end",
+      "conditionType": "always",
+      "condition": "always"
+    },
+    {
+      "from": "review",
+      "to": "sql",
+      "conditionType": "expression",
+      "condition": "nodeOutput.workflowData_report.needsSql == true",
+      "name": "发现慢 SQL 线索"
+    },
+    {
+      "from": "review",
+      "to": "end",
+      "conditionType": "default",
+      "condition": "default",
+      "name": "无可用慢 SQL 线索"
+    },
+    {
+      "from": "sql-review",
+      "to": "explain",
+      "conditionType": "expression",
+      "condition": "nodeOutput.workflowData_report.slowSqlFinding == \"FOUND\"",
+      "name": "确认慢 SQL 记录"
+    },
+    {
+      "from": "sql-review",
+      "to": "end",
+      "conditionType": "default",
+      "condition": "default",
+      "name": "SQL 不可用或未确认"
+    },
+    {
+      "from": "resolve_request",
+      "to": "route_request",
+      "conditionType": "always",
+      "condition": "always"
+    },
+    {
+      "from": "route_request",
+      "to": "window",
+      "conditionType": "expression",
+      "condition": "nodeOutput.status == \"READY\""
+    },
+    {
+      "from": "route_request",
+      "to": "clarify_request",
+      "conditionType": "default",
+      "condition": "default"
+    },
+    {
+      "from": "clarify_request",
+      "to": "end",
+      "conditionType": "always",
+      "condition": "always"
+    }
+  ]
+}

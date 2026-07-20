@@ -304,18 +304,19 @@ make acceptance
 The backend includes a dependency-only Compose stack for MySQL, PostgreSQL/pgvector, and Redis. No default production credential is embedded in the repository.
 
 ```bash
-cd server
-cp config/orbisops.env.example .env
+cp server/config/orbisops.env.example server/.env
 ```
 
-Edit `.env`, load the variables into your shell, and start dependencies:
+Edit `server/.env` before sourcing it. Replace every `[REDACTED_SECRET]` placeholder. On the very first start, also set `ORBISOPS_BOOTSTRAP_ADMIN_ENABLED=true` and provide `ORBISOPS_BOOTSTRAP_ADMIN_USERNAME` / `ORBISOPS_BOOTSTRAP_ADMIN_PASSWORD`; after the administrator has been created, set the flag back to `false` before the next restart.
+
+Load the variables into your shell and start dependencies:
 
 ```bash
 set -a
-source .env
+source server/.env
 set +a
 
-docker compose up -d
+(cd server && docker compose up -d)
 ```
 
 ### 3. Apply database migrations
@@ -323,15 +324,13 @@ docker compose up -d
 The migration runner verifies SHA-256 checksums before applying every migration. Configure a local MySQL client defaults file as described in the server guide, then run:
 
 ```bash
-cd server
-MYSQL_DEFAULTS_FILE="$HOME/.config/orbisops/mysql.cnf" ./scripts/db-migrate.sh
+(cd server && MYSQL_DEFAULTS_FILE="$HOME/.config/orbisops/mysql.cnf" bash ./scripts/db-migrate.sh)
 ```
 
 ### 4. Run the backend
 
 ```bash
-cd server
-mvn -pl orbisops-app -am spring-boot:run
+(cd server && mvn -pl orbisops-app -am spring-boot:run)
 ```
 
 The default HTTP port is `8099` and can be overridden with `SERVER_PORT`.
@@ -343,6 +342,8 @@ cd web
 npm ci
 npm run dev
 ```
+
+The web console reads the backend endpoint from its build/runtime environment; the default development target is `http://127.0.0.1:8099`.
 
 For the complete secure bootstrap flow, first-admin setup, production settings, migration rules, and MCP onboarding, see [`server/README.md`](server/README.md).
 
@@ -392,7 +393,7 @@ OrbisOps defaults to fail-closed behavior:
 The repository currently carries a large executable architecture and behavior suite:
 
 - **4,000+ backend tests** covering domain policy, application use cases, runtime behavior, architecture boundaries, persistence, Testcontainers and MCP integration;
-- **117 frontend Vitest tests** plus TypeScript checking and production compilation;
+- **118 frontend Vitest tests** plus TypeScript checking and production compilation;
 - **36 Chrome Playwright acceptance scenarios**, including 390px mobile, 820px tablet, and desktop coverage;
 - architecture gates for DDD layer direction, bounded-context imports, cross-context application coupling, runtime authority, workflow/tool boundaries and retired compatibility paths;
 - migration checksum verification;

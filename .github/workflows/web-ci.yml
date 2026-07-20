@@ -36,5 +36,17 @@ jobs:
       - name: Install
         run: npm ci
 
+      - name: Install Playwright Chrome
+        run: npx playwright install --with-deps chrome
+
       - name: Verify
         run: npm run verify
+
+      - name: Product acceptance
+        run: npm run test:e2e
+
+      - name: Build container image
+        run: docker build --load -t orbisops/web:ci .
+
+      - name: Smoke web container
+        run: docker run --rm --entrypoint sh orbisops/web:ci -c 'nginx -t && test -f /usr/share/nginx/html/index.html'

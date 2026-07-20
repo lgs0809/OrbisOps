@@ -143,7 +143,7 @@ Protect the file and run migrations:
 
 ```bash
 chmod 600 ~/.config/orbisops/mysql.cnf
-MYSQL_DEFAULTS_FILE="$HOME/.config/orbisops/mysql.cnf" ./scripts/db-migrate.sh
+MYSQL_DEFAULTS_FILE="$HOME/.config/orbisops/mysql.cnf" bash ./scripts/db-migrate.sh
 ```
 
 Every migration is SHA-256 checked before execution and recorded in `orbisops_schema_history`.
@@ -167,6 +167,9 @@ export OPENAI_BASE_URL='https://your-openai-compatible-endpoint'
 export OPENAI_API_KEY='[REDACTED_SECRET]'
 export OPENAI_CHAT_MODEL='your-chat-model'
 export ADMIN_JWT_SECRET='[REDACTED_SECRET]'
+export OPS_ES_URL='http://127.0.0.1:9200'
+export OPS_PROMETHEUS_URL='http://127.0.0.1:9090'
+export OPS_ALLOWED_ORIGIN_PATTERNS='https://your-orbisops-web.example.com'
 ```
 
 `application-prod.yml` contains the complete set of optional runtime settings.

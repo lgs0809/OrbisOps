@@ -53,3 +53,19 @@ jobs:
 
       - name: Test
         run: mvn -B test
+
+      - name: Package
+        run: mvn -B -DskipTests package
+
+      - name: Build container image
+        run: docker build --load -t orbisops/server:ci -f orbisops-app/Dockerfile .
+
+      - name: Smoke container runtime dependencies
+        run: |
+          docker run --rm --entrypoint sh orbisops/server:ci -c '
+            test "$(id -u)" = "10001" &&
+            test -w /var/lib/orbisops/repair &&
+            test -f /opt/orbisops/scripts/mcp/mysql-readonly-mcp-server.mjs &&
+            node --check /opt/orbisops/scripts/mcp/mysql-readonly-mcp-server.mjs &&
+            git --version && mysql --version && psql --version
+          '

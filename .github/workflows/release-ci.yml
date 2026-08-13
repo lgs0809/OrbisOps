@@ -1,0 +1,33 @@
+name: Release Hygiene
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hygiene:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check working tree release hygiene
+        run: python3 scripts/release-hygiene.py
+
+      - name: Check Git history release hygiene
+        run: python3 scripts/history-hygiene.py
+
+      - name: Validate public Compose template
+        run: docker compose --env-file deploy/orbisops.env.example config --quiet

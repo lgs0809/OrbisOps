@@ -233,18 +233,18 @@ class OpsMemoryRuntimeTest {
                                 new OpsSemanticVectorWriteAdapter(vectorStoreProvider),
                                 new OpsSemanticLexicalWriteAdapter(
                                         jdbcTemplateProvider,
-                                        () -> "vector_store_qwen_vl_2048"),
+                                        () -> "orbisops_vector_store"),
                                 failureAdapter),
                         SemanticMemoryRetrievalApplicationService.withDefaultFusion(
                                 new OpsSemanticVectorRecallAdapter(vectorStoreProvider),
                                 new OpsSemanticLexicalRecallAdapter(
                                         jdbcTemplateProvider,
-                                        () -> "vector_store_qwen_vl_2048"),
+                                        () -> "orbisops_vector_store"),
                                 failureAdapter),
                         new SemanticMemoryClearApplicationService(
                                 new OpsSemanticMemoryClearPersistenceAdapter(
                                         jdbcTemplateProvider,
-                                        () -> "vector_store_qwen_vl_2048"),
+                                        () -> "orbisops_vector_store"),
                                 failureAdapter));
         OpsPgVectorSemanticMemoryStore store =
                 new OpsPgVectorSemanticMemoryStore(
@@ -262,7 +262,7 @@ class OpsMemoryRuntimeTest {
                 .metadata(Map.of("turn_index", 1))
                 .build());
 
-        verify(jdbcTemplate).update(startsWith("INSERT INTO vector_store_qwen_vl_2048"),
+        verify(jdbcTemplate).update(startsWith("INSERT INTO orbisops_vector_store"),
                 eq("join_metric_5xx 在 /api/group/join 升高"),
                 contains("\"memory_kind\":\"message\""));
     }

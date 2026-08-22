@@ -33,30 +33,29 @@ test('Global command palette supports keyboard navigation, route search, and pro
   });
 
   await page.goto('/home?projectId=payments');
-  const trigger = page.getByRole('button', { name: 'Open global search' });
+  const trigger = page.getByRole('button', { name: '打开全局搜索' });
   await expect(trigger).toBeVisible();
   await page.keyboard.press('Meta+K');
 
-  const search = page.getByRole('textbox', { name: 'Search pages, actions, and projects' });
+  const search = page.getByRole('textbox', { name: '搜索页面、操作和 Project' });
   await expect(search).toBeVisible();
   await search.fill('mcp');
-  const results = page.getByRole('listbox', { name: 'Search results' });
-  await expect(results.getByRole('option').filter({ hasText: 'Tools / MCP' })).toBeVisible();
+  const results = page.getByRole('listbox', { name: '搜索结果' });
+  await expect(results.getByRole('option').filter({ hasText: '工具 / MCP' })).toBeVisible();
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/\/platform\/tools\?projectId=payments$/);
+  await expect(page).toHaveURL(/\/settings\/tools\?projectId=payments$/);
 
-  await page.getByRole('button', { name: 'Open global search' }).click();
+  await page.getByRole('button', { name: '打开全局搜索' }).click();
   await search.fill('orders');
-  await expect(results.getByRole('option').filter({ hasText: 'Switch project · Orders' })).toBeVisible();
+  await expect(results.getByRole('option').filter({ hasText: '切换 Project · Orders' })).toBeVisible();
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/\/platform\/tools\?projectId=orders$/);
+  await expect(page).toHaveURL(/\/settings\/tools\?projectId=orders$/);
 
   await expect(trigger).toBeVisible();
   await page.keyboard.press('Meta+K');
-  await search.fill('start diagnosis');
-  await page.keyboard.press('ArrowDown');
-  await page.keyboard.press('ArrowUp');
+  await search.fill('打开对话');
+  await expect(results.getByRole('option').filter({ hasText: '打开对话' })).toBeVisible();
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/\/work\/diagnosis\?projectId=orders$/);
+  await expect(page).toHaveURL(/\/chat\?projectId=orders$/);
   expect(unexpectedPageErrors).toEqual([]);
 });

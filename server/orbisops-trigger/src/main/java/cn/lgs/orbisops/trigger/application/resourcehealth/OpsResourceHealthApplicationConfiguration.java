@@ -28,17 +28,17 @@ public class OpsResourceHealthApplicationConfiguration {
             ModelResourceHealthProbePort modelProbe,
             McpRegistryResourceHealthProbePort mcpProbe,
             ChannelResourceHealthProbePort channelProbe,
-            @Value("${ops.elasticsearch-url:http://127.0.0.1:9200}")
+            @Value("${orbisops.elasticsearch-url:http://127.0.0.1:9200}")
             String elasticsearchUrl,
-            @Value("${ops.elasticsearch-index:}")
+            @Value("${orbisops.elasticsearch-index:}")
             String elasticsearchIndex,
-            @Value("${ops.prometheus-url:http://127.0.0.1:9090}")
+            @Value("${orbisops.prometheus-url:http://127.0.0.1:9090}")
             String prometheusUrl,
-            @Value("${ops.prometheus-job:}")
+            @Value("${orbisops.prometheus-job:}")
             String prometheusJob,
-            @Value("${ops.prometheus-instance:}")
+            @Value("${orbisops.prometheus-instance:}")
             String prometheusInstance,
-            @Value("${ops.rag.vector-table-name:vector_store_qwen_vl_2048}")
+            @Value("${orbisops.rag.vector-table-name:orbisops_vector_store}")
             String ragVectorTableName) {
         return new ResourceHealthApplicationService(
                 mySqlProbe,

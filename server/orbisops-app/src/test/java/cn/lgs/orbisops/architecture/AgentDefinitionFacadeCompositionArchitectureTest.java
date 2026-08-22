@@ -64,9 +64,9 @@ class AgentDefinitionFacadeCompositionArchitectureTest {
         String settings = read(ROOT + "OpsAgentDefinitionRuntimeSettings.java");
 
         assertAll(
-                () -> assertTrue(settings.contains("ops.agents.locations")),
-                () -> assertTrue(settings.contains("ops.agents.default-agent-id")),
-                () -> assertTrue(settings.contains("ops.agents.jdbc-enabled")),
+                () -> assertTrue(settings.contains("orbisops.agents.locations")),
+                () -> assertTrue(settings.contains("orbisops.agents.default-agent-id")),
+                () -> assertTrue(settings.contains("orbisops.agents.jdbc-enabled")),
                 () -> assertTrue(settings.contains("volatile String effectiveDefaultAgentId")),
                 () -> assertTrue(settings.contains("useEffectiveDefaultAgentId")),
                 () -> assertFalse(settings.contains("IAgentDefinitionRepository")),

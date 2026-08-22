@@ -7,17 +7,17 @@ import type { OpsChannelReadiness, OpsChannelReadinessCheck } from '../../../ser
 const { Text } = Typography;
 
 const label: Record<OpsChannelReadinessCheck['kind'], string> = {
-  CREDENTIALS: 'Credentials',
-  CONNECTION: 'Connection',
-  INBOUND: 'Inbound',
-  OUTBOUND: 'Outbound',
-  IDENTITY_ACCESS: 'Identity / Access',
+  CREDENTIALS: '凭据',
+  CONNECTION: '连接',
+  INBOUND: '接收消息',
+  OUTBOUND: '发送消息',
+  IDENTITY_ACCESS: '身份与访问',
 };
 
 const checkTag = (check: OpsChannelReadinessCheck) => {
   const color = check.status === 'PASS' ? 'green' : check.status === 'BLOCKED_EXTERNAL' ? 'red' : 'orange';
   const marker = check.status === 'PASS' ? '✓' : check.status === 'BLOCKED_EXTERNAL' ? '■' : '◷';
-  return <Tag color={color}>{marker} {check.status === 'PASS' ? 'Pass' : check.status === 'BLOCKED_EXTERNAL' ? 'Blocked external' : 'Action required'}</Tag>;
+  return <Tag color={color}>{marker} {check.status === 'PASS' ? '通过' : check.status === 'BLOCKED_EXTERNAL' ? '外部阻塞' : '需要处理'}</Tag>;
 };
 
 export const ChannelReadinessPanel: React.FC<{
@@ -29,9 +29,9 @@ export const ChannelReadinessPanel: React.FC<{
     <Space wrap style={{ marginBottom: 12 }}>
       <OpsStatusBadge
         status={readiness?.ready ? 'VERIFIED' : readiness ? 'BLOCKED' : 'AWAITING_APPROVAL'}
-        label={readiness?.ready ? 'Channel Ready' : readiness ? 'Not Ready' : 'Readiness not checked'}
+        label={readiness?.ready ? 'Channel 已就绪' : readiness ? '尚未就绪' : '尚未检查就绪状态'}
       />
-      {onRefresh && <Button size="small" loading={loading} onClick={onRefresh}>Refresh checks</Button>}
+      {onRefresh && <Button size="small" loading={loading} onClick={onRefresh}>刷新检查</Button>}
     </Space>
     <div style={{ display: 'grid', gap: 10 }}>
       {(readiness?.checks || []).map((check) => (
@@ -40,10 +40,10 @@ export const ChannelReadinessPanel: React.FC<{
             <Text strong>{label[check.kind]}</Text>
             {checkTag(check)}
           </Space>
-          <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 6 }}>{check.detail || check.reasonCode}</Text>
+          <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 6 }}>{check.detail || '该项检查未通过，请核对 Channel 配置。'}</Text>
         </div>
       ))}
-      {!readiness && <Text type="tertiary">保存 Channel 后运行真实 readiness 检查。只有五项全部通过才会标记 Ready。</Text>}
+      {!readiness && <Text type="tertiary">请先保存 Channel，再执行真实就绪检查；五项检查全部通过后，Channel 才会标记为已就绪。</Text>}
     </div>
   </div>
 );

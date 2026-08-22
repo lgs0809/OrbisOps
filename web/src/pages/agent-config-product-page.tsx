@@ -4,7 +4,7 @@ import { IconAlertTriangle } from '@douyinfe/semi-icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import styled from 'styled-components';
 
-import { AgentConfigPage } from './agent-config';
+import { WorkflowBuilderPage } from './workflow-builder';
 import type { AgentReferenceImpact } from '../services/ops-agent-reference-impact-service';
 import { useAgentReferenceImpactQuery } from '../features/agents/api/agent-list-queries';
 import { theme } from '../styles/theme';
@@ -54,7 +54,7 @@ export const AgentConfigProductPage: React.FC = () => {
 
   return (
     <>
-      <AgentConfigPage />
+      <WorkflowBuilderPage />
       <ImpactPanel aria-label="Workflow 发布影响">
         <Card>
           <Spin spinning={loading}>
@@ -62,32 +62,32 @@ export const AgentConfigProductPage: React.FC = () => {
               <Space wrap>
                 <IconAlertTriangle />
                 <Text strong>发布影响</Text>
-                {!agentId && <Tag color="grey">新 Workflow</Tag>}
+                {!agentId && <Tag color="grey">新建 Workflow</Tag>}
               </Space>
               {!agentId ? (
                 <Paragraph type="tertiary" style={{ margin: 0 }}>
-                  新 Workflow 尚未被巡检、告警或 Channel 引用。发布后可在 Workflow 列表查看引用影响。
+                  当前 Workflow 还没有被自动化或 Channel 引用。发布后可以在工作流列表查看引用影响。
                 </Paragraph>
               ) : impact.totalCount === 0 ? (
                 <Paragraph type="tertiary" style={{ margin: 0 }}>
-                  当前没有自动化引用，新版本不会直接切换任何巡检、告警或 Channel。
+                  当前没有自动化或 Channel 引用该 Workflow，因此发布新版本不会切换任何执行绑定。
                 </Paragraph>
               ) : (
                 <>
                   <Space wrap>
-                    <Tag color="blue">巡检 {impact.scheduleCount}</Tag>
+                    <Tag color="blue">定时 {impact.scheduleCount}</Tag>
                     <Tag color="orange">告警 {impact.alertCount}</Tag>
                     <Tag color="green">Channel {impact.channelCount}</Tag>
                   </Space>
                   <Paragraph type="tertiary" style={{ margin: 0 }}>
-                    {impact.latestPublishedCount} 个 `LATEST_PUBLISHED` 引用会在发布后跟随新版本；
-                    {impact.pinnedVersionCount} 个 `PINNED_VERSION` 引用继续固定原版本。
+                    {impact.latestPublishedCount} 个 `LATEST_PUBLISHED` 引用会跟随新版本；{' '}
+                    {impact.pinnedVersionCount} 个 `PINNED_VERSION` 引用保持固定。
                   </Paragraph>
                 </>
               )}
               <Button
                 size="small"
-                onClick={() => navigate(`/agent-list${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`)}
+                onClick={() => navigate(`/workflows${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`)}
               >
                 查看全部 Workflow 引用
               </Button>

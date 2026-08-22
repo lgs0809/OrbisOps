@@ -15,7 +15,7 @@ public final class JdbcSkillLifecycleSchemaInitializer {
 
     private final JdbcTemplate jdbcTemplate;
 
-    @Value("${ops.skill-lifecycle.auto-init:true}")
+    @Value("${orbisops.skill-lifecycle.auto-init:true}")
     private boolean autoInit;
 
     public JdbcSkillLifecycleSchemaInitializer(

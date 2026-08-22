@@ -21,11 +21,11 @@ class RuntimeSkillResourceBoundaryArchitectureTest {
         String settings = read(RUNTIME + "OpsRuntimeSkillSettings.java");
 
         assertAll(
-                () -> assertTrue(settings.contains("ops.multi-agent.skill-context-enabled")),
-                () -> assertTrue(settings.contains("ops.multi-agent.skill-context-mode")),
-                () -> assertTrue(settings.contains("ops.multi-agent.skill-context-max-chars")),
-                () -> assertTrue(settings.contains("ops.skill-runtime.max-single-skill-chars")),
-                () -> assertTrue(settings.contains("ops.skill-runtime.catalog-summary-max-chars")),
+                () -> assertTrue(settings.contains("orbisops.multi-agent.skill-context-enabled")),
+                () -> assertTrue(settings.contains("orbisops.multi-agent.skill-context-mode")),
+                () -> assertTrue(settings.contains("orbisops.multi-agent.skill-context-max-chars")),
+                () -> assertTrue(settings.contains("orbisops.skill-runtime.max-single-skill-chars")),
+                () -> assertTrue(settings.contains("orbisops.skill-runtime.catalog-summary-max-chars")),
                 () -> assertTrue(settings.contains("forTest")),
                 () -> assertFalse(settings.contains("OpsSkillToolProvider")),
                 () -> assertFalse(settings.contains("SkillCatalogQueryService")),

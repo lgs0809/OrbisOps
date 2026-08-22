@@ -73,7 +73,7 @@ public class OpsLandingOperationRecoveryService {
                 : settings;
     }
 
-    @Scheduled(fixedDelayString = "${ops.approved-landing.recovery.fixed-delay-ms:30000}")
+    @Scheduled(fixedDelayString = "${orbisops.approved-landing.recovery.fixed-delay-ms:30000}")
     public void recoverExpiredUnknown() {
         if (settings.enabled()) {
             recoverOnce(settings.batchSize());

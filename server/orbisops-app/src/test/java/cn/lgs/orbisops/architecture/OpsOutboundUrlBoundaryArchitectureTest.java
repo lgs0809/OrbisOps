@@ -47,8 +47,8 @@ class OpsOutboundUrlBoundaryArchitectureTest {
                 () -> assertFalse(addressPolicy.contains("@Component")),
                 () -> assertTrue(dnsPort.contains("public interface OpsOutboundDnsResolver")),
                 () -> assertTrue(dnsAdapter.contains("InetAddress.getAllByName(host)")),
-                () -> assertTrue(configuration.contains("ops.channel.webhook.allow-loopback")),
-                () -> assertTrue(configuration.contains("ops.channel.webhook.allowed-hosts")));
+                () -> assertTrue(configuration.contains("orbisops.channel.webhook.allow-loopback")),
+                () -> assertTrue(configuration.contains("orbisops.channel.webhook.allowed-hosts")));
     }
 
     private String read(String relativePath) throws IOException {

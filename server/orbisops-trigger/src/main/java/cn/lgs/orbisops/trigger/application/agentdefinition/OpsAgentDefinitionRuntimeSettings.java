@@ -14,11 +14,11 @@ public class OpsAgentDefinitionRuntimeSettings {
     private volatile String effectiveDefaultAgentId;
 
     public OpsAgentDefinitionRuntimeSettings(
-            @Value("${ops.agents.locations:classpath*:/agents/ops/*.yml,classpath*:/agents/ops/*.yaml}")
+            @Value("${orbisops.agents.locations:classpath*:/agents/ops/*.yml,classpath*:/agents/ops/*.yaml}")
             String locations,
-            @Value("${ops.agents.default-agent-id:" + OpsAgentDefinitionDefaults.DEFAULT_AGENT_ID + "}")
+            @Value("${orbisops.agents.default-agent-id:" + OpsAgentDefinitionDefaults.DEFAULT_AGENT_ID + "}")
             String configuredDefaultAgentId,
-            @Value("${ops.agents.jdbc-enabled:true}")
+            @Value("${orbisops.agents.jdbc-enabled:true}")
             boolean jdbcEnabled) {
         this.locations = locations;
         this.configuredDefaultAgentId = StringUtils.hasText(configuredDefaultAgentId)

@@ -18,9 +18,9 @@ describe('change package summary', () => {
     });
 
     expect(summary.title).toBe('Restart payment service');
-    expect(summary.statusLabel).toBe('待审批');
-    expect(summary.riskLabel).toBe('高风险');
-    expect(summary.reasonLabel).toBe('验证通过，可提交审核');
+    expect(summary.statusLabel).toBe('等待审批');
+    expect(summary.riskLabel).toBe('高');
+    expect(summary.reasonLabel).toBe('校验通过，可以提交审批');
     expect(summary.incidentId).toBe('inc-1');
   });
 
@@ -34,7 +34,7 @@ describe('change package summary', () => {
     });
 
     expect(summary.title).toBe('cp-2');
-    expect(summary.statusLabel).toBe('已落地');
+    expect(summary.statusLabel).toBe('已 Landing');
     expect(summary.packageHash).toBe('hash-2');
     expect(summary.landingRunId).toBe('landing-2');
     expect(summary.targetEnvironment).toBeUndefined();

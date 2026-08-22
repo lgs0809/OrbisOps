@@ -26,8 +26,11 @@ import cn.lgs.orbisops.application.memory.MemoryRetrievalApplicationService;
 import cn.lgs.orbisops.application.memory.MemorySelectionReferenceApplicationService;
 import cn.lgs.orbisops.application.memory.MemorySessionClearApplicationService;
 import cn.lgs.orbisops.application.memory.QueryRuntimeMemoryUseCase;
+import cn.lgs.orbisops.application.memory.SemanticLexicalRecallPort;
+import cn.lgs.orbisops.application.memory.SemanticLexicalWritePort;
 import cn.lgs.orbisops.application.memory.SemanticMemoryApplicationFacade;
 import cn.lgs.orbisops.application.memory.SemanticMemoryClearApplicationService;
+import cn.lgs.orbisops.application.memory.SemanticMemoryClearPersistencePort;
 import cn.lgs.orbisops.application.memory.SemanticMemoryClearPort;
 import cn.lgs.orbisops.application.memory.SemanticMemoryQueryPort;
 import cn.lgs.orbisops.application.memory.SemanticMemoryRetrievalApplicationService;
@@ -49,9 +52,6 @@ import cn.lgs.orbisops.domain.memory.service.MemorySceneClassificationPolicy;
 import cn.lgs.orbisops.domain.memory.service.MemorySelectionPolicy;
 import cn.lgs.orbisops.domain.memory.service.SemanticMemoryFusionPolicy;
 import cn.lgs.orbisops.domain.memory.service.SemanticMemoryPolicy;
-import cn.lgs.orbisops.infrastructure.adapter.repository.OpsSemanticLexicalRecallAdapter;
-import cn.lgs.orbisops.infrastructure.adapter.repository.OpsSemanticLexicalWriteAdapter;
-import cn.lgs.orbisops.infrastructure.adapter.repository.OpsSemanticMemoryClearPersistenceAdapter;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -90,7 +90,7 @@ public class OpsMemoryApplicationConfiguration {
     public GovernedMemoryApplicationService governedMemoryApplicationService(
             IGovernedMemoryRepository repository,
             OpsGovernedMemoryExternalAuditAdapter externalAuditAdapter,
-            @Value("${ops.memory.default-ttl:PT24H}") Duration defaultTtl) {
+            @Value("${orbisops.memory.default-ttl:PT24H}") Duration defaultTtl) {
         return new GovernedMemoryApplicationService(
                 repository,
                 new GovernedMemoryPolicy(),
@@ -105,7 +105,7 @@ public class OpsMemoryApplicationConfiguration {
     public ColdMemoryStoreApplicationService coldMemoryStoreApplicationService(
             ObjectProvider<IColdMemoryRepository> repositoryProvider,
             OpsColdMemoryStoreFailureAdapter failureAdapter,
-            @Value("${ops.chat.memory.jdbc-enabled:true}") boolean jdbcEnabled) {
+            @Value("${orbisops.chat.memory.jdbc-enabled:true}") boolean jdbcEnabled) {
         IColdMemoryRepository repository = repositoryProvider == null
                 ? null
                 : repositoryProvider.getIfAvailable();
@@ -168,7 +168,7 @@ public class OpsMemoryApplicationConfiguration {
     @Bean
     public SemanticMemoryRetrievalApplicationService semanticMemoryRetrievalApplicationService(
             OpsSemanticVectorRecallAdapter vectorRecallAdapter,
-            OpsSemanticLexicalRecallAdapter lexicalRecallAdapter,
+            SemanticLexicalRecallPort lexicalRecallAdapter,
             OpsSemanticRetrievalFailureAdapter failureAdapter) {
         SemanticMemoryPolicy semanticPolicy = new SemanticMemoryPolicy(new MemoryContentHashPolicy());
         return new SemanticMemoryRetrievalApplicationService(
@@ -181,7 +181,7 @@ public class OpsMemoryApplicationConfiguration {
     @Bean
     public SemanticMemoryWriteApplicationService semanticMemoryWriteApplicationService(
             OpsSemanticVectorWriteAdapter vectorWriteAdapter,
-            OpsSemanticLexicalWriteAdapter lexicalWriteAdapter,
+            SemanticLexicalWritePort lexicalWriteAdapter,
             OpsSemanticRetrievalFailureAdapter failureAdapter) {
         return SemanticMemoryWriteApplicationService.withDefaultPolicy(
                 vectorWriteAdapter,
@@ -191,7 +191,7 @@ public class OpsMemoryApplicationConfiguration {
 
     @Bean
     public SemanticMemoryClearApplicationService semanticMemoryClearApplicationService(
-            OpsSemanticMemoryClearPersistenceAdapter persistenceAdapter,
+            SemanticMemoryClearPersistencePort persistenceAdapter,
             OpsSemanticRetrievalFailureAdapter failureAdapter) {
         return new SemanticMemoryClearApplicationService(persistenceAdapter, failureAdapter);
     }

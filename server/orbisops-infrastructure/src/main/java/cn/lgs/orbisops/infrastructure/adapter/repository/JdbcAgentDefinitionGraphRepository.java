@@ -24,7 +24,7 @@ public class JdbcAgentDefinitionGraphRepository implements IAgentDefinitionGraph
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
     private final JdbcAgentDefinitionSchemaInitializer schemaInitializer;
 
-    @Value("${ops.agents.jdbc-enabled:true}")
+    @Value("${orbisops.agents.jdbc-enabled:true}")
     private boolean jdbcEnabled = true;
 
     JdbcAgentDefinitionGraphRepository(

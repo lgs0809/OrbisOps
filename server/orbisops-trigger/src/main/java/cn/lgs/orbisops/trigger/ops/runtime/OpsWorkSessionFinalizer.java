@@ -2,6 +2,7 @@ package cn.lgs.orbisops.trigger.ops.runtime;
 
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -84,27 +85,44 @@ public class OpsWorkSessionFinalizer {
     }
 
     public void failed(Context context, RuntimeException error, Hooks hooks) {
-        String message = value(error == null ? null : error.getMessage());
+        FailureView failure = failureView(error);
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("runId", value(context.request().getRunId()));
+        payload.put("elapsedMs", elapsedMs(context.startedNanos()));
+        payload.put("reasonCode", failure.reasonCode());
         hooks.record(OpsRuntimeEvent.builder()
                 .eventType("RUN_FAILED")
                 .status("FAILED")
-                .summary(message.isBlank() ? "Agent task failed." : message)
-                .payload(Map.of(
-                        "runId", value(context.request().getRunId()),
-                        "elapsedMs", elapsedMs(context.startedNanos())))
+                .summary(failure.userMessage())
+                .payload(payload)
                 .build());
         hooks.telemetryFailed(elapsedMs(context.startedNanos()));
-        hooks.finishTaskContext("FAILED", message);
+        hooks.finishTaskContext("FAILED", failure.reasonCode());
         if (!context.analysisRequest()) {
-            hooks.appendAssistant("Agent run failed: " + message, Map.of(
+            hooks.appendAssistant(failure.userMessage(), Map.of(
                     "agentId", context.definition().getAgentId(),
                     "engine", context.engine(),
                     "status", "FAILED",
-                    "error", message));
+                    "reasonCode", failure.reasonCode()));
         }
         hooks.recordSkillUsage("FAILED");
-        hooks.finishDurable("FAILED", message, null);
+        hooks.finishDurable("FAILED", failure.reasonCode(), null);
         hooks.markFinished();
+    }
+
+    private FailureView failureView(RuntimeException error) {
+        OpsModelProviderFailureClassifier.Failure providerFailure =
+                OpsModelProviderFailureClassifier.classify(error).orElse(null);
+        if (providerFailure != null) {
+            return new FailureView(
+                    providerFailure.code(),
+                    providerFailure.userMessage() + " 本轮未完成，系统未执行任何生产变更。"
+            );
+        }
+        return new FailureView(
+                "AGENT_RUN_FAILED",
+                "本轮执行未完成。已保留运行过程，请查看任务详情并检查模型或项目连接状态后重试。"
+        );
     }
 
     private OpsAgentChatResponse response(Context context, String status, String content) {
@@ -135,6 +153,9 @@ public class OpsWorkSessionFinalizer {
 
     private String value(String value) {
         return value == null ? "" : value;
+    }
+
+    private record FailureView(String reasonCode, String userMessage) {
     }
 
     public record Context(OpsAgentChatRequest request,

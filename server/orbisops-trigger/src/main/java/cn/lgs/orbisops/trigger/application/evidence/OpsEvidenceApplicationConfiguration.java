@@ -32,7 +32,7 @@ public class OpsEvidenceApplicationConfiguration {
             EvidenceIdentityFactory identities,
             EvidenceAuditPort audit,
             EvidenceTransactionPort transactions,
-            @Value("${ops.tool-result.auto-init:true}") boolean autoInit) {
+            @Value("${orbisops.tool-result.auto-init:true}") boolean autoInit) {
         return new ToolResultApplicationService(results, identities, audit, transactions, autoInit);
     }
 
@@ -42,7 +42,7 @@ public class OpsEvidenceApplicationConfiguration {
             EvidenceIdentityFactory identities,
             EvidenceAuditPort audit,
             EvidenceTransactionPort transactions,
-            @Value("${ops.evidence.auto-init:true}") boolean autoInit) {
+            @Value("${orbisops.evidence.auto-init:true}") boolean autoInit) {
         return new EvidenceApplicationService(evidence, identities, audit, transactions, autoInit);
     }
 
@@ -52,7 +52,7 @@ public class OpsEvidenceApplicationConfiguration {
             EvidenceIdentityFactory identities,
             EvidenceAuditPort audit,
             EvidenceTransactionPort transactions,
-            @Value("${ops.trusted-proof.auto-init:true}") boolean autoInit) {
+            @Value("${orbisops.trusted-proof.auto-init:true}") boolean autoInit) {
         return new TrustedProofApplicationService(proofs, identities, audit, transactions, autoInit);
     }
 }

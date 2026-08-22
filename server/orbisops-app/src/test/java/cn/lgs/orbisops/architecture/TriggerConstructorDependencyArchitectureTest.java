@@ -77,8 +77,8 @@ class TriggerConstructorDependencyArchitectureTest {
                 () -> assertFalse(service.contains("@Autowired")),
                 () -> assertFalse(service.contains("ragEvalRerankEnabled")),
                 () -> assertTrue(settings.contains("public record RagQualityEvalSettings(")),
-                () -> assertTrue(configuration.contains("ops.rag.eval.rerank-enabled")),
-                () -> assertTrue(configuration.contains("ops.rag.eval.rerank-model")));
+                () -> assertTrue(configuration.contains("orbisops.rag.eval.rerank-enabled")),
+                () -> assertTrue(configuration.contains("orbisops.rag.eval.rerank-model")));
     }
 
     @Test

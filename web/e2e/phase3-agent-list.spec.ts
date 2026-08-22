@@ -63,8 +63,8 @@ test('Workflow catalog is project-cached while search stays local', async ({ pag
     return route.fulfill({ status: 200, contentType: 'application/json', body: response([]) });
   });
 
-  await page.goto('/automations/workflows?projectId=demo-project');
-  await expect(page.getByRole('heading', { name: '专项 Workflow' })).toBeVisible();
+  await page.goto('/workflows?projectId=demo-project');
+  await expect(page.getByRole('heading', { name: '工作流' })).toBeVisible();
   await expect(page.getByText('HTTP Diagnosis').first()).toBeVisible();
   await expect(page.getByText('Database Recovery').first()).toBeVisible();
   await expect.poll(() => agentRequests).toBe(1);
@@ -72,8 +72,8 @@ test('Workflow catalog is project-cached while search stays local', async ({ pag
   expect(alertRequests).toBe(1);
   expect(channelRequests).toBe(1);
 
-  await page.getByPlaceholder('请输入名称/描述').fill('Database');
-  await page.getByRole('button', { name: '搜索' }).click();
+  await page.getByPlaceholder('搜索名称或说明').fill('Database');
+  await page.getByRole('button', { name: '搜索', exact: true }).click();
   await expect(page.getByText('Database Recovery').first()).toBeVisible();
   await expect(page.getByText('HTTP Diagnosis')).toHaveCount(0);
   expect(agentRequests).toBe(1);

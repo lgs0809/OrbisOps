@@ -82,7 +82,7 @@ class SemanticMemoryRecallAdapterArchitectureTest {
                 () -> assertFalse(store.contains("implements SemanticMemoryRetrievalFailurePort")),
                 () -> assertTrue(configuration.contains("semanticMemoryRetrievalApplicationService(")),
                 () -> assertTrue(configuration.contains("OpsSemanticVectorRecallAdapter vectorRecallAdapter")),
-                () -> assertTrue(configuration.contains("OpsSemanticLexicalRecallAdapter lexicalRecallAdapter")),
+                () -> assertTrue(configuration.contains("SemanticLexicalRecallPort lexicalRecallAdapter")),
                 () -> assertTrue(configuration.contains("OpsSemanticRetrievalFailureAdapter failureAdapter")));
     }
 

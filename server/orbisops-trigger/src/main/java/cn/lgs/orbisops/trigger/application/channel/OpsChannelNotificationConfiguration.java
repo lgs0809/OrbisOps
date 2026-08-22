@@ -10,9 +10,9 @@ public class OpsChannelNotificationConfiguration {
 
     @Bean
     public OpsChannelNotificationSettings opsChannelNotificationSettings(
-            @Value("${ops.channel.notification.max-message-chars:12000}") int maxMessageChars,
-            @Value("${ops.channel.notification.outbox.max-attempts:8}") int maxAttempts,
-            @Value("${ops.channel.notification.outbox.lease-seconds:120}") int leaseSeconds) {
+            @Value("${orbisops.channel.notification.max-message-chars:12000}") int maxMessageChars,
+            @Value("${orbisops.channel.notification.outbox.max-attempts:8}") int maxAttempts,
+            @Value("${orbisops.channel.notification.outbox.lease-seconds:120}") int leaseSeconds) {
         return new OpsChannelNotificationSettings(maxMessageChars, maxAttempts, leaseSeconds);
     }
 }

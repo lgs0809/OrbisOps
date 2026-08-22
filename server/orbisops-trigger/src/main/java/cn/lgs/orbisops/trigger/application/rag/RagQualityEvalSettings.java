@@ -19,12 +19,12 @@ public record RagQualityEvalSettings(
 
     public static RagQualityEvalSettings defaults() {
         return new RagQualityEvalSettings(
-                true,
-                "cohere",
-                "http://127.0.0.1:8110",
-                "local-rag-models",
+                false,
+                "",
+                "",
+                "",
                 "v1/rerank",
-                "Qwen/Qwen3-VL-Reranker-2B");
+                "");
     }
 
     static RagQualityEvalSettings legacyConstructorDefaults() {

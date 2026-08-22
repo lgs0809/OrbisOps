@@ -165,13 +165,29 @@ public class OpsAgentDefinitionApplicationService {
                         .map(node -> node.getNodeId())
                         .filter(value -> value != null && !value.isBlank())
                         .toList();
+        List<String> requiredRoles = definition.getAgentscopeAgents() == null
+                ? List.of()
+                : definition.getAgentscopeAgents().stream()
+                        .filter(java.util.Objects::nonNull)
+                        .map(agent -> agent.getRole())
+                        .filter(value -> value != null && !value.isBlank())
+                        .distinct()
+                        .toList();
+        Map<String, Object> evalCase = new java.util.LinkedHashMap<>();
+        evalCase.put("name", requiredNodes.isEmpty()
+                ? "ReAct 角色与变更边界"
+                : "Workflow 结构与变更边界");
+        evalCase.put("input", "release-gate");
+        if (!requiredNodes.isEmpty()) {
+            evalCase.put("requiredNodes", requiredNodes);
+        }
+        if (!requiredRoles.isEmpty()) {
+            evalCase.put("requiredRoles", requiredRoles);
+        }
         return Map.of(
                 "projectId", definition.getProjectId(),
                 "name", definition.getAgentId() + " 静态发布门禁",
-                "cases", List.of(Map.of(
-                        "name", "Workflow 结构与变更边界",
-                        "input", "release-gate",
-                        "requiredNodes", requiredNodes)));
+                "cases", List.of(Map.copyOf(evalCase)));
     }
 
     public Map<String, Object> createEvalSuite(String projectId,

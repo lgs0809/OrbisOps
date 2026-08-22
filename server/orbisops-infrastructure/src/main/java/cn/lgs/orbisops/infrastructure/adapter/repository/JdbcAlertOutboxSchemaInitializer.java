@@ -12,7 +12,7 @@ public class JdbcAlertOutboxSchemaInitializer {
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 
-    @Value("${ops.alert-triggers.auto-init:true}")
+    @Value("${orbisops.alert-triggers.auto-init:true}")
     private boolean autoInit;
 
     public JdbcAlertOutboxSchemaInitializer(

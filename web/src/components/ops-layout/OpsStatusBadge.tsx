@@ -14,16 +14,16 @@ export type OpsSemanticStatus =
   | 'FAILED';
 
 const statusPresentation: Record<OpsSemanticStatus, { label: string; marker: string; color: 'blue' | 'cyan' | 'violet' | 'amber' | 'green' | 'red' }> = {
-  OBSERVE: { label: 'Observe', marker: '○', color: 'blue' },
-  EVIDENCE: { label: 'Evidence', marker: '◆', color: 'cyan' },
-  REASONING: { label: 'Reasoning', marker: '◇', color: 'violet' },
-  PROPOSED_CHANGE: { label: 'Proposed change', marker: '△', color: 'amber' },
-  AWAITING_APPROVAL: { label: 'Awaiting approval', marker: '◷', color: 'amber' },
-  APPROVED: { label: 'Approved', marker: '✓', color: 'green' },
-  LANDING: { label: 'Landing', marker: '▶', color: 'blue' },
-  VERIFIED: { label: 'Verified', marker: '✓', color: 'green' },
-  BLOCKED: { label: 'Blocked', marker: '■', color: 'red' },
-  FAILED: { label: 'Failed', marker: '×', color: 'red' },
+  OBSERVE: { label: '观察中', marker: '○', color: 'blue' },
+  EVIDENCE: { label: '证据', marker: '◆', color: 'cyan' },
+  REASONING: { label: '分析中', marker: '◇', color: 'violet' },
+  PROPOSED_CHANGE: { label: '变更待确认', marker: '△', color: 'amber' },
+  AWAITING_APPROVAL: { label: '等待审批', marker: '◷', color: 'amber' },
+  APPROVED: { label: '已批准', marker: '✓', color: 'green' },
+  LANDING: { label: '执行中', marker: '▶', color: 'blue' },
+  VERIFIED: { label: '已验证', marker: '✓', color: 'green' },
+  BLOCKED: { label: '已阻塞', marker: '■', color: 'red' },
+  FAILED: { label: '失败', marker: '×', color: 'red' },
 };
 
 export interface OpsStatusBadgeProps {

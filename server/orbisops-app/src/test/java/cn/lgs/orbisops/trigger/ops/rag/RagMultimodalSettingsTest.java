@@ -55,15 +55,16 @@ class RagMultimodalSettingsTest {
     }
 
     @Test
-    void defaultsMustPreserveExistingConfigurationContract() {
+    void defaultsMustRemainProviderNeutralUntilExplicitlyConfigured() {
         RagMultimodalSettings settings = RagMultimodalSettings.defaults();
 
         assertFalse(settings.enabled());
-        assertEquals("qwen-vl", settings.provider());
-        assertEquals("http://127.0.0.1:8110/v1/multimodalembeddings", settings.endpoint());
-        assertEquals("local-rag-models", settings.apiKey());
-        assertEquals("Qwen/Qwen3-VL-Embedding-2B", settings.model());
-        assertEquals("vector_store_qwen_vl_multimodal", settings.tableName());
+        assertEquals("", settings.provider());
+        assertFalse(settings.providerSupported());
+        assertEquals("/v1/multimodalembeddings", settings.endpoint());
+        assertEquals("", settings.apiKey());
+        assertEquals("", settings.model());
+        assertEquals("orbisops_multimodal_vectors", settings.tableName());
         assertEquals(2048, settings.dimension());
         assertTrue(settings.autoInit());
         assertFalse(settings.indexTextDocuments());

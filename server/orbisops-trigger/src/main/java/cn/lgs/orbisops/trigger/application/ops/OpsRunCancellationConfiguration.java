@@ -10,7 +10,7 @@ public class OpsRunCancellationConfiguration {
 
     @Bean
     public OpsRunCancellationSettings opsRunCancellationSettings(
-            @Value("${ops.runs.cancellation-retention-seconds:600}")
+            @Value("${orbisops.runs.cancellation-retention-seconds:600}")
             long retentionSeconds) {
         return new OpsRunCancellationSettings(retentionSeconds);
     }

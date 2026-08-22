@@ -16,6 +16,7 @@ class DddLayerDependencyArchitectureTest {
 
     private static final String DOMAIN = "orbisops-domain/src/main/java";
     private static final String APPLICATION = "orbisops-application/src/main/java";
+    private static final String API = "orbisops-api/src/main/java";
     private static final String TRIGGER = "orbisops-trigger/src/main/java";
 
     @Test
@@ -47,6 +48,53 @@ class DddLayerDependencyArchitectureTest {
                         "com.fasterxml.jackson"));
 
         assertTrue(violations.isEmpty(), () -> "Application dependency violations:\n" + String.join("\n", violations));
+    }
+
+    @Test
+    void apiMustRemainAFrameworkFreeTransportContractModule() throws IOException {
+        List<String> violations = forbiddenImports(
+                API,
+                List.of(
+                        "cn.lgs.orbisops.application",
+                        "cn.lgs.orbisops.domain",
+                        "cn.lgs.orbisops.infrastructure",
+                        "cn.lgs.orbisops.trigger",
+                        "org.springframework",
+                        "jakarta.servlet",
+                        "org.apache.catalina"));
+
+        assertTrue(violations.isEmpty(), () -> "API dependency violations:\n" + String.join("\n", violations));
+    }
+
+    @Test
+    void triggerMustDependOnApplicationPortsInsteadOfInfrastructureImplementations() throws IOException {
+        List<String> violations = forbiddenImports(
+                TRIGGER,
+                List.of("cn.lgs.orbisops.infrastructure"));
+
+        assertTrue(violations.isEmpty(), () -> "Trigger -> Infrastructure dependency violations:\n"
+                + String.join("\n", violations));
+    }
+
+    @Test
+    void mavenModulesMustPreserveDddDependencyDirection() throws IOException {
+        String domainPom = Files.readString(projectRoot().resolve("orbisops-domain/pom.xml"));
+        String apiPom = Files.readString(projectRoot().resolve("orbisops-api/pom.xml"));
+        String triggerPom = Files.readString(projectRoot().resolve("orbisops-trigger/pom.xml"));
+
+        assertAll(
+                () -> assertTrue(!domainPom.contains("<artifactId>fastjson</artifactId>")),
+                () -> assertTrue(!domainPom.contains("<artifactId>java-jwt</artifactId>")),
+                () -> assertTrue(!domainPom.contains("<artifactId>guava</artifactId>")),
+                () -> assertTrue(!domainPom.contains("<artifactId>commons-codec</artifactId>")),
+                () -> assertTrue(!domainPom.contains("<artifactId>commons-lang3</artifactId>")),
+                () -> assertTrue(!apiPom.contains("<artifactId>spring-webmvc</artifactId>")),
+                () -> assertTrue(!apiPom.contains("<artifactId>tomcat-embed-core</artifactId>")),
+                () -> assertTrue(!apiPom.contains("<artifactId>jakarta.validation-api</artifactId>")),
+                () -> assertTrue(!triggerPom.contains("<artifactId>orbisops-infrastructure</artifactId>")),
+                () -> assertTrue(!triggerPom.contains("<artifactId>agentscope</artifactId>")),
+                () -> assertTrue(!triggerPom.contains("<artifactId>commons-lang3</artifactId>")),
+                () -> assertTrue(!triggerPom.contains("<artifactId>Java-WebSocket</artifactId>")));
     }
 
     @Test

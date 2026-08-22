@@ -80,6 +80,8 @@ public class OpsMainAgentCoordinator {
                     List.of("PROVIDE_MISSING_INPUT"),
                     references(command)));
         } catch (RuntimeException error) {
+            OpsMainAgentOutcome providerFailure = providerFailure(command, error);
+            if (providerFailure != null) return providerFailure;
             return OpsMainAgentOutcome.failed(OpsActionStatus.FAILED, new OpsFailureDescriptor(
                     reasonCode(error, "MAIN_AGENT_ACTION_FAILED"),
                     "ACTION_EXECUTION",
@@ -95,6 +97,71 @@ public class OpsMainAgentCoordinator {
 
     public Map<OpsMainAgentActionType, OpsMainAgentActionHandler> handlers() {
         return handlers;
+    }
+
+    private OpsMainAgentOutcome providerFailure(OpsMainAgentCommand command, RuntimeException error) {
+        String code = providerFailureCode(error);
+        if (code == null) return null;
+        boolean retryable = "MODEL_PROVIDER_RATE_LIMITED".equals(code)
+                || "MODEL_PROVIDER_UNAVAILABLE".equals(code);
+        String message = switch (code) {
+            case "MODEL_PROVIDER_QUOTA_EXHAUSTED" ->
+                    "模型服务当前额度不足，本轮未完成分析或变更准备。请补充额度或切换可用模型后重试；系统没有因此绕过审批或自动执行生产变更。";
+            case "MODEL_PROVIDER_AUTH_FAILED" ->
+                    "模型服务认证失败，本轮未完成分析或变更准备。请检查模型 Provider 的凭据配置后重试；系统没有绕过审批或自动执行生产变更。";
+            case "MODEL_PROVIDER_RATE_LIMITED" ->
+                    "模型服务当前限流，本轮未完成分析或变更准备。稍后可安全重试本轮对话；系统没有绕过审批或自动执行生产变更。";
+            default ->
+                    "模型服务当前不可用，本轮未完成分析或变更准备。恢复模型服务后可重新发起；系统没有绕过审批或自动执行生产变更。";
+        };
+        List<String> recovery = switch (code) {
+            case "MODEL_PROVIDER_QUOTA_EXHAUSTED" -> List.of("REFILL_OR_SWITCH_MODEL", "RETRY_AFTER_MODEL_RECOVERY");
+            case "MODEL_PROVIDER_AUTH_FAILED" -> List.of("REVIEW_MODEL_CREDENTIALS", "RETRY_AFTER_MODEL_RECOVERY");
+            default -> List.of("RETRY_AFTER_MODEL_RECOVERY");
+        };
+        return OpsMainAgentOutcome.failed(
+                retryable ? OpsActionStatus.RETRYABLE_FAILURE : OpsActionStatus.BLOCKED,
+                new OpsFailureDescriptor(
+                        code,
+                        "MODEL_PROVIDER",
+                        OpsFailureCategory.DEPENDENCY,
+                        message,
+                        retryable,
+                        OpsSideEffectState.UNKNOWN,
+                        List.of(),
+                        recovery,
+                        references(command)));
+    }
+
+    private String providerFailureCode(Throwable error) {
+        Throwable current = error;
+        for (int depth = 0; current != null && depth < 12; depth++, current = current.getCause()) {
+            String message = String.valueOf(current.getMessage()).trim();
+            String normalized = message.toLowerCase(Locale.ROOT);
+            if (message.startsWith("MODEL_PROVIDER_QUOTA_EXHAUSTED")
+                    || normalized.contains("insufficient_balance")
+                    || normalized.contains("insufficient account balance")
+                    || normalized.contains("quota exceeded")) {
+                return "MODEL_PROVIDER_QUOTA_EXHAUSTED";
+            }
+            if (message.startsWith("MODEL_PROVIDER_AUTH_FAILED")
+                    || normalized.contains("invalid api key")
+                    || normalized.contains("invalid_api_key")
+                    || normalized.contains("unauthorized")
+                    || normalized.matches("(?s).*\\b401\\b.*")) {
+                return "MODEL_PROVIDER_AUTH_FAILED";
+            }
+            if (message.startsWith("MODEL_PROVIDER_RATE_LIMITED")
+                    || normalized.contains("rate limit")
+                    || normalized.contains("rate_limit")
+                    || normalized.matches("(?s).*\\b429\\b.*")) {
+                return "MODEL_PROVIDER_RATE_LIMITED";
+            }
+            if (message.startsWith("MODEL_PROVIDER_UNAVAILABLE")) {
+                return "MODEL_PROVIDER_UNAVAILABLE";
+            }
+        }
+        return null;
     }
 
     private Map<String, Object> references(OpsMainAgentCommand command) {

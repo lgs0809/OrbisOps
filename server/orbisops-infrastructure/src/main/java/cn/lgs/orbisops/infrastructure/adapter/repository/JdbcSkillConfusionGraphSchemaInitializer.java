@@ -15,7 +15,7 @@ public final class JdbcSkillConfusionGraphSchemaInitializer {
 
     private final JdbcTemplate jdbcTemplate;
 
-    @Value("${ops.skill-confusion.auto-init:true}")
+    @Value("${orbisops.skill-confusion.auto-init:true}")
     private boolean autoInit;
 
     public JdbcSkillConfusionGraphSchemaInitializer(

@@ -48,11 +48,14 @@ class OpsRagKnowledgeSettingsTest {
     }
 
     @Test
-    void defaultsPreserveExistingRuntimeBehavior() {
+    void defaultsRemainProviderNeutralUntilRerankIsConfigured() {
         OpsRagKnowledgeSettings defaults = OpsRagKnowledgeSettings.defaults();
 
-        assertTrue(defaults.rerankEnabled());
-        assertEquals("local-rag-models", defaults.rerankApiKey());
+        assertFalse(defaults.rerankEnabled());
+        assertEquals("", defaults.rerankProvider());
+        assertEquals("", defaults.rerankBaseUrl());
+        assertEquals("", defaults.rerankApiKey());
+        assertEquals("", defaults.rerankModel());
         assertEquals("rule", defaults.queryRewriteMode());
         assertFalse(defaults.llmQueryRewriteEnabled());
         assertFalse(defaults.failOnLlmDegradation());

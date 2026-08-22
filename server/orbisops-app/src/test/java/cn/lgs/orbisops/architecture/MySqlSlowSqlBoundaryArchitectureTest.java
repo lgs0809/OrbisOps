@@ -65,10 +65,10 @@ class MySqlSlowSqlBoundaryArchitectureTest {
                 () -> assertFalse(queryFactory.contains("JdbcTemplate")),
                 () -> assertFalse(queryFactory.contains("java.sql")),
                 () -> assertTrue(configuration.contains("OpsMySqlSlowSqlSettings opsMySqlSlowSqlSettings(")),
-                () -> assertTrue(configuration.contains("${ops.mysql-slow-sql.enabled:true}")),
-                () -> assertTrue(configuration.contains("${ops.mysql-slow-sql.sample-size:10}")),
-                () -> assertTrue(configuration.contains("${ops.mysql-slow-sql.threshold-ms:500}")),
-                () -> assertTrue(configuration.contains("${ops.mysql-slow-sql.performance-schema-fallback:true}")));
+                () -> assertTrue(configuration.contains("${orbisops.mysql-slow-sql.enabled:true}")),
+                () -> assertTrue(configuration.contains("${orbisops.mysql-slow-sql.sample-size:10}")),
+                () -> assertTrue(configuration.contains("${orbisops.mysql-slow-sql.threshold-ms:500}")),
+                () -> assertTrue(configuration.contains("${orbisops.mysql-slow-sql.performance-schema-fallback:true}")));
     }
 
     @Test

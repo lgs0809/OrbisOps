@@ -16,7 +16,7 @@ public class JdbcContextMemorySchemaInitializer {
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 
-    @Value("${ops.context-memory.auto-init:true}")
+    @Value("${orbisops.context-memory.auto-init:true}")
     private boolean autoInit = true;
 
     private volatile boolean initialized;

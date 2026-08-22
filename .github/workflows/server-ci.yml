@@ -39,7 +39,8 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Release hygiene
+      - name: Repository release hygiene
+        working-directory: ${{ github.workspace }}
         run: python3 scripts/release-hygiene.py
 
       - name: Check migration script

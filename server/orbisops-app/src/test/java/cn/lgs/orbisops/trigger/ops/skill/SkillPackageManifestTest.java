@@ -175,7 +175,7 @@ class SkillPackageManifestTest {
         assertThrows(IllegalArgumentException.class, () -> packageWith(
                 Map.of("path", "resources/config.yml", "role", "RESOURCE", "content", "password: real-secret-value")));
         assertThrows(IllegalArgumentException.class, () -> packageWith(
-                Map.of("path", "resources/private.pem", "role", "RESOURCE", "content", "-----BEGIN " + "PRIVATE KEY-----\nabc")));
+                Map.of("path", "resources/private.pem", "role", "RESOURCE", "content", "-----BEGIN PRIVATE " + "KEY-----\nabc")));
         assertThrows(IllegalArgumentException.class, () -> packageWith(
                 Map.of("path", "scripts/deploy.sh", "role", "SCRIPT", "content", "kubectl apply -f prod.yml")));
         assertThrows(IllegalArgumentException.class, () -> packageWith(

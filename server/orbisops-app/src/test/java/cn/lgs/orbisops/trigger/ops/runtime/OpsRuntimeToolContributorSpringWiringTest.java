@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ActiveProfiles("test")
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.NONE,
-        properties = "ops.elasticsearch-index=order-service-log-*")
+        properties = "orbisops.elasticsearch-index=order-service-log-*")
 class OpsRuntimeToolContributorSpringWiringTest {
 
     @MockitoBean

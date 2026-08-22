@@ -3,6 +3,7 @@ package cn.lgs.orbisops.trigger.ops.runtime;
 import cn.lgs.orbisops.application.config.AiClientApiCatalogPort;
 import cn.lgs.orbisops.application.config.AiClientModelCatalogPort;
 import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
+import cn.lgs.orbisops.application.modelpolicy.ModelDefaultPolicyApplicationService;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -18,6 +19,7 @@ public class OpsRuntimeResourceAssemblerConfiguration {
             ObjectProvider<ChatModel> fallbackModelProvider,
             ObjectProvider<AiClientModelCatalogPort> modelRepositoryProvider,
             ObjectProvider<AiClientApiCatalogPort> apiRepositoryProvider,
+            ObjectProvider<ModelDefaultPolicyApplicationService> defaultPolicyProvider,
             ModelAvailabilityPort aiModelAvailability,
             OpsSecretResolver secretResolver,
             OpsRuntimeModelSettings settings) {
@@ -26,6 +28,7 @@ public class OpsRuntimeResourceAssemblerConfiguration {
                 fallbackModelProvider::getIfAvailable,
                 modelRepositoryProvider::getIfAvailable,
                 apiRepositoryProvider::getIfAvailable,
+                defaultPolicyProvider::getIfAvailable,
                 aiModelAvailability,
                 secretResolver,
                 settings);

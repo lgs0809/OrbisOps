@@ -14,6 +14,7 @@ import java.util.Locale;
 public final class ProjectProductReadinessApplicationService {
 
     private final ProjectEmergencyStopAcceptancePort emergencyStopAcceptancePort;
+    private final ProjectModelReadinessPort modelReadinessPort;
 
     /**
      * Keeps the application service usable in isolated unit tests and in
@@ -21,13 +22,22 @@ public final class ProjectProductReadinessApplicationService {
      * Those deployments remain fail-closed for environment validation.
      */
     public ProjectProductReadinessApplicationService() {
-        this(projectId -> ProjectEmergencyStopAcceptancePort.EmergencyStopAcceptanceFact.notValidated());
+        this(
+                projectId -> ProjectEmergencyStopAcceptancePort.EmergencyStopAcceptanceFact.notValidated(),
+                () -> false);
     }
 
     public ProjectProductReadinessApplicationService(ProjectEmergencyStopAcceptancePort emergencyStopAcceptancePort) {
+        this(emergencyStopAcceptancePort, () -> false);
+    }
+
+    public ProjectProductReadinessApplicationService(
+            ProjectEmergencyStopAcceptancePort emergencyStopAcceptancePort,
+            ProjectModelReadinessPort modelReadinessPort) {
         this.emergencyStopAcceptancePort = emergencyStopAcceptancePort == null
                 ? projectId -> ProjectEmergencyStopAcceptancePort.EmergencyStopAcceptanceFact.notValidated()
                 : emergencyStopAcceptancePort;
+        this.modelReadinessPort = modelReadinessPort == null ? () -> false : modelReadinessPort;
     }
 
     public ProjectProductReadinessProjection project(
@@ -39,6 +49,7 @@ public final class ProjectProductReadinessApplicationService {
         boolean liveEvidenceConfigured = workspace.dataResourceCount() > 0;
         boolean realQueryVerified = workspace.onboarding().stream()
                 .anyMatch(step -> "query-proof".equals(step.key()) && step.completed());
+        boolean modelConfigured = modelAvailable();
         boolean runtimeEvidence = platform.analysisReady().ready();
 
         List<ProjectProductReadinessProjection.Check> diagnosisChecks = List.of(
@@ -47,17 +58,17 @@ public final class ProjectProductReadinessApplicationService {
                                 ? ProjectProductReadinessProjection.ReadinessLevel.CONFIGURED
                                 : ProjectProductReadinessProjection.ReadinessLevel.NOT_CONFIGURED,
                         workspace.defaultAgentPublished() ? "项目默认 Agent 已发布" : "先发布项目默认 Agent"),
-                check("MODEL", "Model", workspace.defaultAgentPublished() && realQueryVerified,
-                        realQueryVerified
+                check("MODEL", "Model", modelConfigured && realQueryVerified,
+                        modelConfigured && realQueryVerified
                                 ? ProjectProductReadinessProjection.ReadinessLevel.QUERY_VERIFIED
-                                : workspace.defaultAgentPublished()
+                                : modelConfigured
                                 ? ProjectProductReadinessProjection.ReadinessLevel.CONFIGURED
                                 : ProjectProductReadinessProjection.ReadinessLevel.NOT_CONFIGURED,
-                        realQueryVerified
+                        modelConfigured && realQueryVerified
                                 ? "已通过成功的 ReAct 真实证据诊断运行证明模型执行链路可用"
-                                : workspace.defaultAgentPublished()
-                                ? "默认 Agent 已绑定模型配置，但尚未形成成功的真实证据诊断运行证明"
-                                : "默认 Agent 尚未发布，模型配置也未形成可验证入口"),
+                                : modelConfigured
+                                ? "已配置可用 Chat Model 与 Provider，但尚未形成成功的真实证据诊断运行证明"
+                                : "尚未配置可用 Chat Model 与 Provider"),
                 check("REAL_EVIDENCE", "实时 Evidence Source", liveEvidenceConfigured && realQueryVerified,
                         realQueryVerified
                                 ? ProjectProductReadinessProjection.ReadinessLevel.QUERY_VERIFIED
@@ -151,8 +162,13 @@ public final class ProjectProductReadinessApplicationService {
                 .filter(check -> !check.ready())
                 .findFirst()
                 .map(check -> switch (check.key()) {
-                    case "DEFAULT_AGENT", "MODEL" -> "发布项目默认智能助手";
-                    case "REAL_EVIDENCE" -> "接入并测试一个真实数据源";
+                    case "DEFAULT_AGENT" -> "发布项目默认智能助手";
+                    case "MODEL" -> check.level() == ProjectProductReadinessProjection.ReadinessLevel.NOT_CONFIGURED
+                            ? "配置并验证模型 Provider"
+                            : "运行一次真实诊断验证模型执行链路";
+                    case "REAL_EVIDENCE" -> check.level() == ProjectProductReadinessProjection.ReadinessLevel.NOT_CONFIGURED
+                            ? "接入并测试一个真实数据源"
+                            : "运行一次真实诊断验证数据源";
                     case "RUNTIME_TOOL_BINDING" -> "修复诊断 Runtime / Tool 依赖";
                     case "DIAGNOSIS" -> "先完成诊断能力";
                     case "PROD_TOOL_MCP" -> "配置生产处置能力";
@@ -183,6 +199,14 @@ public final class ProjectProductReadinessApplicationService {
             ProjectProductReadinessProjection.ReadinessLevel level,
             String detail) {
         return new ProjectProductReadinessProjection.Check(key, label, ready, level, detail);
+    }
+
+    private boolean modelAvailable() {
+        try {
+            return modelReadinessPort.available();
+        } catch (RuntimeException ignored) {
+            return false;
+        }
     }
 
     private CapabilityDependencyReadiness dependency(CapabilityReadinessSnapshot snapshot, String name) {

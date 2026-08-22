@@ -39,10 +39,10 @@ public class JdbcProjectMcpRepository implements
     private final ConcurrentMap<String, ProjectMcpDefinition> memory =
             new ConcurrentHashMap<>();
 
-    @Value("${ops.project-workspace.jdbc-enabled:true}")
+    @Value("${orbisops.project-workspace.jdbc-enabled:true}")
     private boolean jdbcEnabled = true;
 
-    @Value("${ops.project-workspace.auto-init:true}")
+    @Value("${orbisops.project-workspace.auto-init:true}")
     private boolean autoInit = true;
 
     private volatile boolean initialized;

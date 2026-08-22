@@ -16,11 +16,11 @@ const authenticate = async (page: import('@playwright/test').Page) => {
   });
 };
 
-test('Chat exposes ReAct plus named workflows and freezes execution per session', async ({ page }) => {
+test('Chat binds each conversation to 默认模型 or a Published Workflow', async ({ page }) => {
   await authenticate(page);
 
   const createRequests: Json[] = [];
-  const streamRequests: Json[] = [];
+  const messageRequests: Json[] = [];
   let sequence = 0;
   let sessions: Json[] = [];
 
@@ -48,22 +48,19 @@ test('Chat exposes ReAct plus named workflows and freezes execution per session'
         body: JSON.stringify({
           code: '0000', info: 'success', data: [
             {
-              agentId: 'default-react', name: '内部默认 Agent', engine: 'GRAPH', version: 4,
-              definitionKind: 'MAIN_ASSISTANT',
+              agentId: 'default-react', name: 'Internal Default Agent', engine: 'GRAPH', version: 4,
+              definitionKind: 'MAIN_ASSISTANT', lifecycle: 'PUBLISHED',
             },
             {
-              agentId: 'daily-inspection', name: '每日生产巡检', engine: 'GRAPH', version: 7,
-              definitionKind: 'SPECIALIZED_WORKFLOW',
+              agentId: 'daily-inspection', name: 'Daily Production Inspection', engine: 'GRAPH', version: 7,
+              definitionKind: 'SPECIALIZED_WORKFLOW', lifecycle: 'PUBLISHED',
+            },
+            {
+              agentId: 'draft-workflow', name: 'Draft Workflow', engine: 'GRAPH', version: 1,
+              definitionKind: 'SPECIALIZED_WORKFLOW', lifecycle: 'DRAFT',
             },
           ],
         }),
-      });
-    }
-    if (path.endsWith('/api/v1/user/chat/model-status')) {
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ code: '0000', info: 'success', data: { chatAvailable: true } }),
       });
     }
     if (path.endsWith('/api/v1/user/chat/session') && method === 'POST') {
@@ -74,7 +71,7 @@ test('Chat exposes ReAct plus named workflows and freezes execution per session'
         sessionId,
         projectId: 'demo-project',
         agentId: body.agentId || 'default-react',
-        title: '新会话',
+        title: 'New conversation',
         stateVersion: 1,
         metadata: body.metadata || {},
       }, ...sessions];
@@ -91,15 +88,24 @@ test('Chat exposes ReAct plus named workflows and freezes execution per session'
         body: JSON.stringify({ code: '0000', info: 'success', data: sessions }),
       });
     }
-    if (path.endsWith('/api/v1/user/chat/stream') && method === 'POST') {
-      streamRequests.push(request.postDataJSON() as Json);
+    if (/\/api\/v1\/user\/chat\/sessions\/[^/]+\/messages$/.test(path) && method === 'POST') {
+      const body = request.postDataJSON() as Json;
+      messageRequests.push(body);
+      const sessionId = path.split('/').at(-2) || '';
       return route.fulfill({
         status: 200,
-        contentType: 'text/event-stream',
-        body: 'data: {"eventType":"DONE","status":"SUCCEEDED","summary":"done","payload":{}}\n\n',
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: '0000', info: 'success', data: {
+            sessionId,
+            status: 'SUCCEEDED',
+            metadata: { runId: `run-${messageRequests.length}` },
+            events: [],
+          },
+        }),
       });
     }
-    if (/\/api\/v1\/user\/chat\/sessions\/[^/]+\/(messages|events)$/.test(path)) {
+    if (/\/api\/v1\/user\/chat\/sessions\/[^/]+\/(messages|events)$/.test(path) && method === 'GET') {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -116,36 +122,46 @@ test('Chat exposes ReAct plus named workflows and freezes execution per session'
 
   await page.goto('/chat?projectId=demo-project');
 
-  const executionSelect = page.getByTestId('execution-selector').getByRole('combobox');
+  const executionRoot = page.getByTestId('execution-selector');
+  const executionSelect = executionRoot.getByRole('combobox');
   await expect(executionSelect).toBeVisible();
-  await expect(page.getByText('内部默认 Agent', { exact: true })).toHaveCount(0);
+  await expect(executionRoot).toHaveAttribute('data-execution', 'DEFAULT_REACT');
+  await expect(page.getByText('Internal Default Agent', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Draft Workflow', { exact: true })).toHaveCount(0);
 
   await executionSelect.click();
-  await expect(page.getByText('ReAct', { exact: true }).last()).toBeVisible();
-  await expect(page.getByText('每日生产巡检', { exact: true }).last()).toBeVisible();
-  await page.getByText('每日生产巡检', { exact: true }).last().click();
-  await expect(page.getByTestId('execution-selector')).toHaveAttribute('data-execution', 'daily-inspection');
+  await expect(page.getByText('默认模型', { exact: true }).last()).toBeVisible();
+  await expect(page.getByText('Daily Production Inspection', { exact: true }).last()).toBeVisible();
+  await page.getByText('Daily Production Inspection', { exact: true }).last().click();
+  await expect(executionRoot).toHaveAttribute('data-execution', 'daily-inspection');
   await expect.poll(() => createRequests.length).toBe(1);
   expect(createRequests[0].agentId).toBe('daily-inspection');
   expect(createRequests[0].metadata).toMatchObject({
     executionType: 'WORKFLOW',
-    agentName: '每日生产巡检',
+    executionName: 'Daily Production Inspection',
   });
 
-  await page.getByPlaceholder(/直接描述问题或任务/).fill('执行巡检');
-  await page.getByRole('button', { name: '发送消息' }).click();
-  await expect.poll(() => streamRequests.length).toBe(1);
-  expect(streamRequests[0].agentDefinitionId).toBe('daily-inspection');
+  await page.getByPlaceholder('给 OrbisOps 发消息...').fill('Run the inspection');
+  await page.getByRole('button', { name: '发送' }).click();
+  await expect.poll(() => messageRequests.length).toBe(1);
+  expect(messageRequests[0].agentDefinitionId).toBe('daily-inspection');
+  expect(messageRequests[0].metadata).toMatchObject({ executionType: 'WORKFLOW', triggerSource: 'CHAT' });
+  await expect(page.getByRole('button', { name: '打开当前运行' })).toBeVisible();
 
-  // Switching execution on an existing Workflow session must create a new session, not mutate the old session.
+  // Changing execution creates a new conversation instead of mutating the existing Workflow conversation.
   await executionSelect.click();
-  await page.getByText('ReAct', { exact: true }).last().click();
+  await page.getByText('默认模型', { exact: true }).last().click();
   await expect.poll(() => createRequests.length).toBe(2);
   expect(createRequests[1].agentId).toBeUndefined();
-  expect(createRequests[1].metadata).toMatchObject({ executionType: 'REACT', agentName: 'ReAct' });
+  expect(createRequests[1].metadata).toMatchObject({
+    executionType: 'DEFAULT_REACT',
+    executionName: '默认模型',
+  });
+  await expect(executionRoot).toHaveAttribute('data-execution', 'DEFAULT_REACT');
 
-  await page.getByPlaceholder(/直接描述问题或任务/).fill('动态排查');
-  await page.getByRole('button', { name: '发送消息' }).click();
-  await expect.poll(() => streamRequests.length).toBe(2);
-  expect(streamRequests[1].agentDefinitionId).toBeUndefined();
+  await page.getByPlaceholder('给 OrbisOps 发消息...').fill('Investigate dynamically');
+  await page.getByRole('button', { name: '发送' }).click();
+  await expect.poll(() => messageRequests.length).toBe(2);
+  expect(messageRequests[1].agentDefinitionId).toBeUndefined();
+  expect(messageRequests[1].metadata).toMatchObject({ executionType: 'DEFAULT_REACT', triggerSource: 'CHAT' });
 });

@@ -40,40 +40,40 @@ const routeItems = (routes: readonly AppRouteMetadata[], role: AppRouteRole): Co
 const projectItems = (projects: CommandPaletteProject[], currentProjectId: string): CommandPaletteItem[] => projects.map((project) => ({
   id: `project:${project.projectId}`,
   kind: 'project' as const,
-  label: `Switch project · ${project.name || project.projectId}`,
-  description: project.projectId === currentProjectId ? 'Current project' : project.projectId,
+  label: `切换 Project · ${project.name || project.projectId}`,
+  description: project.projectId === currentProjectId ? '当前 Project' : project.projectId,
   projectId: project.projectId,
-  keywords: ['project', 'switch', project.name, project.projectId, project.projectId === currentProjectId ? 'current' : ''],
+  keywords: ['project', 'switch', '切换', '项目', project.name, project.projectId, project.projectId === currentProjectId ? 'current' : ''],
 }));
 
 const actionItems = (role: AppRouteRole, currentProjectId: string): CommandPaletteItem[] => {
   const scoped = currentProjectId ? `?projectId=${encodeURIComponent(currentProjectId)}` : '';
   const actions: CommandPaletteItem[] = [
     {
-      id: 'action:start-diagnosis',
+      id: 'action:open-chat',
       kind: 'action',
-      label: 'Start Diagnosis',
-      description: currentProjectId ? `Open Diagnosis in ${currentProjectId}` : 'Open Diagnosis',
-      path: `/work/diagnosis${scoped}`,
-      keywords: ['diagnosis', 'chat', 'investigate', 'react', 'run'],
+      label: '打开对话',
+      description: currentProjectId ? `在 ${currentProjectId} 中与 OrbisOps 对话` : '打开对话',
+      path: `/chat${scoped}`,
+      keywords: ['chat', 'diagnosis', 'investigate', 'react', 'workflow'],
     },
     {
-      id: 'action:open-incidents',
+      id: 'action:open-workbench',
       kind: 'action',
-      label: 'Open Incidents',
-      description: currentProjectId ? `View incidents in ${currentProjectId}` : 'View incidents',
-      path: `/work/incidents${scoped}`,
-      keywords: ['incident', 'alert', 'event', 'investigation'],
+      label: '打开工作台',
+      description: currentProjectId ? `查看 ${currentProjectId} 中的 Run` : '查看 Run',
+      path: `/workbench${scoped}`,
+      keywords: ['workbench', 'run', 'incident', 'alert', 'automation', 'execution'],
     },
   ];
   if (role === 'admin' && currentProjectId) {
     actions.push({
-      id: 'action:project-advanced',
+      id: 'action:project-runtime',
       kind: 'action',
-      label: 'Open Current Project Advanced',
+      label: '打开当前 Project Runtime',
       description: currentProjectId,
-      path: `/projects/advanced?projectId=${encodeURIComponent(currentProjectId)}`,
-      keywords: ['project', 'advanced', 'resource', 'member', 'runtime', 'skill', 'knowledge'],
+      path: `/projects?projectId=${encodeURIComponent(currentProjectId)}&view=runtime`,
+      keywords: ['project', 'resource', 'member', 'runtime', 'skill', 'knowledge', 'capability'],
     });
   }
   return actions;

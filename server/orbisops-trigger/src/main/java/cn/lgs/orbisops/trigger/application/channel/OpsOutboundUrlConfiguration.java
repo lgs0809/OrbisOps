@@ -10,8 +10,8 @@ public class OpsOutboundUrlConfiguration {
 
     @Bean
     public OpsOutboundUrlSettings opsOutboundUrlSettings(
-            @Value("${ops.channel.webhook.allow-loopback:false}") boolean allowLoopback,
-            @Value("${ops.channel.webhook.allowed-hosts:}") String allowedHosts) {
+            @Value("${orbisops.channel.webhook.allow-loopback:false}") boolean allowLoopback,
+            @Value("${orbisops.channel.webhook.allowed-hosts:}") String allowedHosts) {
         return OpsOutboundUrlSettings.fromRaw(allowLoopback, allowedHosts);
     }
 }

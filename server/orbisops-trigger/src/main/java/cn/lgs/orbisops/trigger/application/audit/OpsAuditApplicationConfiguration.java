@@ -15,7 +15,7 @@ public class OpsAuditApplicationConfiguration {
     @Bean
     public AnalysisAuditApplicationService analysisAuditApplicationService(
             IAnalysisAuditRepository repository,
-            @Value("${ops.audit.max-records:200}") int maxRecords) {
+            @Value("${orbisops.audit.max-records:200}") int maxRecords) {
         return new AnalysisAuditApplicationService(repository, maxRecords);
     }
 

@@ -32,8 +32,16 @@ public final class McpRuntimeViewMapper {
         item.put("riskLevel", text(tool.get("riskLevel"), "HIGH"));
         item.put("readOnly", bool(tool.get("readOnly")));
         item.put("disclosureTier", text(tool.get("disclosureTier"), "EXTENSION"));
-        item.put("description", text(tool.get("description"),
-                "项目已审核工具；按需启用后才披露完整 schema。"));
+        String policyStatus = text(tool.get("policyStatus"), "ACTIVE");
+        String reviewStatus = text(tool.get("reviewStatus"));
+        item.put("policyStatus", policyStatus);
+        item.put("reviewStatus", reviewStatus);
+        String defaultDescription = "SYSTEM_VERIFIED".equalsIgnoreCase(reviewStatus)
+                ? "平台内置只读工具，已通过系统验证；扩展工具按需激活后披露完整 schema。"
+                : "HUMAN_REVIEWED".equalsIgnoreCase(reviewStatus)
+                ? "已人工审核的项目工具；扩展工具按需激活后披露完整 schema。"
+                : "项目工具；按当前 Tool Policy 状态决定是否可执行或激活。";
+        item.put("description", text(tool.get("description"), defaultDescription));
         return immutable(item);
     }
 
@@ -51,6 +59,8 @@ public final class McpRuntimeViewMapper {
         data.put("capability", policy.capability());
         data.put("riskLevel", policy.riskLevel().name());
         data.put("readOnly", policy.readOnly());
+        data.put("policyStatus", policy.status().name());
+        data.put("reviewStatus", policy.reviewStatus().name());
         data.put("investigateAllowed", policy.investigateAllowed());
         data.put("prepareAllowed", policy.prepareAllowed());
         data.put("requiresApprovedPackage", policy.requiresApprovedPackage());

@@ -83,7 +83,7 @@ final class OpsMainAgentDeterministicPlanningService {
                 context.hasSlowSqlSignal(),
                 context.hasKnowledgeSignal(),
                 !context.traceIds().isEmpty(),
-                !context.orderIds().isEmpty());
+                !context.entityIds().isEmpty());
     }
 
     List<InvestigationPlanningObservation> observations(

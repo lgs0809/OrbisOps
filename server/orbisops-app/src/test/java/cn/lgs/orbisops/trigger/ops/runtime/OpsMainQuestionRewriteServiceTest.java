@@ -43,13 +43,12 @@ class OpsMainQuestionRewriteServiceTest {
     }
 
     @Test
-    void shouldClassifyStandaloneQuestionEvenWhenMemoryIsEmpty() {
+    void shouldKeepStandaloneQuestionEvenWhenMemoryIsEmpty() {
         OpsAgentLlmClient llmClient = mock(OpsAgentLlmClient.class);
         JSONObject json = new JSONObject();
         json.put("rewrittenQuestion", "查一下 /api/demo-project/join");
         json.put("changed", false);
         json.put("reason", "already standalone");
-        json.put("actionClassification", "DIAGNOSE");
         when(llmClient.chatJsonObject(eq("ops-main-query-rewriter"), contains("问题语义标准化器"), contains("查一下 /api/demo-project/join")))
                 .thenReturn(json);
         OpsMainQuestionRewriteService service = new OpsMainQuestionRewriteService(llmClient);
@@ -58,7 +57,6 @@ class OpsMainQuestionRewriteServiceTest {
 
         assertFalse(result.changed());
         assertEquals("查一下 /api/demo-project/join", result.rewrittenQuestion());
-        assertEquals("DIAGNOSE", result.actionClassification());
         verify(llmClient).chatJsonObject(eq("ops-main-query-rewriter"), contains("问题语义标准化器"), contains("查一下 /api/demo-project/join"));
     }
 

@@ -4,8 +4,7 @@
  */
 
 // 环境变量配置。浏览器运行时没有 Node 的 process 全局，优先使用构建工具注入的 import.meta.env。
-declare const __API_BASE_DOMAIN__: string | undefined;
-declare const __PUBLIC_API_BASE_DOMAIN__: string | undefined;
+declare const __ORBISOPS_API_BASE_URL__: string | undefined;
 
 const runtimeEnv = ((import.meta as any).env || (globalThis as any).process?.env || {}) as Record<
   string,
@@ -15,11 +14,9 @@ const nodeEnv = runtimeEnv.NODE_ENV || runtimeEnv.MODE || 'development';
 const isDevelopment = nodeEnv === 'development';
 const isProduction = nodeEnv === 'production';
 const apiBaseDomain =
-  (typeof __API_BASE_DOMAIN__ !== 'undefined' ? __API_BASE_DOMAIN__ : '') ||
-  (typeof __PUBLIC_API_BASE_DOMAIN__ !== 'undefined' ? __PUBLIC_API_BASE_DOMAIN__ : '') ||
-  runtimeEnv.API_BASE_DOMAIN ||
-  runtimeEnv.PUBLIC_API_BASE_DOMAIN ||
-  'http://127.0.0.1:8099';
+  (typeof __ORBISOPS_API_BASE_URL__ !== 'undefined' ? __ORBISOPS_API_BASE_URL__ : '') ||
+  runtimeEnv.ORBISOPS_API_BASE_URL ||
+  (isDevelopment ? 'http://127.0.0.1:8099' : '');
 
 // 基础配置
 export const API_CONFIG = {

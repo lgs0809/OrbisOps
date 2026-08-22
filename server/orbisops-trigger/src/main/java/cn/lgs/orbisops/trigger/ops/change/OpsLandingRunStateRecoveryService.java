@@ -15,8 +15,8 @@ public final class OpsLandingRunStateRecoveryService {
 
     public OpsLandingRunStateRecoveryService(
             ChangePackageLandingProcessManager landingProcessManager,
-            @Value("${ops.approved-landing.run-state-recovery.enabled:true}") boolean enabled,
-            @Value("${ops.approved-landing.run-state-recovery.batch-size:50}") int batchSize) {
+            @Value("${orbisops.approved-landing.run-state-recovery.enabled:true}") boolean enabled,
+            @Value("${orbisops.approved-landing.run-state-recovery.batch-size:50}") int batchSize) {
         if (landingProcessManager == null) {
             throw new IllegalArgumentException("CHANGE_PACKAGE_LANDING_PROCESS_MANAGER_REQUIRED");
         }
@@ -25,7 +25,7 @@ public final class OpsLandingRunStateRecoveryService {
         this.batchSize = Math.max(1, Math.min(batchSize, 100));
     }
 
-    @Scheduled(fixedDelayString = "${ops.approved-landing.run-state-recovery.fixed-delay-ms:15000}")
+    @Scheduled(fixedDelayString = "${orbisops.approved-landing.run-state-recovery.fixed-delay-ms:15000}")
     public void recover() {
         if (!enabled) return;
         landingProcessManager.recoverStrandedTerminalRuns(batchSize, "landing-run-state-recovery");

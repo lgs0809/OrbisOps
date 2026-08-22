@@ -12,17 +12,17 @@ public class OpsChannelNotificationOutboxJob {
 
     private final OpsChannelNotificationService notificationService;
 
-    @Value("${ops.channel.notification.outbox.scheduler-enabled:true}")
+    @Value("${orbisops.channel.notification.outbox.scheduler-enabled:true}")
     private boolean schedulerEnabled;
 
-    @Value("${ops.channel.notification.outbox.batch-size:20}")
+    @Value("${orbisops.channel.notification.outbox.batch-size:20}")
     private int batchSize;
 
     public OpsChannelNotificationOutboxJob(OpsChannelNotificationService notificationService) {
         this.notificationService = notificationService;
     }
 
-    @Scheduled(fixedDelayString = "${ops.channel.notification.outbox.fixed-delay-ms:60000}")
+    @Scheduled(fixedDelayString = "${orbisops.channel.notification.outbox.fixed-delay-ms:60000}")
     public void processPending() {
         if (!schedulerEnabled) return;
         try {

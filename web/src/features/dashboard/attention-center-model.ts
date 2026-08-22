@@ -38,7 +38,7 @@ export const projectNeedsAttention = (project: OpsProjectWorkspace) =>
   !project.defaultAgentId;
 
 const incidentHref = (incident: { projectId?: string; incidentId: string }) =>
-  `/incidents?projectId=${encoded(incident.projectId)}&incidentId=${encoded(incident.incidentId)}`;
+  `/workbench${incident.projectId ? `?projectId=${encoded(incident.projectId)}` : ''}`;
 
 const incidentItem = (
   incident: OpsIncident | UserIncidentSummary,
@@ -50,10 +50,10 @@ const incidentItem = (
   kind,
   tone: kind === 'ACTION_REQUIRED' ? 'danger' : 'warning',
   title: value(incident.title) || incident.incidentId,
-  detail: [value(incident.projectId) || 'Unknown project', value(incident.severity), value(incident.serviceName)]
+  detail: [value(incident.projectId) || '未知 Project', value(incident.severity), value(incident.serviceName)]
     .filter(Boolean)
     .join(' · '),
-  actionLabel: '处理 Incident',
+  actionLabel: '前往工作台',
   href: incidentHref(incident),
 });
 
@@ -62,8 +62,17 @@ const packageHref = (pkg: { projectId?: string; packageId?: string }) => {
   const params = new URLSearchParams();
   if (pkg.projectId) params.set('projectId', pkg.projectId);
   if (pkg.packageId) params.set('packageId', pkg.packageId);
-  return `/executions${params.toString() ? `?${params.toString()}` : ''}`;
+  return `/changes${params.toString() ? `?${params.toString()}` : ''}`;
 };
+const changeStatusLabel = (status: unknown) => ({
+  READY_FOR_REVIEW: '待提交审批',
+  REVIEWING: '审批中',
+  REVISING: '修订中',
+  VALIDATION_FAILED: '校验失败',
+  LANDING_FAILED: '执行失败',
+  VERIFICATION_FAILED: '验证失败',
+  NEEDS_REPLAN: '需要重新规划',
+}[upper(status)] || '状态已更新');
 
 export const buildAdminAttentionItems = (
   overview: OpsAdminDashboardOverview | null,
@@ -96,7 +105,7 @@ export const buildAdminAttentionItems = (
       kind: 'PENDING_DECISION',
       tone: 'warning',
       title: packageTitle(pkg),
-      detail: `${value(pkg.projectId) || 'Unknown project'} · ChangePackage ${value(pkg.status)}`,
+      detail: `${value(pkg.projectId) || '未知 Project'} · ${changeStatusLabel(pkg.status)}`,
       actionLabel: '审批方案',
       href: packageHref(pkg),
     });
@@ -108,10 +117,10 @@ export const buildAdminAttentionItems = (
       priority: 31,
       kind: 'PENDING_DECISION',
       tone: 'warning',
-      title: value(decision.goal) || 'Workflow requires human decision',
-      detail: `${decision.projectId} · Workflow step · ${value(decision.owner) || 'Unassigned owner'}`,
+      title: value(decision.goal) || 'Workflow 需要人工决策',
+      detail: `${decision.projectId} · Workflow 步骤 · ${value(decision.owner) || '未分配负责人'}`,
       actionLabel: '处理 Workflow',
-      href: `/analysis-tasks?projectId=${encoded(decision.projectId)}&runId=${encoded(decision.runId)}`,
+      href: `/workbench?projectId=${encoded(decision.projectId)}&runId=${encoded(decision.runId)}`,
     });
   }
 
@@ -123,7 +132,7 @@ export const buildAdminAttentionItems = (
       kind: 'FAILED_CHANGE',
       tone: 'danger',
       title: packageTitle(pkg),
-      detail: `${value(pkg.projectId) || 'Unknown project'} · ${value(pkg.status)} · requires intervention`,
+      detail: `${value(pkg.projectId) || '未知 Project'} · ${changeStatusLabel(pkg.status)} · 需要人工介入`,
       actionLabel: '介入执行',
       href: packageHref(pkg),
     });
@@ -137,9 +146,9 @@ export const buildAdminAttentionItems = (
       kind: 'READINESS_BLOCKER',
       tone: 'warning',
       title: project.name || project.projectId,
-      detail: 'Project readiness is incomplete: check default Agent, connections and required onboarding.',
-      actionLabel: '修复 Readiness',
-      href: `/project-workspace?projectId=${encoded(project.projectId)}`,
+      detail: '项目配置尚未完成：请检查默认执行能力、资源连接和必需的初始化项。',
+      actionLabel: '完善项目配置',
+      href: `/projects?projectId=${encoded(project.projectId)}`,
     });
   }
 
@@ -168,7 +177,7 @@ export const buildUserAttentionItems = (overview: UserDashboardOverview | null):
       kind: 'PENDING_DECISION',
       tone: 'warning',
       title: value(pkg.title) || pkg.packageId,
-      detail: `${value(pkg.projectId) || 'Unknown project'} · approval required`,
+      detail: `${value(pkg.projectId) || '未知 Project'} · 需要审批`,
       actionLabel: '审批',
       href: packageHref(pkg),
     });
@@ -179,10 +188,10 @@ export const buildUserAttentionItems = (overview: UserDashboardOverview | null):
       priority: 31,
       kind: 'PENDING_DECISION',
       tone: 'warning',
-      title: value(decision.goal) || 'Workflow requires human decision',
-      detail: `${decision.projectId} · Workflow step`,
+      title: value(decision.goal) || 'Workflow 需要人工决策',
+      detail: `${decision.projectId} · Workflow 步骤`,
       actionLabel: '处理 Workflow',
-      href: `/analysis-tasks?projectId=${encoded(decision.projectId)}&runId=${encoded(decision.runId)}`,
+      href: `/workbench?projectId=${encoded(decision.projectId)}&runId=${encoded(decision.runId)}`,
     });
   }
   for (const pkg of overview.pendingOperations || []) {
@@ -192,7 +201,7 @@ export const buildUserAttentionItems = (overview: UserDashboardOverview | null):
       kind: 'PENDING_OPERATION',
       tone: 'warning',
       title: value(pkg.title) || pkg.packageId,
-      detail: `${value(pkg.projectId) || 'Unknown project'} · execution or verification needs you`,
+      detail: `${value(pkg.projectId) || '未知 Project'} · 执行或验证需要你处理`,
       actionLabel: '处理',
       href: packageHref(pkg),
     });
@@ -204,9 +213,9 @@ export const buildUserAttentionItems = (overview: UserDashboardOverview | null):
       kind: 'AUDIT_REMINDER',
       tone: 'info',
       title: value(audit.summary) || `${value(audit.moduleName)} / ${value(audit.actionName)}`,
-      detail: `${value(audit.projectId) || 'No project'} · ${value(audit.createdAt)}`,
+      detail: `${value(audit.projectId) || '无 Project'} · ${value(audit.createdAt)}`,
       actionLabel: '查看审计',
-      href: '/my-audit',
+      href: '/settings/governance',
     });
   }
   return result.sort((left, right) => left.priority - right.priority || left.key.localeCompare(right.key));

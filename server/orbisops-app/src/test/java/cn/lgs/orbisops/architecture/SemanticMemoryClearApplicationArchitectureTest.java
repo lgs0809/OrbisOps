@@ -87,7 +87,7 @@ class SemanticMemoryClearApplicationArchitectureTest {
                 () -> assertTrue(failureAdapter.contains("SemanticMemoryClearFailurePort")),
                 () -> assertTrue(failureAdapter.contains("onClearFailure(")),
                 () -> assertTrue(configuration.contains("semanticMemoryClearApplicationService(")),
-                () -> assertTrue(configuration.contains("OpsSemanticMemoryClearPersistenceAdapter")),
+                () -> assertTrue(configuration.contains("SemanticMemoryClearPersistencePort persistenceAdapter")),
                 () -> assertTrue(configuration.contains("new SemanticMemoryClearApplicationService(")));
     }
 

@@ -21,8 +21,8 @@ public class JdbcRepairWorkspaceSchemaInitializer {
 
     public JdbcRepairWorkspaceSchemaInitializer(
             @Qualifier("mysqlJdbcTemplate") ObjectProvider<JdbcTemplate> jdbcProvider,
-            @Value("${ops.repair.jdbc-enabled:true}") boolean jdbcEnabled,
-            @Value("${ops.repair.auto-init:true}") boolean autoInit) {
+            @Value("${orbisops.repair.jdbc-enabled:true}") boolean jdbcEnabled,
+            @Value("${orbisops.repair.auto-init:true}") boolean autoInit) {
         this.jdbcProvider = jdbcProvider;
         this.jdbcEnabled = jdbcEnabled;
         this.autoInit = autoInit;

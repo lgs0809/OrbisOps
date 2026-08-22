@@ -26,33 +26,33 @@ const booleanValue = (value: unknown, fallback: boolean): boolean => {
 export const effectiveAuditControls = (policy: OpsAuditPolicy): EffectiveAuditControl[] => [
   {
     key: 'retention',
-    title: 'Audit visibility retention',
+    title: '审计可见性保留期',
     status: 'ENFORCED',
-    summary: `${auditRetentionDays(policy)} days · server-side visibility boundary`,
+    summary: `${auditRetentionDays(policy)} 天 · 服务端可见性边界`,
   },
   {
     key: 'masking',
-    title: 'Sensitive field masking',
+    title: '敏感字段脱敏',
     status: 'PLATFORM_INVARIANT',
-    summary: 'Always on · requests cannot disable masking',
+    summary: '始终启用 · 请求无法关闭脱敏',
   },
   {
     key: 'export',
-    title: 'Audit export',
+    title: '审计导出',
     status: 'NOT_ACTIVATED',
-    summary: 'Exports are audit-logged; approval gating is not activated yet',
+    summary: '导出操作会写入审计；导出审批门禁暂未启用',
   },
   {
     key: 'high-risk',
-    title: 'High-risk execution confirmation',
+    title: '高风险执行确认',
     status: 'DELEGATED',
-    summary: 'Governed by ChangePackage → Approval → Landing, not Audit Policy',
+    summary: '由 ChangePackage → Approval → Landing 治理，不由审计策略直接控制',
   },
   {
     key: 'replay',
-    title: 'Audit replay',
+    title: '审计重放',
     status: 'UNAVAILABLE',
-    summary: 'No replay executor is exposed in the current product',
+    summary: '当前产品未暴露审计重放执行器',
   },
 ];
 

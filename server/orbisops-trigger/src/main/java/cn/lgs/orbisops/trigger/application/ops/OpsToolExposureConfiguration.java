@@ -10,9 +10,9 @@ public class OpsToolExposureConfiguration {
 
     @Bean
     public ToolExposureSettings opsToolExposureSettings(
-            @Value("${ops.agent.action-mode:" + ToolExposureSettings.DEFAULT_ACTION_MODE + "}")
+            @Value("${orbisops.agent.action-mode:" + ToolExposureSettings.DEFAULT_ACTION_MODE + "}")
             String actionMode,
-            @Value("${ops.agent.enforce-read-only-tools:true}") boolean enforceReadOnlyTools) {
+            @Value("${orbisops.agent.enforce-read-only-tools:true}") boolean enforceReadOnlyTools) {
         return ToolExposureSettings.fromRaw(actionMode, enforceReadOnlyTools);
     }
 }

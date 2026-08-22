@@ -14,18 +14,18 @@ public class OpsDatasourceSubAgentConfiguration {
 
     @Bean
     public OpsEsLogSettings opsEsLogSettings(
-            @Value("${ops.elasticsearch-url:http://127.0.0.1:9200}") String baseUrl,
-            @Value("${ops.elasticsearch-index:}") String index,
-            @Value("${ops.elasticsearch-timeout-seconds:5}") int timeoutSeconds,
-            @Value("${ops.elasticsearch-sample-size:8}") int sampleSize) {
+            @Value("${orbisops.elasticsearch-url:http://127.0.0.1:9200}") String baseUrl,
+            @Value("${orbisops.elasticsearch-index:}") String index,
+            @Value("${orbisops.elasticsearch-timeout-seconds:5}") int timeoutSeconds,
+            @Value("${orbisops.elasticsearch-sample-size:8}") int sampleSize) {
         return new OpsEsLogSettings(baseUrl, index, timeoutSeconds, sampleSize);
     }
 
     @Bean
     public OpsPrometheusSettings opsPrometheusSettings(
-            @Value("${ops.prometheus-url:http://127.0.0.1:9090}") String baseUrl,
-            @Value("${ops.prometheus-job:}") String jobName,
-            @Value("${ops.prometheus-timeout-seconds:5}") int timeoutSeconds) {
+            @Value("${orbisops.prometheus-url:http://127.0.0.1:9090}") String baseUrl,
+            @Value("${orbisops.prometheus-job:}") String jobName,
+            @Value("${orbisops.prometheus-timeout-seconds:5}") int timeoutSeconds) {
         return new OpsPrometheusSettings(baseUrl, jobName, timeoutSeconds);
     }
 
@@ -37,10 +37,10 @@ public class OpsDatasourceSubAgentConfiguration {
 
     @Bean
     public OpsMySqlSlowSqlSettings opsMySqlSlowSqlSettings(
-            @Value("${ops.mysql-slow-sql.enabled:true}") boolean enabled,
-            @Value("${ops.mysql-slow-sql.sample-size:10}") int sampleSize,
-            @Value("${ops.mysql-slow-sql.threshold-ms:500}") double thresholdMs,
-            @Value("${ops.mysql-slow-sql.performance-schema-fallback:true}") boolean performanceSchemaFallback) {
+            @Value("${orbisops.mysql-slow-sql.enabled:true}") boolean enabled,
+            @Value("${orbisops.mysql-slow-sql.sample-size:10}") int sampleSize,
+            @Value("${orbisops.mysql-slow-sql.threshold-ms:500}") double thresholdMs,
+            @Value("${orbisops.mysql-slow-sql.performance-schema-fallback:true}") boolean performanceSchemaFallback) {
         return new OpsMySqlSlowSqlSettings(enabled, sampleSize, thresholdMs, performanceSchemaFallback);
     }
 }

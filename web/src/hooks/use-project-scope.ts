@@ -7,7 +7,7 @@ import React, {
   useMemo,
 } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { getStoredUserInfo, isAdminUser, isAuthenticated } from '../services/auth-session';
 import { opsAdminService } from '../services/ops-admin-service';
@@ -51,6 +51,7 @@ const loadAccessibleProjects = async (): Promise<AccessibleProjectSnapshot> => {
 
 export const ProjectScopeProvider: React.FC<PropsWithChildren> = ({ children }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [, setSearchParams] = useSearchParams();
   const authenticated = isAuthenticated();
   const roleScope = isAdminUser() ? 'admin' : 'user';
@@ -78,13 +79,12 @@ export const ProjectScopeProvider: React.FC<PropsWithChildren> = ({ children }) 
 
   const selectProject = useCallback((nextProjectId: string) => {
     writeProjectContextId(nextProjectId);
-    setSearchParams((current) => {
-      const next = new URLSearchParams(current);
-      if (nextProjectId) next.set('projectId', nextProjectId);
-      else next.delete('projectId');
-      return next;
-    }, { replace: true });
-  }, [setSearchParams]);
+    const next = new URLSearchParams(location.search);
+    if (nextProjectId) next.set('projectId', nextProjectId);
+    else next.delete('projectId');
+    const search = next.toString();
+    navigate({ pathname: location.pathname, search: search ? `?${search}` : '' }, { replace: true });
+  }, [location.pathname, location.search, navigate]);
 
   useEffect(() => {
     if (!authenticated) {

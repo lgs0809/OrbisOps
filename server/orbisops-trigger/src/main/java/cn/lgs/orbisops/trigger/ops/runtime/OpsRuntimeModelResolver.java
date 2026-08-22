@@ -5,6 +5,7 @@ import cn.lgs.orbisops.application.config.AiClientApiDefinition;
 import cn.lgs.orbisops.application.config.AiClientModelCatalogPort;
 import cn.lgs.orbisops.application.config.AiClientModelDefinition;
 import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
+import cn.lgs.orbisops.application.modelpolicy.ModelDefaultPolicyApplicationService;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
@@ -22,6 +23,7 @@ public final class OpsRuntimeModelResolver {
     private final Supplier<ChatModel> fallbackModelSupplier;
     private final Supplier<AiClientModelCatalogPort> modelRepositorySupplier;
     private final Supplier<AiClientApiCatalogPort> apiRepositorySupplier;
+    private final OpsRuntimeDefaultModelSelector defaultModelSelector;
     private final ModelAvailabilityPort aiModelAvailability;
     private final OpsSecretResolver secretResolver;
     private final OpsRuntimeModelSettings settings;
@@ -34,47 +36,51 @@ public final class OpsRuntimeModelResolver {
             ModelAvailabilityPort aiModelAvailability,
             OpsSecretResolver secretResolver,
             OpsRuntimeModelSettings settings) {
-        if (namedDefaultModelSupplier == null) {
-            throw new IllegalArgumentException("RUNTIME_DEFAULT_CHAT_MODEL_SUPPLIER_REQUIRED");
-        }
-        if (fallbackModelSupplier == null) {
-            throw new IllegalArgumentException("RUNTIME_FALLBACK_CHAT_MODEL_SUPPLIER_REQUIRED");
-        }
-        if (modelRepositorySupplier == null) {
-            throw new IllegalArgumentException("RUNTIME_MODEL_REPOSITORY_SUPPLIER_REQUIRED");
-        }
-        if (apiRepositorySupplier == null) {
-            throw new IllegalArgumentException("RUNTIME_API_REPOSITORY_SUPPLIER_REQUIRED");
-        }
-        if (aiModelAvailability == null) {
-            throw new IllegalArgumentException("AI_MODEL_AVAILABILITY_REQUIRED");
-        }
-        if (secretResolver == null) {
-            throw new IllegalArgumentException("OPS_SECRET_RESOLVER_REQUIRED");
-        }
-        if (settings == null) {
-            throw new IllegalArgumentException("RUNTIME_MODEL_SETTINGS_REQUIRED");
-        }
-        this.namedDefaultModelSupplier = namedDefaultModelSupplier;
-        this.fallbackModelSupplier = fallbackModelSupplier;
-        this.modelRepositorySupplier = modelRepositorySupplier;
-        this.apiRepositorySupplier = apiRepositorySupplier;
-        this.aiModelAvailability = aiModelAvailability;
-        this.secretResolver = secretResolver;
-        this.settings = settings;
+        this(namedDefaultModelSupplier, fallbackModelSupplier, modelRepositorySupplier, apiRepositorySupplier,
+                () -> null, aiModelAvailability, secretResolver, settings);
+    }
+
+    public OpsRuntimeModelResolver(
+            Supplier<ChatModel> namedDefaultModelSupplier,
+            Supplier<ChatModel> fallbackModelSupplier,
+            Supplier<AiClientModelCatalogPort> modelRepositorySupplier,
+            Supplier<AiClientApiCatalogPort> apiRepositorySupplier,
+            Supplier<ModelDefaultPolicyApplicationService> defaultPolicySupplier,
+            ModelAvailabilityPort aiModelAvailability,
+            OpsSecretResolver secretResolver,
+            OpsRuntimeModelSettings settings) {
+        this.namedDefaultModelSupplier = required(
+                namedDefaultModelSupplier, "RUNTIME_DEFAULT_CHAT_MODEL_SUPPLIER_REQUIRED");
+        this.fallbackModelSupplier = required(
+                fallbackModelSupplier, "RUNTIME_FALLBACK_CHAT_MODEL_SUPPLIER_REQUIRED");
+        this.modelRepositorySupplier = required(
+                modelRepositorySupplier, "RUNTIME_MODEL_REPOSITORY_SUPPLIER_REQUIRED");
+        this.apiRepositorySupplier = required(
+                apiRepositorySupplier, "RUNTIME_API_REPOSITORY_SUPPLIER_REQUIRED");
+        this.defaultModelSelector = new OpsRuntimeDefaultModelSelector(defaultPolicySupplier);
+        this.aiModelAvailability = required(aiModelAvailability, "AI_MODEL_AVAILABILITY_REQUIRED");
+        this.secretResolver = required(secretResolver, "OPS_SECRET_RESOLVER_REQUIRED");
+        this.settings = required(settings, "RUNTIME_MODEL_SETTINGS_REQUIRED");
     }
 
     public ChatModel resolve(OpsRuntimeResourceContext context) {
-        if (context == null || !StringUtils.hasText(context.getModelId())) {
+        String modelId = context == null ? "" : value(context.getModelId());
+        if (!StringUtils.hasText(modelId)) {
+            modelId = defaultModelSelector.resolve(context);
+        }
+        if (!StringUtils.hasText(modelId)) {
             return defaultChatModel();
+        }
+        if (context != null) {
+            context.setModelId(modelId);
         }
         AiClientModelCatalogPort modelRepository = modelRepositorySupplier.get();
         AiClientApiCatalogPort apiRepository = apiRepositorySupplier.get();
         if (modelRepository == null || apiRepository == null) {
-            warn(context, "Model 配置库不可用，降级默认模型：" + context.getModelId());
+            warn(context, "Model 配置库不可用，降级默认模型：" + modelId);
             return defaultChatModel();
         }
-        AiClientModelDefinition model = modelRepository.findByModelId(context.getModelId());
+        AiClientModelDefinition model = modelRepository.findByModelId(modelId);
         if (model == null || !Integer.valueOf(1).equals(model.status())) {
             warn(context, "Model 配置不存在或未启用，降级默认模型：" + context.getModelId());
             return defaultChatModel();
@@ -146,5 +152,14 @@ public final class OpsRuntimeModelResolver {
             }
         }
         return "";
+    }
+
+    private <T> T required(T value, String error) {
+        if (value == null) throw new IllegalArgumentException(error);
+        return value;
+    }
+
+    private String value(String input) {
+        return input == null ? "" : input.trim();
     }
 }

@@ -11,6 +11,23 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 class McpRuntimeViewMapperTest {
 
     @Test
+    void runtimeCatalogSurfacesSystemVerifiedPolicyTruthfully() {
+        Map<String, Object> view = new McpRuntimeViewMapper(new McpJsonCodec()).runtimeCatalogView(Map.of(
+                "toolName", "search",
+                "capability", "READ_ONLY",
+                "effectType", "READ_EXTERNAL_STATE",
+                "riskLevel", "MEDIUM",
+                "readOnly", true,
+                "disclosureTier", "EXTENSION",
+                "policyStatus", "ACTIVE",
+                "reviewStatus", "SYSTEM_VERIFIED"));
+
+        assertEquals("ACTIVE", view.get("policyStatus"));
+        assertEquals("SYSTEM_VERIFIED", view.get("reviewStatus"));
+        assertEquals("平台内置只读工具，已通过系统验证；扩展工具按需激活后披露完整 schema。", view.get("description"));
+    }
+
+    @Test
     void legacyBlankSchemaPolicyIsProjectedAsNonExecutableStaleAdminHistory() {
         McpToolPolicyAdminRecord legacy = new McpToolPolicyAdminRecord(
                 1L, "legacy-policy", "project-1", "mcp-1", "tool-1", "restart_service", "",

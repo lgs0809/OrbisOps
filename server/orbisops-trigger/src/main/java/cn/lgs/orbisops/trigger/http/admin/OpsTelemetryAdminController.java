@@ -26,10 +26,10 @@ import java.util.Map;
 @RequestMapping("/api/v1/admin/ops")
 public class OpsTelemetryAdminController {
 
-    @Value("${ops.elasticsearch-url:http://127.0.0.1:9200}")
+    @Value("${orbisops.elasticsearch-url:http://127.0.0.1:9200}")
     private String elasticsearchUrl;
 
-    @Value("${ops.prometheus-url:http://127.0.0.1:9090}")
+    @Value("${orbisops.prometheus-url:http://127.0.0.1:9090}")
     private String prometheusUrl;
 
     private final OpsTelemetryService opsTelemetryService;

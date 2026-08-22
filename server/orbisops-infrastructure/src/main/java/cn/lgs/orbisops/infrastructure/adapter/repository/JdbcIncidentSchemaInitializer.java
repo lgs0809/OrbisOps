@@ -12,7 +12,7 @@ public class JdbcIncidentSchemaInitializer {
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 
-    @Value("${ops.incidents.auto-init:true}")
+    @Value("${orbisops.incidents.auto-init:true}")
     private boolean autoInit;
 
     public JdbcIncidentSchemaInitializer(

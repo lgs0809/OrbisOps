@@ -34,7 +34,7 @@ public class OpsSemanticLexicalRecallAdapter implements SemanticLexicalRecallPor
     @Autowired
     public OpsSemanticLexicalRecallAdapter(
             @Qualifier("pgVectorJdbcTemplate") ObjectProvider<JdbcTemplate> jdbcTemplateProvider,
-            @Value("${ops.rag.vector-table-name:vector_store_qwen_vl_2048}") String vectorTableName) {
+            @Value("${orbisops.rag.vector-table-name:orbisops_vector_store}") String vectorTableName) {
         this(jdbcTemplateProvider, () -> vectorTableName);
     }
 
@@ -42,7 +42,7 @@ public class OpsSemanticLexicalRecallAdapter implements SemanticLexicalRecallPor
                                            Supplier<String> tableNameSupplier) {
         this.jdbcTemplateProvider = jdbcTemplateProvider;
         this.tableNameSupplier = tableNameSupplier == null
-                ? () -> "vector_store_qwen_vl_2048"
+                ? () -> "orbisops_vector_store"
                 : tableNameSupplier;
     }
 
@@ -128,9 +128,9 @@ public class OpsSemanticLexicalRecallAdapter implements SemanticLexicalRecallPor
     private String safeTableName(String tableName) {
         String value = StringUtils.hasText(tableName)
                 ? tableName.trim()
-                : "vector_store_qwen_vl_2048";
+                : "orbisops_vector_store";
         if (!value.matches("[A-Za-z0-9_\\.]+")) {
-            return "vector_store_qwen_vl_2048";
+            return "orbisops_vector_store";
         }
         return value;
     }

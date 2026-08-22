@@ -10,9 +10,9 @@ public class OpsSkillSemanticConfiguration {
 
     @Bean
     public OpsSkillSemanticSettings opsSkillSemanticSettings(
-            @Value("${ops.skill-runtime.semantic-enabled:true}") boolean semanticEnabled,
-            @Value("${ops.skill-runtime.semantic-candidate-limit:64}") int candidateLimit,
-            @Value("${ops.skill-runtime.embedding-cache-size:2048}") int cacheSize) {
+            @Value("${orbisops.skill-runtime.semantic-enabled:true}") boolean semanticEnabled,
+            @Value("${orbisops.skill-runtime.semantic-candidate-limit:64}") int candidateLimit,
+            @Value("${orbisops.skill-runtime.embedding-cache-size:2048}") int cacheSize) {
         return new OpsSkillSemanticSettings(
                 semanticEnabled,
                 candidateLimit,

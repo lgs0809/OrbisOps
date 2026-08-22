@@ -157,7 +157,7 @@ public class MySqlSlowSqlOpsSubAgent extends AbstractOpsSubAgent {
 
         if (!settings.enabled()) {
             response.setMysqlSlowSqlStatus(status("MySQL Slow SQL", "mysql.slow_log/performance_schema", false, "MySQL 慢 SQL 子 Agent 已关闭。"));
-            gaps.add("ops.mysql-slow-sql.enabled=false，未查询慢 SQL。");
+            gaps.add("orbisops.mysql-slow-sql.enabled=false，未查询慢 SQL。");
             adjustments.add("需要数据库慢查询证据时开启 ops.mysql-slow-sql.enabled。");
             return result(task, STATUS_BLOCKED, "MySQL 慢 SQL 子 Agent 未启用。", evidence, attempts, gaps, adjustments, false, 0D);
         }

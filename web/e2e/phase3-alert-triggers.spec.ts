@@ -85,22 +85,22 @@ test('Alert Triggers caches catalog and project options while modal reuse stays 
   });
 
   await page.goto('/automations/alert-triggers?projectId=demo-project');
-  await expect(page.getByRole('heading', { name: '告警触发' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '告警触发器' })).toBeVisible();
   await expect(page.getByText('Critical checkout alerts').first()).toBeVisible();
   await expect(page.getByText('CheckoutErrorRateHigh')).toBeVisible();
-  await expect(page.getByRole('button', { name: '查看事件' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '打开 Run' })).toBeVisible();
   await expect.poll(() => ruleRequests).toBe(1);
   expect(eventRequests).toBe(1);
   expect(agentRequests).toBe(1);
   expect(channelRequests).toBe(1);
   expect(incidentRequests).toBe(1);
 
-  await page.getByRole('button', { name: '新建触发规则' }).click();
-  await expect(page.getByText('新建告警触发规则')).toBeVisible();
+  await page.getByRole('button', { name: '新建告警自动化' }).click();
+  await expect(page.getByRole('heading', { name: '新建告警自动化' })).toBeVisible();
   expect(agentRequests).toBe(1);
   await page.keyboard.press('Escape');
 
-  await page.getByRole('button', { name: '刷新' }).nth(1).click();
+  await page.getByRole('button', { name: '刷新' }).first().click();
   await expect.poll(() => ruleRequests).toBe(2);
   await expect.poll(() => eventRequests).toBe(2);
   await expect.poll(() => agentRequests).toBe(2);

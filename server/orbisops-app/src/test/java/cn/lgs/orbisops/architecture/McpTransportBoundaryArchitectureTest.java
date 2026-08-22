@@ -67,9 +67,9 @@ class McpTransportBoundaryArchitectureTest {
                 () -> assertTrue(secretFilter.contains("Map<String, String> safeEnv(")),
                 () -> assertTrue(secretFilter.contains("Map<String, String> safeHeaders(")),
                 () -> assertFalse(secretFilter.contains("@Service")),
-                () -> assertTrue(configuration.contains("ops.mcp.security.allowed-transports")),
-                () -> assertTrue(configuration.contains("ops.mcp.security.allowed-env-keys")),
-                () -> assertTrue(configuration.contains("ops.mcp.security.max-timeout-seconds")));
+                () -> assertTrue(configuration.contains("orbisops.mcp.security.allowed-transports")),
+                () -> assertTrue(configuration.contains("orbisops.mcp.security.allowed-env-keys")),
+                () -> assertTrue(configuration.contains("orbisops.mcp.security.max-timeout-seconds")));
     }
 
     @Test
@@ -86,7 +86,7 @@ class McpTransportBoundaryArchitectureTest {
                 () -> assertFalse(provider.contains("HttpClientSseClientTransport")),
                 () -> assertFalse(provider.contains("WebClientStreamableHttpTransport")),
                 () -> assertFalse(provider.contains("StdioClientTransport")),
-                () -> assertFalse(provider.contains("ops.mcp.security.allowed-transports")),
+                () -> assertFalse(provider.contains("orbisops.mcp.security.allowed-transports")),
                 () -> assertFalse(provider.contains("OpsSecretResolver secretResolver")),
                 () -> assertFalse(provider.contains("private McpSyncClient createClient")),
                 () -> assertFalse(provider.contains("private void assertTransportAllowed")),

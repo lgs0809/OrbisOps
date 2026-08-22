@@ -37,7 +37,7 @@ class ChannelNotificationSettingsProjectionBoundaryArchitectureTest {
                 () -> assertTrue(assembly.contains("OpsChannelNotificationSettings settings")),
                 () -> assertTrue(assembly.contains("OpsChannelOutboxRecordFactory opsChannelOutboxRecordFactory")),
                 () -> assertFalse(service.contains("@Value")),
-                () -> assertFalse(service.contains("ops.channel.notification.")),
+                () -> assertFalse(service.contains("orbisops.channel.notification.")),
                 () -> assertFalse(service.contains("new ChannelOutboxRecord(")),
                 () -> assertFalse(service.contains("JSON.")),
                 () -> assertTrue(settings.contains("DEFAULT_MAX_MESSAGE_CHARS = 12_000")),
@@ -47,11 +47,11 @@ class ChannelNotificationSettingsProjectionBoundaryArchitectureTest {
                 () -> assertTrue(settings.contains("Math.max(1, Math.min(maxAttempts, 20))")),
                 () -> assertTrue(settings.contains("Math.max(15, leaseSeconds)")),
                 () -> assertTrue(configuration.contains(
-                        "${ops.channel.notification.max-message-chars:12000}")),
+                        "${orbisops.channel.notification.max-message-chars:12000}")),
                 () -> assertTrue(configuration.contains(
-                        "${ops.channel.notification.outbox.max-attempts:8}")),
+                        "${orbisops.channel.notification.outbox.max-attempts:8}")),
                 () -> assertTrue(configuration.contains(
-                        "${ops.channel.notification.outbox.lease-seconds:120}")),
+                        "${orbisops.channel.notification.outbox.lease-seconds:120}")),
                 () -> assertTrue(recordFactory.contains("new ChannelOutboxRecord(")),
                 () -> assertTrue(recordFactory.contains("channel-notify:")),
                 () -> assertTrue(recordFactory.contains("channel-reply:")),

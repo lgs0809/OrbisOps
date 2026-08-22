@@ -36,6 +36,10 @@ jobs:
       - name: Install
         run: npm ci
 
+      - name: Repository release hygiene
+        working-directory: ${{ github.workspace }}
+        run: python3 scripts/release-hygiene.py
+
       - name: Install Playwright Chrome
         run: npx playwright install --with-deps chrome
 

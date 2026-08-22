@@ -26,10 +26,10 @@ public class JdbcChangePackageReadinessAdapter implements ChangePackageReadiness
     private final ChangePackageLandingJournalPort journalPort;
     private final JdbcTemplate jdbcTemplate;
 
-    @Value("${ops.change-package.auto-init:true}")
+    @Value("${orbisops.change-package.auto-init:true}")
     private boolean autoInit;
 
-    @Value("${ops.approved-landing.enabled:false}")
+    @Value("${orbisops.approved-landing.enabled:false}")
     private boolean approvedLandingEnabled;
 
     public JdbcChangePackageReadinessAdapter(IChangePackageCurrentRepository currentRepository,

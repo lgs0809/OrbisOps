@@ -30,7 +30,7 @@ public class JdbcToolResultRepository implements IToolResultRepository {
 
     public JdbcToolResultRepository(
             @Qualifier("mysqlJdbcTemplate") ObjectProvider<JdbcTemplate> provider,
-            @Value("${ops.safety.allow-in-memory-evidence-store:false}") boolean allowMemory,
+            @Value("${orbisops.safety.allow-in-memory-evidence-store:false}") boolean allowMemory,
             @Value("${spring.profiles.active:}") String activeProfiles) {
         this.jdbc = provider.getIfAvailable();
         this.memoryFallbackAllowed = allowMemory && developmentProfile(activeProfiles);

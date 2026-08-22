@@ -39,7 +39,7 @@ class OpsSemanticLexicalWriteAdapterTest {
         ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> metadataCaptor = ArgumentCaptor.forClass(String.class);
         verify(jdbc).update(sqlCaptor.capture(), contentCaptor.capture(), metadataCaptor.capture());
-        assertTrue(sqlCaptor.getValue().contains("INSERT INTO vector_store_qwen_vl_2048"));
+        assertTrue(sqlCaptor.getValue().contains("INSERT INTO orbisops_vector_store"));
         assertTrue(sqlCaptor.getValue().contains("?::jsonb"));
         assertEquals("semantic memory", contentCaptor.getValue());
         assertTrue(metadataCaptor.getValue().contains("\"memory_type\":\"ops_chat\""));
@@ -52,7 +52,7 @@ class OpsSemanticLexicalWriteAdapterTest {
         ObjectProvider<JdbcTemplate> provider = mock(ObjectProvider.class);
         OpsSemanticLexicalWriteAdapter adapter = new OpsSemanticLexicalWriteAdapter(
                 provider,
-                () -> "vector_store_qwen_vl_2048");
+                () -> "orbisops_vector_store");
 
         IllegalStateException error = assertThrows(IllegalStateException.class,
                 () -> adapter.writeLexical(new SemanticMemoryDocumentSnapshot(

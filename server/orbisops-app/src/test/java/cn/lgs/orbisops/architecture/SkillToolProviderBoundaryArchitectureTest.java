@@ -76,10 +76,10 @@ class SkillToolProviderBoundaryArchitectureTest {
                 () -> assertTrue(callback.contains("FunctionToolCallback.builder(")),
                 () -> assertTrue(callback.contains("SkillsTool.SkillsFunction")),
                 () -> assertFalse(callback.contains("@Service")),
-                () -> assertTrue(configuration.contains("ops.skills.enabled")),
-                () -> assertTrue(configuration.contains("ops.skills.locations")),
-                () -> assertTrue(configuration.contains("ops.skills.editable-location")),
-                () -> assertTrue(configuration.contains("ops.skills.editable-auto-init")));
+                () -> assertTrue(configuration.contains("orbisops.skills.enabled")),
+                () -> assertTrue(configuration.contains("orbisops.skills.locations")),
+                () -> assertTrue(configuration.contains("orbisops.skills.editable-location")),
+                () -> assertTrue(configuration.contains("orbisops.skills.editable-auto-init")));
     }
 
     private String read(String relativePath) throws IOException {

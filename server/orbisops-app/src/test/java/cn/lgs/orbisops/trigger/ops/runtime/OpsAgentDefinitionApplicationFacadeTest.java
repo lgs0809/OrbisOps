@@ -336,6 +336,7 @@ class OpsAgentDefinitionApplicationFacadeTest {
         OpsAgentDefinition definition = registry.resolve("generic-ops-react-agent");
         assertEquals(Boolean.TRUE, definition.getQueryRewriteEnabled());
         assertEquals("AGENTSCOPE", definition.getEngine());
+        assertEquals(null, definition.getModelId());
         assertEquals(1, definition.getAgentscopeAgents().size());
         assertEquals(List.of("MAIN_ASSISTANT"),
                 definition.getAgentscopeAgents().stream().map(OpsAgentScopeConfig::getRole).toList());

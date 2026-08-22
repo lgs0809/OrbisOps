@@ -2,11 +2,11 @@ import React from 'react';
 
 import styled from 'styled-components';
 import { Button, Dropdown, Avatar, Typography } from '@douyinfe/semi-ui';
-import { IconActivity, IconExit, IconMenu, IconShield } from '@douyinfe/semi-icons';
+import { IconExit, IconMenu } from '@douyinfe/semi-icons';
 
 import { theme } from '../../styles/theme';
 import { AdminUserService } from '../../services';
-import { getStoredUserInfo, isAdminUser, roleLabel } from '../../services/auth-session';
+import { getStoredUserInfo, roleLabel } from '../../services/auth-session';
 import { GlobalCommandPalette } from '../../features/search/components/GlobalCommandPalette';
 
 const { Text } = Typography;
@@ -102,34 +102,6 @@ const ProductScope = styled.div`
   }
 `;
 
-const StatusRail = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.sm};
-
-  @media (max-width: ${theme.breakpoints.lg}) {
-    display: none;
-  }
-`;
-
-const StatusPill = styled.div`
-  display: inline-flex;
-  align-items: center;
-  gap: ${theme.spacing.xs};
-  height: 32px;
-  padding: 0 ${theme.spacing.sm};
-  border: 1px solid ${theme.colors.border.secondary};
-  border-radius: ${theme.borderRadius.base};
-  color: ${theme.colors.text.secondary};
-  background: ${theme.colors.bg.secondary};
-  font-size: ${theme.typography.fontSize.sm};
-  white-space: nowrap;
-
-  .semi-icon {
-    color: ${theme.colors.success};
-  }
-`;
-
 const UserDropdown = styled.button`
   display: flex;
   align-items: center;
@@ -182,7 +154,6 @@ const UserInfo = styled.div`
 
 export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onLogout, collapsed = false }) => {
   const userInfo = getStoredUserInfo();
-  const admin = isAdminUser();
 
   const userMenuItems = [
     {
@@ -201,35 +172,23 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onLogout, colla
         <ToggleButton
           theme="borderless"
           icon={<IconMenu />}
-          aria-label={collapsed ? 'Open navigation menu' : 'Collapse navigation menu'}
+          aria-label={collapsed ? '打开导航菜单' : '收起导航菜单'}
           aria-controls="orbisops-sidebar"
           aria-expanded={!collapsed}
           onClick={onToggleSidebar}
         />
 
         <ProductScope>
-          <Text className="title">运维 AI 控制台</Text>
-          <Text className="subtitle">
-            {admin ? '多 Agent 排障、知识库和监控数据统一入口' : '通用 Agent 对话和会话工作台'}
-          </Text>
+          <Text className="title">OrbisOps</Text>
+          <Text className="subtitle">受治理的智能运维工作空间</Text>
         </ProductScope>
       </HeaderLeft>
 
       <HeaderRight>
         <GlobalCommandPalette />
-        <StatusRail>
-          <StatusPill>
-            <IconShield />
-            JWT 已保护
-          </StatusPill>
-          <StatusPill>
-            <IconActivity />
-            {admin ? '生产控制台' : 'Agent 工作台'}
-          </StatusPill>
-        </StatusRail>
 
         <Dropdown trigger="click" position="bottomRight" menu={userMenuItems}>
-          <UserDropdown type="button" aria-label={`Open user menu for ${userInfo.username || 'user'}`}>
+          <UserDropdown type="button" aria-label={`打开 ${userInfo.username || '用户'} 的用户菜单`}>
             <UserInfo>
               <Text className="username">{userInfo.username || '用户'}</Text>
               <Text className="role">{roleLabel(userInfo.userRole || userInfo.role)}</Text>

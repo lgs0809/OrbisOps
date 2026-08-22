@@ -26,7 +26,9 @@ public final class OpsAiClientApiHealthHttpProbeAdapter implements AiClientApiHe
     @Override
     public AiClientApiHealthProbeOutcome probe(AiClientApiHealthTarget target) {
         long startNanos = System.nanoTime();
-        String endpoint = resolveModelsEndpoint(target == null ? null : target.baseUrl());
+        String endpoint = resolveModelsEndpoint(
+                target == null ? null : target.baseUrl(),
+                target == null ? null : target.completionsPath());
         try {
             if (!hasText(endpoint)) {
                 throw new IllegalArgumentException("Provider Base URL 为空，无法检测");
@@ -60,14 +62,32 @@ public final class OpsAiClientApiHealthHttpProbeAdapter implements AiClientApiHe
         }
     }
 
-    private String resolveModelsEndpoint(String baseUrl) {
+    private String resolveModelsEndpoint(String baseUrl, String completionsPath) {
         if (!hasText(baseUrl)) {
             return "";
         }
-        String normalized = baseUrl.trim();
-        return normalized.endsWith("/models")
-                ? normalized
-                : normalized.replaceAll("/+$", "") + "/models";
+        String normalizedBase = baseUrl.trim().replaceAll("/+$", "");
+        if (normalizedBase.endsWith("/models")) {
+            return normalizedBase;
+        }
+
+        String normalizedCompletions = hasText(completionsPath)
+                ? completionsPath.trim().replaceAll("^/+", "")
+                : "";
+        String suffix = "chat/completions";
+        int suffixIndex = normalizedCompletions.indexOf(suffix);
+        String prefix = suffixIndex < 0
+                ? ""
+                : normalizedCompletions.substring(0, suffixIndex).replaceAll("/+$", "");
+        if (!hasText(prefix)) {
+            return normalizedBase + "/models";
+        }
+
+        String normalizedPrefix = prefix.replaceAll("^/+", "");
+        if (normalizedBase.endsWith("/" + normalizedPrefix)) {
+            return normalizedBase + "/models";
+        }
+        return normalizedBase + "/" + normalizedPrefix + "/models";
     }
 
     private String maskEndpoint(String endpoint) {

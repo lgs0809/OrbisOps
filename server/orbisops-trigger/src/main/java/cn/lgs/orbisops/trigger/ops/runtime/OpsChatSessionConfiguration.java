@@ -14,7 +14,7 @@ public class OpsChatSessionConfiguration {
     @Bean
     public OpsChatSessionSettings opsChatSessionSettings(Environment environment) {
         return new OpsChatSessionSettings(environment.getProperty(
-                "ops.chat.session.allow-in-memory-fallback",
+                "orbisops.chat.session.allow-in-memory-fallback",
                 Boolean.class,
                 false));
     }

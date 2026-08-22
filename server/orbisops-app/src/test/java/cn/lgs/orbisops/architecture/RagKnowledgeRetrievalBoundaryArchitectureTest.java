@@ -109,7 +109,7 @@ class RagKnowledgeRetrievalBoundaryArchitectureTest {
                 () -> assertTrue(configuration.contains("@Qualifier(\"ragEmbeddingModel\") ObjectProvider<EmbeddingModel>")),
                 () -> assertTrue(configuration.contains("OpsProjectKnowledgeScopeResolver opsProjectKnowledgeScopeResolver(")),
                 () -> assertTrue(configuration.contains("ObjectProvider<ProjectKnowledgeAuthorizationApplicationService>")),
-                () -> assertTrue(configuration.contains("@Value(\"${ops.rag.rerank.enabled:true}\")")),
+                () -> assertTrue(configuration.contains("@Value(\"${orbisops.rag.rerank.enabled:false}\")")),
 
                 () -> assertTrue(retrieval.contains("record Input(")),
                 () -> assertTrue(retrieval.contains("record Settings(")),

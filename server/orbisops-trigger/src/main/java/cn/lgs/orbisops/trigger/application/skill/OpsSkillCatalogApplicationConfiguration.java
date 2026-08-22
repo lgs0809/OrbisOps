@@ -111,9 +111,9 @@ public class OpsSkillCatalogApplicationConfiguration {
 
     @Bean
     public SkillPackageManifest.Limits skillPackageLimits(
-            @Value("${ops.skill-package.max-artifacts:32}") int maxArtifacts,
-            @Value("${ops.skill-package.max-artifact-bytes:262144}") long maxArtifactBytes,
-            @Value("${ops.skill-package.max-package-bytes:2097152}") long maxPackageBytes) {
+            @Value("${orbisops.skill-package.max-artifacts:32}") int maxArtifacts,
+            @Value("${orbisops.skill-package.max-artifact-bytes:262144}") long maxArtifactBytes,
+            @Value("${orbisops.skill-package.max-package-bytes:2097152}") long maxPackageBytes) {
         long safeArtifactBytes = Math.max(1024L, maxArtifactBytes);
         return new SkillPackageManifest.Limits(
                 Math.max(1, maxArtifacts),
@@ -263,11 +263,11 @@ public class OpsSkillCatalogApplicationConfiguration {
 
     @Bean
     public SkillCandidateTournamentSettings skillCandidateTournamentSettings(
-            @Value("${ops.skill-evolution.tournament.mode:LEGACY_PRIMARY}") String mode,
-            @Value("${ops.skill-evolution.tournament.hidden-suite-version:v1}") String hiddenSuiteVersion,
-            @Value("${ops.skill-evolution.tournament.structural-version:structural-v1}") String structuralVersion,
-            @Value("${ops.skill-evolution.tournament.behavior-version:behavior-v1}") String behaviorVersion,
-            @Value("${ops.skill-evolution.tournament.judge-version:judge-v1}") String judgeVersion) {
+            @Value("${orbisops.skill-evolution.tournament.mode:LEGACY_PRIMARY}") String mode,
+            @Value("${orbisops.skill-evolution.tournament.hidden-suite-version:v1}") String hiddenSuiteVersion,
+            @Value("${orbisops.skill-evolution.tournament.structural-version:structural-v1}") String structuralVersion,
+            @Value("${orbisops.skill-evolution.tournament.behavior-version:behavior-v1}") String behaviorVersion,
+            @Value("${orbisops.skill-evolution.tournament.judge-version:judge-v1}") String judgeVersion) {
         return SkillCandidateTournamentSettings.from(
                 mode,
                 hiddenSuiteVersion,
@@ -306,11 +306,11 @@ public class OpsSkillCatalogApplicationConfiguration {
             SkillEvolutionPipelineAuditPort pipelineAuditPort,
             SkillEvolutionCandidateSetSelector candidateSetSelector,
             SkillCandidateTournamentSettings tournamentSettings,
-            @Value("${ops.skill-evolution.promotion.min-observations:3}") int minimumObservations,
-            @Value("${ops.skill-evolution.promotion.explicit-procedure-min-observations:2}") int explicitProcedureMinimumObservations,
-            @Value("${ops.skill-evolution.promotion.min-distinct-runs:2}") int minimumDistinctRuns,
-            @Value("${ops.skill-evolution.promotion.min-distinct-sessions:2}") int minimumDistinctSessions,
-            @Value("${ops.skill-evolution.promotion.consolidation-sample-limit:12}") int consolidationSampleLimit) {
+            @Value("${orbisops.skill-evolution.promotion.min-observations:3}") int minimumObservations,
+            @Value("${orbisops.skill-evolution.promotion.explicit-procedure-min-observations:2}") int explicitProcedureMinimumObservations,
+            @Value("${orbisops.skill-evolution.promotion.min-distinct-runs:2}") int minimumDistinctRuns,
+            @Value("${orbisops.skill-evolution.promotion.min-distinct-sessions:2}") int minimumDistinctSessions,
+            @Value("${orbisops.skill-evolution.promotion.consolidation-sample-limit:12}") int consolidationSampleLimit) {
         return new SkillEvolutionApplicationService(
                 signalService,
                 experienceService,
@@ -419,8 +419,8 @@ public class OpsSkillCatalogApplicationConfiguration {
 
     @Bean
     public SkillCanaryApplicationService skillCanaryApplicationService(
-            @Value("${ops.skill-evolution.canary.enabled:true}") boolean enabled,
-            @Value("${ops.skill-evolution.canary-percent:10}") int percent) {
+            @Value("${orbisops.skill-evolution.canary.enabled:true}") boolean enabled,
+            @Value("${orbisops.skill-evolution.canary-percent:10}") int percent) {
         return new SkillCanaryApplicationService(
                 new SkillCanarySelectionPolicy(),
                 new SkillCanarySettings(enabled, percent));
@@ -441,8 +441,8 @@ public class OpsSkillCatalogApplicationConfiguration {
             SkillPatchRegressionEvaluationPort regressionPort,
             SkillShadowModelPort modelPort,
             SkillShadowEvalCasePort evalCasePort,
-            @Value("${ops.skill-evolution.shadow.enabled:true}") boolean enabled,
-            @Value("${ops.skill-evolution.shadow.min-score:0.80}") double minimumScore) {
+            @Value("${orbisops.skill-evolution.shadow.enabled:true}") boolean enabled,
+            @Value("${orbisops.skill-evolution.shadow.min-score:0.80}") double minimumScore) {
         return new SkillShadowApplicationService(
                 candidateService,
                 regressionPort,
@@ -467,13 +467,13 @@ public class OpsSkillCatalogApplicationConfiguration {
     @Bean
     public SkillEffectMetricApplicationService skillEffectMetricApplicationService(
             SkillEffectMetricPort metricPort,
-            @Value("${ops.skill-evolution.min-sample-size:10}") int minSampleSize,
-            @Value("${ops.skill-evolution.rollback-thresholds.blocked-tool-rate:0.25}") double maxBlockedRate,
-            @Value("${ops.skill-evolution.rollback-thresholds.needs-replan-rate:0.30}") double maxReplanRate,
-            @Value("${ops.skill-evolution.rollback-thresholds.negative-feedback-rate:0.20}") double maxNegativeRate,
-            @Value("${ops.skill-evolution.rollback-thresholds.success-rate-drop:0.15}") double maxSuccessRateDrop,
-            @Value("${ops.skill-evolution.rollback-thresholds.evidence-rate-drop:0.15}") double maxEvidenceRateDrop,
-            @Value("${ops.skill-evolution.rollback-thresholds.tool-call-increase-rate:0.50}") double maxToolCallIncreaseRate) {
+            @Value("${orbisops.skill-evolution.min-sample-size:10}") int minSampleSize,
+            @Value("${orbisops.skill-evolution.rollback-thresholds.blocked-tool-rate:0.25}") double maxBlockedRate,
+            @Value("${orbisops.skill-evolution.rollback-thresholds.needs-replan-rate:0.30}") double maxReplanRate,
+            @Value("${orbisops.skill-evolution.rollback-thresholds.negative-feedback-rate:0.20}") double maxNegativeRate,
+            @Value("${orbisops.skill-evolution.rollback-thresholds.success-rate-drop:0.15}") double maxSuccessRateDrop,
+            @Value("${orbisops.skill-evolution.rollback-thresholds.evidence-rate-drop:0.15}") double maxEvidenceRateDrop,
+            @Value("${orbisops.skill-evolution.rollback-thresholds.tool-call-increase-rate:0.50}") double maxToolCallIncreaseRate) {
         return new SkillEffectMetricApplicationService(
                 metricPort,
                 new SkillEffectDegradationPolicy(),
@@ -498,9 +498,9 @@ public class OpsSkillCatalogApplicationConfiguration {
             SkillManagementUseCase managementUseCase,
             SkillReleasePackageAssembler packageAssembler,
             SkillReleaseAuditPort auditPort,
-            @Value("${ops.skill-evolution.enabled:true}") boolean enabled,
-            @Value("${ops.skill-evolution.min-sample-size:10}") int minimumSampleSize,
-            @Value("${ops.skill-evolution.release.batch-size:20}") int evaluationBatchSize) {
+            @Value("${orbisops.skill-evolution.enabled:true}") boolean enabled,
+            @Value("${orbisops.skill-evolution.min-sample-size:10}") int minimumSampleSize,
+            @Value("${orbisops.skill-evolution.release.batch-size:20}") int evaluationBatchSize) {
         return new SkillReleaseApplicationService(
                 releasePort,
                 candidateService,
@@ -530,18 +530,18 @@ public class OpsSkillCatalogApplicationConfiguration {
 
     @Bean
     public SkillRuntimeSelectionSettings skillRuntimeSelectionSettings(
-            @Value("${ops.skill-runtime.catalog-candidate-limit:24}") int catalogCandidateLimit,
-            @Value("${ops.skill-runtime.selected-limit:6}") int selectedLimit,
-            @Value("${ops.skill-runtime.max-explicit-skills:12}") int maxExplicitSkills,
-            @Value("${ops.skill-runtime.min-relevance-score:0.12}") double minRelevanceScore,
-            @Value("${ops.skill-runtime.similar-suppression-threshold:0.88}") double similarSuppressionThreshold,
-            @Value("${ops.skill-runtime.semantic-weight:0.42}") double semanticWeight,
-            @Value("${ops.skill-runtime.semantic-recall-limit:64}") int semanticRecallLimit,
-            @Value("${ops.skill-runtime.category-boost:0.12}") double categoryBoost,
-            @Value("${ops.skill-runtime.negative-penalty-weight:0.65}") double negativePenaltyWeight,
-            @Value("${ops.skill-runtime.llm-rerank-enabled:true}") boolean llmRerankEnabled,
-            @Value("${ops.skill-runtime.llm-rerank-candidate-limit:10}") int llmRerankCandidateLimit,
-            @Value("${ops.skill-runtime.llm-rerank-weight:0.35}") double llmRerankWeight) {
+            @Value("${orbisops.skill-runtime.catalog-candidate-limit:24}") int catalogCandidateLimit,
+            @Value("${orbisops.skill-runtime.selected-limit:6}") int selectedLimit,
+            @Value("${orbisops.skill-runtime.max-explicit-skills:12}") int maxExplicitSkills,
+            @Value("${orbisops.skill-runtime.min-relevance-score:0.12}") double minRelevanceScore,
+            @Value("${orbisops.skill-runtime.similar-suppression-threshold:0.88}") double similarSuppressionThreshold,
+            @Value("${orbisops.skill-runtime.semantic-weight:0.42}") double semanticWeight,
+            @Value("${orbisops.skill-runtime.semantic-recall-limit:64}") int semanticRecallLimit,
+            @Value("${orbisops.skill-runtime.category-boost:0.12}") double categoryBoost,
+            @Value("${orbisops.skill-runtime.negative-penalty-weight:0.65}") double negativePenaltyWeight,
+            @Value("${orbisops.skill-runtime.llm-rerank-enabled:true}") boolean llmRerankEnabled,
+            @Value("${orbisops.skill-runtime.llm-rerank-candidate-limit:10}") int llmRerankCandidateLimit,
+            @Value("${orbisops.skill-runtime.llm-rerank-weight:0.35}") double llmRerankWeight) {
         return new SkillRuntimeSelectionSettings(
                 catalogCandidateLimit, selectedLimit, maxExplicitSkills,
                 minRelevanceScore, similarSuppressionThreshold, semanticWeight,

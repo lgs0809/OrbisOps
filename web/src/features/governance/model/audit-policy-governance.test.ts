@@ -13,7 +13,7 @@ describe('audit policy governance model', () => {
 
     expect(controls.find((item) => item.key === 'retention')).toMatchObject({
       status: 'ENFORCED',
-      summary: '90 days · server-side visibility boundary',
+      summary: '90 天 · 服务端可见性边界',
     });
     expect(controls.find((item) => item.key === 'masking')).toMatchObject({ status: 'PLATFORM_INVARIANT' });
     expect(controls.find((item) => item.key === 'export')).toMatchObject({ status: 'NOT_ACTIVATED' });

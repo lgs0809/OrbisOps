@@ -68,7 +68,7 @@ class SkillSimilarityBoundaryArchitectureTest {
                 () -> assertTrue(coordinator.contains("settings.threshold()")),
                 () -> assertFalse(coordinator.contains("@Service")),
                 () -> assertTrue(coordinator.lines().count() <= 120),
-                () -> assertTrue(configuration.contains("ops.skill-evolution.similarity-threshold")));
+                () -> assertTrue(configuration.contains("orbisops.skill-evolution.similarity-threshold")));
     }
 
     private String read(String relativePath) throws IOException {

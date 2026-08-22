@@ -26,13 +26,13 @@ public class JdbcGraphEventRepository implements IGraphEventRepository {
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 
-    @Value("${ops.graph-events.jdbc-enabled:true}")
+    @Value("${orbisops.graph-events.jdbc-enabled:true}")
     private boolean jdbcEnabled = true;
 
-    @Value("${ops.graph-events.auto-init:true}")
+    @Value("${orbisops.graph-events.auto-init:true}")
     private boolean autoInit = true;
 
-    @Value("${ops.graph-events.fail-closed:true}")
+    @Value("${orbisops.graph-events.fail-closed:true}")
     private boolean failClosed = true;
 
     private volatile boolean initialized;

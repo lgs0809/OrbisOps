@@ -5,6 +5,7 @@ import { Button, Input, Select, Space, Tag, Toast, Typography } from '@douyinfe/
 import { opsChangePackageService } from '../../../services/ops-change-package-service';
 import type { OpsApprovalChannelOption, OpsExecutionScope } from '../../../services/ops-change-package-service';
 import type { OpsChangePackage } from '../../../services/ops-change-package-types';
+import { userFacingError } from '../../../utils/user-facing-error';
 
 const { Text } = Typography;
 const { Option } = Select;
@@ -43,15 +44,15 @@ export const ApprovalChannelDispatch: React.FC<Props> = ({ record, scope, canApp
   const sendMutation = useMutation({
     mutationFn: async () => {
       const normalizedTarget = target.trim();
-      if (!channelId) throw new Error('请选择审批 Channel');
-      if (!normalizedTarget) throw new Error('请输入 Channel 会话目标');
+      if (!channelId) throw new Error('请选择用于审批的 Channel。');
+      if (!normalizedTarget) throw new Error('请输入 Channel 会话目标。');
       return await opsChangePackageService.sendApprovalCard(record.packageId, channelId, normalizedTarget, scope);
     },
     onSuccess: () => {
-      Toast.success('审批卡已发送；点击卡片时仍会重新校验身份、权限和当前版本');
+      Toast.success('审批卡已发送；用户操作时仍会重新校验身份、权限和当前 ChangePackage 版本。');
     },
     onError: (error) => {
-      Toast.error(error instanceof Error ? error.message : '审批卡发送失败');
+      Toast.error(userFacingError(error, '发送审批卡失败，请稍后重试。'));
     },
   });
 
@@ -60,16 +61,16 @@ export const ApprovalChannelDispatch: React.FC<Props> = ({ record, scope, canApp
   return (
     <Space vertical align="start" spacing="tight" style={{ width: '100%', marginTop: 12 }}>
       <Space wrap align="center">
-        <Text strong>Send Approval to Channel</Text>
-        <Tag color="blue">Command surface only</Tag>
+        <Text strong>发送审批卡到 Channel</Text>
+        <Tag color="blue">仅发起审批交互</Tag>
       </Space>
       <Text type="tertiary">
-        发送卡片不会审批或执行生产变更。审批人在 Feishu / WeCom 点击后，OrbisOps 会重新校验 Channel 身份映射、项目 RBAC、ChangePackage 状态、version 与 hash。
+        发送审批卡不会直接批准或执行生产变更。审批人在 Feishu 或 WeCom 操作时，OrbisOps 会重新校验 Channel 身份映射、Project RBAC、ChangePackage 状态、版本和内容哈希。
       </Text>
       <Space wrap style={{ width: '100%' }}>
         <Select
           value={channelId || undefined}
-          placeholder={channelsQuery.isFetching ? '加载审批 Channel...' : '选择 Feishu / WeCom Channel'}
+          placeholder={channelsQuery.isFetching ? '正在加载可用 Channel...' : '选择 Feishu / WeCom Channel'}
           loading={channelsQuery.isFetching}
           style={{ minWidth: 240 }}
           onChange={(value) => setChannelId(String(value || ''))}
@@ -82,7 +83,7 @@ export const ApprovalChannelDispatch: React.FC<Props> = ({ record, scope, canApp
         </Select>
         <Input
           value={target}
-          placeholder={selectedChannel?.type === 'FEISHU' ? 'Feishu chat_id' : selectedChannel?.type === 'WECOM' ? 'WeCom chatid' : 'Channel 会话目标'}
+          placeholder={selectedChannel?.type === 'FEISHU' ? 'Feishu 会话 ID（chat_id）' : selectedChannel?.type === 'WECOM' ? 'WeCom 会话 ID（chatid）' : 'Channel 会话目标'}
           style={{ minWidth: 260 }}
           onChange={(value) => setTarget(String(value || ''))}
         />
@@ -96,7 +97,7 @@ export const ApprovalChannelDispatch: React.FC<Props> = ({ record, scope, canApp
         </Button>
       </Space>
       {!channelsQuery.isFetching && channels.length === 0 && (
-        <Text type="tertiary">当前项目没有 ACTIVE 的 Feishu / WeCom Channel，请先完成 Channel 配置与身份绑定。</Text>
+        <Text type="tertiary">当前 Project 没有可用的 Feishu / WeCom Channel。请先完成 Channel 配置和身份绑定。</Text>
       )}
       {selectedChannel && <Tag>{selectedChannel.name} · {selectedChannel.type}</Tag>}
     </Space>

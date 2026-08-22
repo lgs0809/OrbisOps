@@ -5,6 +5,10 @@ import cn.lgs.orbisops.application.config.AiClientApiDefinition;
 import cn.lgs.orbisops.application.config.AiClientModelCatalogPort;
 import cn.lgs.orbisops.application.config.AiClientModelDefinition;
 import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
+import cn.lgs.orbisops.application.modelpolicy.ModelDefaultPolicyApplicationService;
+import cn.lgs.orbisops.application.modelpolicy.ModelDefaultPolicySnapshot;
+import cn.lgs.orbisops.domain.modelpolicy.model.ModelDefaultPolicy;
+import cn.lgs.orbisops.domain.modelpolicy.model.ModelPolicyStatus;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
@@ -12,6 +16,7 @@ import org.springframework.core.env.Environment;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -133,6 +138,55 @@ class OpsRuntimeModelResolverTest {
         assertInstanceOf(OpenAiChatModel.class, resolved);
         assertEquals("gpt-test", context.getMetadata().get("modelName"));
         assertEquals("api-1", context.getMetadata().get("apiId"));
+    }
+
+    @Test
+    void blankModelMustUseProjectDefaultPolicyBeforeEnvironmentFallback() {
+        AiClientModelCatalogPort modelRepository = mock(AiClientModelCatalogPort.class);
+        AiClientApiCatalogPort apiRepository = mock(AiClientApiCatalogPort.class);
+        ModelDefaultPolicyApplicationService policies = mock(ModelDefaultPolicyApplicationService.class);
+        AiClientModelDefinition model = new AiClientModelDefinition(
+                null, "model-1", "api-1", "gpt-project-default", null, null, null, 1, null, null);
+        AiClientApiDefinition api = new AiClientApiDefinition(
+                null,
+                "api-1",
+                null,
+                null,
+                "https://example.invalid",
+                "${env:OPS_TEST_KEY:fallback-key}",
+                "/v1/chat/completions",
+                "/v1/embeddings",
+                1,
+                null,
+                null);
+        when(modelRepository.findByModelId("model-1")).thenReturn(model);
+        when(apiRepository.findByApiId("api-1")).thenReturn(api);
+        when(policies.find("project-1")).thenReturn(Optional.of(new ModelDefaultPolicySnapshot(
+                1L,
+                new ModelDefaultPolicy("project-1", "model-1", "", "", "", ModelPolicyStatus.ENABLED),
+                null,
+                null)));
+        OpsRuntimeResourceContext context = OpsRuntimeResourceContext.builder()
+                .definition(OpsAgentDefinition.builder().agentId("agent-1").build())
+                .projectId("project-1")
+                .events(new ArrayList<>())
+                .build();
+        OpsRuntimeModelResolver resolver = new OpsRuntimeModelResolver(
+                () -> mock(ChatModel.class),
+                () -> mock(ChatModel.class),
+                () -> modelRepository,
+                () -> apiRepository,
+                () -> policies,
+                mock(ModelAvailabilityPort.class),
+                secretResolver("resolved-key"),
+                OpsRuntimeModelSettings.forTest(5, 45));
+
+        ChatModel resolved = resolver.resolve(context);
+
+        assertInstanceOf(OpenAiChatModel.class, resolved);
+        assertEquals("model-1", context.getModelId());
+        assertEquals("PROJECT_DEFAULT", context.getMetadata().get("modelSelectionSource"));
+        assertEquals("model-1", context.getMetadata().get("defaultModelId"));
     }
 
     @Test

@@ -13,7 +13,7 @@ public class JdbcProjectWorkspaceReadinessRepository implements IProjectWorkspac
 
     private final JdbcTemplate jdbcTemplate;
 
-    @Value("${ops.project-workspace.jdbc-enabled:true}")
+    @Value("${orbisops.project-workspace.jdbc-enabled:true}")
     private boolean jdbcEnabled = true;
 
     @Autowired

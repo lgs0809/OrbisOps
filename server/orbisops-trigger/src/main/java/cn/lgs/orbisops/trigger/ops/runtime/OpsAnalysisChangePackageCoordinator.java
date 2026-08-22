@@ -19,7 +19,7 @@ import java.util.function.Consumer;
 final class OpsAnalysisChangePackageCoordinator {
 
     private static final Set<String> AUTHORITATIVE_DATASOURCE_TYPES = Set.of(
-            "PROMETHEUS", "ELASTICSEARCH", "MYSQL_SLOW_SQL");
+            "PROMETHEUS", "ELASTICSEARCH", "MYSQL_SLOW_SQL", "MYSQL", "RABBITMQ", "REDIS");
     private static final int MAX_RUNTIME_EVIDENCE = 20;
     private static final int MAX_RUNTIME_EVIDENCE_CHARS = 1800;
     private static final int MAX_EVIDENCE_COMPLETION_ATTEMPTS = 2;
@@ -442,14 +442,23 @@ final class OpsAnalysisChangePackageCoordinator {
             snapshot = new ArrayList<>(events);
         }
         for (OpsRuntimeEvent event : snapshot) {
-            if (event == null
-                    || !"SOURCE_QUERY_FINISHED".equals(event.getEventType())
-                    || !"SUCCEEDED".equalsIgnoreCase(value(event.getStatus()))) continue;
+            if (event == null || !"SUCCEEDED".equalsIgnoreCase(value(event.getStatus()))) continue;
             Map<String, Object> payload = event.getPayload() == null ? Map.of() : event.getPayload();
-            String sourceType = text(payload.get("sourceType")).toUpperCase();
-            if (Boolean.TRUE.equals(payload.get("verified"))
-                    && AUTHORITATIVE_DATASOURCE_TYPES.contains(sourceType)) {
-                result.add(sourceType);
+            if ("SOURCE_QUERY_FINISHED".equals(event.getEventType())) {
+                String sourceType = text(payload.get("sourceType")).toUpperCase();
+                if (Boolean.TRUE.equals(payload.get("verified"))
+                        && AUTHORITATIVE_DATASOURCE_TYPES.contains(sourceType)) {
+                    result.add(sourceType);
+                }
+                continue;
+            }
+            if ("TOOL_CALL_FINISHED".equals(event.getEventType())
+                    && "mcp".equalsIgnoreCase(text(payload.get("toolKind")))
+                    && Boolean.TRUE.equals(payload.get("remoteCallExecuted"))
+                    && !Boolean.FALSE.equals(payload.get("allowed"))
+                    && !text(payload.get("resultId")).isBlank()) {
+                String sourceType = datasourceNameSourceType(text(payload.get("remoteToolName")));
+                if (!sourceType.isBlank()) result.add(sourceType);
             }
         }
         return result;
@@ -461,10 +470,22 @@ final class OpsAnalysisChangePackageCoordinator {
 
     private String datasourceSourceType(ToolCallback callback) {
         if (callback == null || callback.getToolDefinition() == null) return "";
-        String name = text(callback.getToolDefinition().name()).toLowerCase();
-        if (OpsDatasourceRuntimeToolProvider.PROMETHEUS_TOOL.equals(name)) return "PROMETHEUS";
-        if (OpsDatasourceRuntimeToolProvider.ELASTICSEARCH_TOOL.equals(name)) return "ELASTICSEARCH";
-        if (name.contains("mysql") && (name.contains("slow") || name.contains("sql"))) return "MYSQL_SLOW_SQL";
+        return datasourceNameSourceType(text(callback.getToolDefinition().name()));
+    }
+
+    private String datasourceNameSourceType(String toolName) {
+        String name = text(toolName).toLowerCase();
+        if (name.startsWith("mcp_tool_catalog_") || name.startsWith("enable_mcp_tool_")) return "";
+        if (OpsDatasourceRuntimeToolProvider.PROMETHEUS_TOOL.equals(name)
+                || name.contains("prometheus")) return "PROMETHEUS";
+        if (OpsDatasourceRuntimeToolProvider.ELASTICSEARCH_TOOL.equals(name)
+                || name.contains("elasticsearch")) return "ELASTICSEARCH";
+        if (name.contains("rabbitmq")) return "RABBITMQ";
+        if (name.contains("redis")) return "REDIS";
+        if (name.contains("mysql") && (name.contains("slow") || name.contains("digest"))) {
+            return "MYSQL_SLOW_SQL";
+        }
+        if (name.contains("mysql")) return "MYSQL";
         return "";
     }
 
@@ -610,12 +631,7 @@ final class OpsAnalysisChangePackageCoordinator {
         String evidenceCompleteness = sourceTypes.size() >= 2
                 ? "COMPLETE"
                 : sourceTypes.size() == 1 ? "PARTIAL" : "INSUFFICIENT";
-        String classification = taskActionClassification(request);
-        if (classification.isBlank()) {
-            classification = "REMEDIATE";
-        }
         Map<String, Object> outcome = new LinkedHashMap<>();
-        outcome.put("actionClassification", classification);
         outcome.put("requiresAction", true);
         outcome.put("verificationStatus", "NOT_APPLICABLE");
         outcome.put("abstained", false);
@@ -630,15 +646,6 @@ final class OpsAnalysisChangePackageCoordinator {
                 .summary("主 ReAct outcome 缺失，已由受控 Workflow 终态事实补齐结构化 outcome。")
                 .payload(Map.copyOf(outcome))
                 .build());
-    }
-
-    private String taskActionClassification(OpsAgentChatRequest request) {
-        if (request == null || request.getMetadata() == null) return "";
-        String classification = text(request.getMetadata().get(
-                OpsWorkSessionContextMetadataKeys.TASK_ACTION_CLASSIFICATION)).toUpperCase();
-        return Set.of("DIAGNOSE", "REMEDIATE", "VERIFY", "ABSTAIN").contains(classification)
-                ? classification
-                : "";
     }
 
     private boolean isPrepareChangePackageTool(ToolCallback callback) {

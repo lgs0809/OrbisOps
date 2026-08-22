@@ -1,9 +1,12 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
 import cn.lgs.orbisops.application.worksession.ToolLoopCoordinator;
+import com.alibaba.cloud.ai.graph.NodeOutput;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.agent.Agent;
+import com.alibaba.cloud.ai.graph.streaming.OutputType;
+import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.LinkedHashMap;
@@ -96,7 +99,14 @@ final class OpsAgentScopeExecutor {
             hooks.assertNotCanceled(request);
             int eventOffset = eventSize(events);
             int toolCallsBefore = toolCallStartedCount(events);
-            Optional<OverAllState> state = invokeFlow(flow, prepared.content(), request.getSessionId());
+            boolean streamVisibleAnswer = pipeline.agents().size() == 1;
+            Optional<OverAllState> state = invokeFlow(
+                    flow,
+                    prepared.content(),
+                    request.getSessionId(),
+                    events,
+                    eventSink,
+                    streamVisibleAnswer);
             String rawOutput = rawOutput(state, pipeline.outputKey());
             if (OpsAgentOutputGuard.isTransportErrorEnvelope(rawOutput)
                     && toolCallStartedCount(events) == toolCallsBefore) {
@@ -111,7 +121,10 @@ final class OpsAgentScopeExecutor {
                 state = invokeFlow(
                         flow,
                         prepared.content(),
-                        request.getSessionId() + "-transport-retry");
+                        request.getSessionId() + "-transport-retry",
+                        events,
+                        eventSink,
+                        streamVisibleAnswer);
                 rawOutput = rawOutput(state, pipeline.outputKey());
             }
             boolean evidenceBackedDegradation = false;
@@ -123,8 +136,7 @@ final class OpsAgentScopeExecutor {
             }
             OpsAgentScopeOutcomeEnvelope.Parsed parsedOutcome = outcomeEnvelope.parse(rawOutput);
             if (parsedOutcome.present()) {
-                Map<String, Object> outcome = reconcileActionClassification(
-                        parsedOutcome.outcome(), request, events, eventSink, pipeline.name());
+                Map<String, Object> outcome = parsedOutcome.outcome();
                 record(events, eventSink, OpsRuntimeEvent.builder()
                         .eventType("REACT_OUTCOME")
                         .nodeType("AGENTSCOPE_OUTCOME")
@@ -157,12 +169,23 @@ final class OpsAgentScopeExecutor {
                     "ReAct 工具流 " + pipeline.mode() + " 执行完成。"));
             return output;
         } catch (Exception error) {
+            Optional<OpsModelProviderFailureClassifier.Failure> providerFailure =
+                    OpsModelProviderFailureClassifier.classify(error);
+            if (providerFailure.isPresent()) {
+                OpsModelProviderFailureClassifier.Failure failure = providerFailure.get();
+                record(events, eventSink, OpsRuntimeEvent.builder()
+                        .eventType("REACT_FAILED")
+                        .status("FAILED")
+                        .summary(failure.eventSummary())
+                        .payload(Map.of("reasonCode", failure.code()))
+                        .build());
+                throw new IllegalStateException(failure.code(), error);
+            }
             record(events, eventSink, OpsRuntimeEvent.of(
                     "REACT_FAILED",
                     "FAILED",
-                    "ReAct 工具流执行失败：" + error.getMessage()));
-            throw new IllegalStateException(
-                    "ReAct 工具流执行失败：" + error.getMessage(), error);
+                    "ReAct 工具流执行失败，请查看运行详情。"));
+            throw new IllegalStateException("REACT_EXECUTION_FAILED", error);
         }
     }
 
@@ -186,12 +209,53 @@ final class OpsAgentScopeExecutor {
         return configPolicy.maxToolRounds(definition, config, request);
     }
 
-    private Optional<OverAllState> invokeFlow(Agent flow, String content, String threadId) throws Exception {
-        return flow.invoke(
-                content,
-                RunnableConfig.builder()
-                        .threadId(threadId)
-                        .build());
+    private Optional<OverAllState> invokeFlow(
+            Agent flow,
+            String content,
+            String threadId,
+            List<OpsRuntimeEvent> events,
+            Consumer<OpsRuntimeEvent> eventSink,
+            boolean streamVisibleAnswer) throws Exception {
+        RunnableConfig config = RunnableConfig.builder()
+                .threadId(threadId)
+                .build();
+        OpsVisibleAnswerStreamProjector projector = new OpsVisibleAnswerStreamProjector();
+        NodeOutput last = flow.stream(content, config)
+                .doOnNext(output -> {
+                    if (!streamVisibleAnswer
+                            || !(output instanceof StreamingOutput<?> streaming)
+                            || streaming.getOutputType() != OutputType.AGENT_MODEL_STREAMING) {
+                        return;
+                    }
+                    String chunk = streaming.chunk();
+                    if ((chunk == null || chunk.isEmpty()) && streaming.message() != null) {
+                        chunk = streaming.message().getText();
+                    }
+                    for (String delta : projector.accept(chunk)) {
+                        emitTextDelta(events, eventSink, delta);
+                    }
+                })
+                .blockLast();
+        if (streamVisibleAnswer) {
+            for (String delta : projector.finish()) {
+                emitTextDelta(events, eventSink, delta);
+            }
+        }
+        return Optional.ofNullable(last).map(NodeOutput::state);
+    }
+
+    private void emitTextDelta(
+            List<OpsRuntimeEvent> events,
+            Consumer<OpsRuntimeEvent> eventSink,
+            String delta) {
+        if (delta == null || delta.isEmpty()) return;
+        record(events, eventSink, OpsRuntimeEvent.builder()
+                .eventType("TEXT_DELTA")
+                .nodeType("AGENTSCOPE_STREAM")
+                .status("RUNNING")
+                .summary("ReAct 最终回答输出片段。")
+                .content(delta)
+                .build());
     }
 
     private String rawOutput(Optional<OverAllState> state, String outputKey) {
@@ -281,12 +345,9 @@ final class OpsAgentScopeExecutor {
                 .summary("ReAct 最终模型综合失败，已保留本轮已验证证据并降级输出。")
                 .payload(Map.of("authoritativeSourceTypes", List.copyOf(sourceTypes)))
                 .build());
-        String semantic = semanticClassification(request);
-        if (semantic.isBlank() || "ABSTAIN".equals(semantic)) return;
         Map<String, Object> outcome = new LinkedHashMap<>();
-        outcome.put("actionClassification", semantic);
-        outcome.put("requiresAction", "REMEDIATE".equals(semantic));
-        outcome.put("verificationStatus", "VERIFY".equals(semantic) ? "INSUFFICIENT" : "NOT_APPLICABLE");
+        outcome.put("requiresAction", false);
+        outcome.put("verificationStatus", "INSUFFICIENT");
         outcome.put("abstained", false);
         outcome.put("evidenceCompleteness", "INSUFFICIENT");
         outcome.put("source", "EVIDENCE_BACKED_DEGRADATION");
@@ -299,55 +360,6 @@ final class OpsAgentScopeExecutor {
                 .summary("ReAct 综合失败后，已由权威证据保全路径补齐结构化终态。")
                 .payload(Map.copyOf(outcome))
                 .build());
-    }
-
-    private String semanticClassification(OpsAgentChatRequest request) {
-        if (request == null || request.getMetadata() == null) return "";
-        Object semanticValue = request.getMetadata().get(
-                OpsWorkSessionContextMetadataKeys.TASK_ACTION_CLASSIFICATION);
-        String semantic = semanticValue == null
-                ? ""
-                : String.valueOf(semanticValue).trim().toUpperCase(Locale.ROOT);
-        return List.of("DIAGNOSE", "REMEDIATE", "VERIFY", "ABSTAIN").contains(semantic)
-                ? semantic
-                : "";
-    }
-
-    private Map<String, Object> reconcileActionClassification(
-            Map<String, Object> modelOutcome,
-            OpsAgentChatRequest request,
-            List<OpsRuntimeEvent> events,
-            Consumer<OpsRuntimeEvent> eventSink,
-            String agentName) {
-        if (modelOutcome == null || modelOutcome.isEmpty()
-                || request == null || request.getMetadata() == null) {
-            return modelOutcome == null ? Map.of() : modelOutcome;
-        }
-        Object semanticValue = request.getMetadata().get(
-                OpsWorkSessionContextMetadataKeys.TASK_ACTION_CLASSIFICATION);
-        String semantic = semanticValue == null
-                ? ""
-                : String.valueOf(semanticValue).trim().toUpperCase(Locale.ROOT);
-        if (!List.of("DIAGNOSE", "REMEDIATE", "VERIFY", "ABSTAIN").contains(semantic)) {
-            return modelOutcome;
-        }
-        String model = String.valueOf(modelOutcome.getOrDefault("actionClassification", ""));
-        if (semantic.equals(model)) return modelOutcome;
-
-        Map<String, Object> reconciled = new LinkedHashMap<>(modelOutcome);
-        reconciled.put("actionClassification", semantic);
-        record(events, eventSink, OpsRuntimeEvent.builder()
-                .eventType("ACTION_CLASSIFICATION_RECONCILED")
-                .nodeType("AGENTSCOPE_OUTCOME")
-                .agent(agentName)
-                .status("SUCCEEDED")
-                .summary("最终 outcome 已按用户请求语义分类进行一致性对齐。")
-                .payload(Map.of(
-                        "modelClassification", model,
-                        "semanticClassification", semantic,
-                        "source", "MAIN_QUERY_SEMANTICS"))
-                .build());
-        return Map.copyOf(reconciled);
     }
 
     private void record(List<OpsRuntimeEvent> events,

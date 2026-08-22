@@ -4,6 +4,7 @@ import cn.lgs.orbisops.api.dto.AdminUserLoginRequestDTO;
 import cn.lgs.orbisops.api.dto.AdminUserQueryRequestDTO;
 import cn.lgs.orbisops.api.dto.AdminUserRequestDTO;
 import cn.lgs.orbisops.api.dto.AdminUserResponseDTO;
+import cn.lgs.orbisops.api.dto.FirstTimeSetupRequestDTO;
 import cn.lgs.orbisops.application.security.AdminUserAuthenticationException;
 import cn.lgs.orbisops.application.security.AdminUserAuthenticationUseCase;
 import cn.lgs.orbisops.application.security.AdminUserCatalogQuery;
@@ -11,9 +12,11 @@ import cn.lgs.orbisops.application.security.AdminUserCatalogUseCase;
 import cn.lgs.orbisops.application.security.AdminUserCommand;
 import cn.lgs.orbisops.application.security.AdminUserLoginCommand;
 import cn.lgs.orbisops.application.security.AdminUserLoginResult;
+import cn.lgs.orbisops.application.security.FirstTimeSetupUseCase;
 import cn.lgs.orbisops.domain.security.AdminUserAccount;
 import cn.lgs.orbisops.domain.security.AdminUserRole;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -23,18 +26,41 @@ public class AdminUserApplicationService {
 
     private final AdminUserCatalogUseCase catalogUseCase;
     private final AdminUserAuthenticationUseCase authenticationUseCase;
+    private final FirstTimeSetupUseCase firstTimeSetupUseCase;
 
     public AdminUserApplicationService(
             AdminUserCatalogUseCase catalogUseCase,
-            AdminUserAuthenticationUseCase authenticationUseCase) {
+            AdminUserAuthenticationUseCase authenticationUseCase,
+            FirstTimeSetupUseCase firstTimeSetupUseCase) {
         if (catalogUseCase == null) {
             throw new IllegalArgumentException("ADMIN_USER_CATALOG_USE_CASE_REQUIRED");
         }
         if (authenticationUseCase == null) {
             throw new IllegalArgumentException("ADMIN_USER_AUTHENTICATION_USE_CASE_REQUIRED");
         }
+        if (firstTimeSetupUseCase == null) {
+            throw new IllegalArgumentException("FIRST_TIME_SETUP_USE_CASE_REQUIRED");
+        }
         this.catalogUseCase = catalogUseCase;
         this.authenticationUseCase = authenticationUseCase;
+        this.firstTimeSetupUseCase = firstTimeSetupUseCase;
+    }
+
+    public boolean firstTimeSetupRequired() {
+        return firstTimeSetupUseCase.isRequired();
+    }
+
+    @Transactional
+    public AdminUserResponseDTO setupFirstAdministrator(FirstTimeSetupRequestDTO request) {
+        if (request == null) {
+            throw new IllegalArgumentException("FIRST_TIME_SETUP_REQUEST_REQUIRED");
+        }
+        try {
+            AdminUserLoginResult result = firstTimeSetupUseCase.setup(request.getUsername(), request.getPassword());
+            return toResponse(result.account(), result.token());
+        } catch (AdminUserAuthenticationException error) {
+            throw new LoginFailedException(error.getMessage());
+        }
     }
 
     public boolean create(AdminUserRequestDTO request) {

@@ -31,7 +31,7 @@ class OpsSemanticMemoryClearPersistenceAdapterTest {
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> sessionCaptor = ArgumentCaptor.forClass(String.class);
         verify(jdbc).update(sqlCaptor.capture(), sessionCaptor.capture());
-        assertTrue(sqlCaptor.getValue().contains("vector_store_qwen_vl_2048"));
+        assertTrue(sqlCaptor.getValue().contains("orbisops_vector_store"));
         assertTrue(sqlCaptor.getValue().contains("metadata->>'memory_type' = 'ops_chat'"));
         assertTrue(sqlCaptor.getValue().contains("metadata->>'session_id' = ?"));
         assertEquals("session-1", sessionCaptor.getValue());
@@ -44,7 +44,7 @@ class OpsSemanticMemoryClearPersistenceAdapterTest {
         OpsSemanticMemoryClearPersistenceAdapter adapter =
                 new OpsSemanticMemoryClearPersistenceAdapter(
                         provider,
-                        () -> "vector_store_qwen_vl_2048");
+                        () -> "orbisops_vector_store");
 
         assertFalse(adapter.clearSession("session-1"));
     }

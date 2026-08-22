@@ -61,6 +61,33 @@ class OpsChangePackageToolCollaboratorsTest {
     }
 
     @Test
+    void evidenceCollectorPromotesExecutedReadonlyRabbitMqMcpResultToAuthoritativeEvidence() {
+        OpsRuntimeEvent rabbit = OpsRuntimeEvent.builder()
+                .eventType("TOOL_CALL_FINISHED")
+                .status("SUCCEEDED")
+                .summary("RabbitMQ health completed")
+                .payload(Map.of(
+                        "toolName", "project_mcp_demo_rabbitmq_readonly_mcp",
+                        "toolKind", "mcp",
+                        "output", "{\"status\":\"ok\"}",
+                        "remoteCallExecuted", true,
+                        "allowed", true,
+                        "resultId", "tool-result-rabbit",
+                        "mcpId", "demo-rabbitmq-readonly-mcp",
+                        "remoteToolName", "rabbitmq_health"))
+                .build();
+
+        List<OpsChangePackageRunEvidenceCollector.Evidence> result =
+                new OpsChangePackageRunEvidenceCollector().collect("run-rabbit", List.of(rabbit));
+
+        assertEquals(1, result.size());
+        assertEquals("RABBITMQ", result.get(0).sourceType());
+        assertEquals("tool-result-rabbit", result.get(0).sourceId());
+        assertEquals(true, result.get(0).metadata().get("verified"));
+        assertEquals("rabbitmq_health", result.get(0).metadata().get("remoteToolName"));
+    }
+
+    @Test
     void evidenceCollectorAcceptsOnlyVerifiedHashBoundDatasourceResults() {
         Map<String, Object> summary = Map.of("errorCount", 3, "uri", "/api/demo-project/join");
         String outputHash = CanonicalObjectHasher.sha256(summary);

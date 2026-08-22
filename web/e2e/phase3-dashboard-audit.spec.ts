@@ -63,16 +63,17 @@ test('Home dashboard loads one role-scoped overview query', async ({ page }) => 
   });
 
   await page.goto('/home');
-  await expect(page.getByRole('heading', { name: 'Attention & Action' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '首页' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '需要关注' })).toBeVisible();
   await expect.poll(() => overviewRequests).toBe(1);
   await expect.poll(() => productMetricsRequests).toBe(1);
   const activation = page.getByTestId('project-activation');
-  await expect(activation.getByText('Project Activation', { exact: true })).toBeVisible();
+  await expect(activation.getByText('项目激活情况', { exact: true })).toBeVisible();
   await expect(activation).toContainText('40%');
-  await expect(activation).toContainText('Real query proof');
+  await expect(activation).toContainText('真实查询证据');
 });
 
-test('My Audit loads personal audit records through one query boundary', async ({ page }) => {
+test('legacy My Audit route converges on Workbench without reviving a separate audit page', async ({ page }) => {
   await login(page, 'user');
   let auditRequests = 0;
 
@@ -95,7 +96,7 @@ test('My Audit loads personal audit records through one query boundary', async (
   });
 
   await page.goto('/my-audit');
-  await expect(page.getByText('我的审计')).toBeVisible();
-  await expect(page.getByText('APPROVE_CHANGE')).toBeVisible();
-  await expect.poll(() => auditRequests).toBe(1);
+  await expect(page).toHaveURL(/\/workbench$/);
+  await expect(page.getByRole('heading', { name: '工作台' })).toBeVisible();
+  expect(auditRequests).toBe(0);
 });

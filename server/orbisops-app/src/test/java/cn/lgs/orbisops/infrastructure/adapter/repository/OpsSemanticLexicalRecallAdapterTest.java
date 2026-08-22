@@ -55,7 +55,7 @@ class OpsSemanticLexicalRecallAdapterTest {
         assertEquals("postgres_fts", candidate.document().metadata().get("memory_lexical_engine"));
         assertEquals(1, candidate.document().metadata().get("memory_lexical_rank"));
         verify(jdbc).query(
-                org.mockito.ArgumentMatchers.contains("FROM vector_store_qwen_vl_2048"),
+                org.mockito.ArgumentMatchers.contains("FROM orbisops_vector_store"),
                 any(RowMapper.class),
                 any(Object[].class));
     }
@@ -81,7 +81,7 @@ class OpsSemanticLexicalRecallAdapterTest {
                 });
         OpsSemanticLexicalRecallAdapter adapter = new OpsSemanticLexicalRecallAdapter(
                 provider,
-                () -> "vector_store_qwen_vl_2048");
+                () -> "orbisops_vector_store");
 
         assertTrue(adapter.recallLexical("session-1", "user-1", "memory", 8).isEmpty());
     }
@@ -92,7 +92,7 @@ class OpsSemanticLexicalRecallAdapterTest {
         ObjectProvider<JdbcTemplate> missingProvider = mock(ObjectProvider.class);
         OpsSemanticLexicalRecallAdapter missing = new OpsSemanticLexicalRecallAdapter(
                 missingProvider,
-                () -> "vector_store_qwen_vl_2048");
+                () -> "orbisops_vector_store");
 
         assertEquals(List.of(), missing.recallLexical("session-1", "user-1", "query", 8));
 
@@ -101,7 +101,7 @@ class OpsSemanticLexicalRecallAdapterTest {
         when(provider.getIfAvailable()).thenReturn(jdbc);
         OpsSemanticLexicalRecallAdapter blank = new OpsSemanticLexicalRecallAdapter(
                 provider,
-                () -> "vector_store_qwen_vl_2048");
+                () -> "orbisops_vector_store");
 
         assertEquals(List.of(), blank.recallLexical("session-1", "user-1", "a", 8));
     }
@@ -124,7 +124,7 @@ class OpsSemanticLexicalRecallAdapterTest {
                 });
         OpsSemanticLexicalRecallAdapter adapter = new OpsSemanticLexicalRecallAdapter(
                 provider,
-                () -> "vector_store_qwen_vl_2048");
+                () -> "orbisops_vector_store");
 
         assertTrue(adapter.recallLexical("session-1", "user-1", "memory", 8).isEmpty());
     }

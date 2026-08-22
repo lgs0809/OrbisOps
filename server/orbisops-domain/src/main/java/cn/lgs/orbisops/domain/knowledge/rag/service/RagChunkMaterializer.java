@@ -131,6 +131,9 @@ public final class RagChunkMaterializer {
 
     private void appendDocument(MaterializationState state, String text, Map<String, Object> metadata) {
         String trimmed = text == null ? "" : text.trim();
+        if (trimmed.isBlank()) {
+            return;
+        }
         int index = state.nextIndex++;
         Map<String, Object> indexedMetadata = mergeMetadata(metadata, "chunk_index", index);
         state.documents.add(new RagDocument(stableId(trimmed, indexedMetadata, index), trimmed, indexedMetadata));

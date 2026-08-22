@@ -29,7 +29,7 @@ public class OpsSourceApplicationConfiguration {
             SourceMcpRuntimePort runtime,
             SourceAuditPort audit,
             SourceTransactionPort transactions,
-            @Value("${ops.source-repository.enabled:false}") boolean enabled) {
+            @Value("${orbisops.source-repository.enabled:false}") boolean enabled) {
         return new SourceRepositoryApplicationService(
                 repositories, deployments, git, projects, projections, runtime, audit, transactions, enabled);
     }
@@ -42,7 +42,7 @@ public class OpsSourceApplicationConfiguration {
             SourceExecutionResourcePort executionResources,
             SourceAuditPort audit,
             SourceTransactionPort transactions,
-            @Value("${ops.source-repository.enabled:false}") boolean enabled) {
+            @Value("${orbisops.source-repository.enabled:false}") boolean enabled) {
         return new ProjectServiceApplicationService(
                 services, repositories, projects, executionResources, audit, transactions, enabled);
     }

@@ -225,6 +225,70 @@ class OpsChangePackageToolProviderTest {
     }
 
     @Test
+    void shouldAcceptVerifiedRabbitMqEvidenceForHighRiskPackageWhenItIsTheAvailableAuthority() {
+        OpsChangePackageActionPolicyBinder binder = mock(OpsChangePackageActionPolicyBinder.class);
+        when(binder.proposalCatalog("demo-project")).thenReturn(List.of());
+        when(binder.bind(eq("demo-project"), any())).thenReturn(List.of(Map.of(
+                "operationId", "restart_service",
+                "mcpId", "order-service-control-mcp",
+                "toolName", "restart_service",
+                "effectType", "EXECUTE_EXTERNAL_ACTION",
+                "effectScope", "PRODUCTION",
+                "mutability", "PROD_MUTATING",
+                "riskLevel", "HIGH",
+                "requiresDryRun", false,
+                "arguments", Map.of("service", "order-service"))));
+        OpsToolExecutionService toolExecutionService = mock(OpsToolExecutionService.class);
+        when(toolExecutionService.execute(any(), eq("alice"))).thenReturn(Map.of(
+                "projectId", "demo-project",
+                "packageId", "cp-rabbit",
+                "status", "DRAFT",
+                "version", 1,
+                "packageHash", "hash-rabbit",
+                "riskLevel", "HIGH"));
+        OpsChangePackageToolProvider provider =
+                new OpsChangePackageToolProvider(toolExecutionService, null, binder);
+        OpsAgentChatRequest runtimeRequest = OpsAgentChatRequest.builder()
+                .metadata(new java.util.LinkedHashMap<>(Map.of(
+                        OpsChangePackageRuntimeToolContributor.AVAILABLE_AUTHORITATIVE_SOURCE_TYPES_KEY,
+                        List.of("RABBITMQ"))))
+                .build();
+        List<OpsRuntimeEvent> events = List.of(OpsRuntimeEvent.builder()
+                .eventType("TOOL_CALL_FINISHED")
+                .status("SUCCEEDED")
+                .summary("RabbitMQ health completed")
+                .payload(Map.of(
+                        "toolName", "project_mcp_demo_rabbitmq_readonly_mcp",
+                        "toolKind", "mcp",
+                        "output", "{\"status\":\"ok\"}",
+                        "remoteCallExecuted", true,
+                        "allowed", true,
+                        "resultId", "tool-result-rabbit",
+                        "mcpId", "demo-rabbitmq-readonly-mcp",
+                        "remoteToolName", "rabbitmq_health"))
+                .build());
+        ToolCallback tool = provider.build(
+                "demo-project", "alice", "run-rabbit", "bundle-1", "bundle-hash-1",
+                events, List.of("demo-project-local-runtime"), runtimeRequest);
+
+        String output = tool.call("""
+                {
+                  "title":"restart after RabbitMQ recovery",
+                  "summary":"test",
+                  "actions":[{
+                    "operationId":"restart_service",
+                    "mcpId":"order-service-control-mcp",
+                    "toolName":"restart_service",
+                    "arguments":{"service":"order-service"}
+                  }]
+                }
+                """);
+
+        assertTrue(output.contains("cp-rabbit"));
+        verify(toolExecutionService).execute(any(), eq("alice"));
+    }
+
+    @Test
     void shouldForwardCompleteWorkSessionClaimToUnifiedToolExecution() {
         OpsToolExecutionService toolExecutionService = mock(OpsToolExecutionService.class);
         when(toolExecutionService.execute(any(), eq("alice"))).thenReturn(Map.of(

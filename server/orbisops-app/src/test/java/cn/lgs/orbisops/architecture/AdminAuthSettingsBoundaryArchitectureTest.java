@@ -33,11 +33,11 @@ class AdminAuthSettingsBoundaryArchitectureTest {
                 () -> assertTrue(service.contains("settings.matchesServiceCredential(token)")),
                 () -> assertTrue(settings.contains("public record AdminAuthSettings(")),
                 () -> assertTrue(settings.contains("hasWeakOrMissingJwtSecret()")),
-                () -> assertTrue(configuration.contains("admin.auth.jwt-secret")),
-                () -> assertTrue(configuration.contains("admin.auth.jwt-ttl-hours")),
-                () -> assertTrue(configuration.contains("admin.auth.service-token")),
-                () -> assertTrue(configuration.contains("admin.auth.reject-weak-secrets")),
-                () -> assertFalse(webConfig.contains("@Value(\"${admin.auth.jwt-secret")),
+                () -> assertTrue(configuration.contains("orbisops.admin.auth.jwt-secret")),
+                () -> assertTrue(configuration.contains("orbisops.admin.auth.jwt-ttl-hours")),
+                () -> assertTrue(configuration.contains("orbisops.admin.auth.service-token")),
+                () -> assertTrue(configuration.contains("orbisops.admin.auth.reject-weak-secrets")),
+                () -> assertFalse(webConfig.contains("@Value(\"${orbisops.admin.auth.jwt-secret")),
                 () -> assertTrue(webConfig.contains("AdminAuthSettings authSettings")),
                 () -> assertTrue(webConfig.contains("authSettings.hasWeakOrMissingJwtSecret()")));
     }

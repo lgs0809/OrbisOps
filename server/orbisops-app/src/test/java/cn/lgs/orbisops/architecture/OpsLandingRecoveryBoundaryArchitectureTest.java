@@ -48,8 +48,8 @@ class OpsLandingRecoveryBoundaryArchitectureTest {
                 () -> assertTrue(reporter.contains("journal.completeReconciliation(")),
                 () -> assertTrue(reporter.contains("journal.leaveReconciliationUnknown(")),
                 () -> assertTrue(reporter.contains("landingProcessManager.reconcile(")),
-                () -> assertTrue(configuration.contains("ops.approved-landing.recovery.enabled")),
-                () -> assertTrue(configuration.contains("ops.approved-landing.recovery.batch-size")),
+                () -> assertTrue(configuration.contains("orbisops.approved-landing.recovery.enabled")),
+                () -> assertTrue(configuration.contains("orbisops.approved-landing.recovery.batch-size")),
                 () -> assertTrue(configuration.contains("reconciliation-timeout-seconds")));
     }
 

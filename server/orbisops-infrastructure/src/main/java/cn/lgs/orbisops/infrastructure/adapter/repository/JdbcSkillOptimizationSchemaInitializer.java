@@ -16,7 +16,7 @@ public final class JdbcSkillOptimizationSchemaInitializer {
 
     private final JdbcTemplate jdbcTemplate;
 
-    @Value("${ops.skill-optimization.auto-init:true}")
+    @Value("${orbisops.skill-optimization.auto-init:true}")
     private boolean autoInit;
 
     public JdbcSkillOptimizationSchemaInitializer(

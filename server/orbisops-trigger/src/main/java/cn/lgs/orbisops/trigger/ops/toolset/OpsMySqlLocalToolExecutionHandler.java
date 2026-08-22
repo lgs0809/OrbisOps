@@ -8,7 +8,7 @@ import java.util.Map;
 
 @Component
 @ConditionalOnProperty(
-        prefix = "ops.external-local",
+        prefix = "orbisops.external-local",
         name = "mysql-enabled",
         havingValue = "true",
         matchIfMissing = true)

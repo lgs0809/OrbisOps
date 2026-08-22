@@ -100,7 +100,7 @@ class SemanticMemoryRetrievalApplicationArchitectureTest {
                 () -> assertTrue(failureAdapter.contains("volatile boolean unavailableLogged")),
                 () -> assertTrue(configuration.contains("semanticMemoryRetrievalApplicationService(")),
                 () -> assertTrue(configuration.contains("OpsSemanticVectorRecallAdapter")),
-                () -> assertTrue(configuration.contains("OpsSemanticLexicalRecallAdapter")),
+                () -> assertTrue(configuration.contains("SemanticLexicalRecallPort")),
                 () -> assertTrue(configuration.contains("OpsSemanticRetrievalFailureAdapter")));
     }
 

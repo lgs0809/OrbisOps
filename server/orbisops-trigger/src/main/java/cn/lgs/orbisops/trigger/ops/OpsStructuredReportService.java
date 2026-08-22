@@ -48,7 +48,6 @@ public class OpsStructuredReportService {
         report.put("decisionTrace", decisionTrace(response));
         Map<String, Object> runtimeOutcome = runtimeOutcome(response);
         if (!runtimeOutcome.isEmpty()) {
-            report.put("actionClassification", runtimeOutcome.get("actionClassification"));
             report.put("verificationStatus", runtimeOutcome.get("verificationStatus"));
             report.put("abstained", runtimeOutcome.get("abstained"));
         }

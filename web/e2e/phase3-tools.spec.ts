@@ -52,7 +52,7 @@ test('Tools / MCP loads template catalog once and generated tools only when deta
   expect(generatedToolRequests).toBe(0);
 
   await row.getByRole('button', { name: '查看' }).click();
-  await expect(page.getByText('生成记录')).toBeVisible();
+  await expect(page.getByText('已生成的 Project 工具')).toBeVisible();
   await expect.poll(() => generatedToolRequests).toBe(1);
   await expect(page.getByText('demo-project')).toBeVisible();
 

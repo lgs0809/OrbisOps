@@ -25,7 +25,7 @@ public class JdbcKnowledgeBaseCatalogRepository
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 
-    @Value("${ops.knowledge-catalog.auto-init:true}")
+    @Value("${orbisops.knowledge-catalog.auto-init:true}")
     private boolean autoInit;
 
     private volatile boolean initialized;

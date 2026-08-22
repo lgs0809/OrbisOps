@@ -10,8 +10,8 @@ public class RagDocumentParserConfiguration {
 
     @Bean
     public RagDocumentParserSettings ragDocumentParserSettings(
-            @Value("${ops.rag.parse.max-chunk-chars:3000}") int maxChunkChars,
-            @Value("${ops.rag.parse.max-pdf-images:20}") int maxPdfImages) {
+            @Value("${orbisops.rag.parse.max-chunk-chars:3000}") int maxChunkChars,
+            @Value("${orbisops.rag.parse.max-pdf-images:20}") int maxPdfImages) {
         return new RagDocumentParserSettings(maxChunkChars, maxPdfImages);
     }
 }

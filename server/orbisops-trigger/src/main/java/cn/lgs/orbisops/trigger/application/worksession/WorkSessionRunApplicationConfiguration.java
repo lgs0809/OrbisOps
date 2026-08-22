@@ -16,7 +16,7 @@ public class WorkSessionRunApplicationConfiguration {
     public WorkSessionRunApplicationService workSessionRunApplicationService(
             IWorkSessionRunRepository repository,
             WorkSessionRunIdentityPort identity,
-            @Value("${ops.work-session.lease-seconds:90}") long leaseSeconds) {
+            @Value("${orbisops.work-session.lease-seconds:90}") long leaseSeconds) {
         return new WorkSessionRunApplicationService(
                 repository,
                 identity,

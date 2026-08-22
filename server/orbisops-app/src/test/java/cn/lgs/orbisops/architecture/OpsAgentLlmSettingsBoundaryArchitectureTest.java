@@ -38,10 +38,10 @@ class OpsAgentLlmSettingsBoundaryArchitectureTest {
                 () -> assertTrue(settings.contains("policySettings()")),
                 () -> assertFalse(settings.contains("@Value")),
                 () -> assertTrue(configuration.contains("@Bean")),
-                () -> assertTrue(configuration.contains("ops.multi-agent.enabled")),
-                () -> assertTrue(configuration.contains("ops.multi-agent.model-call-timeout-seconds")),
-                () -> assertTrue(configuration.contains("ops.multi-agent.json-response-format-enabled")),
-                () -> assertTrue(configuration.contains("ops.multi-agent.json-skill-context-retry-max-chars")));
+                () -> assertTrue(configuration.contains("orbisops.multi-agent.enabled")),
+                () -> assertTrue(configuration.contains("orbisops.multi-agent.model-call-timeout-seconds")),
+                () -> assertTrue(configuration.contains("orbisops.multi-agent.json-response-format-enabled")),
+                () -> assertTrue(configuration.contains("orbisops.multi-agent.json-skill-context-retry-max-chars")));
     }
 
     private String read(String relativePath) throws IOException {

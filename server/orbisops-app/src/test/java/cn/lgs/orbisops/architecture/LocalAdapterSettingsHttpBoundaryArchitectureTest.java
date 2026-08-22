@@ -32,7 +32,7 @@ class LocalAdapterSettingsHttpBoundaryArchitectureTest {
                 () -> assertTrue(facade.contains("OpsLocalAdapterSettings settings")),
                 () -> assertTrue(facade.contains("new OpsLocalToolArguments(arguments)")),
                 () -> assertFalse(facade.contains("@Value")),
-                () -> assertFalse(facade.contains("${ops.")),
+                () -> assertFalse(facade.contains("${orbisops.")),
                 () -> assertFalse(facade.contains("HttpClient")),
                 () -> assertFalse(facade.contains("HttpRequest")),
                 () -> assertFalse(facade.contains("JSON.")),
@@ -63,22 +63,22 @@ class LocalAdapterSettingsHttpBoundaryArchitectureTest {
                 () -> assertFalse(http.contains("@Service")),
                 () -> assertFalse(http.contains("@Value")),
                 () -> assertTrue(configuration.contains(
-                        "${ops.prometheus-url:http://127.0.0.1:9090}")),
+                        "${orbisops.prometheus-url:http://127.0.0.1:9090}")),
                 () -> assertTrue(configuration.contains(
-                        "${ops.elasticsearch-url:http://127.0.0.1:9200}")),
-                () -> assertTrue(configuration.contains("${ops.elasticsearch-index:}")),
+                        "${orbisops.elasticsearch-url:http://127.0.0.1:9200}")),
+                () -> assertTrue(configuration.contains("${orbisops.elasticsearch-index:}")),
                 () -> assertTrue(configuration.contains(
-                        "${ops.elasticsearch-index-whitelist:${ops.elasticsearch-index:}}")),
+                        "${orbisops.elasticsearch-index-whitelist:${orbisops.elasticsearch-index:}}")),
                 () -> assertTrue(configuration.contains(
-                        "${ops.local-log.allowed-roots:./logs}")),
+                        "${orbisops.local-log.allowed-roots:./logs}")),
                 () -> assertTrue(configuration.contains(
-                        "${ops.docker-compose.allowed-roots:./}")),
+                        "${orbisops.docker-compose.allowed-roots:./}")),
                 () -> assertTrue(configuration.contains(
-                        "${ops.local-adapter.timeout-seconds:8}")),
+                        "${orbisops.local-adapter.timeout-seconds:8}")),
                 () -> assertTrue(configuration.contains(
-                        "${ops.local-adapter.max-rows:200}")),
+                        "${orbisops.local-adapter.max-rows:200}")),
                 () -> assertTrue(configuration.contains(
-                        "${ops.local-adapter.max-response-bytes:65536}")));
+                        "${orbisops.local-adapter.max-response-bytes:65536}")));
     }
 
     private String read(String relativePath) throws IOException {

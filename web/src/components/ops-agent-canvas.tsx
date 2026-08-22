@@ -269,7 +269,7 @@ const agentMode = (node: OpsWorkflowNode) => {
 
 const roleMeta = (node: OpsWorkflowNode) => {
   const role = String(node.config?.role || '').trim().toLowerCase();
-  if (role === 'reviewer') return { label: 'Review' };
+  if (role === 'reviewer') return { label: 'Reviewer' };
   if (role === 'reporter') return { label: 'Report' };
   if (role === 'extractor') return { label: 'Extract' };
   if (role === 'classifier') return { label: 'Classify' };
@@ -282,7 +282,6 @@ const nodeVisualKind = (node: OpsWorkflowNode) => {
   if (normalized(node.type) === 'ROUTER') return 'ROUTER';
   if (normalized(node.type) === 'SUB_WORKFLOW') return 'SUB_WORKFLOW';
   const mode = agentMode(node);
-  if (String(node.config?.role || '').trim().toLowerCase() === 'reviewer') return 'REVIEW';
   const abilityText = normalized([
     node.nodeId,
     node.agent,
@@ -349,9 +348,9 @@ const nodeTagColor = (engine: string) => {
 
 const paletteItems = [
   { type: 'START', label: 'Start', icon: IconPlayCircle },
-  { type: 'AGENT', label: 'Agent', icon: IconCommand },
+  { type: 'AGENT', label: 'Agent Node', icon: IconCommand },
   { type: 'ROUTER', label: 'Router', icon: IconRoute },
-  { type: 'SUB_WORKFLOW', label: 'Sub Workflow', icon: IconBranch },
+  { type: 'SUB_WORKFLOW', label: '子 Workflow', icon: IconBranch },
   { type: 'END', label: 'End', icon: IconStop },
 ];
 
@@ -362,8 +361,8 @@ const createNodeByType = (type: string, position: PositionValue): OpsWorkflowNod
       nodeId,
       type: 'START',
       agent: 'start',
-      description: '工作流起始节点；输入契约可选。',
-      instruction: '如有显式输入则透传给后续节点；定时巡检等无输入场景可直接从后续 Agent Prompt 与运行时上下文开始。',
+      description: 'Workflow 起始节点；输入契约可选。',
+      instruction: '存在显式输入时向下游传递；定时或无输入 Run 可以直接从后续 Agent Prompt 与 Runtime 上下文开始。',
       outputKey: 'input',
       config: { position, inputKeys: [] },
     };
@@ -373,8 +372,8 @@ const createNodeByType = (type: string, position: PositionValue): OpsWorkflowNod
       nodeId,
       type: 'END',
       agent: 'end',
-      description: '工作流结束节点；输出契约可选。',
-      instruction: '如配置输出字段则按契约暴露结果；留空时直接使用最终 Graph 输出。',
+      description: 'Workflow 结束节点；输出契约可选。',
+      instruction: '存在显式契约时输出配置字段；未定义契约时使用最终 Graph 输出。',
       outputKey: 'output',
       config: { position, outputKeys: [] },
     };
@@ -385,8 +384,8 @@ const createNodeByType = (type: string, position: PositionValue): OpsWorkflowNod
       type: 'AGENT',
       mode: 'llm',
       agent: nodeId,
-      description: '可配置 Agent 节点',
-      instruction: '围绕节点职责使用模型、RAG、Skill 和 MCP 工具完成任务。',
+      description: '可配置 Agent Node',
+      instruction: '使用绑定到当前 Agent Node 的模型、RAG、Skill 和 MCP 能力完成节点职责。',
       outputKey: `${nodeId}_result`,
       config: { position, mode: 'llm', role: 'general', contextInputs: ['query', 'upstreamOutputs'] },
     };
@@ -396,8 +395,8 @@ const createNodeByType = (type: string, position: PositionValue): OpsWorkflowNod
       nodeId,
       type: 'ROUTER',
       agent: nodeId,
-      description: '路由节点',
-      instruction: '读取上游结构化输出或 Graph State，按条件选择一个或多个下游节点。',
+      description: 'Router 节点',
+      instruction: '读取上游结构化输出或 Graph State，并根据路由条件选择一个或多个下游节点。',
       outputKey: 'selectedRoutes',
       config: { position, routeMode: 'multi', inputKey: 'selectedRoutes' },
     };
@@ -407,7 +406,7 @@ const createNodeByType = (type: string, position: PositionValue): OpsWorkflowNod
       nodeId,
       type: 'SUB_WORKFLOW',
       agent: '',
-      description: '复用一个已发布的专项 Workflow。',
+      description: '复用当前 Project 中已发布的 Workflow。',
       outputKey: `${nodeId}_result`,
       config: { position, versionPolicy: 'LATEST_PUBLISHED', inputKey: '' },
     };
@@ -417,8 +416,8 @@ const createNodeByType = (type: string, position: PositionValue): OpsWorkflowNod
     type: 'AGENT',
     mode: 'llm',
     agent: nodeId,
-    description: '通用模型节点',
-    instruction: '根据上游输入完成当前节点职责。',
+    description: 'General LLM Agent Node',
+    instruction: 'Complete this Agent Node responsibility using the upstream input.',
     outputKey: `${nodeId}_result`,
     config: { position, mode: 'llm' },
   };
@@ -686,8 +685,8 @@ function OpsAgentFlowCanvas({
           type: 'AGENT',
           mode: 'react',
           agent: nodeId,
-          description: '拖线创建的新 ReAct Agent',
-          instruction: '补充这个 Agent 的职责、检索参数和输出格式。',
+          description: '从画布连接创建的新 ReAct Agent Node',
+          instruction: '描述这个 Agent Node 的职责、检索参数和输出格式。',
           outputKey: `${nodeId}_result`,
           config: { position, mode: 'react', role: 'data_agent', contextInputs: ['query', 'upstreamOutputs'] },
         },
@@ -753,7 +752,7 @@ function OpsAgentFlowCanvas({
       >
         <FlowPanel position="top-left">
           <Palette>
-            <PaletteGroupTitle>基础节点</PaletteGroupTitle>
+            <PaletteGroupTitle>核心节点</PaletteGroupTitle>
             {paletteItems.map((item) => {
               const Icon = item.icon;
               return (

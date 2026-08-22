@@ -90,7 +90,6 @@ class OpsStructuredReportServiceTest {
                         .eventType("REACT_OUTCOME")
                         .status("SUCCEEDED")
                         .outcome(Map.of(
-                                "actionClassification", "REMEDIATE",
                                 "requiresAction", true,
                                 "verificationStatus", "INSUFFICIENT",
                                 "abstained", false,
@@ -111,8 +110,7 @@ class OpsStructuredReportServiceTest {
         Map<String, Object> report = service.compose(response);
         Map<String, Object> diagnosis = (Map<String, Object>) report.get("diagnosis");
 
-        assertThat(report).containsEntry("actionClassification", "REMEDIATE")
-                .containsEntry("verificationStatus", "INSUFFICIENT")
+        assertThat(report).containsEntry("verificationStatus", "INSUFFICIENT")
                 .containsEntry("changePackageBehavior", "PROPOSE_ONLY");
         assertThat(diagnosis).containsEntry("requiresAction", true)
                 .containsEntry("evidenceCompleteness", "INSUFFICIENT");

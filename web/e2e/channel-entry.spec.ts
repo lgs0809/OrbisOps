@@ -32,7 +32,7 @@ test('Channel is transport-first and can be output-only, ReAct, or Workflow', as
         contentType: 'application/json',
         body: response([
           { agentId: 'default-react', name: '内部默认 Agent', definitionKind: 'MAIN_ASSISTANT', version: 4 },
-          { agentId: 'daily-inspection', name: '每日生产巡检', definitionKind: 'SPECIALIZED_WORKFLOW', version: 7 },
+          { agentId: 'daily-inspection', name: '每日生产巡检', definitionKind: 'SPECIALIZED_WORKFLOW', lifecycle: 'PUBLISHED', version: 7 },
         ]),
       });
     }
@@ -82,19 +82,18 @@ test('Channel is transport-first and can be output-only, ReAct, or Workflow', as
   });
 
   await page.goto('/platform/integrations?projectId=demo-project');
-  await page.getByRole('button', { name: '新建 Channel' }).click();
-  await page.getByPlaceholder('Production On-call').fill('只发通知');
-  await page.getByRole('button', { name: 'Next' }).click();
+  await page.getByRole('button', { name: '接入渠道' }).first().click();
+  await page.getByPlaceholder('生产值班群').fill('Notification only');
 
   const inboundSection = page.getByTestId('channel-inbound-execution');
   const inboundSelect = inboundSection.getByRole('combobox');
   await expect(inboundSelect).toBeVisible();
   await expect(inboundSection).toHaveAttribute('data-workflow-count', '1');
   await inboundSelect.click();
-  await expect(page.getByRole('option', { name: 'Outbound only' })).toBeVisible();
-  await expect(page.getByRole('option', { name: 'Project Default ReAct' })).toBeVisible();
-  await expect(page.getByRole('option', { name: 'Specialized Workflow' })).toBeVisible();
-  await page.getByRole('option', { name: 'Specialized Workflow' }).click();
+  await expect(page.getByRole('option', { name: '仅出站' })).toBeVisible();
+  await expect(page.getByRole('option', { name: '默认模型' })).toBeVisible();
+  await expect(page.getByRole('option', { name: '专用工作流' })).toBeVisible();
+  await page.getByRole('option', { name: '专用工作流' }).click();
 
   const workflowSelect = page.getByTestId('channel-workflow-selector').getByRole('combobox');
   await expect(workflowSelect).toBeVisible();
@@ -104,10 +103,10 @@ test('Channel is transport-first and can be output-only, ReAct, or Workflow', as
   await expect(page.getByRole('option', { name: /内部默认 Agent/ })).toHaveCount(0);
   await workflowOption.click();
 
-  await inboundSelect.click();
-  await page.getByRole('option', { name: 'Outbound only' }).click();
-  await expect(inboundSection).toContainText('Outbound only');
-  await page.getByRole('button', { name: 'Save & Test' }).click();
+  await inboundSection.getByRole('combobox').click();
+  await page.getByRole('option', { name: '仅出站' }).click();
+  await expect(inboundSection.getByRole('combobox')).toContainText('仅出站');
+  await page.getByRole('button', { name: 'confirm' }).click();
 
   await expect.poll(() => createRequests.length).toBe(1);
   expect(createRequests[0].executionType).toBe('NONE');

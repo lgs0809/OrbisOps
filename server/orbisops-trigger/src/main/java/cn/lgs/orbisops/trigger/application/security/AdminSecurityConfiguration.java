@@ -4,6 +4,7 @@ import cn.lgs.orbisops.application.security.AdminUserAuthenticationPort;
 import cn.lgs.orbisops.application.security.AdminUserAuthenticationUseCase;
 import cn.lgs.orbisops.application.security.AdminUserCatalogPort;
 import cn.lgs.orbisops.application.security.AdminUserCatalogUseCase;
+import cn.lgs.orbisops.application.security.FirstTimeSetupUseCase;
 import cn.lgs.orbisops.domain.security.AdminCredentialRules;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,8 +17,8 @@ public class AdminSecurityConfiguration {
     @Bean
     public AdminUserSecuritySettings adminUserSecuritySettings(Environment environment) {
         return new AdminUserSecuritySettings(
-                environment.getProperty("admin.auth.password-min-length", Integer.class, 8),
-                environment.getProperty("admin.auth.allow-prehashed-passwords", Boolean.class, false));
+                environment.getProperty("orbisops.admin.auth.password-min-length", Integer.class, 8),
+                environment.getProperty("orbisops.admin.auth.allow-prehashed-passwords", Boolean.class, false));
     }
 
     @Bean
@@ -43,5 +44,12 @@ public class AdminSecurityConfiguration {
             AdminUserCatalogPort catalogPort,
             AdminUserAuthenticationPort authenticationPort) {
         return new AdminUserAuthenticationUseCase(catalogPort, authenticationPort);
+    }
+
+    @Bean
+    public FirstTimeSetupUseCase firstTimeSetupUseCase(
+            AdminUserCatalogUseCase catalogUseCase,
+            AdminUserAuthenticationUseCase authenticationUseCase) {
+        return new FirstTimeSetupUseCase(catalogUseCase, authenticationUseCase);
     }
 }

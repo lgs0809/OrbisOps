@@ -4,7 +4,7 @@
     <parent>
         <groupId>cn.lgs</groupId>
         <artifactId>orbisops-parent</artifactId>
-        <version>0.1.0</version>
+        <version>2.0.0</version>
     </parent>
 
     <artifactId>orbisops-trigger</artifactId>
@@ -34,6 +34,10 @@
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-crypto</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.auth0</groupId>
+            <artifactId>java-jwt</artifactId>
         </dependency>
         <dependency>
             <groupId>io.micrometer</groupId>
@@ -87,14 +91,6 @@
             <artifactId>spring-ai-alibaba-agent-framework</artifactId>
         </dependency>
         <dependency>
-            <groupId>io.agentscope</groupId>
-            <artifactId>agentscope</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-lang3</artifactId>
-        </dependency>
-        <dependency>
             <groupId>com.larksuite.oapi</groupId>
             <artifactId>oapi-sdk</artifactId>
             <version>2.7.3</version>
@@ -103,11 +99,6 @@
             <groupId>com.slack.api</groupId>
             <artifactId>slack-api-client</artifactId>
             <version>1.50.0</version>
-        </dependency>
-        <dependency>
-            <groupId>org.java-websocket</groupId>
-            <artifactId>Java-WebSocket</artifactId>
-            <version>1.6.0</version>
         </dependency>
         <dependency>
             <groupId>com.dingtalk.open</groupId>
@@ -131,10 +122,6 @@
         <dependency>
             <groupId>cn.lgs</groupId>
             <artifactId>orbisops-application</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>cn.lgs</groupId>
-            <artifactId>orbisops-infrastructure</artifactId>
         </dependency>
     </dependencies>
 

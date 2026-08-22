@@ -37,5 +37,5 @@ export const productActivationMetrics = (productMetrics?: Record<string, any> | 
 };
 
 export const activationRateLabel = (metrics: ProductActivationMetrics): string => (
-  metrics.activationRate === null ? 'No sample' : `${Math.round(metrics.activationRate * 100)}%`
+  metrics.activationRate === null ? '暂无样本' : `${Math.round(metrics.activationRate * 100)}%`
 );

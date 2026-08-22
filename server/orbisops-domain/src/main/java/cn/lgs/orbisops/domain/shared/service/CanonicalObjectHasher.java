@@ -1,8 +1,11 @@
 package cn.lgs.orbisops.domain.shared.service;
 
 import cn.lgs.orbisops.domain.shared.json.CanonicalJson;
-import org.apache.commons.codec.digest.DigestUtils;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -23,7 +26,13 @@ public final class CanonicalObjectHasher {
     }
 
     public static String sha256Text(String value) {
-        return DigestUtils.sha256Hex(value == null ? "" : value);
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] bytes = digest.digest((value == null ? "" : value).getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(bytes);
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
+        }
     }
 
     private static Object withoutRootKeys(

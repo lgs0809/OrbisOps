@@ -1,7 +1,9 @@
 package cn.lgs.orbisops.trigger.http.agent;
 
+import cn.lgs.orbisops.api.dto.AiClientModelResponseDTO;
 import cn.lgs.orbisops.api.response.Response;
 import cn.lgs.orbisops.application.project.AuthorizeProjectAccessUseCase;
+import cn.lgs.orbisops.trigger.application.config.AiClientModelApplicationService;
 import cn.lgs.orbisops.trigger.application.ops.OpsAgentDefinitionApplicationService;
 import cn.lgs.orbisops.trigger.application.ops.OpsChatApplicationService;
 import cn.lgs.orbisops.trigger.application.security.OpsTrustedRequestMetadata;
@@ -39,6 +41,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicReference;
@@ -51,20 +54,23 @@ public class OpsUserChatController {
     private final OpsChatApplicationService chatApplicationService;
     private final AuthorizeProjectAccessUseCase projectAccess;
     private final OpsAgentDefinitionApplicationService agentDefinitionApplicationService;
+    private final AiClientModelApplicationService modelApplicationService;
     private final ThreadPoolExecutor opsRunExecutor;
     private final OpsSseExecutionTemplate sseTemplate;
 
-    @Value("${ops.chat.stream.timeout-ms:360000}")
+    @Value("${orbisops.chat.stream.timeout-ms:360000}")
     private long chatStreamTimeoutMs;
 
     public OpsUserChatController(OpsChatApplicationService chatApplicationService,
                                  AuthorizeProjectAccessUseCase projectAccess,
                                  OpsAgentDefinitionApplicationService agentDefinitionApplicationService,
+                                 AiClientModelApplicationService modelApplicationService,
                                  @Qualifier("opsRunExecutor") ThreadPoolExecutor opsRunExecutor,
                                  OpsSseExecutionTemplate sseTemplate) {
         this.chatApplicationService = chatApplicationService;
         this.projectAccess = projectAccess;
         this.agentDefinitionApplicationService = agentDefinitionApplicationService;
+        this.modelApplicationService = modelApplicationService;
         this.opsRunExecutor = opsRunExecutor;
         this.sseTemplate = sseTemplate;
     }
@@ -81,6 +87,24 @@ public class OpsUserChatController {
                                                              HttpServletRequest request) {
         assertProjectAccess(projectId, principal(request));
         return success(agentDefinitionApplicationService.listAgents(projectId));
+    }
+
+    @GetMapping("/catalog/models")
+    public Response<List<Map<String, Object>>> models(HttpServletRequest request) {
+        principal(request);
+        List<Map<String, Object>> models = modelApplicationService.queryEnabled().stream()
+                .filter(this::isChatModel)
+                .map(model -> {
+                    Map<String, Object> view = new LinkedHashMap<>();
+                    view.put("modelId", model.getModelId());
+                    view.put("modelName", model.getModelName());
+                    view.put("modelType", model.getModelType());
+                    view.put("modelUsage", model.getModelUsage());
+                    view.put("description", model.getDescription());
+                    return view;
+                })
+                .toList();
+        return success(models);
     }
 
     @PostMapping("/session")
@@ -269,6 +293,13 @@ public class OpsUserChatController {
     @GetMapping("/model-status")
     public Response<Map<String, Object>> modelStatus() {
         return success(chatApplicationService.modelStatus());
+    }
+
+    private boolean isChatModel(AiClientModelResponseDTO model) {
+        if (model == null) return false;
+        String capabilities = String.format("%s %s", model.getModelUsage(), model.getModelType())
+                .toUpperCase(Locale.ROOT);
+        return capabilities.contains("CHAT");
     }
 
     private void assertProjectAccess(String projectId, AdminAuthService.AuthPrincipal principal) {

@@ -53,9 +53,9 @@ class SkillSemanticMatcherBoundaryArchitectureTest {
                 () -> assertTrue(coordinator.contains("cache.put(")),
                 () -> assertTrue(coordinator.contains("policy.cosine(")),
                 () -> assertFalse(coordinator.contains("@Service")),
-                () -> assertTrue(configuration.contains("ops.skill-runtime.semantic-enabled")),
-                () -> assertTrue(configuration.contains("ops.skill-runtime.semantic-candidate-limit")),
-                () -> assertTrue(configuration.contains("ops.skill-runtime.embedding-cache-size")));
+                () -> assertTrue(configuration.contains("orbisops.skill-runtime.semantic-enabled")),
+                () -> assertTrue(configuration.contains("orbisops.skill-runtime.semantic-candidate-limit")),
+                () -> assertTrue(configuration.contains("orbisops.skill-runtime.embedding-cache-size")));
     }
 
     private String read(String relativePath) throws IOException {

@@ -39,6 +39,7 @@ import { ApprovalChannelDispatch } from '../features/changes/components/Approval
 import { ApprovalCockpit } from '../features/changes/components/ApprovalCockpit';
 import { toChangePackageSummary } from '../features/changes/model/change-package-summary';
 import { theme } from '../styles/theme';
+import { userFacingError } from '../utils/user-facing-error';
 import {
   changePackageReasonLabel,
   changePackageRiskColor,
@@ -98,17 +99,17 @@ const shortHash = (value?: string) => {
 const statusOptions = [
   { value: '', label: '全部状态' },
   { value: 'DRAFT', label: '草稿' },
-  { value: 'VALIDATING', label: '验证中' },
-  { value: 'VALIDATION_FAILED', label: '验证失败' },
-  { value: 'READY_FOR_REVIEW', label: '可提交审核' },
-  { value: 'REVIEWING', label: '待审批' },
-  { value: 'REVISING', label: '待修订' },
+  { value: 'VALIDATING', label: '校验中' },
+  { value: 'VALIDATION_FAILED', label: '校验失败' },
+  { value: 'READY_FOR_REVIEW', label: '待提交审批' },
+  { value: 'REVIEWING', label: '等待审批' },
+  { value: 'REVISING', label: '修订中' },
   { value: 'REJECTED', label: '已驳回' },
-  { value: 'APPROVED', label: '已审批' },
-  { value: 'LANDING', label: '落地执行中' },
+  { value: 'APPROVED', label: '已批准' },
+  { value: 'LANDING', label: '落地中' },
   { value: 'LANDED', label: '已落地' },
-  { value: 'NEEDS_REPLAN', label: '需重规划' },
-  { value: 'LANDING_FAILED', label: '执行失败' },
+  { value: 'NEEDS_REPLAN', label: '需要重规划' },
+  { value: 'LANDING_FAILED', label: '落地失败' },
   { value: 'CLOSED', label: '已关闭' },
 ];
 
@@ -161,41 +162,41 @@ const safeArgumentText = (key: string, value: unknown) => (
 );
 
 const argumentLabels: Record<string, string> = {
-  query: '查询条件',
+  query: '查询',
   sql: 'SQL',
-  namespace: '命名空间',
+  namespace: 'Namespace',
   database: '数据库',
-  table: '数据表',
+  table: '表',
   service: '服务',
   environment: '环境',
   key: '配置项',
   value: '目标值',
   timeoutMs: '超时',
-  limit: '数量上限',
+  limit: '数量限制',
 };
 
 const humanArguments = (value: unknown) => {
   const parsed = parseJsonValue(value);
   if (parsed == null || parsed === '') return '无参数';
-  if (Array.isArray(parsed)) return parsed.map((item) => valueText(item)).join('；');
+  if (Array.isArray(parsed)) return parsed.map((item) => valueText(item)).join('; ');
   if (typeof parsed !== 'object') return String(parsed);
   const entries = Object.entries(parsed as Record<string, unknown>);
   if (entries.length === 0) return '无参数';
   return entries
     .slice(0, 6)
-    .map(([key, item]) => `${argumentLabels[key] || key}：${safeArgumentText(key, item)}`)
-    .join('；');
+    .map(([key, item]) => `${argumentLabels[key] || key}: ${safeArgumentText(key, item)}`)
+    .join('; ');
 };
 
 const operationStatus = (run: OpsLandingOperationRun) => {
   const status = String(run.status || '').toUpperCase();
-  if (status === 'SUCCEEDED') return { label: '执行成功', color: 'green' as const };
-  if (status === 'FAILED') return { label: '执行失败', color: 'red' as const };
-  if (status === 'BLOCKED' || status === 'NEEDS_REPLAN') return { label: '已阻断', color: 'orange' as const };
+  if (status === 'SUCCEEDED') return { label: '成功', color: 'green' as const };
+  if (status === 'FAILED') return { label: '失败', color: 'red' as const };
+  if (status === 'BLOCKED' || status === 'NEEDS_REPLAN') return { label: '已阻塞', color: 'orange' as const };
   if (status === 'EXECUTING' || status === 'POST_CHECKING' || status === 'PRECONDITION_CHECKING') {
-    return { label: '执行中', color: 'blue' as const };
+    return { label: '运行中', color: 'blue' as const };
   }
-  return { label: status || '等待执行', color: 'grey' as const };
+  return { label: status || '待执行', color: 'grey' as const };
 };
 
 const packageOperations = (record?: OpsChangePackage | null) => {
@@ -219,9 +220,9 @@ const packageOperations = (record?: OpsChangePackage | null) => {
       const id = valueText(op.operationId || op.operation_id || op.id || `${op.mcpId || op.toolName || 'operation'}-${index}`);
       return {
         id,
-        tool: valueText(op.toolName || op.tool_name || op.remoteToolName || op.remote_tool_name || op.action || op.type, '待确认工具'),
-        resource: valueText(op.resourceKey || op.resource_key || op.resourceScope || op.resource_scope || op.targetObject || op.target_object || op.serviceId || op.service_id, '未声明资源'),
-        effect: valueText(op.effectType || op.effect_type || op.mutability || op.riskLevel || op.risk_level, '未声明效果'),
+        tool: valueText(op.toolName || op.tool_name || op.remoteToolName || op.remote_tool_name || op.action || op.type, '未指定工具'),
+        resource: valueText(op.resourceKey || op.resource_key || op.resourceScope || op.resource_scope || op.targetObject || op.target_object || op.serviceId || op.service_id, '未指定资源'),
+        effect: valueText(op.effectType || op.effect_type || op.mutability || op.riskLevel || op.risk_level, '未指定影响'),
         args: op.arguments || op.args || op.input || op.parameters,
       };
     })
@@ -237,7 +238,7 @@ const proofState = (value: unknown) => {
   const parsed = parseJsonValue(value);
   const status = String(parsed?.status || parsed?.resultStatus || parsed?.assessment || '').toUpperCase();
   if (!parsed) return { label: '未提供', color: 'grey' as const };
-  if (['PASSED', 'SUCCEEDED', 'SUCCESS', 'READY'].includes(status)) return { label: '已通过', color: 'green' as const };
+  if (['PASSED', 'SUCCEEDED', 'SUCCESS', 'READY'].includes(status)) return { label: '通过', color: 'green' as const };
   if (['FAILED', 'BLOCKED', 'SANDBOX_UNAVAILABLE', 'WAITING_SANDBOX'].includes(status)) return { label: status, color: 'red' as const };
   return { label: status || '已记录', color: 'blue' as const };
 };
@@ -261,15 +262,15 @@ const hasContextBundle = (record?: OpsChangePackage | null) => Boolean(
 );
 
 const missingReviewItems = (record?: OpsChangePackage | null) => {
-  if (!record) return ['未选择执行包'];
+  if (!record) return ['尚未选择 ChangePackage'];
   const items: string[] = [];
-  if (!hasContextBundle(record)) items.push('缺少后端 Runtime Context Bundle，请从对话重新生成执行包');
-  if (!record.packageHash) items.push('缺少当前版本 packageHash');
-  if (!record.riskLevel) items.push('缺少风险等级');
+  if (!hasContextBundle(record)) items.push('缺少 Runtime Context Bundle；请返回对话重新生成 ChangePackage');
+  if (!record.packageHash) items.push('当前版本缺少 packageHash');
+  if (!record.riskLevel) items.push('缺少风险级别');
   if (!record.targetEnvironment) items.push('缺少目标环境');
-  if (packageOperations(record).length === 0 && record.packageType !== 'NO_ACTION_REQUIRED') items.push('没有声明可落地操作');
-  if (!record.rollbackStepsJson && ['HIGH', 'CRITICAL'].includes(String(record.riskLevel || '').toUpperCase())) items.push('高风险执行包缺少回滚计划');
-  if (!record.verificationCriteriaJson && record.packageType !== 'NO_ACTION_REQUIRED') items.push('缺少落地后验证标准');
+  if (packageOperations(record).length === 0 && record.packageType !== 'NO_ACTION_REQUIRED') items.push('未声明 Landing 操作');
+  if (!record.rollbackStepsJson && ['HIGH', 'CRITICAL'].includes(String(record.riskLevel || '').toUpperCase())) items.push('高风险 ChangePackage 缺少回滚方案');
+  if (!record.verificationCriteriaJson && record.packageType !== 'NO_ACTION_REQUIRED') items.push('缺少 Landing 后的 Verification 标准');
   return items;
 };
 
@@ -301,11 +302,13 @@ export const ChangePackageCenterPage: React.FC = () => {
     limit: 100,
   }), [apiScope, projectId, searchParams, status]);
 
+  const requestedProjectId = searchParams.get('projectId') || '';
+  const waitingForRequestedProject = Boolean(requestedProjectId) && !query.projectId;
   const packageQuery = useChangePackagesQuery({
     principalKey,
     scope: apiScope,
     params: query,
-    enabled: admin || Boolean(query.projectId),
+    enabled: Boolean(query.projectId) || (admin && !waitingForRequestedProject),
   });
   const packages = packageQuery.data || [];
   const loading = packageQuery.isFetching;
@@ -355,7 +358,7 @@ export const ChangePackageCenterPage: React.FC = () => {
       cleanup: 'canCleanup',
     };
     if (!packageCapability(selected, requiredCapability[actionMode])) {
-      Toast.error('当前账号没有执行该动作的项目权限');
+      Toast.error('当前 Project 权限不允许执行此操作。');
       return;
     }
     try {
@@ -365,17 +368,17 @@ export const ChangePackageCenterPage: React.FC = () => {
           packageId: selected.packageId,
           reason: comment.trim(),
         });
-        Toast.success('已触发审核前验证');
+        Toast.success('审批前校验已启动。');
       } else if (actionMode === 'submitReview') {
         await actionMutation.mutateAsync({
           kind: 'submit-review',
           packageId: selected.packageId,
           summary: comment.trim(),
         });
-        Toast.success('已提交人工审核');
+        Toast.success('已提交审批。');
       } else if (actionMode === 'approve') {
         if (!selected.packageHash) {
-          Toast.error('当前版本缺少 packageHash，不能审批');
+          Toast.error('当前版本缺少 packageHash，无法审批。');
           return;
         }
         await actionMutation.mutateAsync({
@@ -384,19 +387,19 @@ export const ChangePackageCenterPage: React.FC = () => {
           version: selected.version,
           packageHash: selected.packageHash,
         });
-        Toast.success('ChangePackage 已审批');
+        Toast.success('ChangePackage 已批准。');
       } else if (actionMode === 'reject') {
         await actionMutation.mutateAsync({
           kind: 'reject',
           packageId: selected.packageId,
           reason: comment.trim(),
         });
-        Toast.success('ChangePackage 已驳回');
+        Toast.success('ChangePackage 已驳回。');
       } else if (actionMode === 'land') {
         const approvedVersion = selected.approvedVersion || selected.version;
         const approvedPackageHash = selected.approvedPackageHash || selected.packageHash || '';
         if (!approvedVersion || !approvedPackageHash) {
-          Toast.error('缺少已审批版本或 approvedPackageHash，不能落地');
+          Toast.error('缺少 approvedVersion 或 approvedPackageHash，无法启动 Landing。');
           return;
         }
         await actionMutation.mutateAsync({
@@ -406,26 +409,26 @@ export const ChangePackageCenterPage: React.FC = () => {
           packageHash: approvedPackageHash,
           approvedPackageHash,
         });
-        Toast.success('生产处置已提交到独立安全执行环境');
+        Toast.success('Landing 已提交到受治理的生产 Runtime。');
       } else if (actionMode === 'cleanup') {
         await actionMutation.mutateAsync({
           kind: 'cleanup',
           packageId: selected.packageId,
           reason: comment.trim(),
         });
-        Toast.success('清理请求已提交');
+        Toast.success('临时资源清理请求已提交。');
       }
       setActionMode(null);
       setComment('');
     } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '操作失败');
+      Toast.error(userFacingError(error, '操作失败，请稍后重试。'));
     }
   };
 
   const selectedHash = selected?.approvedPackageHash || selected?.packageHash || '-';
   const returnToPreApproval = (record: OpsChangePackage) => {
     const reason = changePackageReasonLabel(record.reasonCode)
-      || String(parseJsonValue(record.failureSummaryJson)?.reason || record.reasonCode || '落地结果要求重新规划');
+      || String(parseJsonValue(record.failureSummaryJson)?.reason || record.reasonCode || 'Landing result requires a new plan');
     const params = new URLSearchParams({
       projectId: record.projectId,
       replanPackageId: record.packageId,
@@ -445,39 +448,39 @@ export const ChangePackageCenterPage: React.FC = () => {
   const landingFailedCount = interventionItems.filter((item) => item.status === 'LANDING_FAILED').length;
 
   return (
-    <OpsPageShell selectedKey="executions">
+    <OpsPageShell selectedKey="changes">
       <OpsPageHeader
-        title="执行中心"
+        title="变更"
         description={admin
-          ? '统一查看项目处置方案、审批、生产执行与恢复证明。所有动作都以后端项目权限和当前执行包 capability facts 为准。'
-          : '这里统一展示与你所在项目有关的处置任务。默认只看当前需要你处理的事项，审批和生产执行权限完全以后端 capability facts 为准。'}
+          ? '在一个受治理工作区中查看受控变更包、审批、落地、验证、失败与恢复证据。'
+          : '查看你所在项目的受控变更包；可执行的审批和生产操作始终以当前账号权限与变更状态为准。'}
         primaryAction={<Button onClick={loadPackages}>刷新</Button>}
       />
 
       <OpsResponsiveGrid $min="220px">
         <OpsSectionCard title="待审批">
           <Title heading={4} style={{ margin: 0 }}>{queueItems('pending').length}</Title>
-          <Text type="tertiary">等待验证完成、提交审核或人工审批</Text>
+          <Text type="tertiary">等待校验、提交审批或审批处理</Text>
           <div style={{ marginTop: 8 }}><Button theme="borderless" onClick={() => setQueue('pending')}>查看待审批</Button></div>
         </OpsSectionCard>
-        <OpsSectionCard title="执行中">
+        <OpsSectionCard title="落地">
           <Title heading={4} style={{ margin: 0 }}>{queueItems('running').length}</Title>
-          <Text type="tertiary">已审批待 Landing 或正在生产执行</Text>
-          <div style={{ marginTop: 8 }}><Button theme="borderless" onClick={() => setQueue('running')}>查看执行中</Button></div>
+          <Text type="tertiary">已批准等待落地，或正在执行</Text>
+          <div style={{ marginTop: 8 }}><Button theme="borderless" onClick={() => setQueue('running')}>查看落地任务</Button></div>
         </OpsSectionCard>
-        <OpsSectionCard title="需介入">
+        <OpsSectionCard title="需要人工处理">
           <Title heading={4} style={{ margin: 0 }}>{queueItems('intervention').length}</Title>
-          <Text type="tertiary">{needsReplanCount} 个需重规划，{landingFailedCount} 个执行失败；不会自动重试。</Text>
-          <div style={{ marginTop: 8 }}><Button theme="borderless" onClick={() => setQueue('intervention')}>查看需介入</Button></div>
+          <Text type="tertiary">{needsReplanCount} 个需要重规划，{landingFailedCount} 个落地失败；两类都不会自动重试。</Text>
+          <div style={{ marginTop: 8 }}><Button theme="borderless" onClick={() => setQueue('intervention')}>查看待处理</Button></div>
         </OpsSectionCard>
         <OpsSectionCard title="历史">
           <Title heading={4} style={{ margin: 0 }}>{queueItems('history').length}</Title>
-          <Text type="tertiary">已落地或关闭的执行记录与审计证明</Text>
+          <Text type="tertiary">已落地或已关闭的受控变更包及其审计证据</Text>
           <div style={{ marginTop: 8 }}><Button theme="borderless" onClick={() => setQueue('history')}>查看历史</Button></div>
         </OpsSectionCard>
       </OpsResponsiveGrid>
 
-      <OpsSectionCard title={`执行队列 · ${{ pending: '待审批', running: '执行中', intervention: '需介入', history: '历史' }[queue]}`}>
+      <OpsSectionCard title={`变更队列 · ${{ pending: '待审批', running: '落地', intervention: '需要人工处理', history: '历史' }[queue]}`}>
         <Toolbar>
           <Select
             value={projectId}
@@ -494,7 +497,7 @@ export const ChangePackageCenterPage: React.FC = () => {
           {!admin && (
             <Select value={workView} onChange={(value) => setWorkView(value as 'mine' | 'all')} style={{ width: 160 }}>
               <Option value="mine">需要我处理</Option>
-              <Option value="all">项目全部</Option>
+              <Option value="all">全部项目变更</Option>
             </Select>
           )}
           <Select value={status} onChange={(value) => setStatus(String(value || ''))} style={{ width: 180 }}>
@@ -502,16 +505,16 @@ export const ChangePackageCenterPage: React.FC = () => {
               <Option key={item.value || 'all'} value={item.value}>{item.label}</Option>
             ))}
           </Select>
-          <Text type="tertiary">列表只展示业务状态；版本、哈希和执行证明请在详情的高级安全证明中查看。</Text>
+          <Text type="tertiary">列表只展示业务状态；打开受控变更包后可查看版本、内容哈希、落地、验证与审计证据。</Text>
         </Toolbar>
         <Spin spinning={loading}>
           {packageQuery.isError ? (
             <OpsEmptyState
-              title="ChangePackage 加载失败"
-              description={packageQuery.error instanceof Error ? packageQuery.error.message : '请刷新后重试。'}
+              title="加载受控变更包失败"
+              description={userFacingError(packageQuery.error, '加载变更列表失败，请刷新后重试。')}
             />
           ) : visiblePackages.length === 0 ? (
-            <Empty title="当前队列暂无 ChangePackage" description="切换上方待审批、执行中、需介入或历史队列查看其他执行包。" />
+            <Empty title="当前队列暂无受控变更包" description="可切换待审批、落地、需要人工处理和历史队列查看其他变更。" />
           ) : (
             <TableScroll>
               <Table
@@ -521,7 +524,7 @@ export const ChangePackageCenterPage: React.FC = () => {
                 scroll={{ x: 1080 }}
                 columns={[
                   {
-                    title: '执行包',
+                    title: '受控变更包',
                     dataIndex: 'packageId',
                     width: 260,
                     render: (_: unknown, record: OpsChangePackage) => {
@@ -540,7 +543,7 @@ export const ChangePackageCenterPage: React.FC = () => {
                     title: '项目',
                     dataIndex: 'projectId',
                     width: 160,
-                    render: (value: string) => value || '-',
+                    render: (value: string) => projectScope.projects.find((project) => project.projectId === value)?.name || '当前项目',
                   },
                   {
                     title: '状态',
@@ -567,7 +570,7 @@ export const ChangePackageCenterPage: React.FC = () => {
                     render: (value: string) => value || '-',
                   },
                   {
-                    title: '当前结论',
+                    title: '当前状态',
                     dataIndex: 'reasonCode',
                     width: 190,
                     render: (_: string, record: OpsChangePackage) => {
@@ -602,7 +605,7 @@ export const ChangePackageCenterPage: React.FC = () => {
       </OpsSectionCard>
 
       <Modal
-        title={selected ? `执行包详情 - ${selected.summary || selected.objective || selected.packageId}` : '执行包详情'}
+        title={selected ? `受控变更包 - ${selected.summary || selected.objective || selected.packageId}` : '受控变更包'}
         visible={detailVisible}
         footer={null}
         width={1120}
@@ -612,13 +615,13 @@ export const ChangePackageCenterPage: React.FC = () => {
         <Spin spinning={detailQuery.isFetching}>
           {detailQuery.isError ? (
             <OpsEmptyState
-              title="执行包详情加载失败"
-              description={detailQuery.error instanceof Error ? detailQuery.error.message : '请刷新后重试。'}
+              title="加载受控变更包失败"
+              description={userFacingError(detailQuery.error, '加载变更详情失败，请刷新后重试。')}
             />
           ) : selected ? (
         <div style={{ maxHeight: '72vh', overflow: 'auto', paddingRight: 8 }}>
         <DetailGrid>
-          <OpsSectionCard title="Approval Cockpit">
+          <OpsSectionCard title="审批工作台">
             <ApprovalCockpit record={selected} />
             <ApprovalChannelDispatch
               record={selected}
@@ -627,15 +630,15 @@ export const ChangePackageCenterPage: React.FC = () => {
             />
             {selectedMissingItems.length > 0 && (
               <OpsDangerZone
-                title="审批材料仍有缺口"
-                description="缺口未闭合前不能把“可查看”误当成“可审批”。"
+                title="审批证据不完整"
+                description="ChangePackage 可见不代表可以直接批准；请先补齐以下缺口。"
               >
                 <Space vertical align="start" spacing={4}>
                   {selectedMissingItems.map((item) => <Text key={item}>- {item}</Text>)}
                 </Space>
               </OpsDangerZone>
             )}
-            <OpsAdvancedPreview title="审批版本与 Runtime 标识" description="仅用于审计与调试，不作为普通用户理解处置方案的第一屏。">
+            <OpsAdvancedPreview title="审批版本与 Runtime 身份" description="用于审计和调试的技术细节，不是变更的主要产品视图。">
               <JsonBlock>{formatJson({
                 packageId: selected.packageId,
                 version: selected.version,
@@ -650,22 +653,22 @@ export const ChangePackageCenterPage: React.FC = () => {
               })}</JsonBlock>
             </OpsAdvancedPreview>
 
-            <OpsSectionCard title="审批前请确认：Landing 会做什么" style={{ marginTop: 16 }}>
+            <OpsSectionCard title="批准前确认：Landing 将执行什么" style={{ marginTop: 16 }}>
               <Space vertical align="start" spacing="medium" style={{ width: '100%' }}>
                 <Text>
-                  这个执行包面向 <Text strong>{selected.targetEnvironment || '未声明环境'}</Text>，
-                  风险等级为 <Tag color={riskColor(selected.riskLevel)}>{changePackageRiskLabel(selected.riskLevel)}</Tag>。
-                  审批通过后，AI 只能在你当前确认的处置范围内执行；任何需要实质改变方案的情况都必须重新规划并重新审批。
+                  当前 ChangePackage 的目标环境是 <Text strong>{selected.targetEnvironment || '未指定环境'}</Text>，风险级别为{' '}
+                  <Tag color={riskColor(selected.riskLevel)}>{changePackageRiskLabel(selected.riskLevel)}</Tag>。
+                  批准后，Landing 只能在已批准边界内执行；任何实质性方案变化都必须重新规划并重新审批。
                 </Text>
                 <Space wrap>
-                  <Tag color={proofState(selected.preflightResultJson).color}>预检：{proofState(selected.preflightResultJson).label}</Tag>
+                  <Tag color={proofState(selected.preflightResultJson).color}>Preflight：{proofState(selected.preflightResultJson).label}</Tag>
                   {selected.dryRunResultJson && (
-                    <Tag color={proofState(selected.dryRunResultJson).color}>验证：{proofState(selected.dryRunResultJson).label}</Tag>
+                    <Tag color={proofState(selected.dryRunResultJson).color}>校验：{proofState(selected.dryRunResultJson).label}</Tag>
                   )}
                   {selected.ciResultJson && (
                     <Tag color={proofState(selected.ciResultJson).color}>CI：{proofState(selected.ciResultJson).label}</Tag>
                   )}
-                  {selected.testProofHash && <Tag color="green">测试证明：{shortHash(selected.testProofHash)}</Tag>}
+                  {selected.testProofHash && <Tag color="green">测试证据：{shortHash(selected.testProofHash)}</Tag>}
                 </Space>
                 {packageOperations(selected).length > 0 ? (
                   <Table
@@ -676,7 +679,7 @@ export const ChangePackageCenterPage: React.FC = () => {
                     columns={[
                       { title: '操作', dataIndex: 'tool', width: 180 },
                       { title: '目标资源', dataIndex: 'resource' },
-                      { title: '效果/风险', dataIndex: 'effect', width: 160 },
+                      { title: '影响 / 风险', dataIndex: 'effect', width: 160 },
                       {
                         title: '关键参数',
                         dataIndex: 'args',
@@ -687,29 +690,29 @@ export const ChangePackageCenterPage: React.FC = () => {
                     ]}
                   />
                 ) : (
-                  <OpsEmptyState title="没有可执行的处置步骤" description="当前方案没有声明可执行的生产处置步骤。审批前应要求 AI 修订；如果方案本身不成立，必须重新规划并重新审批。" />
+                  <OpsEmptyState title="没有可执行的 Landing 步骤" description="当前 ChangePackage 没有声明生产操作。请在审批前修订；如果方案已失效，则返回对话重新规划。" />
                 )}
                 <Space vertical align="start" spacing={2}>
-                  <Text strong>回滚/验证</Text>
-                  <Text type="tertiary">回滚计划：{selected.rollbackStepsJson ? '已记录' : '未记录'}；落地后验证：{selected.verificationCriteriaJson ? '已记录' : '未记录'}；允许的小修：{selected.allowedLandingAdjustmentsJson ? '已声明' : '未声明'}。</Text>
+                  <Text strong>回滚 / Verification</Text>
+                  <Text type="tertiary">回滚方案：{selected.rollbackStepsJson ? '已记录' : '缺失'}；Verification：{selected.verificationCriteriaJson ? '已记录' : '缺失'}；允许的 Landing 调整：{selected.allowedLandingAdjustmentsJson ? '已声明' : '未声明'}。</Text>
                 </Space>
                 {selectedMissingItems.length > 0 ? (
                   <OpsDangerZone
-                    title="当前不能审批或落地"
-                    description="下面这些缺口会阻止审批或安全执行；如果原方案因此不再成立，需要回到诊断重新规划并重新审批。"
+                    title="审批或 Landing 已阻塞"
+                    description="以下缺口会阻止安全审批或执行。如果方案已经失效，请返回对话重新规划，并审批新版本。"
                   >
                     <Space vertical align="start" spacing={4}>
                       {selectedMissingItems.map((item) => <Text key={item}>- {item}</Text>)}
                     </Space>
                   </OpsDangerZone>
                 ) : (
-                  <Tag color="green">审批材料完整：可以按当前状态执行允许的下一步</Tag>
+                  <Tag color="green">审批证据完整：下一步状态允许的操作已可执行</Tag>
                 )}
               </Space>
             </OpsSectionCard>
 
             <Space vertical align="start" spacing="medium" style={{ width: '100%', marginTop: 16 }}>
-              <OpsAdvancedPreview title="MCP 步骤 / 预检 / 显式验证" description="这些字段会纳入审批快照和 packageHash，落地时只能读取已审批版本。">
+              <OpsAdvancedPreview title="MCP 步骤 / Preflight / 显式校验" description="这些字段属于审批快照和 packageHash；Landing 只能读取已批准版本。">
                 <JsonBlock>{formatJson({
                   toolBindingsJson: selected.toolBindingsJson,
                   mcpStepsJson: selected.mcpStepsJson,
@@ -717,7 +720,7 @@ export const ChangePackageCenterPage: React.FC = () => {
                   validationResultJson: selected.dryRunResultJson,
                 })}</JsonBlock>
               </OpsAdvancedPreview>
-              <OpsAdvancedPreview title="代码修复 / Bash / LSP 证据" description="代码修复字段会进入审批快照；Landing 只能执行 approvedVersion 中记录的 repairCommit、diffHash 和测试证明。">
+              <OpsAdvancedPreview title="代码修复 / Bash / LSP 证据" description="代码修复事实属于审批快照；Landing 只能执行 approvedVersion 中记录的 repairCommit、diffHash 和测试证据。">
                 <JsonBlock>{formatJson({
                   repairWorkspaceId: selected.repairWorkspaceId,
                   repositoryId: selected.repositoryId,
@@ -733,7 +736,7 @@ export const ChangePackageCenterPage: React.FC = () => {
                   lspEvidenceJson: selected.lspEvidenceJson,
                 })}</JsonBlock>
               </OpsAdvancedPreview>
-              <OpsAdvancedPreview title="审批边界 / Landing Plan / 回滚和验证" description="platform-landing-react 会基于这些边界做执行前检查。">
+              <OpsAdvancedPreview title="审批边界 / Landing 方案 / 回滚 / Verification" description="受治理的 Landing Runtime 会在执行前检查这些已批准边界。">
                 <JsonBlock>{formatJson({
                   approvalBoundaryJson: selected.approvalBoundaryJson,
                   preferredPlanJson: selected.preferredPlanJson,
@@ -749,9 +752,9 @@ export const ChangePackageCenterPage: React.FC = () => {
           </OpsSectionCard>
 
           <Space vertical align="start" spacing="medium" style={{ width: '100%', minWidth: 0 }}>
-            <OpsSectionCard title="落地步骤">
+            <OpsSectionCard title="Landing 步骤">
               {landingOperations.length === 0 ? (
-                <Empty title="尚未执行生产处置" description="审批通过并开始安全执行后，这里会逐项显示前置检查、执行和后置检查结果。" />
+                <Empty title="Landing 尚未开始" description="审批完成并启动受治理执行后，这里会展示每个操作的前置条件、执行过程和后置检查结果。" />
               ) : (
                 <TableScroll>
                   <Table
@@ -790,11 +793,11 @@ export const ChangePackageCenterPage: React.FC = () => {
                         render: (value: string) => value ? <Tag color={value === 'SUCCEEDED' ? 'green' : value === 'FAILED' ? 'red' : 'blue'}>{value}</Tag> : '-',
                       },
                       {
-                        title: '结果说明',
+                        title: '结果',
                         dataIndex: 'reasonCode',
                         render: (value: string, run: OpsLandingOperationRun) => (
                           <Space vertical align="start" spacing={2}>
-                            <Text>{changePackageReasonLabel(value) || value || (run.status === 'SUCCEEDED' ? '前置检查、执行和后置检查均通过' : '-')}</Text>
+                            <Text>{changePackageReasonLabel(value) || value || (run.status === 'SUCCEEDED' ? '前置条件、执行和后置检查均已通过' : '-')}</Text>
                             {(run.resultId || run.outputHash) && (
                               <Text type="tertiary">结果 {run.resultId || '-'} · {shortHash(run.outputHash)}</Text>
                             )}
@@ -806,7 +809,7 @@ export const ChangePackageCenterPage: React.FC = () => {
                 </TableScroll>
               )}
               {landingOperations.length > 0 && (
-                <OpsAdvancedPreview title="操作级技术记录" description="用于故障定位；审批判断请以上方人类可读状态为准。">
+                <OpsAdvancedPreview title="操作级技术记录" description="用于故障排查；审批决策应以上方人类可读状态为准。">
                   <JsonBlock>{formatJson(landingOperations)}</JsonBlock>
                 </OpsAdvancedPreview>
               )}
@@ -814,7 +817,7 @@ export const ChangePackageCenterPage: React.FC = () => {
 
             <OpsSectionCard title="事件轨迹">
               {events.length === 0 ? (
-                <Empty title="暂无事件" description="审批、落地、拦截、清理等动作会记录到这里。" />
+                <Empty title="暂无事件" description="审批、Landing、阻塞、清理及相关操作都会记录在这里。" />
               ) : (
                 <EventList>
                   {events.map((event) => (
@@ -825,7 +828,7 @@ export const ChangePackageCenterPage: React.FC = () => {
                           <Text type="tertiary">{event.createTime || '-'}</Text>
                         </Space>
                         <Text>{event.summary || changePackageReasonLabel(event.reasonCode) || '-'}</Text>
-                        <OpsAdvancedPreview title="事件 Payload" description="默认折叠，避免原始 payload 撑开页面。">
+                        <OpsAdvancedPreview title="事件 Payload" description="默认折叠，避免原始 Payload 干扰主要业务视图。">
                           <JsonBlock>{formatJson(event.payloadJson)}</JsonBlock>
                         </OpsAdvancedPreview>
                       </Space>
@@ -836,8 +839,8 @@ export const ChangePackageCenterPage: React.FC = () => {
             </OpsSectionCard>
 
             <OpsDangerZone
-              title="ChangePackage 危险操作"
-              description="验证、提交审核、审批、驳回、生产执行和清理都会写入审计。生产处置始终只能执行已审批的当前方案，任何实质变化都必须重新审批。"
+              title="受治理的 ChangePackage 操作"
+              description="校验、提交审批、批准、驳回、Landing 和清理都会进入审计。生产执行只能使用当前已批准方案；实质性变更必须重新审批。"
             >
               <Space wrap>
                 {packageCapability(selected, 'canRevise') && (
@@ -845,7 +848,7 @@ export const ChangePackageCenterPage: React.FC = () => {
                     disabled={!['DRAFT', 'VALIDATION_FAILED', 'REVISING'].includes(selected.status)}
                     onClick={() => setActionMode('validate')}
                   >
-                    运行审核前验证
+                    执行审批前校验
                   </Button>
                 )}
                 {packageCapability(selected, 'canSubmitReview') && (
@@ -853,7 +856,7 @@ export const ChangePackageCenterPage: React.FC = () => {
                     disabled={selected.status !== 'READY_FOR_REVIEW'}
                     onClick={() => setActionMode('submitReview')}
                   >
-                    提交人工审核
+                    提交审批
                   </Button>
                 )}
                 {packageCapability(selected, 'canApprove') && (
@@ -862,7 +865,7 @@ export const ChangePackageCenterPage: React.FC = () => {
                     disabled={selected.status !== 'REVIEWING' || !hasPackageHash(selected) || !selectedReadyForApproval}
                     onClick={() => setActionMode('approve')}
                   >
-                    审批当前版本
+                    批准当前版本
                   </Button>
                 )}
                 {packageCapability(selected, 'canReject') && (
@@ -872,7 +875,7 @@ export const ChangePackageCenterPage: React.FC = () => {
                     disabled={selected.status !== 'REVIEWING'}
                     onClick={() => setActionMode('reject')}
                   >
-                    驳回修订
+                    驳回并要求修订
                   </Button>
                 )}
                 {packageCapability(selected, 'canLand') && (
@@ -885,7 +888,7 @@ export const ChangePackageCenterPage: React.FC = () => {
                     }
                     onClick={() => setActionMode('land')}
                   >
-                    执行生产处置
+                    启动 Landing
                   </Button>
                 )}
                 {packageCapability(selected, 'canCleanup') && (
@@ -902,12 +905,12 @@ export const ChangePackageCenterPage: React.FC = () => {
                     disabled={!['NEEDS_REPLAN', 'LANDING_FAILED', 'REJECTED', 'VALIDATION_FAILED'].includes(selected.status)}
                     onClick={() => returnToPreApproval(selected)}
                   >
-                    回到对话重新规划
+                    返回对话并重新规划
                   </Button>
                 )}
                 {!['canRevise', 'canSubmitReview', 'canApprove', 'canReject', 'canLand', 'canCleanup']
                   .some((capability) => packageCapability(selected, capability as PackageCapability)) && (
-                  <Tag color="grey">当前项目权限仅允许查看</Tag>
+                  <Tag color="grey">当前 Project 权限仅允许查看</Tag>
                 )}
               </Space>
             </OpsDangerZone>
@@ -915,18 +918,18 @@ export const ChangePackageCenterPage: React.FC = () => {
         </DetailGrid>
         </div>
           ) : (
-            <Empty title="选择一个执行包查看完整详情" />
+            <Empty title="请选择一个 ChangePackage 查看完整详情" />
           )}
         </Spin>
       </Modal>
 
       <Modal
         title={
-          actionMode === 'validate' ? '运行审核前验证'
-            : actionMode === 'submitReview' ? '提交人工审核'
-              : actionMode === 'approve' ? '审批 ChangePackage'
+          actionMode === 'validate' ? '执行审批前校验'
+            : actionMode === 'submitReview' ? '提交审批'
+              : actionMode === 'approve' ? '批准 ChangePackage'
                 : actionMode === 'reject' ? '驳回 ChangePackage'
-                  : actionMode === 'land' ? '执行生产处置'
+                  : actionMode === 'land' ? '启动 Landing'
                     : '清理临时资源'
         }
         visible={Boolean(actionMode)}
@@ -947,17 +950,17 @@ export const ChangePackageCenterPage: React.FC = () => {
           </Text>
           <Text>
             {actionMode === 'validate'
-              ? '验证会重新检查 repair workspace、controlled bash / CI，以及包中显式声明的 validation proof；不能使用 request 自报 proof。'
+              ? '校验会重新检查修复工作区、受控 Bash / CI 以及显式声明的验证证据；不会信任请求方自行提供的证明。'
               : actionMode === 'submitReview'
-                ? '只有验证通过后的 READY_FOR_REVIEW 执行包才能提交人工审核。'
+                ? '只有已经校验并处于 READY_FOR_REVIEW 的 ChangePackage 才能提交审批。'
                 : actionMode === 'land'
-                  ? '生产处置只执行当前已审批方案。AI 会在独立安全执行环境中工作；权限、停止、幂等、审计和结果确认仍由平台统一治理。'
-                  : '请确认当前版本、hash 和风险边界。该操作会写入审计。'}
+                  ? 'Landing 只执行当前已批准方案。平台仍持续治理权限、停止控制、幂等、审计和结果 Verification。'
+                  : '请确认当前版本、hash 与风险边界；本次操作会进入审计。'}
           </Text>
           {(actionMode === 'validate' || actionMode === 'submitReview' || actionMode === 'reject' || actionMode === 'cleanup') && (
             <TextArea
               value={comment}
-              placeholder="填写原因或备注"
+              placeholder="原因或备注"
               autosize={{ minRows: 4, maxRows: 8 }}
               onChange={setComment}
             />

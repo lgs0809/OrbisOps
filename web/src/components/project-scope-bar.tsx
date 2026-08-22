@@ -74,7 +74,7 @@ export const ProjectScopeBar: React.FC<ProjectScopeBarProps> = ({
         <Text strong>当前项目</Text>
         <ProjectSelect
           value={projectId || undefined}
-          placeholder="请先选择项目"
+          placeholder="选择项目"
           loading={loading}
           prefix={<IconFolder />}
           onChange={(value) => onChange(String(value || ''))}
@@ -87,9 +87,9 @@ export const ProjectScopeBar: React.FC<ProjectScopeBarProps> = ({
         </ProjectSelect>
       </div>
       <ProjectMeta>
-        <Title className="project-name" heading={6}>{project?.name || '未选择项目'}</Title>
+        <Title className="project-name" heading={6}>{project?.name || '尚未选择项目'}</Title>
         <Text type="tertiary">
-          {project ? `${project.projectId} · ${project.description || '暂无项目说明'}` : '后续列表、创建操作和权限均限定在所选项目内。'}
+          {project ? `${project.projectId} · ${project.description || '暂无项目说明'}` : '列表、创建操作和权限都会限定在当前选择的项目范围内。'}
         </Text>
       </ProjectMeta>
       <Space wrap>

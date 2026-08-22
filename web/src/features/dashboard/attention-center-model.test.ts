@@ -51,7 +51,7 @@ describe('attention center model', () => {
     expect(items[0].key).toBe('incident:inc-action');
     expect(items.filter((item) => item.key === 'incident:inc-action')).toHaveLength(1);
     expect(items.find((item) => item.key === 'workflow-decision:run-1')?.href)
-      .toBe('/analysis-tasks?projectId=p1&runId=run-1');
+      .toBe('/workbench?projectId=p1&runId=run-1');
   });
 
   it('does not treat approved changes as pending approval', () => {
@@ -91,6 +91,6 @@ describe('attention center model', () => {
     ]);
     expect(items.filter((item) => item.key === 'incident:inc-action')).toHaveLength(1);
     expect(items.find((item) => item.key === 'user-workflow-decision:run-2')?.href)
-      .toBe('/analysis-tasks?projectId=p1&runId=run-2');
+      .toBe('/workbench?projectId=p1&runId=run-2');
   });
 });

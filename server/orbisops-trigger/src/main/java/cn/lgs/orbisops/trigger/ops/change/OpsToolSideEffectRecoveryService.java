@@ -60,7 +60,7 @@ public class OpsToolSideEffectRecoveryService {
         this.landingProcessManager = required(landingProcessManager, "CHANGE_PACKAGE_LANDING_PROCESS_MANAGER_REQUIRED");
     }
 
-    @Scheduled(fixedDelayString = "${ops.tool-execution.side-effect-recovery.fixed-delay-ms:30000}")
+    @Scheduled(fixedDelayString = "${orbisops.tool-execution.side-effect-recovery.fixed-delay-ms:30000}")
     public void recoverScheduled() {
         recoverOnce(25);
     }

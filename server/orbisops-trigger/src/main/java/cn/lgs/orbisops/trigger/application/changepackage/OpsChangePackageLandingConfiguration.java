@@ -9,7 +9,7 @@ public class OpsChangePackageLandingConfiguration {
 
     @Bean
     public OpsChangePackageLandingSettings opsChangePackageLandingSettings(
-            @Value("${ops.approved-landing.enabled:false}") boolean enabled) {
+            @Value("${orbisops.approved-landing.enabled:false}") boolean enabled) {
         return new OpsChangePackageLandingSettings(enabled);
     }
 }

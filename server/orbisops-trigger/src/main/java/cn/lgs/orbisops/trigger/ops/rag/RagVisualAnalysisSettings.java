@@ -28,7 +28,7 @@ public record RagVisualAnalysisSettings(
         baseUrl = stripTrailingSlash(normalize(baseUrl, ""));
         apiKey = normalize(apiKey, "");
         path = stripLeadingSlash(normalize(path, "v1/chat/completions"));
-        model = normalize(model, "gpt-5.4-mini");
+        model = normalize(model, "");
         detail = normalize(detail, "low");
         timeoutSeconds = Math.max(5, timeoutSeconds);
         maxCompletionTokens = Math.max(300, Math.min(4000, maxCompletionTokens));
@@ -47,7 +47,7 @@ public record RagVisualAnalysisSettings(
                 "",
                 "",
                 "v1/chat/completions",
-                "gpt-5.4-mini",
+                "",
                 "low",
                 30,
                 1200,

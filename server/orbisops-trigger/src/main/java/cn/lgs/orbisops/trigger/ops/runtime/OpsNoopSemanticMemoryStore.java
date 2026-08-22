@@ -8,7 +8,7 @@ import java.util.List;
 
 @Service
 @Primary
-@ConditionalOnProperty(prefix = "ops.chat.memory", name = "semantic-enabled", havingValue = "false", matchIfMissing = true)
+@ConditionalOnProperty(prefix = "orbisops.chat.memory", name = "semantic-enabled", havingValue = "false", matchIfMissing = true)
 public class OpsNoopSemanticMemoryStore implements OpsSemanticMemoryStore {
 
     @Override

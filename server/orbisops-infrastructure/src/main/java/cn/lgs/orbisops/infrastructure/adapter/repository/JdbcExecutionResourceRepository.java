@@ -32,10 +32,10 @@ public class JdbcExecutionResourceRepository implements IExecutionResourceReposi
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 
-    @Value("${ops.execution-resource.jdbc-enabled:true}")
+    @Value("${orbisops.execution-resource.jdbc-enabled:true}")
     private boolean jdbcEnabled = true;
 
-    @Value("${ops.execution-resource.auto-init:true}")
+    @Value("${orbisops.execution-resource.auto-init:true}")
     private boolean autoInit = true;
 
     private volatile boolean initialized;

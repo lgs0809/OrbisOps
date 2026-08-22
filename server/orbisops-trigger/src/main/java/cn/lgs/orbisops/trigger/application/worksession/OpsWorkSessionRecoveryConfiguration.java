@@ -10,8 +10,8 @@ public class OpsWorkSessionRecoveryConfiguration {
 
     @Bean
     public OpsWorkSessionRecoverySettings opsWorkSessionRecoverySettings(
-            @Value("${ops.work-session.recovery.enabled:true}") boolean enabled,
-            @Value("${ops.work-session.recovery.batch-size:100}") int batchSize) {
+            @Value("${orbisops.work-session.recovery.enabled:true}") boolean enabled,
+            @Value("${orbisops.work-session.recovery.batch-size:100}") int batchSize) {
         return new OpsWorkSessionRecoverySettings(enabled, batchSize);
     }
 }

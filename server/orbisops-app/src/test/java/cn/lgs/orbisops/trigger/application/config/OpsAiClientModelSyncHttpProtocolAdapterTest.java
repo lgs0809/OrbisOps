@@ -69,7 +69,7 @@ class OpsAiClientModelSyncHttpProtocolAdapterTest {
             AiClientModelSyncTarget target = new AiClientModelSyncTarget(
                     "openai-main",
                     "http://127.0.0.1:" + server.getAddress().getPort() + "/v1",
-                    "sk-unit-test");
+                    "unit-test-api-key");
             String endpoint = adapter.resolveEndpoint(target);
 
             AiClientModelSyncFetchResult result = adapter.fetch(target, endpoint);
@@ -77,7 +77,7 @@ class OpsAiClientModelSyncHttpProtocolAdapterTest {
             assertEquals(endpoint, result.endpoint());
             assertEquals(200, result.httpStatus());
             assertEquals(List.of("gpt-main", "text-embedding-3-small"), result.modelIds());
-            assertEquals("Bearer sk-unit-test", authorization.get());
+            assertEquals("Bearer unit-test-api-key", authorization.get());
             assertEquals("application/json", accept.get());
         } finally {
             server.stop(0);

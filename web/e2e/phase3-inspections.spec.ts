@@ -71,19 +71,19 @@ test('Inspection schedules use project queries and load execution history on dem
     return route.fulfill({ status: 200, contentType: 'application/json', body: response([]) });
   });
 
-  await page.goto('/automations/inspections?projectId=demo-project');
-  await expect(page.getByRole('heading', { name: '巡检' })).toBeVisible();
+  await page.goto('/automations/schedules?projectId=demo-project');
+  await expect(page.getByRole('heading', { name: '定时自动化' })).toBeVisible();
   await expect(page.getByText('生产运行巡检')).toBeVisible();
-  await expect(page.getByText('ReAct', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('默认模型', { exact: true }).first()).toBeVisible();
   await expect.poll(() => scheduleRequests).toBe(1);
   expect(agentRequests).toBe(1);
   expect(channelRequests).toBe(1);
   expect(executionRequests).toBe(0);
 
   const row = page.getByRole('row').filter({ hasText: '生产运行巡检' });
-  await row.getByRole('button', { name: '记录' }).click();
+  await row.getByRole('button', { name: 'Run 记录' }).click();
   await expect.poll(() => executionRequests).toBe(1);
-  await expect(page.getByText('SUCCESS')).toBeVisible();
+  await expect(page.getByText('成功')).toBeVisible();
 
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: '刷新' }).click();

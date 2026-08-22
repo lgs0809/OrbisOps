@@ -25,7 +25,7 @@ public class JdbcModelDefaultPolicyAdapter implements ModelDefaultPolicyPort {
 
     public JdbcModelDefaultPolicyAdapter(
             @Qualifier("mysqlJdbcTemplate") JdbcTemplate jdbcTemplate,
-            @Value("${ops.model-default-policy.auto-init:true}") boolean autoInit) {
+            @Value("${orbisops.model-default-policy.auto-init:true}") boolean autoInit) {
         this.jdbcTemplate = jdbcTemplate;
         this.autoInit = autoInit;
     }

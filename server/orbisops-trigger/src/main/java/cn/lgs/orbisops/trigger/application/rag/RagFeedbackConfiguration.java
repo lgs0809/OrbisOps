@@ -11,7 +11,7 @@ public class RagFeedbackConfiguration {
 
     @Bean
     public RagFeedbackSettings ragFeedbackSettings(
-            @Value("${ops.rag.feedback.auto-init:true}") boolean autoInit) {
+            @Value("${orbisops.rag.feedback.auto-init:true}") boolean autoInit) {
         return new RagFeedbackSettings(autoInit);
     }
 

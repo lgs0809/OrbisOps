@@ -38,8 +38,8 @@ class OpsSchemaGovernanceBoundaryArchitectureTest {
                 () -> assertTrue(factory.contains("MIGRATION_FILES")),
                 () -> assertTrue(factory.contains("MANUAL_MIGRATION_REQUIRED")),
                 () -> assertFalse(factory.contains("@Service")),
-                () -> assertTrue(configuration.contains("ops.agents.auto-init")),
-                () -> assertTrue(configuration.contains("ops.rag.ingestion.auto-init")));
+                () -> assertTrue(configuration.contains("orbisops.agents.auto-init")),
+                () -> assertTrue(configuration.contains("orbisops.rag.ingestion.auto-init")));
     }
 
     private String read(String relativePath) throws IOException {

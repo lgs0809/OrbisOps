@@ -10,8 +10,8 @@ public class OpsMcpClientCacheConfiguration {
 
     @Bean
     public OpsMcpClientCacheSettings opsMcpClientCacheSettings(
-            @Value("${ops.mcp.cache.ttl-seconds:600}") long ttlSeconds,
-            @Value("${ops.mcp.cache.cleanup-interval-ms:60000}") long cleanupIntervalMillis) {
+            @Value("${orbisops.mcp.cache.ttl-seconds:600}") long ttlSeconds,
+            @Value("${orbisops.mcp.cache.cleanup-interval-ms:60000}") long cleanupIntervalMillis) {
         return new OpsMcpClientCacheSettings(ttlSeconds, cleanupIntervalMillis);
     }
 }

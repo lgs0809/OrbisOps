@@ -39,7 +39,7 @@ public class JdbcRepairWorkspaceRepository implements IRepairWorkspaceRepository
     @org.springframework.beans.factory.annotation.Autowired
     public JdbcRepairWorkspaceRepository(
             @Qualifier("mysqlJdbcTemplate") ObjectProvider<JdbcTemplate> jdbcProvider,
-            @Value("${ops.repair.jdbc-enabled:true}") boolean jdbcEnabled) {
+            @Value("${orbisops.repair.jdbc-enabled:true}") boolean jdbcEnabled) {
         this.jdbc = jdbcProvider.getIfAvailable();
         this.jdbcEnabled = jdbcEnabled;
     }

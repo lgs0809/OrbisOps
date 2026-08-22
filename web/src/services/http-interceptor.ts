@@ -51,7 +51,7 @@ export const installHttpInterceptor = () => {
       });
     } catch (error) {
       if ((error as Error)?.name === 'AbortError' || (error as Error)?.name === 'TimeoutError') {
-        throw new Error(`请求超时，请检查后端服务或本地代理/VPN：${requestUrl(input)}`);
+        throw new Error('请求超时，请检查网络连接或服务状态。');
       }
       throw error;
     } finally {
@@ -110,7 +110,7 @@ const installFetchFallback = () => {
       };
       xhr.onerror = () => {
         init?.signal?.removeEventListener('abort', abort);
-        reject(new TypeError(`Network request failed: ${requestUrl(input)}`));
+        reject(new TypeError('网络请求失败，请检查网络连接。'));
       };
       xhr.onabort = () => {
         init?.signal?.removeEventListener('abort', abort);

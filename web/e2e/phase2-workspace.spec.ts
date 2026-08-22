@@ -58,45 +58,45 @@ test('Project Workspace Advanced exposes five feature tabs and switches domain c
   await authenticateAdmin(page);
   await mockProjectApis(page);
 
-  await page.goto('/projects/advanced?projectId=demo-project');
-  await expect(page.getByRole('button', { name: 'Overview' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Access' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Knowledge & Skills' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Code & Runtime' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Data & Tools' })).toBeVisible();
+  await page.goto('/projects?projectId=demo-project');
+  for (const tab of ['概览', '资源', '能力', '成员', '运行配置']) {
+    await expect(page.getByRole('tab', { name: tab })).toBeVisible();
+  }
 
-  await expect(page.getByText('开始第一次真实诊断', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Access' }).click();
-  await expect(page.getByText('项目成员与使用权限', { exact: true })).toBeVisible();
-  await expect(page.getByText('暂无显式项目成员', { exact: true })).toBeVisible();
+  await expect(page.getByText('默认模型：', { exact: false })).toBeVisible();
+  await page.getByRole('tab', { name: '成员' }).click();
+  await expect(page.getByText('项目成员', { exact: true })).toBeVisible();
+  await expect(page.getByText('当前项目尚未分配用户。', { exact: true })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Code & Runtime' }).click();
-  await expect(page.getByText('代码与服务', { exact: true })).toBeVisible();
-  await expect(page.getByText('变更执行目标', { exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: '运行配置' }).click();
+  await expect(page.getByText(/生产变更仍必须经过受控变更包/)).toBeVisible();
 
-  await page.getByRole('button', { name: 'Data & Tools' }).click();
-  await expect(page.getByText('数据连接与工具', { exact: true })).toBeVisible();
-  await expect(page.getByText('已生成工具', { exact: true }).last()).toBeVisible();
+  await page.getByRole('tab', { name: '能力' }).click();
+  await expect(page.getByText('默认模型', { exact: true })).toBeVisible();
+  await expect(page.getByText(/可用工作流/)).toBeVisible();
 });
 
-test('Agent Builder defaults to Basic and only exposes low-frequency internals in Advanced', async ({ page }) => {
+test('Workflow Builder exposes only DIRECT, LLM, and REACT while Advanced reveals routing and JSON', async ({ page }) => {
   await authenticateAdmin(page);
   await mockProjectApis(page);
 
   await page.goto('/automations/workflows/config?projectId=demo-project');
-  const basic = page.getByRole('button', { name: /Basic/ });
-  const advanced = page.getByRole('button', { name: /Advanced/ });
+  const basic = page.getByRole('button', { name: '基础', exact: true });
+  const advanced = page.getByRole('button', { name: '高级', exact: true });
   await expect(basic).toBeVisible();
   await expect(advanced).toBeVisible();
   await expect(basic).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('button', { name: '节点能力' })).toBeVisible();
   await expect(page.getByRole('button', { name: '测试', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: '连接路由' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '连接与路由' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '高级 JSON' })).toHaveCount(0);
+  await expect(page.getByText('LLM · 单次模型调用', { exact: true })).toBeVisible();
+  await expect(page.getByText(/Review 是 LLM 节点的一种职责/)).toBeVisible();
+  await expect(page.getByText('REVIEW', { exact: true })).toHaveCount(0);
 
   await advanced.click();
   await expect(advanced).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByRole('button', { name: '连接路由' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '连接与路由' })).toBeVisible();
   await expect(page.getByRole('button', { name: '高级 JSON' })).toBeVisible();
   await expect(page.getByText('版本', { exact: true }).first()).toBeVisible();
 });

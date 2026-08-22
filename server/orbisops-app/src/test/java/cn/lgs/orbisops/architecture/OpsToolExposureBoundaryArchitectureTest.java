@@ -55,8 +55,8 @@ class OpsToolExposureBoundaryArchitectureTest {
                 () -> assertTrue(projector.contains("toolCapabilityPolicy")),
                 () -> assertFalse(projector.contains("@Service")),
                 () -> assertTrue(configuration.contains("ToolExposureSettings")),
-                () -> assertTrue(configuration.contains("ops.agent.action-mode")),
-                () -> assertTrue(configuration.contains("ops.agent.enforce-read-only-tools")),
+                () -> assertTrue(configuration.contains("orbisops.agent.action-mode")),
+                () -> assertTrue(configuration.contains("orbisops.agent.enforce-read-only-tools")),
                 () -> assertFalse(configuration.contains("blocked-action-keywords")),
                 () -> assertFalse(configuration.contains("allowed-notification-tool-keywords")));
     }

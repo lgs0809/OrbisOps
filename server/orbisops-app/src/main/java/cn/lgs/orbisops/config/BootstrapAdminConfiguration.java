@@ -10,6 +10,8 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.util.StringUtils;
 
+import java.util.UUID;
+
 /**
  * Optional first-run administrator bootstrap.
  *
@@ -28,7 +30,7 @@ public class BootstrapAdminConfiguration implements ApplicationRunner {
     public BootstrapAdminConfiguration(
             AdminUserCatalogUseCase catalogUseCase,
             @Value("${orbisops.bootstrap.admin.enabled:false}") boolean enabled,
-            @Value("${orbisops.bootstrap.admin.user-id:bootstrap-admin}") String userId,
+            @Value("${orbisops.bootstrap.admin.user-id:}") String userId,
             @Value("${orbisops.bootstrap.admin.username:}") String username,
             @Value("${orbisops.bootstrap.admin.password:}") String password) {
         this.catalogUseCase = catalogUseCase;
@@ -52,7 +54,7 @@ public class BootstrapAdminConfiguration implements ApplicationRunner {
         }
         boolean created = catalogUseCase.create(new AdminUserCommand(
                 null,
-                StringUtils.hasText(userId) ? userId.trim() : "bootstrap-admin",
+                StringUtils.hasText(userId) ? userId.trim() : "user-" + UUID.randomUUID(),
                 username.trim(),
                 password,
                 AdminUserRole.ADMIN.value(),

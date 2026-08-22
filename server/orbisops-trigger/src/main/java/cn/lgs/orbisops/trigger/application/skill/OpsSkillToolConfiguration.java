@@ -10,10 +10,10 @@ public class OpsSkillToolConfiguration {
 
     @Bean
     public OpsSkillToolSettings opsSkillToolSettings(
-            @Value("${ops.skills.enabled:true}") boolean enabled,
-            @Value("${ops.skills.locations:classpath:/skills}") String locations,
-            @Value("${ops.skills.editable-location:./data/skills}") String editableLocation,
-            @Value("${ops.skills.editable-auto-init:true}") boolean editableAutoInit) {
+            @Value("${orbisops.skills.enabled:true}") boolean enabled,
+            @Value("${orbisops.skills.locations:classpath:/skills}") String locations,
+            @Value("${orbisops.skills.editable-location:./data/skills}") String editableLocation,
+            @Value("${orbisops.skills.editable-auto-init:true}") boolean editableAutoInit) {
         return OpsSkillToolSettings.fromRaw(
                 enabled,
                 locations,

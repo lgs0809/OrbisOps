@@ -2,428 +2,92 @@
 
 # OrbisOps
 
-### Governed Agentic Operations Platform
+**Governed Agentic Operations Platform**
 
-**Investigate freely. Change deliberately.**
+Investigate → Automate → Approve → Land → Verify
 
-OrbisOps is an open-source operations Agent platform that separates **reasoning authority** from **production authority**.
-It combines ReAct, durable workflows, MCP, Skills, RAG, memory, evidence, and controlled change into one governed runtime.
-
-<p>
-  <img alt="Java 17" src="https://img.shields.io/badge/Java-17-ED8B00?logo=openjdk&logoColor=white">
-  <img alt="Spring Boot 3.4" src="https://img.shields.io/badge/Spring%20Boot-3.4-6DB33F?logo=springboot&logoColor=white">
-  <img alt="React 18" src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=111111">
-  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white">
-  <img alt="Architecture" src="https://img.shields.io/badge/Architecture-DDD%20%2B%20Hexagonal-6f42c1">
-  <img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-blue.svg">
-</p>
-
-<img alt="OrbisOps operations dashboard" src="./docs/assets/orbisops-dashboard.png" width="100%">
-
-<sub>Real OrbisOps UI captured in Chrome with deterministic demo data.</sub>
+[![GitHub Actions](https://img.shields.io/badge/-E9F3FF?style=flat-square&logo=githubactions&logoColor=2088FF)](https://github.com/lgs0809/OrbisOps/actions/workflows/server-ci.yml)[![Server CI](https://img.shields.io/github/actions/workflow/status/lgs0809/OrbisOps/server-ci.yml?branch=main&style=flat-square&label=Server%20CI&labelColor=2D333B)](https://github.com/lgs0809/OrbisOps/actions/workflows/server-ci.yml) [![GitHub Actions](https://img.shields.io/badge/-E9F3FF?style=flat-square&logo=githubactions&logoColor=2088FF)](https://github.com/lgs0809/OrbisOps/actions/workflows/web-ci.yml)[![Web CI](https://img.shields.io/github/actions/workflow/status/lgs0809/OrbisOps/web-ci.yml?branch=main&style=flat-square&label=Web%20CI&labelColor=2D333B)](https://github.com/lgs0809/OrbisOps/actions/workflows/web-ci.yml)
+[![GitHub](https://img.shields.io/badge/-E8E8E8?style=flat-square&logo=github&logoColor=181717)](https://github.com/lgs0809/OrbisOps/tags)[![Release](https://img.shields.io/github/v/tag/lgs0809/OrbisOps?sort=semver&style=flat-square&label=release&color=5F70E1&labelColor=2D333B)](https://github.com/lgs0809/OrbisOps/tags)
+![OpenJDK](https://img.shields.io/badge/-FDF3E6?style=flat-square&logo=openjdk&logoColor=ED8B00)![Java 17](https://img.shields.io/badge/Java-17-ED8B00?style=flat-square&labelColor=2D333B)
+![Spring Boot](https://img.shields.io/badge/-F0F7EC?style=flat-square&logo=springboot&logoColor=6DB33F)![Spring Boot 3.4](https://img.shields.io/badge/Spring%20Boot-3.4-6DB33F?style=flat-square&labelColor=2D333B)
+![React](https://img.shields.io/badge/-EAFBFF?style=flat-square&logo=react&logoColor=61DAFB)![React 18](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&labelColor=2D333B)
+![PostgreSQL](https://img.shields.io/badge/-ECF0FC?style=flat-square&logo=postgresql&logoColor=4169E1)![PostgreSQL + pgvector](https://img.shields.io/badge/PostgreSQL-pgvector-4169E1?style=flat-square&labelColor=2D333B)
+[![Apache](https://img.shields.io/badge/-FBE9EA?style=flat-square&logo=apache&logoColor=D22128)![License](https://img.shields.io/badge/License-Apache--2.0-D22128?style=flat-square&labelColor=2D333B)](LICENSE)
 
 </div>
 
----
+OrbisOps brings investigation, automation, workflows, MCP tools, knowledge retrieval, and controlled production changes into one operations workspace.
 
-## Why OrbisOps?
+It uses a ReAct Agent for open-ended diagnosis and versioned Workflows for repeatable procedures, while keeping production authority outside model reasoning.
 
-Most Agent systems optimize for a single loop:
+## Quick Start
 
-```text
-reason → call tool → observe → reason → call tool → ...
+Requirements: **Docker + Docker Compose v2**.
+
+```bash
+git clone <your-orbisops-repository-url>
+cd orbisops
+cp deploy/orbisops.env.example deploy/orbisops.env
 ```
 
-That is useful for exploration, but dangerous as a production authority model.
+Edit `deploy/orbisops.env` and replace the infrastructure and authentication placeholders required by the deployment preflight, especially the MySQL, PostgreSQL, Redis, and administrator JWT secrets. Model-provider credentials can be configured later.
 
-OrbisOps treats operations as a governed lifecycle instead:
+Start OrbisOps:
 
-```text
-Observe → Investigate → Prepare → Approve → Land → Verify / Recover
+```bash
+make up
 ```
 
-An Agent may discover evidence, reason about a failure, run read-only tools, and prepare a change — but it **cannot grant itself production-write authority**. Production mutation is executed by a separate trusted Landing runtime against an approved, immutable `ChangePackage`.
+Open the web console at `http://localhost:3002`. On a fresh installation, OrbisOps shows the first-time setup flow in the browser; create the first administrator there and you will be signed in automatically.
 
-That separation is the core design principle of OrbisOps.
+The backend API is available at `http://localhost:8099` by default. Both ports can be changed in `deploy/orbisops.env`.
 
-## What you get
+For unattended or automated deployments, OrbisOps also supports optional headless administrator bootstrap through the `ORBISOPS_BOOTSTRAP_ADMIN_*` variables. It is disabled by default and is not required for normal installation.
 
-| Capability | OrbisOps model |
-|---|---|
-| Open-ended diagnosis | Project-scoped default **ReAct Agent** |
-| Repeatable SOPs | Versioned **Workflow** with `DIRECT`, `LLM`, and `REACT` execution |
-| Tool connectivity | MCP, local tools, code, Skills, RAG, memory, channels, schedules |
-| Tool exposure | Project + Agent + runtime-authority scoped |
-| Long-running execution | Durable Work Sessions, checkpoints, retries, recovery and idempotency |
-| Production changes | `ChangePackage → Approval → Landing → Verification / Rollback` |
-| Trust | Evidence, Tool Results, Trusted Proofs, audit facts and immutable run snapshots |
-| Extensibility | Agent capability binding instead of proliferating special workflow node types |
+Stop the stack with:
 
-<details>
-<summary><strong>Quick UI tour</strong></summary>
-<br>
-<img alt="OrbisOps command palette demo" src="./docs/assets/orbisops-demo.gif" width="960">
-</details>
-
-## Two execution models, one runtime
-
-OrbisOps deliberately does **not** force every task into a fixed graph, and it does not make every task an unconstrained Agent loop.
-
-### 1. ReAct for open-ended work
-
-Use the project default ReAct Agent when the correct investigation path is not known in advance:
-
-- incident diagnosis;
-- exploratory production analysis;
-- multi-source investigation;
-- ad-hoc operational questions;
-- change preparation whose exact steps depend on discovered evidence.
-
-### 2. Workflow for repeatable operations
-
-Use a published Workflow when humans already know the macro SOP:
-
-- scheduled inspection;
-- release/preflight checks;
-- alert-specific diagnosis;
-- standard remediation preparation;
-- repeatable multi-step operational procedures.
-
-A Workflow is a versioned graph. Its Agent nodes may execute in:
-
-- `DIRECT` — deterministic application/tool action;
-- `LLM` — one bounded model call;
-- `REACT` — an Agent loop with bounded autonomy.
-
-MCP, Skills, RAG, code access, memory, and tools are **capabilities bound to an Agent node**. They are not modeled as a growing list of unrelated workflow node types.
-
-## Runtime at a glance
-
-```mermaid
-flowchart TD
-    E[Chat / Alert / Schedule / Channel / API] --> P{Execution Binding}
-
-    P -->|REACT| R[Project Default ReAct Agent]
-    P -->|WORKFLOW| W[Published Workflow]
-
-    W --> N[Agent Node]
-    N --> D[DIRECT]
-    N --> L[LLM]
-    N --> A[REACT]
-
-    R --> C[Bound Capabilities]
-    D --> C
-    L --> C
-    A --> C
-
-    C --> MCP[MCP]
-    C --> SK[Skills]
-    C --> RAG[RAG]
-    C --> MEM[Memory]
-    C --> CODE[Code / Controlled Tools]
-
-    MCP --> EV[Evidence & Tool Results]
-    SK --> EV
-    RAG --> EV
-    MEM --> EV
-    CODE --> EV
-
-    EV --> OUT[Report / Outcome]
-    EV --> CP[Optional ChangePackage]
-
-    CP --> AP[Human / Policy Approval]
-    AP --> LAND[Trusted Landing Runtime]
-    LAND --> VERIFY[Verification / Rollback / Recovery]
+```bash
+make down
 ```
 
-## Production authority is a separate boundary
+## What You Get
 
-OrbisOps uses three runtime authority levels:
+- **ReAct Agent** — open-ended investigation, diagnosis, tool use, and evidence collection.
+- **Visual Workflows** — versioned, repeatable procedures with a stable macro flow and optional Agent-powered steps.
+- **Tools & MCP** — project-scoped tools, MCP resources, capability boundaries, and progressive disclosure.
+- **Knowledge & Memory** — RAG, optional reranking and multimodal retrieval, conversation context, and semantic memory.
+- **Automation & Channels** — scheduled inspections, alert-driven execution, and messaging integrations.
+- **Governed Changes** — `ChangePackage → Approval → Landing → Verification` instead of unrestricted production mutation.
 
-| Authority | Purpose | Direct governed production mutation |
-|---|---|---|
-| `OBSERVE_ONLY` | investigation, inspection, reporting | No |
-| `PREPARE_CHANGE` | isolated repair, validation, build/test, ChangePackage preparation | No |
-| `PROD_FULL` | approved trusted Landing runtime | Yes, within Landing controls |
+## Model Providers
 
-The normal ReAct runtime and Workflow runtime cannot silently escalate from investigation to `PROD_FULL`.
+OrbisOps does not bundle or start an LLM, embedding model, or reranker. Connect the services you operate or obtain from a provider after the control plane is running.
 
-```mermaid
-sequenceDiagram
-    participant Agent as Investigation / Workflow Agent
-    participant CP as ChangePackage
-    participant Approval as Approval Boundary
-    participant Landing as Trusted Landing Runtime
-    participant Target as Production Target
-    participant Evidence as Evidence / Audit
-
-    Agent->>CP: Prepare immutable change proposal + proof
-    CP->>Approval: Request approval
-    Approval-->>CP: Approved version / hash
-    CP->>Landing: Authorized landing context
-    Landing->>Target: Execute approved operation
-    Target-->>Landing: Result
-    Landing->>Evidence: Record authoritative result
-    Landing->>Target: Verify / compensate if required
-```
-
-## Durable by design
-
-Operational work often outlives a browser tab, HTTP connection, process, or model call. OrbisOps persists the execution facts needed to recover safely:
-
-- Work Session and Run identity;
-- frozen Agent / Workflow version and hash;
-- runtime context bundle hash;
-- node attempts and route decisions;
-- loop counters;
-- completed tool-call checkpoints;
-- authority snapshots;
-- Tool Result / Evidence references;
-- Landing operation journal and recovery state.
-
-Recovery is therefore not “restart the prompt and hope for the same answer”. Completed side effects are tracked independently and idempotency/reconciliation rules are part of the execution model.
+Provider endpoints and model selections are managed in OrbisOps. Credentials are referenced from deployment environment variables or your secret-management system rather than stored as raw browser-entered API keys.
 
 ## Architecture
 
-OrbisOps is a modular monolith built with **DDD + Hexagonal Architecture**. Business ownership is defined by bounded contexts; Maven modules enforce macro layer direction; executable architecture tests enforce context boundaries inside those layers.
-
-```mermaid
-flowchart LR
-    API[HTTP / SSE / Scheduler / Channel] --> APP[Application Use Cases]
-    APP --> DOM[Domain Model & Policies]
-    APP --> PORTS[Application Ports]
-    ADAPTERS[Outbound Adapters] --> PORTS
-    ADAPTERS --> EXT[(MySQL / PostgreSQL / Redis / MCP / Model APIs / Git)]
-
-    subgraph Core
-      DOM
-      APP
-      PORTS
-    end
-
-    subgraph Outer Layers
-      API
-      ADAPTERS
-    end
-```
-
-### Backend modules
-
 ```text
-server/
-├── orbisops-types           shared stable value types / published language
-├── orbisops-domain          aggregates, value objects, domain policies
-├── orbisops-application     use cases, commands, queries, process managers, ports
-├── orbisops-infrastructure  persistence and outbound infrastructure adapters
-├── orbisops-api             transport DTOs and public response contracts
-├── orbisops-trigger         HTTP/SSE, scheduling, MCP/model/runtime adapters
-└── orbisops-app             Spring Boot composition root
+Chat / Alert / Schedule / Channel
+              │
+              ▼
+       ReAct Agent / Workflow
+              │
+              ▼
+      Tools · MCP · RAG · Memory
+              │
+       diagnose / propose change
+              │
+              ▼
+ChangePackage → Approval → Landing → Verification
 ```
 
-The dependency direction is intentionally one-way:
+ReAct handles tasks where the next step depends on what the Agent discovers. Workflows handle procedures whose macro structure should remain stable and reproducible. Production changes use the governed change path rather than giving the model unrestricted mutation authority.
 
-```text
-Domain  ←  Application  ←  Adapters / Trigger  ←  Composition Root
-```
+## Development
 
-`domain` and `application` are framework-independent: they do not depend on Spring, HTTP DTOs, MyBatis/JDBC implementations, MCP SDK objects, or JSON framework types.
-
-### Bounded contexts
-
-The current strategic Context Map contains four core operational contexts and supporting contexts around them:
-
-```text
-Core
-├── Work Session & Investigation
-├── Controlled Change
-├── Execution Governance
-└── Evidence & Trust
-
-Supporting
-├── Project Workspace
-├── Agent Definition & Capability
-├── Knowledge & RAG
-├── Skill Lifecycle
-├── Memory
-├── Channel
-├── Alert & Incident
-└── Code Repair
-
-Generic
-├── Security Identity
-├── Model Policy
-├── Statistics / Read Models
-└── Canonical JSON / Hashing
-```
-
-Cross-context dependencies are checked by executable architecture tests rather than documentation alone. See [`server/docs/architecture/strategic-ddd-context-map.md`](server/docs/architecture/strategic-ddd-context-map.md).
-
-## Repository layout
-
-```text
-orbisops/
-├── server/                  Java backend + bundled MCP adapters + DB migrations
-├── web/                     React operator console
-├── .github/workflows/       server and web CI
-├── Makefile                 repository-level build / verification entry points
-├── LICENSE
-└── README.md
-```
-
-## Quick start
-
-### Prerequisites
-
-- JDK 17
-- Maven 3.9+
-- Node.js 20+
-- Docker / Docker Compose
-- MySQL client for the migration runner
-- an OpenAI-compatible model endpoint for real Agent execution
-
-### 1. Verify the repository
-
-From the repository root:
-
-```bash
-make verify
-```
-
-This runs backend release hygiene + Maven tests and the frontend hygiene + typecheck + Vitest + production build pipeline.
-
-For a release candidate, also run the browser product acceptance gate:
-
-```bash
-make acceptance
-```
-
-`make acceptance` runs `make verify` first, then the full Playwright Chrome E2E suite across the governed product paths and responsive breakpoints.
-
-### 2. Configure local dependencies
-
-The backend includes a dependency-only Compose stack for MySQL, PostgreSQL/pgvector, and Redis. No default production credential is embedded in the repository.
-
-```bash
-cp server/config/orbisops.env.example server/.env
-```
-
-Edit `server/.env` before sourcing it. Replace every `[REDACTED_SECRET]` placeholder. On the very first start, also set `ORBISOPS_BOOTSTRAP_ADMIN_ENABLED=true` and provide `ORBISOPS_BOOTSTRAP_ADMIN_USERNAME` / `ORBISOPS_BOOTSTRAP_ADMIN_PASSWORD`; after the administrator has been created, set the flag back to `false` before the next restart.
-
-Load the variables into your shell and start dependencies:
-
-```bash
-set -a
-source server/.env
-set +a
-
-(cd server && docker compose up -d)
-```
-
-### 3. Apply database migrations
-
-The migration runner verifies SHA-256 checksums before applying every migration. Configure a local MySQL client defaults file as described in the server guide, then run:
-
-```bash
-(cd server && MYSQL_DEFAULTS_FILE="$HOME/.config/orbisops/mysql.cnf" bash ./scripts/db-migrate.sh)
-```
-
-### 4. Run the backend
-
-```bash
-(cd server && mvn -pl orbisops-app -am spring-boot:run)
-```
-
-The default HTTP port is `8099` and can be overridden with `SERVER_PORT`.
-
-### 5. Run the web console
-
-```bash
-cd web
-npm ci
-npm run dev
-```
-
-The web console reads the backend endpoint from its build/runtime environment; the default development target is `http://127.0.0.1:8099`.
-
-For the complete secure bootstrap flow, first-admin setup, production settings, migration rules, and MCP onboarding, see [`server/README.md`](server/README.md).
-
-## Built-in MCP adapters
-
-OrbisOps ships generic local MCP server implementations for common operational resources, including:
-
-- MySQL and PostgreSQL read-only access;
-- Redis and RabbitMQ inspection;
-- Prometheus and Elasticsearch;
-- OpenAPI catalogs;
-- Git / code workspace access;
-- controlled service actions;
-- controlled alert-threshold updates.
-
-MCP registration does not automatically make a tool executable. Discovery, authoritative schema hydration, governance policy, project/Agent binding, runtime authority, and audit state remain separate concerns.
-
-## Skills, RAG and Memory
-
-OrbisOps treats these as runtime capabilities with their own lifecycle instead of prompt text pasted into every request.
-
-**Skills** support versioned packages, routing, progressive loading, evaluation, canary/rollback state, runtime usage signals, and governed self-evolution.
-
-**RAG** supports ingestion, lexical/vector retrieval, reranking, multimodal processing, quality evaluation, and project-scoped knowledge authorization.
-
-**Memory** separates conversation/context memory from governed and semantic memory so runtime context can be selected and audited instead of becoming an unbounded transcript dump.
-
-## Security model
-
-OrbisOps defaults to fail-closed behavior:
-
-- no built-in administrator account;
-- no default password;
-- no fallback JWT signing secret;
-- no default model API key;
-- explicit first-admin bootstrap only;
-- credential references instead of secret propagation through Agent metadata;
-- project-scoped resource and capability authorization;
-- runtime authority separated from model reasoning;
-- production mutation isolated behind approved Landing;
-- redaction and transport filtering for sensitive tool/MCP data;
-- append-oriented Evidence / Tool Result / Trusted Proof records;
-- release-hygiene checks for private paths, legacy project markers, and secret-like literals.
-
-## Quality gates
-
-The repository currently carries a large executable architecture and behavior suite:
-
-- **4,000+ backend tests** covering domain policy, application use cases, runtime behavior, architecture boundaries, persistence, Testcontainers and MCP integration;
-- **118 frontend Vitest tests** plus TypeScript checking and production compilation;
-- **36 Chrome Playwright acceptance scenarios**, including 390px mobile, 820px tablet, and desktop coverage;
-- architecture gates for DDD layer direction, bounded-context imports, cross-context application coupling, runtime authority, workflow/tool boundaries and retired compatibility paths;
-- migration checksum verification;
-- backend and frontend release-hygiene scanners;
-- GitHub Actions for server and web verification.
-
-Useful commands:
-
-```bash
-make verify          # backend + frontend verification
-make acceptance      # verify + full Chrome product acceptance
-make build           # production build
-make test-server     # backend test suite
-make clean
-```
-
-## Design documents
-
-- [Strategic DDD Context Map](server/docs/architecture/strategic-ddd-context-map.md)
-- [DDD convergence status](server/docs/architecture/ddd-convergence-status.md)
-- [Unified tool binding and invocation ADR](server/docs/architecture/adr/ADR-unified-tool-definition-binding-and-invocation.md)
-- [Unified governed ReAct runtime ADR](server/docs/architecture/adr/ADR-intent-governed-unified-react-runtime.md)
-- [Backend architecture and operator guide](server/README.md)
-- [Web console guide](web/README.md)
-- [Operator runbooks](server/docs/runbook/)
-
-## Project status
-
-OrbisOps is an actively evolving open-source codebase. The repository is designed to be independently buildable and testable; production deployment still requires operators to supply their own infrastructure, model endpoints, credentials, access policies, and environment-specific acceptance gates.
+Run the repository checks with `make verify`. Backend and frontend development notes are in [`server/README.md`](server/README.md) and [`web/README.md`](web/README.md).
 
 ## License
 
-Licensed under the [Apache License 2.0](LICENSE).
+Apache License 2.0. See [`LICENSE`](LICENSE).

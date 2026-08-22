@@ -21,6 +21,25 @@ const phase3Types = [
 ];
 
 test('Phase 3 Channel setup exposes only implemented Telegram, Discord, and QQ transports', async ({ page }) => {
+  const consoleErrors: string[] = [];
+  const pageErrors: string[] = [];
+  const failedResponses: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() !== 'error') return;
+    const text = message.text();
+    const knownThirdPartyDevWarning = text.includes('findDOMNode is deprecated')
+      && text.includes('ReactResizeObserver');
+    if (!knownThirdPartyDevWarning && !text.includes('ResizeObserver loop completed with undelivered notifications')) {
+      consoleErrors.push(text);
+    }
+  });
+  page.on('pageerror', (error) => {
+    if (!error.message.includes('ResizeObserver loop completed with undelivered notifications')) pageErrors.push(error.message);
+  });
+  page.on('response', (response) => {
+    if (response.status() >= 400) failedResponses.push(`${response.status()} ${response.url()}`);
+  });
+
   await page.addInitScript(() => {
     localStorage.setItem('token', 'x');
     localStorage.setItem('isLoggedIn', 'true');
@@ -49,29 +68,33 @@ test('Phase 3 Channel setup exposes only implemented Telegram, Discord, and QQ t
   });
 
   await page.goto('/platform/integrations?projectId=demo-project');
-  await page.getByRole('button', { name: '新建 Channel' }).click();
+  const providerGrid = page.getByTestId('channel-provider-cards');
+  const connectButtons = providerGrid.getByRole('button', { name: '接入' });
 
-  const modal = page.locator('.semi-modal').filter({ hasText: 'Connect' });
-  const providerSelect = modal.getByRole('combobox').first();
-
-  await providerSelect.click();
-  await page.getByRole('option', { name: 'Telegram' }).click();
+  await connectButtons.nth(0).click();
+  let modal = page.locator('.semi-modal').filter({ hasText: '接入渠道' });
+  await expect(modal).toContainText('Telegram');
   await expect(modal.getByPlaceholder('@orbisops_bot')).toBeVisible();
-  await expect(modal).toContainText('Bot API long polling');
-  await expect(modal).toContainText('Inline Keyboard');
+  await expect(modal).toContainText('LONG_CONNECTION');
+  await expect(modal).toContainText('群聊中必须 @Bot 才响应');
+  await modal.getByRole('button', { name: 'cancel' }).click();
 
-  await providerSelect.click();
-  await page.getByRole('option', { name: 'Discord' }).click();
-  await expect(modal.getByPlaceholder('@orbisops_bot')).toHaveCount(0);
-  await expect(modal).toContainText('Gateway v10 WebSocket');
-  await expect(modal).toContainText('MESSAGE_CONTENT privileged intent');
-  await expect(modal).toContainText('Button component');
+  await connectButtons.nth(1).click();
+  modal = page.locator('.semi-modal').filter({ hasText: '接入渠道' });
+  await expect(modal).toContainText('Discord');
+  await expect(modal.getByPlaceholder('@orbisops_bot')).toBeVisible();
+  await expect(modal).toContainText('已启用 Message Content Intent');
+  await modal.getByRole('button', { name: 'cancel' }).click();
 
-  await providerSelect.click();
-  await page.getByRole('option', { name: 'QQ' }).click();
-  await expect(modal.getByPlaceholder('1020...')).toBeVisible();
-  await expect(modal).toContainText('QQ Gateway WebSocket');
-  await expect(modal).toContainText('暂不宣称 QQ Guild、附件或原消息更新');
+  await connectButtons.nth(2).click();
+  modal = page.locator('.semi-modal').filter({ hasText: '接入渠道' });
+  await expect(modal).toContainText('QQ');
+  await expect(modal).toContainText('App / Client ID');
+  await expect(modal).toContainText('凭据环境变量');
+
+  expect(consoleErrors).toEqual([]);
+  expect(pageErrors).toEqual([]);
+  expect(failedResponses).toEqual([]);
 });
 
 test('Channel detail queries stay on demand and isolate message limits', async ({ page }) => {
@@ -125,12 +148,12 @@ test('Channel detail queries stay on demand and isolate message limits', async (
   expect(messageLimits).toEqual([]);
   expect(identityRequests).toBe(0);
 
-  await row.getByRole('button', { name: '消息' }).click();
+  await row.getByRole('button', { name: '查看' }).click();
+  await page.getByRole('tab', { name: '消息' }).click();
   await expect.poll(() => messageLimits).toEqual([100]);
   expect(identityRequests).toBe(0);
 
-  await page.keyboard.press('Escape');
-  await row.getByRole('button', { name: '身份' }).click();
+  await page.getByRole('tab', { name: '身份与访问控制' }).click();
   await expect.poll(() => messageLimits).toEqual([100, 200]);
   await expect.poll(() => identityRequests).toBe(1);
 });

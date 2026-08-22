@@ -10,7 +10,7 @@ public class OpsSkillSimilarityConfiguration {
 
     @Bean
     public OpsSkillSimilaritySettings opsSkillSimilaritySettings(
-            @Value("${ops.skill-evolution.similarity-threshold:0.72}") double threshold) {
+            @Value("${orbisops.skill-evolution.similarity-threshold:0.72}") double threshold) {
         return new OpsSkillSimilaritySettings(threshold);
     }
 }

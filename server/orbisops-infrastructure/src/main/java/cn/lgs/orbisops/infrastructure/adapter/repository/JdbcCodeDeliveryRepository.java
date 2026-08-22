@@ -28,7 +28,7 @@ public class JdbcCodeDeliveryRepository implements ICodeDeliveryRepository {
     @org.springframework.beans.factory.annotation.Autowired
     public JdbcCodeDeliveryRepository(
             @Qualifier("mysqlJdbcTemplate") ObjectProvider<JdbcTemplate> jdbcProvider,
-            @Value("${ops.repair.jdbc-enabled:true}") boolean jdbcEnabled) {
+            @Value("${orbisops.repair.jdbc-enabled:true}") boolean jdbcEnabled) {
         this.jdbc = jdbcProvider.getIfAvailable();
         this.jdbcEnabled = jdbcEnabled;
     }

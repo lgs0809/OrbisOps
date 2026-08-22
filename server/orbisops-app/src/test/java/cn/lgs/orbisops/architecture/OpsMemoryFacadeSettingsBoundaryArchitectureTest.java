@@ -38,9 +38,9 @@ class OpsMemoryFacadeSettingsBoundaryArchitectureTest {
                 () -> assertTrue(facade.lines().count() <= 125),
                 () -> assertTrue(settings.contains("public record OpsMemoryFacadeSettings(")),
                 () -> assertTrue(settings.contains("captureBufferSize()")),
-                () -> assertTrue(configuration.contains("ops.chat.memory.enabled")),
-                () -> assertTrue(configuration.contains("ops.chat.memory.semantic-top-k")),
-                () -> assertTrue(configuration.contains("ops.chat.memory.recency-half-life-turns")),
+                () -> assertTrue(configuration.contains("orbisops.chat.memory.enabled")),
+                () -> assertTrue(configuration.contains("orbisops.chat.memory.semantic-top-k")),
+                () -> assertTrue(configuration.contains("orbisops.chat.memory.recency-half-life-turns")),
                 () -> assertTrue(configuration.contains("OpsSemanticMemoryRetrievalSettings.from(settings)")));
     }
 

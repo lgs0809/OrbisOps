@@ -101,8 +101,8 @@ public final class DefaultModelApiBootstrapUseCase {
         String normalized = value.trim().toLowerCase(Locale.ROOT);
         return normalized.contains("replace_with")
                 || normalized.contains("placeholder")
-                || normalized.equals("sk-xxxx")
-                || normalized.equals("sk-test");
+                || normalized.equals("test-api-key")
+                || normalized.equals("example-api-key");
     }
 
     private String trimTrailingSlash(String value) {

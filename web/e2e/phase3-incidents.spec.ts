@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 const response = (data: unknown) => JSON.stringify({ code: '0000', info: 'success', data });
 
-test('Incident Center loads list first and detail/member data only after opening an incident', async ({ page }) => {
+test('legacy Incident Center route converges on Workbench without reviving a separate Incident page', async ({ page }) => {
   await page.addInitScript(() => {
     const sessionKey = ['to', 'ken'].join('');
     localStorage.setItem(sessionKey, 'x');
@@ -91,23 +91,11 @@ test('Incident Center loads list first and detail/member data only after opening
   });
 
   await page.goto('/incidents?projectId=demo-project');
-  await expect(page.getByRole('heading', { name: '事件中心' })).toBeVisible();
-  const row = page.getByRole('row').filter({ hasText: 'Checkout error rate elevated' });
-  await expect(row).toBeVisible();
+  await expect(page).toHaveURL(/\/workbench\?projectId=demo-project$/);
+  await expect(page.getByRole('heading', { name: '工作台' })).toBeVisible();
   await expect.poll(() => projectRequests).toBe(1);
-  await expect.poll(() => incidentRequests).toBe(1);
+  expect(incidentRequests).toBe(0);
   expect(detailRequests).toBe(0);
   expect(memberRequests).toBe(0);
-
-  await row.getByRole('button', { name: '查看' }).click();
-  await expect.poll(() => detailRequests).toBe(1);
-  await expect.poll(() => memberRequests).toBe(1);
-  await expect(page.getByRole('heading', { name: 'Checkout error rate elevated' })).toBeVisible();
-  await expect(page).toHaveURL(/incidentId=incident-1/);
-  await expect(page.getByText('Elevated 5xx responses confirmed on checkout.')).toBeVisible();
-
-  await page.getByRole('button', { name: '刷新' }).click();
-  await expect.poll(() => projectRequests).toBe(2);
-  await expect.poll(() => incidentRequests).toBe(2);
-  expect(detailRequests).toBe(1);
+  await expect(page.getByText('Checkout error rate elevated', { exact: true })).toHaveCount(0);
 });

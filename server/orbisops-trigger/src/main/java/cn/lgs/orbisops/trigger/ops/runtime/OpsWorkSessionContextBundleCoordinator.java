@@ -49,14 +49,16 @@ final class OpsWorkSessionContextBundleCoordinator {
             boolean pinnedResume = request != null
                     && request.getMetadata() != null
                     && Boolean.TRUE.equals(request.getMetadata().get("resumeContextBundlePinned"));
-            Map<String, Object> bundle = pinnedResume
-                    ? runtimeContextBundleService.requireBundle(
-                            value(String.valueOf(request.getMetadata().get("contextBundleId"))),
-                            value(String.valueOf(request.getMetadata().get("contextBundleHash"))))
-                    : runtimeContextBundleService.createBundle(
-                            request,
-                            memoryContext,
-                            metadata == null ? Map.of() : metadata);
+            Map<String, Object> safeMetadata = metadata == null ? Map.of() : metadata;
+            Map<String, Object> bundle;
+            if (pinnedResume) {
+                bundle = runtimeContextBundleService.requireBundle(
+                        value(String.valueOf(request.getMetadata().get("contextBundleId"))),
+                        value(String.valueOf(request.getMetadata().get("contextBundleHash"))));
+            } else {
+                bundle = runtimeContextBundleService.createBundle(
+                        request, memoryContext, safeMetadata);
+            }
             request.getMetadata().put("_runtimeContextBundle", bundle);
             BUNDLE_FIELDS.forEach(key -> request.getMetadata().put(key, bundle.get(key)));
             record(events, eventSink, OpsRuntimeEvent.builder()

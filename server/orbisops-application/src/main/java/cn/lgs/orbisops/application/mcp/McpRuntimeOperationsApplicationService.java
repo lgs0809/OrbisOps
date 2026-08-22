@@ -76,8 +76,7 @@ public final class McpRuntimeOperationsApplicationService implements McpRuntimeO
                 required.authoritativeDefinition()));
         McpToolPolicyProjection policy = schema.policy();
         if (policy.status() != cn.lgs.orbisops.domain.mcp.model.McpToolPolicyStatus.ACTIVE
-                || policy.reviewStatus()
-                != cn.lgs.orbisops.domain.mcp.model.McpToolPolicyReviewStatus.HUMAN_REVIEWED) {
+                || !reviewedForExecution(policy.reviewStatus())) {
             throw new SecurityException("MCP_POLICY_NOT_ACTIVE：未审核工具不能激活");
         }
         boolean trustedLanding = required.trustedLandingRuntime()
@@ -237,6 +236,11 @@ public final class McpRuntimeOperationsApplicationService implements McpRuntimeO
         } catch (RuntimeException ignored) {
             return McpRuntimeToolSnapshot.fallback(toolId);
         }
+    }
+
+    private boolean reviewedForExecution(cn.lgs.orbisops.domain.mcp.model.McpToolPolicyReviewStatus status) {
+        return status == cn.lgs.orbisops.domain.mcp.model.McpToolPolicyReviewStatus.HUMAN_REVIEWED
+                || status == cn.lgs.orbisops.domain.mcp.model.McpToolPolicyReviewStatus.SYSTEM_VERIFIED;
     }
 
     private IMcpRuntimeCatalogRepository runtimeStore() {

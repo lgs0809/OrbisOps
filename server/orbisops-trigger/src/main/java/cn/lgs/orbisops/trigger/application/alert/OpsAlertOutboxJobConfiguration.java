@@ -10,8 +10,8 @@ public class OpsAlertOutboxJobConfiguration {
 
     @Bean
     public OpsAlertOutboxJobSettings opsAlertOutboxJobSettings(
-            @Value("${ops.alert-triggers.outbox.enabled:true}") boolean enabled,
-            @Value("${ops.alert-triggers.outbox.batch-size:20}") int batchSize) {
+            @Value("${orbisops.alert-triggers.outbox.enabled:true}") boolean enabled,
+            @Value("${orbisops.alert-triggers.outbox.batch-size:20}") int batchSize) {
         return new OpsAlertOutboxJobSettings(enabled, batchSize);
     }
 }

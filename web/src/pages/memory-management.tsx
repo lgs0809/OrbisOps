@@ -19,6 +19,7 @@ import {
   useSaveContextMemoryMutation,
 } from '../features/memory/api/memory-queries';
 import { theme } from '../styles/theme';
+import { userFacingError } from '../utils/user-facing-error';
 
 const { Option } = Select;
 const { Text } = Typography;
@@ -116,7 +117,7 @@ export const MemoryManagementPage: React.FC = () => {
       Toast.success(editing ? '记忆已更新' : '记忆已创建');
       setFormVisible(false);
     } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '保存记忆失败');
+      Toast.error(userFacingError(error, '保存记忆失败，请稍后重试。'));
     }
   };
 
@@ -125,7 +126,7 @@ export const MemoryManagementPage: React.FC = () => {
       await archiveMemoryMutation.mutateAsync(asText(record.memoryId || record.memory_id));
       Toast.success('记忆已归档');
     } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '归档记忆失败');
+      Toast.error(userFacingError(error, '归档记忆失败，请稍后重试。'));
     }
   };
 
@@ -191,14 +192,14 @@ export const MemoryManagementPage: React.FC = () => {
     <OpsPageShell selectedKey="memory-management">
       <OpsPageHeader
         title="记忆管理"
-        description="Memory 只保存用户和项目上下文，不保存排障 SOP、硬策略或工具执行细节。运维方法进入 Skill，正式知识进入 RAG，执行过程进入 Trace。"
+        description="管理可长期复用的用户偏好和 Project 上下文。排障方法、正式知识和执行记录分别由对应能力管理。"
         primaryAction={<Button theme="solid" icon={<IconPlus />} onClick={openCreate}>新增记忆</Button>}
         extra={<Button icon={<IconRefresh />} loading={memoriesQuery.isFetching} onClick={() => memoriesQuery.refetch()}>刷新</Button>}
       />
 
       <OpsResponsiveGrid $min="220px">
         <OpsSectionCard title="Task Context">
-          <Text type="tertiary">当前对话任务的目标、已知事实、待办动作由后端自动记录，可从对话详情或执行包详情进入查看。</Text>
+          <Text type="tertiary">当前任务的目标、已知事实和待办动作会自动记录，可从对话或相关执行详情中查看。</Text>
           <Text type="tertiary">用于单次任务，不作为长期经验。</Text>
         </OpsSectionCard>
         <OpsSectionCard title="Context Memory">

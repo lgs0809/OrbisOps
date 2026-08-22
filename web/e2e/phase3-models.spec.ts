@@ -14,6 +14,8 @@ const authenticateAdmin = async (page: import('@playwright/test').Page) => {
   });
 };
 
+const ok = (data: unknown) => JSON.stringify({ code: '0000', info: 'success', data });
+
 test('Model catalog loads provider, models and default policy through one query boundary', async ({ page }) => {
   await authenticateAdmin(page);
 
@@ -54,15 +56,11 @@ test('Model catalog loads provider, models and default policy through one query 
       };
     }
 
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ code: '0000', info: 'success', data }),
-    });
+    await route.fulfill({ status: 200, contentType: 'application/json', body: ok(data) });
   });
 
-  await page.goto('/platform/models');
-  await expect(page.getByRole('heading', { name: '模型接入' })).toBeVisible();
+  await page.goto('/settings/models');
+  await expect(page.getByRole('heading', { name: '模型' })).toBeVisible();
   await expect(page.getByText('Primary Provider', { exact: true }).first()).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Chat Main' })).toBeVisible();
 
@@ -70,9 +68,47 @@ test('Model catalog loads provider, models and default policy through one query 
   expect(requestCounts.get('/api/v1/admin/ai-client-model/query-all')).toBe(1);
   expect(requestCounts.get('/api/v1/admin/model-default-policy')).toBe(1);
 
-  await page.getByRole('button', { name: /刷新/ }).click();
+  await page.getByRole('button', { name: '刷新' }).click();
 
   await expect.poll(() => requestCounts.get('/api/v1/admin/ai-client-api/query-all')).toBe(2);
   await expect.poll(() => requestCounts.get('/api/v1/admin/ai-client-model/query-all')).toBe(2);
   await expect.poll(() => requestCounts.get('/api/v1/admin/model-default-policy')).toBe(2);
+});
+
+test('Provider setup stores an environment reference instead of a browser-managed credential', async ({ page }) => {
+  await authenticateAdmin(page);
+
+  let referencePayload: Record<string, unknown> | null = null;
+  await page.route('http://127.0.0.1:8099/**', async (route) => {
+    const url = new URL(route.request().url());
+    const path = url.pathname;
+
+    if (path.endsWith('/admin/ai-client-api/query-all') || path.endsWith('/admin/ai-client-model/query-all')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: ok([]) });
+    }
+    if (path.endsWith('/admin/model-default-policy')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: ok({
+        defaultChatModelId: '', defaultEmbeddingModelId: '', defaultRerankModelId: '', defaultVisionModelId: '', status: 'ENABLED',
+      }) });
+    }
+    if (path.endsWith('/admin/ai-client-provider-references') && route.request().method() === 'POST') {
+      referencePayload = route.request().postDataJSON();
+      return route.fulfill({ status: 200, contentType: 'application/json', body: ok(true) });
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: ok([]) });
+  });
+
+  await page.goto('/settings/models');
+  await page.getByRole('button', { name: '新建 Provider', exact: true }).click();
+  const modal = page.locator('.semi-modal').filter({ hasText: '新建 Provider' });
+
+  await modal.getByRole('textbox', { name: 'Provider 名称' }).fill('Production OpenAI');
+  await modal.getByRole('textbox', { name: 'Base URL' }).fill('https://api.example.test');
+  await modal.getByRole('textbox', { name: '凭据环境变量' }).fill('OPENAI_API_KEY');
+  await modal.getByRole('button', { name: 'confirm' }).click();
+
+  await expect.poll(() => referencePayload).not.toBeNull();
+  expect(referencePayload?.credentialEnvironmentVariable).toBe('OPENAI_API_KEY');
+  expect(referencePayload).not.toHaveProperty('apiKey');
+  await expect(modal).toHaveCount(0);
 });

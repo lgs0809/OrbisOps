@@ -62,11 +62,10 @@ public class OpsMainQuestionRewriteService {
             String rewrittenQuestion,
             boolean changed,
             String reason,
-            List<String> resolvedReferences,
-            String actionClassification) {
+            List<String> resolvedReferences) {
 
         static RewriteResult unchanged(String query, String reason) {
-            return new RewriteResult(query, query, false, reason, List.of(), "");
+            return new RewriteResult(query, query, false, reason, List.of());
         }
     }
 }

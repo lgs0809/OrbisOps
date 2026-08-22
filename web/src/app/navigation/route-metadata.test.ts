@@ -18,28 +18,32 @@ describe('route metadata', () => {
     expect(new Set(allPaths).size).toBe(allPaths.length);
   });
 
-  it('maps legacy bookmarks to the new product information architecture', () => {
+  it('maps legacy bookmarks to the current product information architecture', () => {
     expect(canonicalPathFor('/dashboard')).toBe('/home');
-    expect(canonicalPathFor('/chat')).toBe('/work/diagnosis');
-    expect(canonicalPathFor('/executions')).toBe('/work/changes');
-    expect(canonicalPathFor('/channel-management')).toBe('/platform/integrations');
-    expect(canonicalPathFor('/memory-management')).toBe('/platform/advanced/memory');
+    expect(canonicalPathFor('/work/diagnosis')).toBe('/chat');
+    expect(canonicalPathFor('/executions')).toBe('/changes');
+    expect(canonicalPathFor('/channel-management')).toBe('/settings/channels');
+    expect(canonicalPathFor('/memory-management')).toBe('/settings/advanced/memory');
   });
 
-  it('derives role-visible navigation from the same route metadata', () => {
+  it('derives the eight first-level product entries from the same route metadata', () => {
     const userPaths = navigationRoutesForRole('user').map((route) => route.path);
     const adminPaths = navigationRoutesForRole('admin').map((route) => route.path);
 
-    expect(userPaths).toEqual(['/home', '/work/incidents', '/work/diagnosis', '/work/changes']);
-    expect(adminPaths).toContain('/automations/workflows');
-    expect(adminPaths).toContain('/projects');
-    expect(adminPaths).toContain('/platform');
-    expect(adminPaths).toContain('/platform/integrations');
-    expect(adminPaths).toContain('/platform/governance');
-    expect(adminPaths).toContain('/platform/advanced/memory');
+    expect(userPaths).toEqual(['/home', '/chat', '/workbench', '/changes']);
+    expect(adminPaths).toEqual([
+      '/home',
+      '/chat',
+      '/workbench',
+      '/workflows',
+      '/automations',
+      '/projects',
+      '/changes',
+      '/settings',
+    ]);
   });
 
-  it('groups platform settings instead of flattening every admin page', () => {
+  it('groups lower-frequency settings without flattening them into first-level navigation', () => {
     expect(PLATFORM_NAVIGATION_GROUPS.map((group) => group.key)).toEqual([
       'integrations',
       'intelligence',
@@ -53,13 +57,15 @@ describe('route metadata', () => {
     expect(subgroupOf('tools')).toBe('execution-governance');
     expect(subgroupOf('governance')).toBe('execution-governance');
     expect(subgroupOf('memory')).toBe('advanced');
+    expect(navigationRoutesForRole('admin').some((route) => route.id === 'channels')).toBe(false);
   });
 
   it('provides breadcrumb and page-title metadata without a second page map', () => {
-    expect(breadcrumbsForPath('/platform')).toEqual(['Platform']);
-    expect(breadcrumbsForPath('/platform/integrations')).toEqual(['Platform', 'Integrations / Channels']);
-    expect(breadcrumbsForPath('/channel-management')).toEqual(['Platform', 'Integrations / Channels']);
-    expect(pageTitleForPath('/platform')).toBe('Platform Settings · OrbisOps');
-    expect(pageTitleForPath('/work/incidents')).toBe('Incidents · OrbisOps');
+    expect(breadcrumbsForPath('/settings')).toEqual(['设置']);
+    expect(breadcrumbsForPath('/platform')).toEqual(['设置']);
+    expect(breadcrumbsForPath('/settings/channels')).toEqual(['设置', '渠道']);
+    expect(breadcrumbsForPath('/channel-management')).toEqual(['设置', '渠道']);
+    expect(pageTitleForPath('/settings')).toBe('设置 · OrbisOps');
+    expect(pageTitleForPath('/workbench/incidents')).toBe('工作台 · OrbisOps');
   });
 });

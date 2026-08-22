@@ -4,6 +4,7 @@ package cn.lgs.orbisops.application.schedule;
 public record TaskScheduleCommand(
         Long id,
         String projectId,
+        String executionType,
         String agentId,
         String agentBindingMode,
         Integer agentVersion,
@@ -52,7 +53,7 @@ public record TaskScheduleCommand(
             Boolean notifyChannel,
             String notificationChannelId,
             String notificationTarget) {
-        this(id, projectId, agentId, agentBindingMode, agentVersion, taskName, description,
+        this(id, projectId, null, agentId, agentBindingMode, agentVersion, taskName, description,
                 cronExpression, prompt, status, rangeMinutes, promWindow, includeRecentLogs,
                 maxRounds, subAgentMaxIterations, nodeTimeoutSeconds, maxEvidenceItems,
                 notifyChannel, notificationChannelId, notificationTarget,

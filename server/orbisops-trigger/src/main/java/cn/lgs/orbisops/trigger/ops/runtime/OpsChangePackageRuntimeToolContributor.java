@@ -52,7 +52,10 @@ public final class OpsChangePackageRuntimeToolContributor implements OpsRuntimeT
         Map<String, Object> requestMetadata = request == null || request.getMetadata() == null
                 ? Map.of()
                 : request.getMetadata();
-        if (!Boolean.TRUE.equals(requestMetadata.get(GOVERNANCE_PHASE_KEY))) {
+        boolean explicitGovernancePhase = Boolean.TRUE.equals(requestMetadata.get(GOVERNANCE_PHASE_KEY));
+        boolean reactPrepareAuthority = OpsRuntimeAgentAuthority.resolve(context)
+                == OpsRuntimeAgentAuthority.PREPARE_CHANGE;
+        if (!explicitGovernancePhase && !reactPrepareAuthority) {
             return;
         }
         OpsChangePackageToolProvider provider = providerSupplier.get();
@@ -126,9 +129,17 @@ public final class OpsChangePackageRuntimeToolContributor implements OpsRuntimeT
 
     private String sourceType(String toolName) {
         String name = toolName == null ? "" : toolName.trim().toLowerCase();
-        if (OpsDatasourceRuntimeToolProvider.PROMETHEUS_TOOL.equals(name)) return "PROMETHEUS";
-        if (OpsDatasourceRuntimeToolProvider.ELASTICSEARCH_TOOL.equals(name)) return "ELASTICSEARCH";
-        if (name.contains("mysql") && (name.contains("slow") || name.contains("sql"))) return "MYSQL_SLOW_SQL";
+        if (name.startsWith("mcp_tool_catalog_") || name.startsWith("enable_mcp_tool_")) return "";
+        if (OpsDatasourceRuntimeToolProvider.PROMETHEUS_TOOL.equals(name)
+                || name.contains("prometheus")) return "PROMETHEUS";
+        if (OpsDatasourceRuntimeToolProvider.ELASTICSEARCH_TOOL.equals(name)
+                || name.contains("elasticsearch")) return "ELASTICSEARCH";
+        if (name.contains("rabbitmq")) return "RABBITMQ";
+        if (name.contains("redis")) return "REDIS";
+        if (name.contains("mysql") && (name.contains("slow") || name.contains("digest"))) {
+            return "MYSQL_SLOW_SQL";
+        }
+        if (name.contains("mysql")) return "MYSQL";
         return "";
     }
 }

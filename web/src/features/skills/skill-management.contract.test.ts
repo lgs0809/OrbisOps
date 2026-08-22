@@ -2,20 +2,16 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-describe('Skill Management query boundary', () => {
-  it('keeps server state behind the skills Query API while retaining UI lifecycle effects', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/pages/skill-management.tsx'), 'utf8');
+describe('Skill Management canonical boundary', () => {
+  it('keeps the legacy module as a thin compatibility shim and server state behind Query hooks', () => {
+    const legacySource = readFileSync(resolve(process.cwd(), 'src/pages/skill-management.tsx'), 'utf8');
+    const source = readFileSync(resolve(process.cwd(), 'src/pages/skills.tsx'), 'utf8');
 
-    expect(source).not.toContain('opsAdminService');
+    expect(legacySource.trim()).toBe("export { SkillsPage as SkillManagementPage } from './skills';");
     expect(source).not.toContain('opsProjectService');
     expect(source).not.toContain('setSkills(');
-    expect(source).not.toContain('setDetail(');
-    expect(source).not.toContain('setUsageRecords(');
-    expect(source).not.toContain('setSkillVersions(');
-    expect(source).not.toContain('detailRequestSeq');
     expect(source).not.toContain('loadSkillDetail');
-    expect(source).not.toContain('const loadSkills');
-    expect(source).toContain('useSkillCatalogQuery(sessionReady)');
+    expect(source).toContain('useSkillCatalogQuery(true)');
     expect(source).toContain('useSkillDetailQuery');
     expect(source).toContain('useSkillContextQuery');
     expect(source).toContain('useSkillUsageQuery');

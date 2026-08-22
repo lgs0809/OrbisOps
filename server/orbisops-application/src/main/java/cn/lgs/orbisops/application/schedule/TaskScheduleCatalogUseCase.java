@@ -121,7 +121,11 @@ public final class TaskScheduleCatalogUseCase {
         String agentId = requireText(command.agentId(), "执行 Agent 不能为空");
         cronValidationPort.validate(cronExpression);
 
+        String executionType = executionType(command.executionType());
         String bindingMode = agentBindingMode(command.agentBindingMode());
+        if ("DEFAULT_REACT".equals(executionType)) {
+            bindingMode = "LATEST_PUBLISHED";
+        }
         Integer requestedVersion = "PINNED_VERSION".equals(bindingMode) ? command.agentVersion() : null;
         if ("PINNED_VERSION".equals(bindingMode)
                 && (requestedVersion == null || requestedVersion <= 0)) {
@@ -137,6 +141,7 @@ public final class TaskScheduleCatalogUseCase {
 
         TaskScheduleRuntimeConfiguration runtime = new TaskScheduleRuntimeConfiguration(
                 projectId,
+                executionType,
                 bindingMode,
                 snapshot.version(),
                 snapshot.definitionHash(),
@@ -205,6 +210,14 @@ public final class TaskScheduleCatalogUseCase {
             throw new IllegalArgumentException(message);
         }
         return value.trim();
+    }
+
+    private String executionType(String value) {
+        String type = hasText(value) ? value.trim().toUpperCase() : "WORKFLOW";
+        if (!List.of("DEFAULT_REACT", "WORKFLOW").contains(type)) {
+            throw new IllegalArgumentException("执行方式只允许 DEFAULT_REACT 或 WORKFLOW");
+        }
+        return type;
     }
 
     private String agentBindingMode(String value) {

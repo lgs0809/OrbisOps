@@ -14,11 +14,11 @@ public final class OpsRuntimeSkillSettings {
     private final int catalogSummaryMaxChars;
 
     public OpsRuntimeSkillSettings(
-            @Value("${ops.multi-agent.skill-context-enabled:true}") boolean contextEnabled,
-            @Value("${ops.multi-agent.skill-context-mode:lazy}") String contextMode,
-            @Value("${ops.multi-agent.skill-context-max-chars:12000}") int contextMaxChars,
-            @Value("${ops.skill-runtime.max-single-skill-chars:4000}") int maxSingleSkillChars,
-            @Value("${ops.skill-runtime.catalog-summary-max-chars:2500}") int catalogSummaryMaxChars) {
+            @Value("${orbisops.multi-agent.skill-context-enabled:true}") boolean contextEnabled,
+            @Value("${orbisops.multi-agent.skill-context-mode:lazy}") String contextMode,
+            @Value("${orbisops.multi-agent.skill-context-max-chars:12000}") int contextMaxChars,
+            @Value("${orbisops.skill-runtime.max-single-skill-chars:4000}") int maxSingleSkillChars,
+            @Value("${orbisops.skill-runtime.catalog-summary-max-chars:2500}") int catalogSummaryMaxChars) {
         this.contextEnabled = contextEnabled;
         this.contextMode = contextMode == null ? "lazy" : contextMode;
         this.contextMaxChars = contextMaxChars;

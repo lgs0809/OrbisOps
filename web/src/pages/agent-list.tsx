@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Layout,
   Table,
   Button,
   Input,
@@ -23,21 +22,17 @@ import {
 } from '@douyinfe/semi-icons';
 import styled from 'styled-components';
 import { theme } from '../styles/theme';
-import { Sidebar, Header, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from '../components/layout';
+import { OpsPageHeader, OpsPageShell } from '../components/ops-layout';
 import type { OpsAgentDefinition } from '../services/ops-admin-service';
 import {
   useAgentListQuery,
   useCloneAgentMutation,
   useDisableAgentMutation,
 } from '../features/agents/api/agent-list-queries';
-import { clearAuthSession } from '../services/auth-session';
 import { ProjectScopeBar } from '../components/project-scope-bar';
 import { useProjectScope } from '../hooks/use-project-scope';
 import { generatedId } from '../utils/generated-id';
-import { useResponsiveSidebar } from '../hooks/use-responsive-sidebar';
-
-const { Content } = Layout;
-const { Title } = Typography;
+import { userFacingError } from '../utils/user-facing-error';
 
 const displayAgentName = (agent: OpsAgentDefinition) => {
   return agent.name || agent.agentId;
@@ -46,57 +41,6 @@ const displayAgentName = (agent: OpsAgentDefinition) => {
 const displayAgentDescription = (agent: OpsAgentDefinition) => {
   return agent.description || '-';
 };
-
-// 样式组件
-const AgentListLayout = styled(Layout)`
-  min-height: 100vh;
-  background: ${theme.colors.bg.secondary};
-`;
-
-const MainContent = styled.div<{ $collapsed: boolean }>`
-  display: flex;
-  flex: 1;
-  width: ${(props) =>
-    props.$collapsed
-      ? `calc(100vw - ${SIDEBAR_COLLAPSED_WIDTH}px)`
-      : `calc(100vw - ${SIDEBAR_WIDTH}px)`};
-  margin-left: ${(props) => (props.$collapsed ? `${SIDEBAR_COLLAPSED_WIDTH}px` : `${SIDEBAR_WIDTH}px`)};
-  transition:
-    width ${theme.animation.duration.normal} ${theme.animation.easing.cubic},
-    margin-left ${theme.animation.duration.normal} ${theme.animation.easing.cubic};
-  min-width: 0;
-  overflow-x: hidden;
-
-  @media (max-width: ${theme.breakpoints.md}) {
-    width: 100vw;
-    margin-left: 0;
-  }
-`;
-
-const ContentArea = styled(Content)`
-  box-sizing: border-box;
-  flex: 1;
-  width: 100%;
-  max-width: 100%;
-  padding: ${theme.spacing.lg};
-  background: ${theme.colors.bg.secondary};
-  overflow-y: auto;
-  overflow-x: hidden;
-  min-width: 0;
-
-  @media (max-width: 720px) {
-    padding: ${theme.spacing.base};
-  }
-`;
-
-const PageHeader = styled.div`
-  box-sizing: border-box;
-  margin-bottom: ${theme.spacing.lg};
-  width: 100%;
-  max-width: 100%;
-  margin-left: auto;
-  margin-right: auto;
-`;
 
 const SearchSection = styled(Card)`
   box-sizing: border-box;
@@ -154,51 +98,9 @@ const ActionButton = styled(Button)`
   margin-right: 0;
 `;
 
-interface AgentListPageProps {
-  selectedKey?: string;
-  onMenuSelect?: (key: string) => void;
-}
-
-export const AgentListPage: React.FC<AgentListPageProps> = ({
-  selectedKey = 'agent-list',
-  onMenuSelect
-}) => {
+export const AgentListPage: React.FC = () => {
   const navigate = useNavigate();
-  const { collapsed, sidebarCollapsed, toggleSidebar, closeMobileSidebar } = useResponsiveSidebar();
   const projectScope = useProjectScope();
-
-  // 处理侧边栏导航
-  const handleNavigation = (path: string) => {
-    switch (path) {
-      case 'agent-list':
-        navigate('/agent-list');
-        break;
-      case 'agent-config':
-        navigate('/agent-config');
-        break;
-      case 'model-api-management':
-        navigate('/model-api-management');
-        break;
-      case 'rag-order-management':
-        navigate('/rag-order-management');
-        break;
-      case 'model-catalog':
-        navigate('/model-catalog');
-        break;
-      case 'mcp-tool-management':
-        navigate('/mcp-tool-management');
-        break;
-      default:
-        navigate(path.startsWith('/') ? path : `/${path}`);
-        break;
-    }
-  };
-
-  // 处理退出登录
-  const handleLogout = () => {
-    clearAuthSession();
-    navigate('/login');
-  };
   const [searchParams, setSearchParams] = useState<{
     configName?: string;
     pageNum?: number;
@@ -227,7 +129,6 @@ export const AgentListPage: React.FC<AgentListPageProps> = ({
   const [cloneSource, setCloneSource] = useState<OpsAgentDefinition | null>(null);
   const [cloneForm, setCloneForm] = useState({ projectId: '', agentId: '', name: '' });
 
-  // 表格列定义
   const columns = [
     {
       title: '名称',
@@ -239,13 +140,13 @@ export const AgentListPage: React.FC<AgentListPageProps> = ({
       )
     },
     {
-      title: '选择方式',
+      title: '调用方式',
       key: 'invocation',
       width: 120,
-      render: () => <Tag color="grey">用户显式选择</Tag>,
+      render: () => <Tag color="grey">显式选择</Tag>,
     },
     {
-      title: '引用影响',
+      title: '引用关系',
       key: 'references',
       width: 220,
       render: (_: unknown, record: OpsAgentDefinition) => {
@@ -253,7 +154,7 @@ export const AgentListPage: React.FC<AgentListPageProps> = ({
         if (!impact?.totalCount) return <Tag color="grey">暂无自动化引用</Tag>;
         return (
           <Space wrap spacing={4}>
-            <Tag color="blue">巡检 {impact.scheduleCount}</Tag>
+            <Tag color="blue">定时 {impact.scheduleCount}</Tag>
             <Tag color="orange">告警 {impact.alertCount}</Tag>
             <Tag color="green">Channel {impact.channelCount}</Tag>
             {impact.pinnedVersionCount > 0 && <Tag color="grey">固定版本 {impact.pinnedVersionCount}</Tag>}
@@ -278,7 +179,7 @@ export const AgentListPage: React.FC<AgentListPageProps> = ({
       ),
     },
     {
-      title: '描述',
+      title: '说明',
       dataIndex: 'description',
       key: 'description',
       width: 260,
@@ -297,7 +198,7 @@ export const AgentListPage: React.FC<AgentListPageProps> = ({
             icon={<IconEdit />}
             onClick={() => handleEdit(record)}
           >
-            编辑流程
+            编辑
           </ActionButton>
           <ActionButton
             type="tertiary"
@@ -308,10 +209,10 @@ export const AgentListPage: React.FC<AgentListPageProps> = ({
             复制
           </ActionButton>
           <Popconfirm
-            title="确定要停用这个专项 Workflow 吗？"
+            title="停用这个工作流？"
             content={referenceImpacts[record.agentId || '']?.totalCount
-              ? `当前仍被 ${referenceImpacts[record.agentId || ''].scheduleCount} 个巡检、${referenceImpacts[record.agentId || ''].alertCount} 个告警和 ${referenceImpacts[record.agentId || ''].channelCount} 个 Channel 引用，其中 ${referenceImpacts[record.agentId || ''].pinnedVersionCount} 个固定版本引用。配置本身不会自动解绑，后续执行仍会经过各自绑定模式与生命周期校验。`
-              : '当前没有自动化引用。停用后已发布版本与审计仍会保留。'}
+              ? `该工作流仍被 ${referenceImpacts[record.agentId || ''].scheduleCount} 个定时自动化、${referenceImpacts[record.agentId || ''].alertCount} 个告警触发器和 ${referenceImpacts[record.agentId || ''].channelCount} 个渠道引用；其中 ${referenceImpacts[record.agentId || ''].pinnedVersionCount} 个引用固定到特定版本。停用工作流不会静默改写这些绑定，每次执行仍按原绑定策略和生命周期校验处理。`
+              : '当前没有自动化或渠道引用该工作流。已发布版本和审计历史会继续保留。'}
             onConfirm={() => handleDelete(record)}
           >
             <ActionButton
@@ -342,12 +243,12 @@ export const AgentListPage: React.FC<AgentListPageProps> = ({
 
   // 新建
   const handleCreate = () => {
-    navigate(`/agent-config?projectId=${encodeURIComponent(projectScope.projectId)}`);
+    navigate(`/workflows/config?projectId=${encodeURIComponent(projectScope.projectId)}`);
   };
 
   // 编辑
   const handleEdit = (record: OpsAgentDefinition) => {
-    navigate(`/agent-config?projectId=${encodeURIComponent(projectScope.projectId)}&agentId=${encodeURIComponent(record.agentId || '')}`);
+    navigate(`/workflows/config?projectId=${encodeURIComponent(projectScope.projectId)}&agentId=${encodeURIComponent(record.agentId || '')}`);
   };
 
   const openClone = (record: OpsAgentDefinition) => {
@@ -361,7 +262,7 @@ export const AgentListPage: React.FC<AgentListPageProps> = ({
 
   const submitClone = async () => {
     if (!cloneSource?.agentId || !cloneForm.projectId || !cloneForm.name.trim()) {
-      Toast.warning('请选择目标项目并填写 Workflow 名称');
+      Toast.warning('请选择目标项目，并填写工作流名称。');
       return;
     }
     try {
@@ -370,125 +271,102 @@ export const AgentListPage: React.FC<AgentListPageProps> = ({
         agentId: cloneForm.agentId.trim() || generatedId('workflow', cloneForm.name),
       };
       const created = await cloneMutation.mutateAsync({ sourceAgentId: cloneSource.agentId, ...payload });
-      Toast.success('专项 Workflow 已复制为目标项目的独立草稿');
+      Toast.success('工作流已作为独立草稿复制到目标项目。');
       setCloneSource(null);
       const createdAgentId = created.agentId || payload.agentId;
       if (cloneForm.projectId !== projectScope.projectId) {
         projectScope.selectProject(cloneForm.projectId);
       }
-      navigate(`/agent-config?projectId=${encodeURIComponent(cloneForm.projectId)}&agentId=${encodeURIComponent(createdAgentId)}`);
+      navigate(`/workflows/config?projectId=${encodeURIComponent(cloneForm.projectId)}&agentId=${encodeURIComponent(createdAgentId)}`);
     } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '复制失败');
+      Toast.error(userFacingError(error, '复制工作流失败，请稍后重试。'));
     }
   };
 
   const handleDelete = async (record: OpsAgentDefinition) => {
     try {
       await disableMutation.mutateAsync(record.agentId || '');
-      Toast.success(`已停用专项 Workflow：${record.name || '未命名'}`);
+      Toast.success(`工作流已停用：${record.name || '未命名'}`);
     } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '停用配置失败');
-      console.error('停用配置失败:', error);
+      Toast.error(userFacingError(error, '停用工作流失败，请稍后重试。'));
+      console.error('Unable to disable Workflow:', error);
     }
   };
 
   return (
-    <AgentListLayout>
-      <Sidebar
-        selectedKey={selectedKey}
-        onSelect={handleNavigation}
-        collapsed={sidebarCollapsed}
-        onMobileClose={closeMobileSidebar}
+    <OpsPageShell selectedKey="workflows">
+      <OpsPageHeader
+        title="工作流"
+        description="创建并发布可复用工作流，用于稳定、可重复的标准执行流程；开放式排查仍使用默认模型。"
       />
-      <MainContent $collapsed={collapsed}>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <Header
-            onToggleSidebar={toggleSidebar}
-            onLogout={handleLogout}
-            collapsed={sidebarCollapsed}
+
+      <ProjectScopeBar
+        projects={projectScope.projects}
+        projectId={projectScope.projectId}
+        onChange={projectScope.selectProject}
+        loading={projectScope.loading}
+        onRefresh={() => listQuery.refetch()}
+        actions={<Button type="primary" icon={<IconPlus />} disabled={!projectScope.projectId} onClick={handleCreate}>新建工作流</Button>}
+      />
+
+      <SearchSection>
+        <SearchRow>
+          <Input
+            placeholder="搜索名称或说明"
+            value={searchParams.configName || ''}
+            onChange={(value) => setSearchParams(prev => ({ ...prev, configName: value }))}
+            style={{ width: 200 }}
+            prefix={<IconSearch />}
           />
-          <ContentArea>
-            <PageHeader>
-              <Title heading={3}>专项 Workflow</Title>
-              <Typography.Text type="tertiary">项目主助手默认处理所有请求；这里管理重复、稳定场景下可选的专项执行流程。</Typography.Text>
-            </PageHeader>
+          <Button type="primary" onClick={handleSearch} loading={loading}>搜索</Button>
+          <Button onClick={handleReset}>重置</Button>
+        </SearchRow>
+      </SearchSection>
 
-            <ProjectScopeBar
-              projects={projectScope.projects}
-              projectId={projectScope.projectId}
-              onChange={projectScope.selectProject}
-              loading={projectScope.loading}
-              onRefresh={() => listQuery.refetch()}
-              actions={<Button type="primary" icon={<IconPlus />} disabled={!projectScope.projectId} onClick={handleCreate}>新建专项 Workflow</Button>}
-            />
+      <TableCard>
+        <Table
+          columns={columns}
+          dataSource={dataSource}
+          loading={loading}
+          pagination={{
+            currentPage: searchParams.pageNum || 1,
+            pageSize: searchParams.pageSize || 10,
+            total: total,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            onChange: handlePageChange
+          }}
+          rowKey="agentId"
+          scroll={{ x: 820 }}
+          size="middle"
+        />
+      </TableCard>
 
-            <SearchSection>
-              <SearchRow>
-                <Input
-                  placeholder="请输入名称/描述"
-                  value={searchParams.configName || ''}
-                  onChange={(value) => setSearchParams(prev => ({ ...prev, configName: value }))}
-                  style={{ width: 200 }}
-                  prefix={<IconSearch />}
-                />
-                <Button
-                  type="primary"
-                  onClick={handleSearch}
-                  loading={loading}
-                >
-                  搜索
-                </Button>
-                <Button onClick={handleReset}>
-                  重置
-                </Button>
-              </SearchRow>
-            </SearchSection>
-
-            <TableCard>
-              <Table
-                columns={columns}
-                dataSource={dataSource}
-                loading={loading}
-                pagination={{
-                  currentPage: searchParams.pageNum || 1,
-                  pageSize: searchParams.pageSize || 10,
-                  total: total,
-                  showSizeChanger: true,
-                  showQuickJumper: true,
-                  onChange: handlePageChange
-                }}
-                rowKey="agentId"
-                scroll={{ x: 820 }}
-                size="middle"
-              />
-            </TableCard>
-            <Modal
-              title="复制专项 Workflow"
-              visible={Boolean(cloneSource)}
-              onCancel={() => setCloneSource(null)}
-              onOk={submitClone}
-              okText="创建副本"
-            >
-              <Space vertical align="start" spacing="medium" style={{ width: '100%' }}>
-                <Typography.Text type="tertiary">复制后形成独立 Workflow，后续修改不会影响来源流程。</Typography.Text>
-                <Typography.Text strong>目标项目</Typography.Text>
-                <Select
-                  value={cloneForm.projectId}
-                  style={{ width: '100%' }}
-                  onChange={(value) => setCloneForm((current) => ({ ...current, projectId: String(value || '') }))}
-                >
-                  {projectScope.projects.map((project) => (
-                    <Select.Option key={project.projectId} value={project.projectId}>{project.name}</Select.Option>
-                  ))}
-                </Select>
-                <Typography.Text strong>名称</Typography.Text>
-                <Input value={cloneForm.name} onChange={(name) => setCloneForm((current) => ({ ...current, name }))} />
-              </Space>
-            </Modal>
-          </ContentArea>
-        </div>
-      </MainContent>
-    </AgentListLayout>
+      <Modal
+        title="复制工作流"
+        visible={Boolean(cloneSource)}
+        onCancel={() => setCloneSource(null)}
+        onOk={submitClone}
+        okText="创建副本"
+        cancelText="取消"
+      >
+        <Space vertical align="start" spacing="medium" style={{ width: '100%' }}>
+          <Typography.Text type="tertiary">副本会成为独立工作流，后续修改不会影响源流程。</Typography.Text>
+          <Typography.Text strong>目标项目</Typography.Text>
+          <Select
+            value={cloneForm.projectId}
+            style={{ width: '100%' }}
+            onChange={(value) => setCloneForm((current) => ({ ...current, projectId: String(value || '') }))}
+          >
+            {projectScope.projects.map((project) => (
+              <Select.Option key={project.projectId} value={project.projectId}>{project.name}</Select.Option>
+            ))}
+          </Select>
+          <Typography.Text strong>名称</Typography.Text>
+          <Input value={cloneForm.name} onChange={(name) => setCloneForm((current) => ({ ...current, name }))} />
+        </Space>
+      </Modal>
+    </OpsPageShell>
   );
 };
 

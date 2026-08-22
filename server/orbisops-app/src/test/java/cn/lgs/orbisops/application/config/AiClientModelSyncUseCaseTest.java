@@ -242,7 +242,7 @@ class AiClientModelSyncUseCaseTest {
         return new AiClientModelSyncTarget(
                 "openai-main",
                 "http://127.0.0.1:8080/v1",
-                "sk-test");
+                "test-api-key");
     }
 
     private record Fixture(

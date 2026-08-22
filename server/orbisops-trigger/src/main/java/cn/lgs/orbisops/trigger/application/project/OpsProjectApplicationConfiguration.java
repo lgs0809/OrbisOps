@@ -47,6 +47,7 @@ import cn.lgs.orbisops.domain.analysis.adapter.repository.IAnalysisRunRepository
 import cn.lgs.orbisops.domain.audit.adapter.repository.IConfigAuditRepository;
 import cn.lgs.orbisops.domain.project.adapter.repository.IProjectDefinitionRepository;
 import cn.lgs.orbisops.trigger.application.analysis.OpsAnalysisRunPersistenceMapper;
+import cn.lgs.orbisops.trigger.application.ops.OpsConfiguredChatModelAvailabilityService;
 import cn.lgs.orbisops.trigger.ops.OpsStructuredReportService;
 import cn.lgs.orbisops.domain.project.adapter.repository.IProjectMcpRepository;
 import cn.lgs.orbisops.domain.project.adapter.repository.IProjectMemberRepository;
@@ -100,10 +101,13 @@ public class OpsProjectApplicationConfiguration {
 
     @Bean
     public ProjectProductReadinessApplicationService projectProductReadinessApplicationService(
-            IConfigAuditRepository audits) {
+            IConfigAuditRepository audits,
+            OpsConfiguredChatModelAvailabilityService chatModelAvailability) {
         ProjectEmergencyStopAcceptancePort emergencyStopAcceptance =
                 new OpsProjectEmergencyStopAcceptanceAdapter(audits);
-        return new ProjectProductReadinessApplicationService(emergencyStopAcceptance);
+        return new ProjectProductReadinessApplicationService(
+                emergencyStopAcceptance,
+                chatModelAvailability::anyAvailable);
     }
 
     @Bean

@@ -29,7 +29,7 @@ public class JdbcAnalysisAuditRepository implements IAnalysisAuditRepository {
 
     public JdbcAnalysisAuditRepository(
             @Qualifier("mysqlJdbcTemplate") ObjectProvider<JdbcTemplate> jdbcTemplateProvider,
-            @Value("${ops.audit.jdbc-enabled:true}") boolean jdbcEnabled) {
+            @Value("${orbisops.audit.jdbc-enabled:true}") boolean jdbcEnabled) {
         this.jdbcTemplateProvider = jdbcTemplateProvider;
         this.jdbcEnabled = jdbcEnabled;
     }

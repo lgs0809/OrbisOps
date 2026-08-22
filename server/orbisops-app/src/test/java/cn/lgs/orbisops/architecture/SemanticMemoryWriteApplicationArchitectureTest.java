@@ -108,7 +108,7 @@ class SemanticMemoryWriteApplicationArchitectureTest {
                 () -> assertFalse(store.contains("putIfPresent(")),
                 () -> assertTrue(configuration.contains("semanticMemoryWriteApplicationService(")),
                 () -> assertTrue(configuration.contains("OpsSemanticVectorWriteAdapter")),
-                () -> assertTrue(configuration.contains("OpsSemanticLexicalWriteAdapter")),
+                () -> assertTrue(configuration.contains("SemanticLexicalWritePort lexicalWriteAdapter")),
                 () -> assertTrue(configuration.contains("SemanticMemoryWriteApplicationService.withDefaultPolicy(")));
     }
 

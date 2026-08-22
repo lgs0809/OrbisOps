@@ -34,10 +34,10 @@ public class GithubCodeDeliveryProviderAdapter implements CodeDeliveryProviderPo
     @org.springframework.beans.factory.annotation.Autowired
     public GithubCodeDeliveryProviderAdapter(
             CodeDeliverySecretPort secrets,
-            @Value("${ops.repair.github.enabled:false}") boolean enabled,
-            @Value("${ops.repair.github.repository:}") String repository,
-            @Value("${ops.repair.github.api-url:https://api.github.com}") String apiUrl,
-            @Value("${ops.repair.github.token-ref:}") String tokenRef) {
+            @Value("${orbisops.repair.github.enabled:false}") boolean enabled,
+            @Value("${orbisops.repair.github.repository:}") String repository,
+            @Value("${orbisops.repair.github.api-url:https://api.github.com}") String apiUrl,
+            @Value("${orbisops.repair.github.token-ref:}") String tokenRef) {
         this(secrets, enabled, repository, apiUrl, tokenRef,
                 HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build());
     }

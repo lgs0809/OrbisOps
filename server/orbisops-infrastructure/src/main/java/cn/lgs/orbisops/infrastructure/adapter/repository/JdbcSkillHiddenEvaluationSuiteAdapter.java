@@ -43,7 +43,7 @@ public class JdbcSkillHiddenEvaluationSuiteAdapter
 
     public JdbcSkillHiddenEvaluationSuiteAdapter(
             @Qualifier("mysqlJdbcTemplate") ObjectProvider<JdbcTemplate> provider,
-            @Value("${ops.skill-evolution.tournament.hidden-suite-auto-init:true}")
+            @Value("${orbisops.skill-evolution.tournament.hidden-suite-auto-init:true}")
             boolean autoInit) {
         this.jdbc = provider.getIfAvailable();
         this.autoInit = autoInit;

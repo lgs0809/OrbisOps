@@ -40,7 +40,7 @@ public class RagRetrievalSettings {
     @Builder.Default
     private String llmQueryRewritePath = "v1/chat/completions";
     @Builder.Default
-    private String llmQueryRewriteModel = "gpt-5.4-mini";
+    private String llmQueryRewriteModel = "";
     @Builder.Default
     private int llmQueryRewriteMaxQueries = 4;
     @Builder.Default
@@ -53,16 +53,16 @@ public class RagRetrievalSettings {
     private int llmQueryRewriteLowRecallMinCandidates = 2;
 
     @Builder.Default
-    private Boolean rerankEnabled = true;
+    private Boolean rerankEnabled = false;
     @Builder.Default
-    private String rerankProvider = "cohere";
+    private String rerankProvider = "";
     @Builder.Default
-    private String rerankBaseUrl = "http://127.0.0.1:8110";
+    private String rerankBaseUrl = "";
     private String rerankApiKey;
     @Builder.Default
     private String rerankPath = "v1/rerank";
     @Builder.Default
-    private String rerankModel = "Qwen/Qwen3-VL-Reranker-2B";
+    private String rerankModel = "";
     @Builder.Default
     private int rerankCandidateTopK = 20;
     @Builder.Default

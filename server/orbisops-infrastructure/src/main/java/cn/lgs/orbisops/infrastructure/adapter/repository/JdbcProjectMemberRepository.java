@@ -31,10 +31,10 @@ public class JdbcProjectMemberRepository implements IProjectMemberRepository {
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 
-    @Value("${ops.project-workspace.jdbc-enabled:true}")
+    @Value("${orbisops.project-workspace.jdbc-enabled:true}")
     private boolean jdbcEnabled = true;
 
-    @Value("${ops.project-workspace.auto-init:true}")
+    @Value("${orbisops.project-workspace.auto-init:true}")
     private boolean autoInit = true;
 
     private volatile boolean initialized;

@@ -18,7 +18,7 @@ public class JdbcConfigAuditSchemaInitializer {
 
     public JdbcConfigAuditSchemaInitializer(
             @Qualifier("mysqlJdbcTemplate") ObjectProvider<JdbcTemplate> jdbcTemplateProvider,
-            @Value("${ops.config-audit.auto-init:true}") boolean autoInit) {
+            @Value("${orbisops.config-audit.auto-init:true}") boolean autoInit) {
         this.jdbcTemplateProvider = jdbcTemplateProvider;
         this.autoInit = autoInit;
     }

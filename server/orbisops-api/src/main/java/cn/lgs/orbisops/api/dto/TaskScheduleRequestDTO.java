@@ -22,6 +22,8 @@ public class TaskScheduleRequestDTO implements Serializable {
 
     private Long id;
     private String projectId;
+    /** Product execution binding: DEFAULT_REACT or WORKFLOW. */
+    private String executionType;
     private String agentId;
     private String agentBindingMode;
     private Integer agentVersion;

@@ -5,6 +5,9 @@ import com.alibaba.cloud.ai.graph.agent.interceptor.ModelResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
+import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -106,6 +109,61 @@ class OpsAgentScopeModelCallInterceptorTest {
                     .containsEntry("timeoutSeconds", 1)
                     .containsKey("durationMs")
                     .containsKey("error");
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void streamingModelCallMustFinishOnlyAfterTheFluxCompletes() {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            List<OpsRuntimeEvent> events = new ArrayList<>();
+            OpsAgentScopeModelCallInterceptor interceptor = new OpsAgentScopeModelCallInterceptor(
+                    executor, 5, events, ignored -> { }, "agent-stream");
+            ModelRequest request = ModelRequest.builder()
+                    .messages(List.of(new UserMessage("stream")))
+                    .build();
+
+            ModelResponse response = interceptor.interceptModel(
+                    request,
+                    ignored -> ModelResponse.of(Flux.just(new ChatResponse(List.of(
+                            new Generation(new AssistantMessage("ok")))))));
+
+            assertThat(events).extracting(OpsRuntimeEvent::getEventType)
+                    .containsExactly("MODEL_CALL_QUEUED", "MODEL_CALL_STARTED");
+            ((Flux<?>) response.getMessage()).blockLast();
+            assertThat(events).extracting(OpsRuntimeEvent::getEventType)
+                    .containsExactly("MODEL_CALL_QUEUED", "MODEL_CALL_STARTED", "MODEL_CALL_FINISHED");
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void streamingProviderAuthFailureMustNeverBeRecordedAsSuccess() {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            List<OpsRuntimeEvent> events = new ArrayList<>();
+            OpsAgentScopeModelCallInterceptor interceptor = new OpsAgentScopeModelCallInterceptor(
+                    executor, 5, events, ignored -> { }, "agent-stream-auth");
+            ModelRequest request = ModelRequest.builder()
+                    .messages(List.of(new UserMessage("stream")))
+                    .build();
+            ModelResponse response = interceptor.interceptModel(
+                    request,
+                    ignored -> ModelResponse.of(Flux.error(new IllegalStateException(
+                            "401 Unauthorized from POST https://provider.invalid/v1/chat/completions"))));
+
+            assertThatThrownBy(() -> ((Flux<?>) response.getMessage()).blockLast())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("MODEL_PROVIDER_AUTH_FAILED");
+            assertThat(events).extracting(OpsRuntimeEvent::getEventType)
+                    .containsExactly("MODEL_CALL_QUEUED", "MODEL_CALL_STARTED", "MODEL_CALL_FAILED")
+                    .doesNotContain("MODEL_CALL_FINISHED");
+            assertThat(events.get(2).getSummary()).contains("MODEL_PROVIDER_AUTH_FAILED").doesNotContain("https://");
+            assertThat(events.get(2).getPayload())
+                    .containsEntry("error", "MODEL_PROVIDER_AUTH_FAILED");
         } finally {
             executor.shutdownNow();
         }

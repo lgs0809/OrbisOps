@@ -25,8 +25,8 @@ export class AppErrorBoundary extends React.Component<React.PropsWithChildren, S
     return (
       <main role="alert" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24 }}>
         <div style={{ maxWidth: 560 }}>
-          <Title heading={3}>页面暂时无法显示</Title>
-          <Text type="secondary">当前页面发生了前端渲染错误。不会自动重放审批或生产执行操作，可以安全刷新后重新查看。</Text>
+          <Title heading={3}>当前页面无法显示</Title>
+          <Text type="secondary">页面渲染时发生错误。审批或生产执行操作不会被自动重放；可以安全刷新后重新检查页面状态。</Text>
           <div style={{ marginTop: 16 }}>
             <Button type="primary" onClick={this.reload}>刷新页面</Button>
           </div>

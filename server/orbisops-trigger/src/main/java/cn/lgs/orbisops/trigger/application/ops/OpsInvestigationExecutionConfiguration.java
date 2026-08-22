@@ -11,11 +11,11 @@ public class OpsInvestigationExecutionConfiguration {
 
     @Bean
     public OpsInvestigationExecutorSettings opsInvestigationExecutorSettings(
-            @Value("${ops.multi-agent.main-reflection-llm-enabled:true}") boolean mainReflectionLlmEnabled,
-            @Value("${ops.multi-agent.parallel-execution-enabled:true}") boolean parallelExecutionEnabled,
-            @Value("${ops.multi-agent.max-task-executions:8}") int maxTaskExecutions,
-            @Value("${ops.multi-agent.max-adjustments:3}") int maxAdjustmentsLimit,
-            @Value("${ops.multi-agent.max-evidence-items:12}") int defaultMaxEvidenceItems) {
+            @Value("${orbisops.multi-agent.main-reflection-llm-enabled:true}") boolean mainReflectionLlmEnabled,
+            @Value("${orbisops.multi-agent.parallel-execution-enabled:true}") boolean parallelExecutionEnabled,
+            @Value("${orbisops.multi-agent.max-task-executions:8}") int maxTaskExecutions,
+            @Value("${orbisops.multi-agent.max-adjustments:3}") int maxAdjustmentsLimit,
+            @Value("${orbisops.multi-agent.max-evidence-items:12}") int defaultMaxEvidenceItems) {
         return new OpsInvestigationExecutorSettings(
                 mainReflectionLlmEnabled,
                 parallelExecutionEnabled,

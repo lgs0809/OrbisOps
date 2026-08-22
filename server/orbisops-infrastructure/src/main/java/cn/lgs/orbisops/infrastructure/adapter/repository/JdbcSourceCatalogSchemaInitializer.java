@@ -17,9 +17,9 @@ public class JdbcSourceCatalogSchemaInitializer {
 
     public JdbcSourceCatalogSchemaInitializer(
             @Qualifier("mysqlJdbcTemplate") ObjectProvider<JdbcTemplate> jdbcProvider,
-            @Value("${ops.source-repository.enabled:false}") boolean enabled,
-            @Value("${ops.source-repository.jdbc-enabled:true}") boolean jdbcEnabled,
-            @Value("${ops.source-repository.auto-init:true}") boolean autoInit) {
+            @Value("${orbisops.source-repository.enabled:false}") boolean enabled,
+            @Value("${orbisops.source-repository.jdbc-enabled:true}") boolean jdbcEnabled,
+            @Value("${orbisops.source-repository.auto-init:true}") boolean autoInit) {
         this.jdbcProvider = jdbcProvider;
         this.enabled = enabled;
         this.jdbcEnabled = jdbcEnabled;

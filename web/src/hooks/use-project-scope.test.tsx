@@ -35,6 +35,7 @@ const ScopeProbe = () => {
   return (
     <>
       <div data-testid="project-id">{scope.projectId}</div>
+      <div data-testid="project-pathname">{location.pathname}</div>
       <div data-testid="project-search">{location.search}</div>
       <button type="button" onClick={() => scope.selectProject('project-two')}>select project two</button>
     </>
@@ -84,6 +85,7 @@ describe('ProjectScopeProvider', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('project-id')).toHaveTextContent('project-two');
+      expect(screen.getByTestId('project-pathname')).toHaveTextContent('/executions');
       expect(screen.getByTestId('project-search')).toHaveTextContent('?projectId=project-two');
     });
     expect(localStorage.getItem('ops:selected-project-id')).toBe('project-two');

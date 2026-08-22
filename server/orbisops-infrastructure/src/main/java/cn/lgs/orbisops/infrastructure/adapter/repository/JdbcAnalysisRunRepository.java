@@ -19,10 +19,10 @@ public class JdbcAnalysisRunRepository implements IAnalysisRunRepository {
 
     private final JdbcTemplate jdbcTemplate;
 
-    @Value("${ops.runs.jdbc-enabled:true}")
+    @Value("${orbisops.runs.jdbc-enabled:true}")
     private boolean jdbcEnabled = true;
 
-    @Value("${ops.runs.auto-init:true}")
+    @Value("${orbisops.runs.auto-init:true}")
     private boolean autoInit = true;
 
     private volatile boolean tableInitialized;

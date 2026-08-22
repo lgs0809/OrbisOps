@@ -137,12 +137,6 @@ final class OpsWorkSessionQueryRewriteCoordinator {
                         ? "QUERY_REWRITE_UNSUPPORTED_OPERATIONAL_PREMISE_REJECTED"
                         : value(result.reason()));
         payload.put("resolvedReferences", result.resolvedReferences());
-        if (StringUtils.hasText(result.actionClassification())) {
-            request.getMetadata().put(
-                    OpsWorkSessionContextMetadataKeys.TASK_ACTION_CLASSIFICATION,
-                    result.actionClassification());
-            payload.put("actionClassification", result.actionClassification());
-        }
         payload.put("memoryContextChars", memoryContext.length());
         record(events, eventSink, OpsRuntimeEvent.builder()
                 .eventType("QUERY_REWRITE_FINISHED")
@@ -179,14 +173,6 @@ final class OpsWorkSessionQueryRewriteCoordinator {
             skip(request, originalQuery, events, eventSink, requestStartedNanos,
                     "检测到安全关键运维意图，禁止 Query Rewrite 改写权限、审批、验证或生产副作用语义。",
                     Map.of("reason", "SAFETY_CRITICAL_INTENT_PRESERVED"));
-            return true;
-        }
-        Object skip = request.getMetadata().get("skipQueryRewrite");
-        if (Boolean.TRUE.equals(skip)
-                || "true".equalsIgnoreCase(String.valueOf(skip))) {
-            skip(request, originalQuery, events, eventSink, requestStartedNanos,
-                    "当前请求已匹配受控快速路径，跳过主 Agent 问题重写。",
-                    Map.of("reason", "CONTROLLED_FAST_PATH"));
             return true;
         }
         if (definition != null

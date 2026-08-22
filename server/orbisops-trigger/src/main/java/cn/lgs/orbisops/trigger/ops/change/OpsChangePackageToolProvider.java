@@ -166,7 +166,7 @@ public class OpsChangePackageToolProvider {
         Set<String> actualSourceTypes = new LinkedHashSet<>();
         List<OpsChangePackageRunEvidenceCollector.Evidence> authoritative = safeEvidence.stream()
                 .filter(item -> item != null && Set.of(
-                        "PROMETHEUS", "ELASTICSEARCH", "MYSQL_SLOW_SQL")
+                        "PROMETHEUS", "ELASTICSEARCH", "MYSQL_SLOW_SQL", "MYSQL", "RABBITMQ", "REDIS")
                         .contains(text(item.sourceType()).toUpperCase()))
                 .peek(item -> actualSourceTypes.add(text(item.sourceType()).toUpperCase()))
                 .toList();
@@ -207,7 +207,8 @@ public class OpsChangePackageToolProvider {
         Set<String> result = new LinkedHashSet<>();
         for (Object item : iterable) {
             String sourceType = text(item).toUpperCase();
-            if (Set.of("PROMETHEUS", "ELASTICSEARCH", "MYSQL_SLOW_SQL").contains(sourceType)) {
+            if (Set.of("PROMETHEUS", "ELASTICSEARCH", "MYSQL_SLOW_SQL", "MYSQL", "RABBITMQ", "REDIS")
+                    .contains(sourceType)) {
                 result.add(sourceType);
             }
         }

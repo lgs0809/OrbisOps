@@ -11,6 +11,7 @@ import org.springframework.boot.DefaultApplicationArguments;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -26,7 +27,7 @@ class BootstrapAdminConfigurationTest {
     void disabledBootstrapDoesNotTouchAccountStore() {
         AdminUserCatalogUseCase accounts = mock(AdminUserCatalogUseCase.class);
         BootstrapAdminConfiguration bootstrap = new BootstrapAdminConfiguration(
-                accounts, false, "bootstrap-admin", "admin", "credential");
+                accounts, false, "configured-admin-id", "admin", "credential");
 
         bootstrap.run(NO_ARGS);
 
@@ -38,7 +39,7 @@ class BootstrapAdminConfigurationTest {
         AdminUserCatalogUseCase accounts = mock(AdminUserCatalogUseCase.class);
         when(accounts.findByUsername("admin")).thenReturn(mock(AdminUserAccount.class));
         BootstrapAdminConfiguration bootstrap = new BootstrapAdminConfiguration(
-                accounts, true, "bootstrap-admin", " admin ", "credential");
+                accounts, true, "configured-admin-id", " admin ", "credential");
 
         bootstrap.run(NO_ARGS);
 
@@ -49,7 +50,7 @@ class BootstrapAdminConfigurationTest {
     void enabledBootstrapRequiresExternalCredential() {
         AdminUserCatalogUseCase accounts = mock(AdminUserCatalogUseCase.class);
         BootstrapAdminConfiguration bootstrap = new BootstrapAdminConfiguration(
-                accounts, true, "bootstrap-admin", "admin", "");
+                accounts, true, "configured-admin-id", "admin", "");
 
         IllegalStateException failure = assertThrows(IllegalStateException.class, () -> bootstrap.run(NO_ARGS));
 
@@ -64,16 +65,31 @@ class BootstrapAdminConfigurationTest {
         AdminUserCatalogUseCase accounts = mock(AdminUserCatalogUseCase.class);
         when(accounts.create(any())).thenReturn(true);
         BootstrapAdminConfiguration bootstrap = new BootstrapAdminConfiguration(
-                accounts, true, " bootstrap-admin ", " admin ", "credential");
+                accounts, true, " explicit-admin-id ", " admin ", "credential");
 
         bootstrap.run(NO_ARGS);
 
         ArgumentCaptor<AdminUserCommand> command = ArgumentCaptor.forClass(AdminUserCommand.class);
         verify(accounts).create(command.capture());
-        assertEquals("bootstrap-admin", command.getValue().userId());
+        assertEquals("explicit-admin-id", command.getValue().userId());
         assertEquals("admin", command.getValue().username());
         assertEquals("credential", command.getValue().credential());
         assertEquals(AdminUserRole.ADMIN.value(), command.getValue().userRole());
         assertEquals(AdminUserStatus.ENABLED, command.getValue().status());
+    }
+
+    @Test
+    void enabledHeadlessBootstrapGeneratesUserIdWhenOperatorDoesNotProvideOne() {
+        AdminUserCatalogUseCase accounts = mock(AdminUserCatalogUseCase.class);
+        when(accounts.create(any())).thenReturn(true);
+        BootstrapAdminConfiguration bootstrap = new BootstrapAdminConfiguration(
+                accounts, true, "", "admin", "credential");
+
+        bootstrap.run(NO_ARGS);
+
+        ArgumentCaptor<AdminUserCommand> command = ArgumentCaptor.forClass(AdminUserCommand.class);
+        verify(accounts).create(command.capture());
+        assertTrue(command.getValue().userId().startsWith("user-"));
+        assertEquals("admin", command.getValue().username());
     }
 }

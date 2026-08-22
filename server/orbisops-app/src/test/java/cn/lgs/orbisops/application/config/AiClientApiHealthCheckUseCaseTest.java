@@ -57,7 +57,7 @@ class AiClientApiHealthCheckUseCaseTest {
         AiClientApiHealthCheckUseCase useCase = new AiClientApiHealthCheckUseCase(
                 targets, probe, operator, records, audit, CLOCK);
         AiClientApiHealthTarget target = new AiClientApiHealthTarget(
-                "local-provider", "http://127.0.0.1:8080/v1", "api-key");
+                "local-provider", "http://127.0.0.1:8080/v1", "v1/chat/completions", "api-key");
         AiClientApiHealthProbeOutcome outcome = new AiClientApiHealthProbeOutcome(
                 "http://127.0.0.1:8080/v1/models", "SUCCESS", 200, 12L, "");
         when(operator.currentOperator()).thenReturn("admin-1");
@@ -87,7 +87,7 @@ class AiClientApiHealthCheckUseCaseTest {
         AiClientApiHealthCheckUseCase useCase = new AiClientApiHealthCheckUseCase(
                 targets, probe, operator, records, audit, CLOCK);
         AiClientApiHealthTarget target = new AiClientApiHealthTarget(
-                "local-provider", "http://127.0.0.1:8080/v1", "api-key");
+                "local-provider", "http://127.0.0.1:8080/v1", "v1/chat/completions", "api-key");
         when(targets.find("local-provider")).thenReturn(target);
         when(probe.probe(target)).thenReturn(null);
 

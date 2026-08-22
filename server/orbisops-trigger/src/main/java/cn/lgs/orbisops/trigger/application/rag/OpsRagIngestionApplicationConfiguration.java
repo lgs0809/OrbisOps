@@ -37,11 +37,11 @@ public class OpsRagIngestionApplicationConfiguration {
             RagIngestionCommandUseCase ingestionUseCase,
             @Qualifier("ragIngestionExecutor") ThreadPoolExecutor executor,
             IRagIngestionJobRepository repository,
-            @Value("${ops.rag.ingestion.max-file-count:20}") int maxFileCount,
-            @Value("${ops.rag.ingestion.max-file-bytes:52428800}") long maxFileBytes,
-            @Value("${ops.rag.ingestion.max-total-bytes:209715200}") long maxTotalBytes,
-            @Value("${ops.rag.ingestion.allowed-extensions:md,markdown,pdf}") String allowedExtensions,
-            @Value("${ops.rag.ingestion.allowed-content-types:text/markdown,text/plain,application/pdf,application/octet-stream}") String allowedContentTypes) {
+            @Value("${orbisops.rag.ingestion.max-file-count:20}") int maxFileCount,
+            @Value("${orbisops.rag.ingestion.max-file-bytes:52428800}") long maxFileBytes,
+            @Value("${orbisops.rag.ingestion.max-total-bytes:209715200}") long maxTotalBytes,
+            @Value("${orbisops.rag.ingestion.allowed-extensions:md,markdown,pdf}") String allowedExtensions,
+            @Value("${orbisops.rag.ingestion.allowed-content-types:text/markdown,text/plain,application/pdf,application/octet-stream}") String allowedContentTypes) {
         RagIngestionJobSettings settings = RagIngestionJobSettings.fromCsv(
                 maxFileCount, maxFileBytes, maxTotalBytes, allowedExtensions, allowedContentTypes);
         return new RagIngestionJobApplicationService(ingestionUseCase, executor, repository, settings);

@@ -26,8 +26,8 @@ export interface OpsDangerZoneProps {
 }
 
 export const OpsDangerZone: React.FC<OpsDangerZoneProps> = ({
-  title = '危险操作',
-  description = '这里的操作会影响生产执行、审批或数据可用性，请在详情确认后再执行。',
+  title = 'Dangerous actions',
+  description = 'These actions affect production execution, approval, or data availability. Review the details before continuing.',
   children,
 }) => (
   <DangerWrap>

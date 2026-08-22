@@ -36,9 +36,9 @@ class OpsContextCompressionBoundaryArchitectureTest {
                 () -> assertTrue(compressor.lines().count() <= 85),
                 () -> assertTrue(settings.contains("public record OpsContextCompressionSettings(")),
                 () -> assertTrue(settings.contains("legacyConstructorDefaults()")),
-                () -> assertTrue(configuration.contains("ops.chat.memory.compression-enabled")),
-                () -> assertTrue(configuration.contains("ops.chat.memory.compression-hot-threshold-messages")),
-                () -> assertTrue(configuration.contains("ops.chat.memory.compression-llm-max-input-chars")));
+                () -> assertTrue(configuration.contains("orbisops.chat.memory.compression-enabled")),
+                () -> assertTrue(configuration.contains("orbisops.chat.memory.compression-hot-threshold-messages")),
+                () -> assertTrue(configuration.contains("orbisops.chat.memory.compression-llm-max-input-chars")));
     }
 
     private String read(String relativePath) throws IOException {

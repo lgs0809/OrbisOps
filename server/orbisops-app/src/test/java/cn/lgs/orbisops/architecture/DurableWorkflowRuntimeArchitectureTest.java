@@ -47,7 +47,7 @@ class DurableWorkflowRuntimeArchitectureTest {
         String coordinator = read(TRIGGER + "OpsTypedWorkflowExecutionCoordinator.java");
 
         assertAll(
-                () -> assertTrue(settings.contains("ops.workflow.typed.scope:DURABLE_ONLY")),
+                () -> assertTrue(settings.contains("orbisops.workflow.typed.scope:DURABLE_ONLY")),
                 () -> assertTrue(settings.contains("OpsWorkSessionClaimMetadata.ATTEMPT_ID")),
                 () -> assertTrue(settings.contains("resumedFromAttemptId")),
                 () -> assertTrue(settings.contains("durableWorkflow")),

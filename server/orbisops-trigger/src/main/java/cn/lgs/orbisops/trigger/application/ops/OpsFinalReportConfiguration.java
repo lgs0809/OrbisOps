@@ -10,8 +10,8 @@ public class OpsFinalReportConfiguration {
 
     @Bean
     public OpsFinalReportSettings opsFinalReportSettings(
-            @Value("${ops.multi-agent.final-report-llm-enabled:true}") boolean llmEnabled,
-            @Value("${ops.multi-agent.final-report-max-chars:8000}") int maxChars) {
+            @Value("${orbisops.multi-agent.final-report-llm-enabled:true}") boolean llmEnabled,
+            @Value("${orbisops.multi-agent.final-report-max-chars:8000}") int maxChars) {
         return new OpsFinalReportSettings(llmEnabled, maxChars);
     }
 }

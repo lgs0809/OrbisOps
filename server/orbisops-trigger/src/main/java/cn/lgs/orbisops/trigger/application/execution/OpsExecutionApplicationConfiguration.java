@@ -33,7 +33,7 @@ public class OpsExecutionApplicationConfiguration {
             ExecutionResourceRuntimeDirectoryApplicationService directory,
             ExecutionResourceProjectPort projects,
             ExecutionAuditPort auditPort,
-            @Value("${ops.execution-resource.enabled:true}") boolean enabled) {
+            @Value("${orbisops.execution-resource.enabled:true}") boolean enabled) {
         return new ExecutionResourceCommandApplicationService(
                 repository, directory, projects, auditPort, enabled);
     }
@@ -41,7 +41,7 @@ public class OpsExecutionApplicationConfiguration {
     @Bean
     public ExecutionResourceQueryApplicationService executionResourceQueryApplicationService(
             ExecutionResourceRuntimeDirectoryApplicationService directory,
-            @Value("${ops.execution-resource.enabled:true}") boolean enabled) {
+            @Value("${orbisops.execution-resource.enabled:true}") boolean enabled) {
         return new ExecutionResourceQueryApplicationService(directory, enabled);
     }
 

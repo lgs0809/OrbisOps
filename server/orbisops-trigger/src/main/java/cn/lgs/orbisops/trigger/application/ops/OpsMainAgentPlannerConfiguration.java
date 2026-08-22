@@ -10,8 +10,8 @@ public class OpsMainAgentPlannerConfiguration {
 
     @Bean
     public OpsMainAgentPlannerSettings opsMainAgentPlannerSettings(
-            @Value("${ops.multi-agent.planner-llm-enabled:true}") boolean llmEnabled,
-            @Value("${ops.multi-agent.planner-mode:smart}") String mode) {
+            @Value("${orbisops.multi-agent.planner-llm-enabled:true}") boolean llmEnabled,
+            @Value("${orbisops.multi-agent.planner-mode:smart}") String mode) {
         return new OpsMainAgentPlannerSettings(llmEnabled, mode);
     }
 }

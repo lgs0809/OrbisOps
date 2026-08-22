@@ -78,12 +78,12 @@ public final class RagMultimodalSettings {
     public static RagMultimodalSettings defaults() {
         return new RagMultimodalSettings(
                 false,
-                DEFAULT_PROVIDER,
-                "http://127.0.0.1:8110",
-                "local-rag-models",
+                "",
+                "",
+                "",
                 "v1/multimodalembeddings",
-                "Qwen/Qwen3-VL-Embedding-2B",
-                "vector_store_qwen_vl_multimodal",
+                "",
+                "orbisops_multimodal_vectors",
                 DEFAULT_DIMENSION,
                 true,
                 false,

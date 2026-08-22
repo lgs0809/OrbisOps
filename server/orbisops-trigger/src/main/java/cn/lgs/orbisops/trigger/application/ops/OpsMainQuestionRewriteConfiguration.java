@@ -10,9 +10,9 @@ public class OpsMainQuestionRewriteConfiguration {
 
     @Bean
     public OpsMainQuestionRewriteSettings opsMainQuestionRewriteSettings(
-            @Value("${ops.chat.query-rewrite.enabled:true}") boolean enabled,
-            @Value("${ops.chat.query-rewrite.max-memory-chars:5000}") int maxMemoryChars,
-            @Value("${ops.chat.query-rewrite.max-question-chars:1200}") int maxQuestionChars) {
+            @Value("${orbisops.chat.query-rewrite.enabled:true}") boolean enabled,
+            @Value("${orbisops.chat.query-rewrite.max-memory-chars:5000}") int maxMemoryChars,
+            @Value("${orbisops.chat.query-rewrite.max-question-chars:1200}") int maxQuestionChars) {
         return new OpsMainQuestionRewriteSettings(
                 enabled,
                 maxMemoryChars,

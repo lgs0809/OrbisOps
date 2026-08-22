@@ -14,7 +14,7 @@ public class JdbcChangePackageSchemaInitializer {
 
     private final JdbcTemplate jdbcTemplate;
 
-    @Value("${ops.change-package.auto-init:true}")
+    @Value("${orbisops.change-package.auto-init:true}")
     private boolean autoInit;
 
     public JdbcChangePackageSchemaInitializer(

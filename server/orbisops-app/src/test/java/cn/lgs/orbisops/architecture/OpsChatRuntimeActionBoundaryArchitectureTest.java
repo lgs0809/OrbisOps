@@ -55,7 +55,7 @@ class OpsChatRuntimeActionBoundaryArchitectureTest {
                 () -> assertFalse(settings.contains("@Value")),
                 () -> assertTrue(configuration.contains("@Configuration")),
                 () -> assertTrue(configuration.contains("OpsChatRuntimeSettings opsChatRuntimeSettings(")),
-                () -> assertTrue(configuration.contains("${ops.chat.sync-timeout-seconds:90}")));
+                () -> assertTrue(configuration.contains("${orbisops.chat.sync-timeout-seconds:90}")));
     }
 
     private String read(String relativePath) throws IOException {

@@ -52,8 +52,8 @@ class OpsCapabilityImportBoundaryArchitectureTest {
                 () -> assertFalse(urlPolicy.contains("@Value")),
                 () -> assertTrue(fetcher.contains("settings.fetchTimeoutSeconds()")),
                 () -> assertFalse(fetcher.contains("@Value")),
-                () -> assertTrue(configuration.contains("ops.capability-import.max-artifact-bytes")),
-                () -> assertTrue(configuration.contains("ops.capability-import.allowed-hosts")));
+                () -> assertTrue(configuration.contains("orbisops.capability-import.max-artifact-bytes")),
+                () -> assertTrue(configuration.contains("orbisops.capability-import.allowed-hosts")));
     }
 
     private String read(String relativePath) throws IOException {

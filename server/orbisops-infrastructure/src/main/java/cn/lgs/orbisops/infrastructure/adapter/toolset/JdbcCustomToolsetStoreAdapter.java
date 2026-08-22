@@ -31,7 +31,7 @@ public class JdbcCustomToolsetStoreAdapter implements CustomToolsetStorePort {
     private final Map<String, CustomToolsetRecord> memory =
             new ConcurrentHashMap<>();
 
-    @Value("${ops.toolset.auto-init:true}")
+    @Value("${orbisops.toolset.auto-init:true}")
     private boolean autoInit;
 
     public JdbcCustomToolsetStoreAdapter(

@@ -38,7 +38,7 @@ public class AdminWebSecurityConfig implements WebMvcConfigurer {
     private final AdminAuthService adminAuthService;
     private final OpsRateLimitService opsRateLimitService;
 
-    public AdminWebSecurityConfig(@Value("${ops.allowed-origin-patterns:http://127.0.0.1:3000,http://localhost:3000}") String allowedOriginPatterns,
+    public AdminWebSecurityConfig(@Value("${orbisops.allowed-origin-patterns:http://127.0.0.1:3000,http://localhost:3000}") String allowedOriginPatterns,
                                   AdminAuthSettings authSettings,
                                   AdminAuthService adminAuthService,
                                   OpsRateLimitService opsRateLimitService) {
@@ -51,7 +51,7 @@ public class AdminWebSecurityConfig implements WebMvcConfigurer {
     @PostConstruct
     public void warnDefaultJwtSecret() {
         if (authSettings.hasWeakOrMissingJwtSecret()) {
-            log.warn("admin.auth.jwt-secret 未配置或强度不足；启用严格认证配置时应用将拒绝启动。");
+            log.warn("orbisops.admin.auth.jwt-secret 未配置或强度不足；启用严格认证配置时应用将拒绝启动。");
         }
     }
 

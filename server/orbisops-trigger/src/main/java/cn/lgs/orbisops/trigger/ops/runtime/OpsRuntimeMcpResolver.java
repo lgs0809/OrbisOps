@@ -133,12 +133,15 @@ public final class OpsRuntimeMcpResolver {
                     .map(String::trim)
                     .anyMatch(stage::equalsIgnoreCase);
             String environment = firstText(capabilities.get("resourceEnvironment"), "unknown");
+            String normalizedEnvironment = environment.toLowerCase(java.util.Locale.ROOT);
             boolean environmentKnown = java.util.Set.of(
-                    "prod", "production", "test", "testing", "dev", "development",
+                    "prod", "production", "prod-like", "production-like", "shared",
+                    "test", "testing", "dev", "development",
                     "staging", "sandbox", "local", "external")
-                    .contains(environment.toLowerCase(java.util.Locale.ROOT));
-            boolean production = "prod".equalsIgnoreCase(environment)
-                    || "production".equalsIgnoreCase(environment);
+                    .contains(normalizedEnvironment);
+            boolean production = java.util.Set.of(
+                    "prod", "production", "prod-like", "production-like", "shared")
+                    .contains(normalizedEnvironment);
             String readOnlyValue = capabilities.get("readOnly");
             boolean readOnlyDeclared = StringUtils.hasText(readOnlyValue);
             boolean readOnly = readOnlyDeclared && Boolean.parseBoolean(readOnlyValue);

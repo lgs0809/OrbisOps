@@ -22,8 +22,8 @@ public final class OpsMcpInvocationResiliencePolicy {
 
     @Autowired
     public OpsMcpInvocationResiliencePolicy(
-            @Value("${ops.mcp.resilience.failure-threshold:3}") int failureThreshold,
-            @Value("${ops.mcp.resilience.open-seconds:30}") long openSeconds,
+            @Value("${orbisops.mcp.resilience.failure-threshold:3}") int failureThreshold,
+            @Value("${orbisops.mcp.resilience.open-seconds:30}") long openSeconds,
             OpsMcpRuntimeSloTelemetry telemetry) {
         this(
                 failureThreshold,

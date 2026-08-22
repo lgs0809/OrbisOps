@@ -10,7 +10,7 @@ public class OpsSourceMcpProjectionConfiguration {
 
     @Bean
     public OpsSourceMcpProjectionSettings opsSourceMcpProjectionSettings(
-            @Value("${ops.source-repository.command-timeout-seconds:8}") int requestTimeoutSeconds) {
+            @Value("${orbisops.source-repository.command-timeout-seconds:8}") int requestTimeoutSeconds) {
         return new OpsSourceMcpProjectionSettings(requestTimeoutSeconds);
     }
 }

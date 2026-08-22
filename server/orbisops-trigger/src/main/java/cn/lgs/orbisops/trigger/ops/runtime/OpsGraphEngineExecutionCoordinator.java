@@ -10,6 +10,7 @@ import com.alibaba.cloud.ai.graph.StateGraph;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.StringUtils;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -263,6 +264,36 @@ final class OpsGraphEngineExecutionCoordinator {
         List<OpsWorkflowNode> nodes = Optional.ofNullable(definition.getNodes()).orElse(List.of());
         if (!nodes.isEmpty()) {
             return nodes;
+        }
+        String engine = value(definition.getEngine()).trim().toUpperCase(java.util.Locale.ROOT);
+        List<OpsAgentScopeConfig> scopes = Optional.ofNullable(definition.getAgentscopeAgents()).orElse(List.of());
+        if ("AGENTSCOPE".equals(engine) && !scopes.isEmpty() && scopes.get(0) != null) {
+            OpsAgentScopeConfig scope = scopes.get(0);
+            Map<String, Object> config = new LinkedHashMap<>();
+            if (StringUtils.hasText(scope.getRole())) config.put("role", scope.getRole());
+            if (scope.getMaxDepth() != null) config.put("maxDepth", scope.getMaxDepth());
+            if (scope.getMaxIterations() != null) config.put("maxIterations", scope.getMaxIterations());
+            config.put("inheritProjectCapabilities", Boolean.TRUE.equals(scope.getInheritProjectCapabilities()));
+            config.put("allowedToolNames", Optional.ofNullable(scope.getAllowedToolNames()).orElse(List.of()));
+            return List.of(OpsWorkflowNode.builder()
+                    .nodeId(nodeExecutionPolicy.firstText(scope.getAgentId(), "main-assistant"))
+                    .type("AGENTSCOPE")
+                    .mode("REACT")
+                    .agent(nodeExecutionPolicy.firstText(
+                            scope.getAgentId(), scope.getName(), definition.getName(), definition.getAgentId()))
+                    .instruction(nodeExecutionPolicy.firstText(scope.getInstruction(), definition.getInstruction()))
+                    .modelId(nodeExecutionPolicy.firstText(scope.getModelId(), definition.getModelId()))
+                    .outputKey(scope.getOutputKey())
+                    .ragEnabled(scope.getRagEnabled())
+                    .knowledgeBaseId(scope.getKnowledgeBaseId())
+                    .repairEnabled(scope.getRepairEnabled())
+                    .changePackageEnabled(scope.getChangePackageEnabled())
+                    .skills(Optional.ofNullable(scope.getSkills()).orElse(List.of()))
+                    .mcpIds(Optional.ofNullable(scope.getMcpIds()).orElse(List.of()))
+                    .executionTargetIds(Optional.ofNullable(scope.getExecutionTargetIds()).orElse(List.of()))
+                    .mcpServers(Optional.ofNullable(scope.getMcpServers()).orElse(List.of()))
+                    .config(config)
+                    .build());
         }
         return List.of(OpsWorkflowNode.builder()
                 .nodeId("chat")

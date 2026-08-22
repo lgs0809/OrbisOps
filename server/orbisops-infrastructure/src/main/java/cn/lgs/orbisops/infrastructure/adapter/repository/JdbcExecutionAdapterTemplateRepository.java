@@ -33,7 +33,7 @@ public class JdbcExecutionAdapterTemplateRepository
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 
-    @Value("${ops.execution-adapter-template.auto-init:true}")
+    @Value("${orbisops.execution-adapter-template.auto-init:true}")
     private boolean autoInit = true;
 
     private volatile boolean initialized;

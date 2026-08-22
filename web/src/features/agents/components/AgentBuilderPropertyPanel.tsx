@@ -96,7 +96,7 @@ export const AgentBuilderPropertyPanel: React.FC<Props> = ({
       <TabBar $count={advanced ? 4 : 2}>
         <TabButton $active={activePanel === 'node'} onClick={() => onPanelChange('node')}>节点能力</TabButton>
         {advanced && (
-          <TabButton $active={activePanel === 'edge'} onClick={() => onPanelChange('edge')}>连接路由</TabButton>
+          <TabButton $active={activePanel === 'edge'} onClick={() => onPanelChange('edge')}>连接与路由</TabButton>
         )}
         {advanced && (
           <TabButton $active={activePanel === 'json'} onClick={() => onPanelChange('json')}>高级 JSON</TabButton>

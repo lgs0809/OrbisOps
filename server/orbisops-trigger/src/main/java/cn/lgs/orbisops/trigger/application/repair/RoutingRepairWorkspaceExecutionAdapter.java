@@ -12,7 +12,7 @@ import cn.lgs.orbisops.domain.repair.model.RepairDiffSnapshot;
 import cn.lgs.orbisops.domain.repair.model.RepairWorkspace;
 import cn.lgs.orbisops.domain.source.model.SourceRepository;
 import cn.lgs.orbisops.domain.source.model.SourceRepositoryAccessMode;
-import cn.lgs.orbisops.infrastructure.adapter.repository.LocalRepairWorkspaceExecutionAdapter;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
@@ -23,14 +23,14 @@ import java.nio.file.Path;
 @Component
 public final class RoutingRepairWorkspaceExecutionAdapter implements RepairWorkspaceExecutionPort {
 
-    private final LocalRepairWorkspaceExecutionAdapter local;
-    private final McpRepairWorkspaceExecutionAdapter remote;
+    private final RepairWorkspaceExecutionPort local;
+    private final RepairWorkspaceExecutionPort remote;
     private final RepairSourceCatalogPort sources;
     private final IRepairWorkspaceRepository workspaces;
 
     public RoutingRepairWorkspaceExecutionAdapter(
-            LocalRepairWorkspaceExecutionAdapter local,
-            McpRepairWorkspaceExecutionAdapter remote,
+            @Qualifier("localRepairWorkspaceExecutionAdapter") RepairWorkspaceExecutionPort local,
+            @Qualifier("mcpRepairWorkspaceExecutionAdapter") RepairWorkspaceExecutionPort remote,
             RepairSourceCatalogPort sources,
             IRepairWorkspaceRepository workspaces) {
         this.local = local;

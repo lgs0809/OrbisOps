@@ -74,9 +74,9 @@ public class OpsChannelApplicationConfiguration {
             ChannelRuntimeAuditPort audit,
             ChannelTaskExecutorPort executor,
             ChannelOutboundContentPolicy contentPolicy,
-            @Value("${ops.channel.inbound.worker.enabled:true}") boolean workerEnabled,
-            @Value("${ops.channel.inbound.worker.batch-size:20}") int workerBatchSize,
-            @Value("${ops.channel.inbound.lease-seconds:300}") int leaseSeconds) {
+            @Value("${orbisops.channel.inbound.worker.enabled:true}") boolean workerEnabled,
+            @Value("${orbisops.channel.inbound.worker.batch-size:20}") int workerBatchSize,
+            @Value("${orbisops.channel.inbound.lease-seconds:300}") int leaseSeconds) {
         return new ChannelInboundProcessManager(repository, protocol, leases, executionBindings, identities, chat,
                 replies, audit, executor, contentPolicy, workerEnabled, workerBatchSize, leaseSeconds);
     }
@@ -92,7 +92,7 @@ public class OpsChannelApplicationConfiguration {
             ChannelOutboundDeliveryPort deliveryPort,
             ChannelRuntimeAuditPort auditPort,
             ChannelOutboundContentPolicy contentPolicy,
-            @Value("${ops.channel.outbound.max-message-chars:20000}") int maxMessageChars) {
+            @Value("${orbisops.channel.outbound.max-message-chars:20000}") int maxMessageChars) {
         return new ChannelOutboundApplicationService(repository, deliveryPort, auditPort,
                 contentPolicy, maxMessageChars);
     }

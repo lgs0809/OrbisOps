@@ -4,7 +4,9 @@ import com.alibaba.cloud.ai.graph.agent.interceptor.ModelCallHandler;
 import com.alibaba.cloud.ai.graph.agent.interceptor.ModelInterceptor;
 import com.alibaba.cloud.ai.graph.agent.interceptor.ModelRequest;
 import com.alibaba.cloud.ai.graph.agent.interceptor.ModelResponse;
+import reactor.core.publisher.Flux;
 
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +18,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
@@ -53,13 +56,15 @@ final class OpsAgentScopeModelCallInterceptor extends ModelInterceptor {
             record(event("MODEL_CALL_STARTED", "RUNNING", "AgentScope 模型调用已开始。", request, 0L, 0L, null));
             try {
                 ModelResponse response = handler.call(request);
+                if (isStreaming(response)) {
+                    return decorateStream(response, request, startedNanos, 0L,
+                            TimeUnit.SECONDS.toMillis(timeoutSeconds));
+                }
                 record(event("MODEL_CALL_FINISHED", "SUCCEEDED", "AgentScope 模型调用完成。",
                         request, elapsedMs(startedNanos), 0L, null));
                 return response;
             } catch (RuntimeException error) {
-                record(event("MODEL_CALL_FAILED", "FAILED", "AgentScope 模型调用失败：" + error.getMessage(),
-                        request, elapsedMs(startedNanos), 0L, error.getMessage()));
-                throw error;
+                throw recordFailure(request, startedNanos, 0L, error);
             }
         }
         return boundedCall(request, handler);
@@ -99,6 +104,10 @@ final class OpsAgentScopeModelCallInterceptor extends ModelInterceptor {
             ModelResponse response = future.get(executionTimeoutMillis, TimeUnit.MILLISECONDS);
             long executionMs = elapsedMs(startedNanos.get());
             long queueWaitMs = nanosToMillis(startedNanos.get() - queuedNanos);
+            if (isStreaming(response)) {
+                long streamTimeoutMillis = Math.max(1L, executionTimeoutMillis - executionMs);
+                return decorateStream(response, request, startedNanos.get(), queueWaitMs, streamTimeoutMillis);
+            }
             record(event("MODEL_CALL_FINISHED", "SUCCEEDED", "AgentScope 模型调用完成。",
                     request, executionMs, queueWaitMs, null));
             return response;
@@ -121,10 +130,78 @@ final class OpsAgentScopeModelCallInterceptor extends ModelInterceptor {
             RuntimeException runtimeException = cause instanceof RuntimeException runtime
                     ? runtime
                     : new IllegalStateException("MODEL_CALL_FAILED: " + cause.getMessage(), cause);
-            record(event("MODEL_CALL_FAILED", "FAILED", "AgentScope 模型调用失败：" + runtimeException.getMessage(),
-                    request, elapsedMs(startedNanos.get()), nanosToMillis(startedNanos.get() - queuedNanos), runtimeException.getMessage()));
-            throw runtimeException;
+            throw recordFailure(
+                    request,
+                    startedNanos.get(),
+                    nanosToMillis(startedNanos.get() - queuedNanos),
+                    runtimeException);
         }
+    }
+
+    private boolean isStreaming(ModelResponse response) {
+        return response != null && response.getMessage() instanceof Flux<?>;
+    }
+
+    private ModelResponse decorateStream(
+            ModelResponse response,
+            ModelRequest request,
+            long startedNanos,
+            long queueWaitMs,
+            long streamTimeoutMillis) {
+        Flux<?> source = (Flux<?>) response.getMessage();
+        AtomicBoolean terminalRecorded = new AtomicBoolean();
+        Flux<?> guarded = source
+                .timeout(Duration.ofMillis(Math.max(1L, streamTimeoutMillis)))
+                .doOnComplete(() -> {
+                    if (terminalRecorded.compareAndSet(false, true)) {
+                        record(event("MODEL_CALL_FINISHED", "SUCCEEDED", "AgentScope 模型调用完成。",
+                                request, elapsedMs(startedNanos), queueWaitMs, null));
+                    }
+                })
+                .onErrorMap(error -> {
+                    RuntimeException propagated = classifiedException(error);
+                    if (terminalRecorded.compareAndSet(false, true)) {
+                        recordFailureEvent(request, startedNanos, queueWaitMs, propagated);
+                    }
+                    return propagated;
+                });
+        return new ModelResponse(guarded, response.getChatResponse());
+    }
+
+    private RuntimeException recordFailure(
+            ModelRequest request,
+            long startedNanos,
+            long queueWaitMs,
+            Throwable error) {
+        RuntimeException propagated = classifiedException(error);
+        recordFailureEvent(request, startedNanos, queueWaitMs, propagated);
+        return propagated;
+    }
+
+    private void recordFailureEvent(
+            ModelRequest request,
+            long startedNanos,
+            long queueWaitMs,
+            RuntimeException error) {
+        OpsModelProviderFailureClassifier.Failure failure =
+                OpsModelProviderFailureClassifier.classify(error).orElse(null);
+        String summary = failure == null
+                ? "AgentScope 模型调用失败。"
+                : failure.eventSummary();
+        String reasonCode = failure == null ? "MODEL_CALL_FAILED" : failure.code();
+        record(event("MODEL_CALL_FAILED", "FAILED", summary,
+                request, elapsedMs(startedNanos), queueWaitMs, reasonCode));
+    }
+
+    private RuntimeException classifiedException(Throwable error) {
+        OpsModelProviderFailureClassifier.Failure failure =
+                OpsModelProviderFailureClassifier.classify(error).orElse(null);
+        if (failure != null) {
+            return new IllegalStateException(failure.code(), error);
+        }
+        return error instanceof RuntimeException runtime
+                ? runtime
+                : new IllegalStateException("MODEL_CALL_FAILED", error);
     }
 
     private OpsRuntimeEvent event(

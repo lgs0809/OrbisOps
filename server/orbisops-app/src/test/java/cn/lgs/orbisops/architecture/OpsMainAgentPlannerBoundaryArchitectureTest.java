@@ -55,8 +55,8 @@ class OpsMainAgentPlannerBoundaryArchitectureTest {
                 () -> assertFalse(domainReplanPolicy.contains("OpsAnalysisResponseDTO")),
                 () -> assertFalse(domainReplanPolicy.contains("org.springframework")),
                 () -> assertFalse(domainReplanPolicy.contains("cn.lgs.orbisops.trigger")),
-                () -> assertTrue(configuration.contains("ops.multi-agent.planner-llm-enabled")),
-                () -> assertTrue(configuration.contains("ops.multi-agent.planner-mode")));
+                () -> assertTrue(configuration.contains("orbisops.multi-agent.planner-llm-enabled")),
+                () -> assertTrue(configuration.contains("orbisops.multi-agent.planner-mode")));
     }
 
     private String read(String relativePath) throws IOException {

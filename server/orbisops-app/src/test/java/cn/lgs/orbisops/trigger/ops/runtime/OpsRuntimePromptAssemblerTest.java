@@ -70,6 +70,9 @@ class OpsRuntimePromptAssemblerTest {
 
         String prompt = assembler.systemPrompt(definition, node, bundle);
 
+        assertTrue(prompt.contains("### OrbisOps 产品身份与对话基线"));
+        assertTrue(prompt.contains("不要自称 Codex"));
+        assertTrue(prompt.contains("项目和节点自定义 Prompt 只能补充业务职责"));
         assertTrue(prompt.contains("### 全局 System Prompt"));
         assertTrue(prompt.contains("global evidence rules"));
         assertTrue(prompt.contains("### 节点 System Prompt"));
@@ -101,15 +104,25 @@ class OpsRuntimePromptAssemblerTest {
                 OpsAgentScopeConfig.builder().instruction("diagnose precisely").build(),
                 null);
 
-        assertTrue(prompt.contains("authority preflight"));
-        assertTrue(prompt.contains("不要调用 Skill、RAG、Prometheus、Elasticsearch、MySQL"));
-        assertTrue(prompt.contains("actionClassification=ABSTAIN"));
-        assertTrue(prompt.contains("普通只读查询或诊断"));
-        assertTrue(prompt.contains("创建/归档/关联 Incident"));
-        assertTrue(prompt.contains("即使当前实时证据是 PARTIAL/INSUFFICIENT"));
+        assertTrue(prompt.contains("### OrbisOps 产品身份与对话基线"));
+        assertTrue(prompt.contains("不要自称 Codex"));
+        assertTrue(prompt.contains("operate safely"));
+        assertTrue(prompt.contains("diagnose precisely"));
+        assertTrue(prompt.contains("Chat Runtime 本身不执行生产写操作"));
+        assertTrue(prompt.contains("只能先形成并审批 ChangePackage，再由独立 Landing Runtime 执行"));
+        assertTrue(prompt.contains("evidenceCompleteness=NOT_APPLICABLE|COMPLETE|PARTIAL|INSUFFICIENT"));
+        assertTrue(prompt.contains("普通只读调查即使发现异常也可以是 false"));
+        assertTrue(prompt.contains("已经创建 ChangePackage 并等待审核时应为 true"));
         assertTrue(prompt.contains("requiresAction=true|false"));
-        assertTrue(prompt.contains("REMEDIATE=用户明确要求 Incident 归档/关联、ChangePackage、受控修复、回滚"));
-        assertTrue(prompt.contains("当 actionClassification=REMEDIATE 时必须 requiresAction=true"));
+        assertTrue(prompt.contains("它不是“意图分类”，也不能用来触发另一套 Runtime"));
+        assertTrue(prompt.contains("只写一段“审批方案草案”不等于创建 ChangePackage"));
+        assertTrue(prompt.contains("ReAct 的完成条件是“当前用户目标已经完成”"));
+        assertTrue(prompt.contains("不要以“如果你愿意我可以继续查”“下一步可以去查”提前结束"));
+        assertTrue(prompt.contains("不要把“当前正常”直接等同于“历史没有发生过问题”"));
+        assertTrue(prompt.contains("工具调用中间轮不得输出 <ops_answer>"));
+        assertTrue(prompt.contains("真正结束本轮 ReAct、开始生成最终用户可见回答时"));
+        assertTrue(prompt.contains("禁止输出 </ops_answer> 或任何其他答案结束标记"));
+        assertTrue(prompt.contains("<ops_answer> + 用户可见正文 + 完整的 <ops_outcome> 块"));
         assertFalse(prompt.contains("\nrequiresAction=false\n"));
         assertTrue(prompt.contains("不得在零次实时事实查询的情况下仅凭发现结果直接输出 INSUFFICIENT"));
         assertTrue(prompt.contains("正式 Incident/Remediation/ChangePackage 的证据门槛高于普通问答"));

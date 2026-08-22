@@ -17,9 +17,9 @@ public class JdbcEvidenceSchemaInitializer {
 
     public JdbcEvidenceSchemaInitializer(
             @Qualifier("mysqlJdbcTemplate") ObjectProvider<JdbcTemplate> provider,
-            @Value("${ops.tool-result.auto-init:true}") boolean toolResultAutoInit,
-            @Value("${ops.evidence.auto-init:true}") boolean evidenceAutoInit,
-            @Value("${ops.trusted-proof.auto-init:true}") boolean trustedProofAutoInit) {
+            @Value("${orbisops.tool-result.auto-init:true}") boolean toolResultAutoInit,
+            @Value("${orbisops.evidence.auto-init:true}") boolean evidenceAutoInit,
+            @Value("${orbisops.trusted-proof.auto-init:true}") boolean trustedProofAutoInit) {
         this.jdbc = provider.getIfAvailable();
         this.toolResultAutoInit = toolResultAutoInit;
         this.evidenceAutoInit = evidenceAutoInit;

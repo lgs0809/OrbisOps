@@ -25,7 +25,7 @@ public class JdbcRuntimeContextBundleRepository implements IRuntimeContextBundle
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 
-    @Value("${ops.runtime-context-bundle.auto-init:true}")
+    @Value("${orbisops.runtime-context-bundle.auto-init:true}")
     private boolean autoInit = true;
 
     private volatile boolean initialized;

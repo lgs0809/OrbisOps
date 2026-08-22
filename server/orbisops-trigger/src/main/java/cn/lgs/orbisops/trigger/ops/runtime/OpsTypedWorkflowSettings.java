@@ -16,9 +16,9 @@ public final class OpsTypedWorkflowSettings {
 
     @Autowired
     public OpsTypedWorkflowSettings(
-            @Value("${ops.workflow.typed.mode:SHADOW}") String mode,
-            @Value("${ops.workflow.typed.scope:DURABLE_ONLY}") String scope,
-            @Value("${ops.workflow.typed.max-node-attempts:3}") int maxNodeAttempts) {
+            @Value("${orbisops.workflow.typed.mode:SHADOW}") String mode,
+            @Value("${orbisops.workflow.typed.scope:DURABLE_ONLY}") String scope,
+            @Value("${orbisops.workflow.typed.max-node-attempts:3}") int maxNodeAttempts) {
         this.mode = Mode.parse(mode);
         this.scope = Scope.parse(scope);
         this.maxNodeAttempts = Math.max(1, Math.min(maxNodeAttempts, 20));

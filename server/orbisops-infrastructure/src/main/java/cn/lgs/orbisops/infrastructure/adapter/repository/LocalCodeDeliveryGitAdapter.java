@@ -22,9 +22,9 @@ public class LocalCodeDeliveryGitAdapter implements CodeDeliveryGitPort {
     private final int maxOutputBytes;
 
     public LocalCodeDeliveryGitAdapter(
-            @Value("${ops.repair.github.remote:origin}") String remote,
-            @Value("${ops.repair.delivery.command-timeout-seconds:120}") long timeoutSeconds,
-            @Value("${ops.repair.delivery.max-output-bytes:1048576}") int maxOutputBytes) {
+            @Value("${orbisops.repair.github.remote:origin}") String remote,
+            @Value("${orbisops.repair.delivery.command-timeout-seconds:120}") long timeoutSeconds,
+            @Value("${orbisops.repair.delivery.max-output-bytes:1048576}") int maxOutputBytes) {
         this.remote = value(remote).isBlank() ? "origin" : value(remote);
         this.timeout = Duration.ofSeconds(Math.max(10L, timeoutSeconds));
         this.maxOutputBytes = Math.max(4096, maxOutputBytes);

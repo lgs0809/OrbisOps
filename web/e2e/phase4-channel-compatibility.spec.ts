@@ -45,20 +45,20 @@ test('Channel compatibility matrix renders backend capability facts without inve
   await page.goto('/platform/integrations?projectId=demo-project');
   const matrix = page.getByTestId('channel-compatibility-matrix');
   await expect(matrix).toBeVisible();
-  await expect(matrix).toContainText('Capability facts come directly from the backend Provider Adapter Catalog');
+  await expect(matrix).toContainText('这里只展示当前版本实际可用的渠道能力');
 
   const wechat = matrix.getByRole('row').filter({ hasText: 'WeChat' });
   await expect(wechat).toContainText('WEBHOOK');
-  await expect(wechat.getByLabel('Supported', { exact: true })).toHaveCount(4);
-  await expect(wechat.getByLabel('Not supported', { exact: true })).toHaveCount(5);
+  await expect(wechat.getByLabel('支持', { exact: true })).toHaveCount(4);
+  await expect(wechat.getByLabel('不支持', { exact: true })).toHaveCount(5);
 
   const discord = matrix.getByRole('row').filter({ hasText: 'Discord' });
   await expect(discord).toContainText('LONG_CONNECTION');
-  await expect(discord.getByLabel('Supported', { exact: true })).toHaveCount(8);
-  await expect(discord.getByLabel('Not supported', { exact: true })).toHaveCount(1);
+  await expect(discord.getByLabel('支持', { exact: true })).toHaveCount(8);
+  await expect(discord.getByLabel('不支持', { exact: true })).toHaveCount(1);
 
   const slack = matrix.getByRole('row').filter({ hasText: 'Slack' });
-  await expect(slack).toContainText('Not installed');
-  await expect(slack.getByLabel('Supported', { exact: true })).toHaveCount(0);
-  await expect(slack.getByLabel('Not supported', { exact: true })).toHaveCount(9);
+  await expect(slack).toContainText('未安装');
+  await expect(slack.getByLabel('支持', { exact: true })).toHaveCount(0);
+  await expect(slack.getByLabel('不支持', { exact: true })).toHaveCount(9);
 });

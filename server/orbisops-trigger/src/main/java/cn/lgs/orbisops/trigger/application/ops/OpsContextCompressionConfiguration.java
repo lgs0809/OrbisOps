@@ -10,11 +10,11 @@ public class OpsContextCompressionConfiguration {
 
     @Bean
     public OpsContextCompressionSettings opsContextCompressionSettings(
-            @Value("${ops.chat.memory.compression-enabled:true}") boolean enabled,
-            @Value("${ops.chat.memory.compression-hot-threshold-messages:20}") int thresholdMessages,
-            @Value("${ops.chat.memory.compression-keep-recent:8}") int keepRecent,
-            @Value("${ops.chat.memory.compression-llm-enabled:true}") boolean modelEnabled,
-            @Value("${ops.chat.memory.compression-llm-max-input-chars:6000}") int modelMaxInputChars) {
+            @Value("${orbisops.chat.memory.compression-enabled:true}") boolean enabled,
+            @Value("${orbisops.chat.memory.compression-hot-threshold-messages:20}") int thresholdMessages,
+            @Value("${orbisops.chat.memory.compression-keep-recent:8}") int keepRecent,
+            @Value("${orbisops.chat.memory.compression-llm-enabled:true}") boolean modelEnabled,
+            @Value("${orbisops.chat.memory.compression-llm-max-input-chars:6000}") int modelMaxInputChars) {
         return new OpsContextCompressionSettings(
                 enabled,
                 thresholdMessages,

@@ -35,6 +35,26 @@ class OpsMainQuestionRewriteProtocolTest {
     }
 
     @Test
+    void keepsGeneralConversationAsPlainStandaloneQuestion() {
+        OpsMainQuestionRewriteService.RewriteResult result = protocol.project(
+                "你是谁？",
+                JSON.parseObject("""
+                        {
+                          "rewrittenQuestion":"你是谁？",
+                          "changed":false,
+                          "reason":"普通身份询问",
+                          "resolvedReferences":[]
+                        }
+                        """),
+                OpsMainQuestionRewriteSettings.defaults());
+
+        assertFalse(result.changed());
+        assertEquals("你是谁？", result.rewrittenQuestion());
+        assertTrue(protocol.systemPrompt().contains("先别动生产"));
+        assertTrue(protocol.systemPrompt().contains("不要改写成已经执行或可以直接执行生产变更"));
+    }
+
+    @Test
     void degradesToOriginalWhenModelReturnsNoUsableQuestion() {
         OpsMainQuestionRewriteService.RewriteResult result = protocol.project(
                 "查日志",

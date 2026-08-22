@@ -10,15 +10,15 @@ public class OpsLocalAdapterConfiguration {
 
     @Bean
     public OpsLocalAdapterSettings opsLocalAdapterSettings(
-            @Value("${ops.prometheus-url:http://127.0.0.1:9090}") String prometheusUrl,
-            @Value("${ops.elasticsearch-url:http://127.0.0.1:9200}") String elasticsearchUrl,
-            @Value("${ops.elasticsearch-index:}") String elasticsearchIndex,
-            @Value("${ops.elasticsearch-index-whitelist:${ops.elasticsearch-index:}}") String elasticsearchIndexWhitelist,
-            @Value("${ops.local-log.allowed-roots:./logs}") String allowedLogRoots,
-            @Value("${ops.docker-compose.allowed-roots:./}") String allowedDockerComposeRoots,
-            @Value("${ops.local-adapter.timeout-seconds:8}") int timeoutSeconds,
-            @Value("${ops.local-adapter.max-rows:200}") int maxRows,
-            @Value("${ops.local-adapter.max-response-bytes:65536}") int maxResponseBytes) {
+            @Value("${orbisops.prometheus-url:http://127.0.0.1:9090}") String prometheusUrl,
+            @Value("${orbisops.elasticsearch-url:http://127.0.0.1:9200}") String elasticsearchUrl,
+            @Value("${orbisops.elasticsearch-index:}") String elasticsearchIndex,
+            @Value("${orbisops.elasticsearch-index-whitelist:${orbisops.elasticsearch-index:}}") String elasticsearchIndexWhitelist,
+            @Value("${orbisops.local-log.allowed-roots:./logs}") String allowedLogRoots,
+            @Value("${orbisops.docker-compose.allowed-roots:./}") String allowedDockerComposeRoots,
+            @Value("${orbisops.local-adapter.timeout-seconds:8}") int timeoutSeconds,
+            @Value("${orbisops.local-adapter.max-rows:200}") int maxRows,
+            @Value("${orbisops.local-adapter.max-response-bytes:65536}") int maxResponseBytes) {
         return new OpsLocalAdapterSettings(
                 prometheusUrl,
                 elasticsearchUrl,

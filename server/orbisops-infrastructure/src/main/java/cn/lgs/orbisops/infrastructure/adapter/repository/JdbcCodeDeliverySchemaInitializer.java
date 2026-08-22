@@ -17,8 +17,8 @@ public class JdbcCodeDeliverySchemaInitializer {
     @org.springframework.beans.factory.annotation.Autowired
     public JdbcCodeDeliverySchemaInitializer(
             @Qualifier("mysqlJdbcTemplate") ObjectProvider<JdbcTemplate> jdbcProvider,
-            @Value("${ops.repair.jdbc-enabled:true}") boolean jdbcEnabled,
-            @Value("${ops.repair.auto-init:true}") boolean autoInit) {
+            @Value("${orbisops.repair.jdbc-enabled:true}") boolean jdbcEnabled,
+            @Value("${orbisops.repair.auto-init:true}") boolean autoInit) {
         this.jdbc = jdbcProvider.getIfAvailable();
         this.jdbcEnabled = jdbcEnabled;
         this.autoInit = autoInit;

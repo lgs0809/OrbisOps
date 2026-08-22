@@ -36,7 +36,10 @@ public class OpsRuntimeContextBundleAdapter {
             String memoryContext,
             Map<String, Object> metadata) {
         return mapper.view(commands.create(mapper.createCommand(
-                request, memoryContext, metadata, settings.selectedSkillLimit())));
+                request,
+                memoryContext,
+                metadata,
+                settings.selectedSkillLimit())));
     }
 
     public Map<String, Object> requireBundle(String contextBundleId, String contextBundleHash) {

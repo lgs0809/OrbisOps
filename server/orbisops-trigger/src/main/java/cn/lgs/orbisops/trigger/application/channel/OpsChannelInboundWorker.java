@@ -13,7 +13,7 @@ public final class OpsChannelInboundWorker {
         this.processManager = processManager;
     }
 
-    @Scheduled(fixedDelayString = "${ops.channel.inbound.worker.fixed-delay-ms:5000}")
+    @Scheduled(fixedDelayString = "${orbisops.channel.inbound.worker.fixed-delay-ms:5000}")
     public void processPending() {
         processManager.processPending();
     }

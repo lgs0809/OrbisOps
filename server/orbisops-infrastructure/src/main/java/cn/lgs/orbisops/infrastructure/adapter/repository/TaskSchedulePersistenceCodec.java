@@ -25,6 +25,7 @@ final class TaskSchedulePersistenceCodec {
         }
         ObjectNode value = objectMapper.createObjectNode();
         put(value, "projectId", configuration.projectId());
+        put(value, "executionType", configuration.executionType());
         put(value, "agentBindingMode", configuration.agentBindingMode());
         put(value, "agentVersion", configuration.agentVersion());
         put(value, "agentDefinitionHash", configuration.agentDefinitionHash());
@@ -80,6 +81,7 @@ final class TaskSchedulePersistenceCodec {
                     doubleValue(screening, "minInstanceUpRatio"));
             return new TaskScheduleRuntimeConfiguration(
                     textValue(config, "projectId"),
+                    textValue(config, "executionType"),
                     textValue(config, "agentBindingMode"),
                     integerValue(config, "agentVersion"),
                     textValue(config, "agentDefinitionHash"),

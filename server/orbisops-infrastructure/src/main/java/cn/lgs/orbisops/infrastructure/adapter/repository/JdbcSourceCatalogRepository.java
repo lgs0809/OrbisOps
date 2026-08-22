@@ -38,7 +38,7 @@ public class JdbcSourceCatalogRepository implements
     @org.springframework.beans.factory.annotation.Autowired
     public JdbcSourceCatalogRepository(
             @Qualifier("mysqlJdbcTemplate") ObjectProvider<JdbcTemplate> jdbcProvider,
-            @Value("${ops.source-repository.jdbc-enabled:true}") boolean jdbcEnabled) {
+            @Value("${orbisops.source-repository.jdbc-enabled:true}") boolean jdbcEnabled) {
         this(jdbcProvider.getIfAvailable(), jdbcEnabled, false);
     }
 

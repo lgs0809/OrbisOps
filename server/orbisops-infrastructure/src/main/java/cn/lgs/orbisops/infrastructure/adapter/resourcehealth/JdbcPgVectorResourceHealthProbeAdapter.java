@@ -32,7 +32,7 @@ public class JdbcPgVectorResourceHealthProbeAdapter
 
     @Override
     public ResourceHealthCheck probe(String tableName) {
-        String configuredTable = text(tableName, "vector_store_qwen_vl_2048");
+        String configuredTable = text(tableName, "orbisops_vector_store");
         if (jdbcTemplate == null) {
             return ResourceHealthCheck.unavailable(
                     "pgvector",

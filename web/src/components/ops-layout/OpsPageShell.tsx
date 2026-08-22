@@ -122,7 +122,7 @@ export const OpsPageShell: React.FC<OpsPageShellProps> = ({
 
   const handleLogout = () => {
     clearAuthSession();
-    Toast.success('已退出登录');
+    Toast.success('已退出登录。');
     if (onLogout) {
       onLogout();
       return;
@@ -132,7 +132,7 @@ export const OpsPageShell: React.FC<OpsPageShellProps> = ({
 
   return (
     <PageLayout>
-      <SkipLink href="#main-content">Skip to main content</SkipLink>
+      <SkipLink href="#main-content">跳到主要内容</SkipLink>
       <Sidebar
         selectedKey={selectedKey}
         onSelect={handleNavigation}

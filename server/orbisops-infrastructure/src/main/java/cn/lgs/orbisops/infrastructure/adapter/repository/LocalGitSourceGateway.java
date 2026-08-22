@@ -34,11 +34,11 @@ public class LocalGitSourceGateway implements SourceGitPort {
     private final long maxCommandOutputBytes;
 
     public LocalGitSourceGateway(
-            @Value("${ops.source-repository.allowed-local-roots:}") String allowedLocalRoots,
-            @Value("${ops.source-repository.git-binary:git}") String gitBinary,
-            @Value("${ops.source-repository.command-timeout-seconds:8}") int commandTimeoutSeconds,
-            @Value("${ops.source-repository.max-file-bytes:1048576}") long maxFileBytes,
-            @Value("${ops.source-repository.max-command-output-bytes:2097152}") long maxCommandOutputBytes) {
+            @Value("${orbisops.source-repository.allowed-local-roots:}") String allowedLocalRoots,
+            @Value("${orbisops.source-repository.git-binary:git}") String gitBinary,
+            @Value("${orbisops.source-repository.command-timeout-seconds:8}") int commandTimeoutSeconds,
+            @Value("${orbisops.source-repository.max-file-bytes:1048576}") long maxFileBytes,
+            @Value("${orbisops.source-repository.max-command-output-bytes:2097152}") long maxCommandOutputBytes) {
         this.allowedLocalRoots = allowedLocalRoots;
         this.gitBinary = gitBinary;
         this.commandTimeoutSeconds = commandTimeoutSeconds;
@@ -165,6 +165,8 @@ public class LocalGitSourceGateway implements SourceGitPort {
     private GitResult runGitInternal(Path repositoryPath, List<String> arguments, long outputLimit) {
         List<String> command = new ArrayList<>();
         command.add(StringUtils.hasText(gitBinary) ? gitBinary.trim() : "git");
+        command.add("-c");
+        command.add("safe.directory=" + repositoryPath);
         command.add("-C");
         command.add(repositoryPath.toString());
         command.addAll(arguments);

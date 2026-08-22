@@ -75,6 +75,7 @@ public class TaskScheduleApplicationService {
         return new TaskScheduleCommand(
                 request.getId(),
                 request.getProjectId(),
+                request.getExecutionType(),
                 request.getAgentId(),
                 request.getAgentBindingMode(),
                 request.getAgentVersion(),
@@ -107,6 +108,7 @@ public class TaskScheduleApplicationService {
         return TaskScheduleResponseDTO.builder()
                 .id(schedule.id())
                 .projectId(schedule.projectId())
+                .executionType(runtime.executionType())
                 .agentId(schedule.agentId())
                 .agentBindingMode(runtime.agentBindingMode())
                 .agentVersion(runtime.agentVersion())

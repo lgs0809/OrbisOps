@@ -19,8 +19,8 @@ public class JdbcAnalysisAuditSchemaInitializer {
 
     public JdbcAnalysisAuditSchemaInitializer(
             @Qualifier("mysqlJdbcTemplate") ObjectProvider<JdbcTemplate> jdbcTemplateProvider,
-            @Value("${ops.audit.jdbc-enabled:true}") boolean jdbcEnabled,
-            @Value("${ops.audit.auto-init:true}") boolean autoInit) {
+            @Value("${orbisops.audit.jdbc-enabled:true}") boolean jdbcEnabled,
+            @Value("${orbisops.audit.auto-init:true}") boolean autoInit) {
         this.jdbcTemplateProvider = jdbcTemplateProvider;
         this.jdbcEnabled = jdbcEnabled;
         this.autoInit = autoInit;

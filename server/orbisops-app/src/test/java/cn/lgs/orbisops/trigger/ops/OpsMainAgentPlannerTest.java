@@ -511,13 +511,13 @@ public class OpsMainAgentPlannerTest {
 
     @Test
     public void shouldSplitEsMustAndShouldPhrases() {
-        OpsQuestionContext context = OpsQuestionContext.from("traceId:abc123XYZ789 orderId:ORDER202605070001 /api/orders/create 订单 超时 ERROR");
+        OpsQuestionContext context = OpsQuestionContext.from("traceId:abc123XYZ789 requestId:REQ202605070001 /api/services/checkout 服务 超时 ERROR");
 
         assertTrue(context.esMustPhrases().contains("abc123XYZ789"));
-        assertTrue(context.esMustPhrases().contains("ORDER202605070001"));
-        assertTrue(context.esMustPhrases().contains("/api/orders/create"));
-        assertFalse(context.esMustPhrases().contains("订单"));
-        assertTrue(context.esShouldPhrases().contains("订单"));
+        assertTrue(context.esMustPhrases().contains("REQ202605070001"));
+        assertTrue(context.esMustPhrases().contains("/api/services/checkout"));
+        assertFalse(context.esMustPhrases().contains("服务"));
+        assertTrue(context.esShouldPhrases().contains("服务"));
         assertTrue(context.esShouldPhrases().contains("超时"));
     }
 

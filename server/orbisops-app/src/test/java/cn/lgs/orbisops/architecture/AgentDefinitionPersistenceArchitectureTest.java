@@ -67,7 +67,7 @@ class AgentDefinitionPersistenceArchitectureTest {
                 () -> assertFalse(registry.contains("ensureTable(")),
                 () -> assertFalse(registry.contains("addColumnIfMissing(")),
                 () -> assertFalse(registry.contains("jdbcInitialized")),
-                () -> assertFalse(registry.contains("ops.agents.auto-init")));
+                () -> assertFalse(registry.contains("orbisops.agents.auto-init")));
     }
 
     @Test

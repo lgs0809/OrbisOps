@@ -42,7 +42,7 @@ public class OpsAlertTriggerOutboxJob {
         this.settings = settings == null ? OpsAlertOutboxJobSettings.defaults() : settings;
     }
 
-    @Scheduled(fixedDelayString = "${ops.alert-triggers.outbox.fixed-delay-ms:30000}")
+    @Scheduled(fixedDelayString = "${orbisops.alert-triggers.outbox.fixed-delay-ms:30000}")
     public void process() {
         if (!settings.enabled() || !running.compareAndSet(false, true)) {
             return;

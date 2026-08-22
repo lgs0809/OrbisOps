@@ -22,6 +22,7 @@ import {
 } from '../features/tool-routing/api/tool-routing-queries';
 import { useProjectScope } from '../hooks/use-project-scope';
 import { theme } from '../styles/theme';
+import { userFacingError } from '../utils/user-facing-error';
 
 const { Option } = Select;
 const { Text } = Typography;
@@ -223,7 +224,7 @@ export const ToolRoutingObservabilityPage: React.FC = () => {
       await rebuildMutation.mutateAsync();
       Toast.success('工具目录摘要已重建');
     } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '重建工具目录摘要失败');
+      Toast.error(userFacingError(error, '重建工具目录摘要失败，请稍后重试。'));
     }
   };
 
@@ -237,7 +238,7 @@ export const ToolRoutingObservabilityPage: React.FC = () => {
       setSelected(result || null);
       Toast.success('已生成工具候选');
     } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '工具路由失败');
+      Toast.error(userFacingError(error, '工具路由失败，请稍后重试。'));
     }
   };
 
@@ -247,7 +248,7 @@ export const ToolRoutingObservabilityPage: React.FC = () => {
       await reviewPolicyMutation.mutateAsync({ policyId, action, payload: { reason: `${action} by admin` } });
       Toast.success(action === 'reject' ? '策略已驳回' : '策略已停用');
     } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '工具策略审核失败');
+      Toast.error(userFacingError(error, '工具策略审核失败，请稍后重试。'));
     }
   };
 
@@ -286,7 +287,7 @@ export const ToolRoutingObservabilityPage: React.FC = () => {
       setPolicyReviewTarget(null);
       setPolicyReviewDraft(null);
     } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '工具策略审核失败');
+      Toast.error(userFacingError(error, '工具策略审核失败，请稍后重试。'));
     }
   };
 

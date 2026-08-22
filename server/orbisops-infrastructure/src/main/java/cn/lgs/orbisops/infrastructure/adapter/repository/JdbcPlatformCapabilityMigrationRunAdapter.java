@@ -34,7 +34,7 @@ public final class JdbcPlatformCapabilityMigrationRunAdapter
 
     public JdbcPlatformCapabilityMigrationRunAdapter(
             @Qualifier("mysqlJdbcTemplate") ObjectProvider<JdbcTemplate> provider,
-            @Value("${ops.platform-migration.auto-init:true}") boolean autoInit) {
+            @Value("${orbisops.platform-migration.auto-init:true}") boolean autoInit) {
         this.jdbc = provider.getIfAvailable();
         this.autoInit = autoInit;
     }

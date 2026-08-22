@@ -15,7 +15,7 @@ public final class OpsToolExecutionCompletionReconciliationJob {
 
     public OpsToolExecutionCompletionReconciliationJob(
             ToolExecutionCompletionReconciliationService reconciliation,
-            @Value("${ops.tool-execution.completion-reconciliation.batch-size:100}")
+            @Value("${orbisops.tool-execution.completion-reconciliation.batch-size:100}")
             int batchSize) {
         if (reconciliation == null) {
             throw new IllegalArgumentException("TOOL_COMPLETION_RECONCILIATION_REQUIRED");
@@ -25,7 +25,7 @@ public final class OpsToolExecutionCompletionReconciliationJob {
     }
 
     @Scheduled(fixedDelayString =
-            "${ops.tool-execution.completion-reconciliation.fixed-delay-ms:10000}")
+            "${orbisops.tool-execution.completion-reconciliation.fixed-delay-ms:10000}")
     public void reconcile() {
         ToolExecutionCompletionReconciliationService.ReconciliationOutcome outcome =
                 reconciliation.reconcile(batchSize);

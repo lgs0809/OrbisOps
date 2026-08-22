@@ -7,7 +7,7 @@ import java.util.Map;
 
 @Component
 @ConditionalOnProperty(
-        prefix = "ops.external-local",
+        prefix = "orbisops.external-local",
         name = "elasticsearch-enabled",
         havingValue = "true",
         matchIfMissing = true)

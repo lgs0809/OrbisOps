@@ -39,7 +39,7 @@ class OpsRunCancellationBoundaryArchitectureTest {
                 () -> assertTrue(state.contains("cleanupExpired()")),
                 () -> assertFalse(state.contains("@Service")),
                 () -> assertTrue(settings.contains("public record OpsRunCancellationSettings(")),
-                () -> assertTrue(configuration.contains("ops.runs.cancellation-retention-seconds")));
+                () -> assertTrue(configuration.contains("orbisops.runs.cancellation-retention-seconds")));
     }
 
     private String read(String relativePath) throws IOException {

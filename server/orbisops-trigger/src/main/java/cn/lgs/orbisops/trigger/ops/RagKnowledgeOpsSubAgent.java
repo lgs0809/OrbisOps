@@ -164,8 +164,8 @@ public class RagKnowledgeOpsSubAgent extends AbstractOpsSubAgent {
                 decision.llmGenerated() ? "LLM rag-knowledge-agent 生成检索策略" : "规则 rag-knowledge-agent 检索策略"));
 
         if (!embeddingAvailable && !bm25Available) {
-            gaps.add("未配置真实 OPENAI_EMBEDDING_API_KEY/OPENAI_API_KEY，向量 embedding 不可用；PgVector JDBC 也不可用，无法降级 BM25。");
-            adjustments.add("配置 OPENAI_EMBEDDING_API_KEY 或 OPENAI_API_KEY 后可启用 vector/hybrid；配置 OPS_RERANK_API_KEY 后可启用 rerank，本地模型服务可使用 local-rag-models；或检查 PgVector 数据源以使用 BM25。");
+            gaps.add("未配置可用的 ORBISOPS_EMBEDDING_BASE_URL / ORBISOPS_EMBEDDING_API_KEY，向量 embedding 不可用；PgVector JDBC 也不可用，无法降级 BM25。");
+            adjustments.add("配置 ORBISOPS_EMBEDDING_BASE_URL / ORBISOPS_EMBEDDING_API_KEY 后可启用 vector/hybrid；如需 rerank，请在模型配置中提供对应 Provider、endpoint、model 和凭据；或检查 PgVector 数据源以使用 BM25。");
             return reviewedResult(task, request, questionContext, evidence, attempts, gaps, adjustments, STATUS_BLOCKED, "知识库子 Agent 被阻塞：模型密钥和 PgVector BM25 均不可用。", false, 0D, iteration, maxIterations);
         }
 

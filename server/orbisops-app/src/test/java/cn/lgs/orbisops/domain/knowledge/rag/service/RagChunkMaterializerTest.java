@@ -117,6 +117,17 @@ class RagChunkMaterializerTest {
     }
 
     @Test
+    void shouldIgnoreEmptyExactDraftsAndKeepIndexesContinuous() {
+        List<RagDocument> documents = materializer.materialize(List.of(
+                RagChunkDraft.exact("   \n\t ", metadata(1000, 0)),
+                RagChunkDraft.exact("usable evidence", metadata(1000, 0))));
+
+        assertEquals(1, documents.size());
+        assertEquals("usable evidence", documents.get(0).text());
+        assertEquals(0, documents.get(0).metadata().get("chunk_index"));
+    }
+
+    @Test
     void shouldPreserveDraftOrderAndAssignContinuousIndexesAcrossSplitResults() {
         List<RagDocument> documents = materializer.materialize(List.of(
                 RagChunkDraft.exact("first", metadata(1000, 0)),

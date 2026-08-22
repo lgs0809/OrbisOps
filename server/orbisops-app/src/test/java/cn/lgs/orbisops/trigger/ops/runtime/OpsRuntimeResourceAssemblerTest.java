@@ -358,7 +358,7 @@ class OpsRuntimeResourceAssemblerTest {
     }
 
     @Test
-    void shouldExposeProposalToolOnlyWithRunAndAuthenticatedActor() {
+    void prepareAuthorityReactMustExposeProposalToolWithoutSeparateGovernanceRuntime() {
         ChatModel defaultChatModel = mock(ChatModel.class);
         OpsChangePackageToolProvider proposalProvider =
                 mock(OpsChangePackageToolProvider.class);
@@ -405,11 +405,6 @@ class OpsRuntimeResourceAssemblerTest {
                         prepareAuthority("run-1", "demo-project"))))
                 .build();
 
-        OpsRuntimeResourceBundle investigationBundle = assembler.assembleNode(
-                definition, node, request, events, null);
-        assertTrue(investigationBundle.getTools().isEmpty());
-
-        request.getMetadata().put(OpsChangePackageRuntimeToolContributor.GOVERNANCE_PHASE_KEY, true);
         OpsRuntimeResourceBundle bundle = assembler.assembleNode(
                 definition, node, request, events, null);
 

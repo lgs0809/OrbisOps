@@ -83,7 +83,7 @@ class McpRuntimeConfigSourceChainArchitectureTest {
         String telemetry = read(RUNTIME + "OpsMcpRuntimeConfigResolutionTelemetry.java");
 
         assertAll(
-                () -> assertTrue(telemetry.contains("ops.mcp.runtime.config.resolution")),
+                () -> assertTrue(telemetry.contains("orbisops.mcp.runtime.config.resolution")),
                 () -> assertTrue(telemetry.contains("tag(\"source\", source)")),
                 () -> assertTrue(telemetry.contains("tag(\"outcome\", outcome)")),
                 () -> assertTrue(telemetry.contains("tag(\"fallback\", fallback)")),

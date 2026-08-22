@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button, Form, Toast, Typography } from '@douyinfe/semi-ui';
 import { IconEyeClosed, IconEyeOpened, IconLock, IconSafe, IconUser } from '@douyinfe/semi-icons';
 import { useNavigate } from 'react-router-dom';
@@ -6,7 +6,9 @@ import styled from 'styled-components';
 import { theme } from '../styles/theme';
 import { Card } from '../components/common';
 import { AdminUserService } from '../services';
+import { FirstTimeSetupService } from '../services/first-time-setup-service';
 import { defaultRouteForCurrentUser, normalizeUserRole } from '../services/auth-session';
+import { userFacingError } from '../utils/user-facing-error';
 
 const { Title, Text } = Typography;
 
@@ -162,39 +164,81 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [setupRequired, setSetupRequired] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    FirstTimeSetupService.isRequired()
+      .then((required) => {
+        if (active) setSetupRequired(required);
+      })
+      .catch(() => {
+        if (active) setSetupRequired(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const persistSession = (loginUser: { userId?: string; username: string; userRole?: string; token?: string }, fallbackUsername: string) => {
+    if (!loginUser.token) return false;
+    const userInfo = {
+      userId: loginUser.userId,
+      username: loginUser.username || fallbackUsername,
+      userRole: normalizeUserRole(loginUser.userRole),
+      loginTime: new Date().toISOString(),
+      token: loginUser.token,
+    };
+    localStorage.setItem('token', userInfo.token);
+    localStorage.setItem('userInfo', JSON.stringify(userInfo));
+    localStorage.setItem('isLoggedIn', 'true');
+    return true;
+  };
 
   const handleLogin = async (values: Record<string, any>) => {
     setLoading(true);
     try {
       if (!values.username || !values.password) {
-        Toast.error('请输入账号和密码');
+        Toast.error('请输入用户名和密码。');
+        return;
+      }
+
+      if (setupRequired) {
+        if (values.password !== values.confirmPassword) {
+          Toast.error('两次输入的密码不一致。');
+          return;
+        }
+        const password = String(values.password);
+        if (!/\p{L}/u.test(password) || !/\p{N}/u.test(password)) {
+          Toast.error('管理员密码必须同时包含字母和数字。');
+          return;
+        }
+        const firstAdministrator = await FirstTimeSetupService.createFirstAdministrator({
+          username: values.username,
+          password: values.password,
+        });
+        if (!persistSession(firstAdministrator, values.username)) {
+          throw new Error('初始化已完成，但未返回有效登录会话。');
+        }
+        Toast.success('首位管理员已创建，欢迎使用 OrbisOps。');
+        navigate('/home');
         return;
       }
 
       const loginUser = await AdminUserService.loginAdminUser({
         username: values.username,
-        password: values.password
+        password: values.password,
       });
 
-      if (loginUser?.token) {
-        const userInfo = {
-          userId: loginUser.userId,
-          username: loginUser.username || values.username,
-          userRole: normalizeUserRole(loginUser.userRole),
-          loginTime: new Date().toISOString(),
-          token: loginUser.token
-        };
-        localStorage.setItem('token', userInfo.token);
-        localStorage.setItem('userInfo', JSON.stringify(userInfo));
-        localStorage.setItem('isLoggedIn', 'true');
-        Toast.success('登录成功！');
+      if (loginUser?.token && persistSession(loginUser, values.username)) {
+        Toast.success('登录成功。');
         navigate(defaultRouteForCurrentUser());
       } else {
-        Toast.error('账号或密码错误，请重试');
+        Toast.error('用户名或密码错误。');
       }
     } catch (error) {
-      console.error('登录失败:', error);
-      Toast.error('登录失败，请检查网络连接或稍后重试');
+      console.error('Authentication failed:', error);
+      Toast.error(userFacingError(error, '登录失败，请稍后重试。'));
     } finally {
       setLoading(false);
     }
@@ -209,53 +253,53 @@ const LoginPage: React.FC = () => {
           </BrandLogo>
           <BrandTitle heading={1}>OrbisOps</BrandTitle>
           <BrandDescription>
-            面向生产运维的受控 Agent 平台，把 ReAct 调查、可编排 Workflow、MCP 工具、知识与变更治理放进同一条可信执行链。
+            用自然对话完成排查与分析，用可复用工作流标准化重复任务，并让每次执行与生产变更都可追踪、可审批、可验证。
           </BrandDescription>
           <CapabilityGrid>
             <CapabilityItem>
-              <strong>ReAct + Workflow</strong>
-              <span>未知任务交给默认 ReAct；成熟 SOP 使用可发布、可恢复的 Workflow 固定宏观流程。</span>
+              <strong>智能排查</strong>
+              <span>直接描述问题，OrbisOps 会结合已授权的工具、数据和知识完成分析。</span>
             </CapabilityItem>
             <CapabilityItem>
-              <strong>Evidence First</strong>
-              <span>MCP、RAG、指标、日志和数据库查询形成可追踪证据，不把模型文字冒充执行事实。</span>
+              <strong>标准流程</strong>
+              <span>将稳定的处理方法固化为工作流，支持手动运行和自动触发。</span>
             </CapabilityItem>
             <CapabilityItem>
-              <strong>Governed Changes</strong>
-              <span>调查与准备变更和生产落地分权；ChangePackage 审批后才允许独立 Landing Runtime 执行。</span>
+              <strong>证据可追溯</strong>
+              <span>关键查询、判断和执行结果会随任务保存，便于复核与审计。</span>
             </CapabilityItem>
             <CapabilityItem>
-              <strong>Durable Runtime</strong>
-              <span>运行、节点、工具调用与 checkpoint 可持久化，进程异常后可安全恢复而不是盲目重跑。</span>
+              <strong>受控变更</strong>
+              <span>涉及生产环境的操作需要明确审批，并保留执行与验证记录。</span>
             </CapabilityItem>
           </CapabilityGrid>
         </BrandSection>
 
         <LoginCard>
           <LoginHeader>
-            <LoginTitle heading={3}>
-              欢迎登录
-            </LoginTitle>
+            <LoginTitle heading={3}>{setupRequired ? '初始化 OrbisOps' : '登录'}</LoginTitle>
             <LoginSubtitle>
-              请输入您的账号和密码
+              {setupRequired
+                ? '创建平台首位管理员，完成后将自动登录。'
+                : '使用 OrbisOps 平台账号继续。'}
             </LoginSubtitle>
           </LoginHeader>
 
           <StyledForm onSubmit={handleLogin}>
             <Form.Input
               field="username"
-              placeholder="请输入账号"
+              placeholder="用户名"
               prefix={<IconUser />}
               size="large"
               rules={[
-                { required: true, message: '请输入账号' },
-                { min: 3, message: '账号至少3个字符' }
+                { required: true, message: '请输入用户名。' },
+                { min: 3, message: '用户名至少 3 个字符。' },
               ]}
             />
             <Form.Input
               field="password"
               type={showPassword ? 'text' : 'password'}
-              placeholder="请输入密码"
+              placeholder={setupRequired ? '管理员密码' : '密码'}
               prefix={<IconLock />}
               size="large"
               suffix={
@@ -268,21 +312,36 @@ const LoginPage: React.FC = () => {
                 />
               }
               rules={[
-                { required: true, message: '请输入密码' },
-                { min: 6, message: '密码至少6个字符' }
+                { required: true, message: '请输入密码。' },
+                { min: setupRequired ? 8 : 6, message: setupRequired ? '管理员密码至少 8 个字符。' : '密码至少 6 个字符。' },
               ]}
             />
+            {setupRequired && (
+              <Form.Input
+                field="confirmPassword"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="确认管理员密码"
+                prefix={<IconLock />}
+                size="large"
+                rules={[{ required: true, message: '请再次输入管理员密码。' }]}
+              />
+            )}
 
             <LoginButton
               type="primary"
               htmlType="submit"
-              loading={loading}
+              loading={loading || setupRequired === null}
+              disabled={setupRequired === null}
             >
-              立即登录
+              {setupRequired ? '创建管理员并进入系统' : '登录'}
             </LoginButton>
           </StyledForm>
 
-          <LoginFootnote>后台接口使用登录令牌访问，页面不会内置演示账号。</LoginFootnote>
+          {setupRequired && (
+            <LoginFootnote>
+              仅当平台还没有任何用户时才会显示首次初始化入口。管理员密码至少 8 位，并同时包含字母和数字。
+            </LoginFootnote>
+          )}
         </LoginCard>
       </LoginWrapper>
     </LoginContainer>

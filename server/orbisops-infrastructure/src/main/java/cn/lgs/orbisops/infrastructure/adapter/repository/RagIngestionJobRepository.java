@@ -21,10 +21,10 @@ public class RagIngestionJobRepository implements IRagIngestionJobRepository {
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 
-    @Value("${ops.rag.ingestion.jdbc-enabled:true}")
+    @Value("${orbisops.rag.ingestion.jdbc-enabled:true}")
     private boolean jdbcEnabled;
 
-    @Value("${ops.rag.ingestion.auto-init:true}")
+    @Value("${orbisops.rag.ingestion.auto-init:true}")
     private boolean autoInit;
 
     private volatile boolean initialized;

@@ -11,9 +11,9 @@ public final class OpsMcpProgressiveSettings {
     private final boolean disclosureEnabled;
 
     public OpsMcpProgressiveSettings(
-            @Value("${ops.progressive-mcp.enforce-project-managed:true}")
+            @Value("${orbisops.progressive-mcp.enforce-project-managed:true}")
             boolean enforceProjectManaged,
-            @Value("${ops.progressive-mcp.disclosure.enabled:true}")
+            @Value("${orbisops.progressive-mcp.disclosure.enabled:true}")
             boolean disclosureEnabled) {
         this.enforceProjectManaged = enforceProjectManaged;
         this.disclosureEnabled = disclosureEnabled;

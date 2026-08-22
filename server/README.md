@@ -1,316 +1,135 @@
-# OrbisOps
+# OrbisOps Server
 
-**Governed Agentic Operations Platform**
+Spring Boot backend for OrbisOps.
 
-OrbisOps is an operations-focused Agent platform for investigating production systems, orchestrating repeatable operational workflows, and governing changes with explicit evidence, approval, execution, verification, and recovery boundaries.
+The root [`compose.yml`](../compose.yml) is the supported end-to-end deployment path. This document is for backend development and architecture work.
 
-It follows a simple runtime rule:
-
-- **Open-ended work** uses the project default **ReAct Agent**.
-- **Repeatable operational SOPs** use a published **Workflow** whose Agent nodes run in `DIRECT`, `LLM`, or `REACT` mode.
-- **Capabilities** such as MCP servers, Skills, RAG, code access, and tools are bound to Agent nodes instead of becoming independent workflow node types.
-- **Production mutation** is never obtained by self-escalation. A prepared `ChangePackage` must be approved before an independent trusted Landing runtime receives production authority.
-
-## What OrbisOps provides
-
-- Project-scoped default ReAct Agents and published specialized Workflows
-- Workflow nodes for `START`, `AGENT`, `ROUTER`, `SUB_WORKFLOW`, and `END`
-- `DIRECT`, `LLM`, and `REACT` Agent execution modes
-- Bounded feedback loops and durable node-attempt checkpoints
-- MCP discovery, schema governance, progressive tool disclosure, and remote-call audit evidence
-- RAG, Skill packages, memory, channels, schedules, alerts, incidents, and execution history
-- `OBSERVE_ONLY`, `PREPARE_CHANGE`, and trusted Landing authority boundaries
-- `ChangePackage → Approval → Landing → Verification / Rollback`
-- Durable Work Sessions that can recover after process loss without blindly re-running completed tool calls
-- Audit records for model execution, tool execution, workflow state, authority, evidence, and change operations
-
-## Runtime model
+## Modules
 
 ```text
-Chat / Alert / Schedule / Channel / API
-                 │
-                 ▼
-      Project entry policy
-          ┌──────┴─────────┐
-          │                │
-          ▼                ▼
- Default ReAct       Published Workflow
-                           │
-          START → AGENT → ROUTER → ... → END
-                    │
-        DIRECT | LLM | REACT
-                    │
-     MCP / Skill / RAG / Tool / Code
-                    │
-             Evidence / Report
-                    │
-          optional ChangePackage
-                    │
-                 Approval
-                    │
-       trusted Landing ReAct runtime
-                    │
-          Verification / Rollback
-```
-
-A normal Workflow or ReAct run can inspect systems and, when explicitly authorized, prepare an isolated change. It cannot turn itself into a production-write runtime. Production authority belongs to a separate approved Landing execution.
-
-## Authority model
-
-| Authority | Intended use | Production mutation |
-| --- | --- | --- |
-| `OBSERVE_ONLY` | diagnosis, inspection, reporting | no |
-| `PREPARE_CHANGE` | investigation, isolated repair, test/build, ChangePackage preparation | no direct governed production mutation |
-| `PROD_FULL` | trusted approved Landing runtime only | yes, subject to Landing controls |
-
-MCP/tool execution is also governed by executable, proposal-only, or hidden exposure. A callback returning a policy denial is not recorded as a successful remote execution; `remoteCallExecuted` is persisted separately from framework-level callback completion.
-
-## DDD / Hexagonal structure
-
-The backend is a Java 17 multi-module Maven reactor under the `cn.lgs.orbisops` package root.
-
-```text
-orbisops-types
-    shared value types, errors and trace context
-
 orbisops-domain
-    aggregates, domain policies, value objects and domain services
+    framework-independent domain objects and policies
 
 orbisops-application
-    use cases, ports, commands/queries and process managers
+    use cases, commands/queries, process managers and outbound ports
 
 orbisops-infrastructure
-    JDBC/MyBatis/Redis persistence and outbound adapter implementations
+    JDBC/MyBatis/Redis persistence and outbound infrastructure adapters
 
 orbisops-api
     public transport DTOs and response contracts
 
 orbisops-trigger
-    HTTP/SSE, scheduling, MCP/runtime adapters and inbound technical orchestration
+    REST/SSE, scheduling, channel, MCP and other inbound/technical adapters
+
+orbisops-types
+    small shared stable technical/value types
 
 orbisops-app
-    Spring Boot composition root and runtime configuration
+    Spring Boot composition root
 ```
 
-Architecture tests enforce dependency direction and keep transport/infrastructure concerns out of domain and application policies. Scheduler runtime implementation lives in the trigger adapter layer; the shared `types` module does not depend on Spring Web.
+The intended dependency direction is:
 
-## Requirements
+```text
+Domain ← Application ← Infrastructure / Trigger ← App
+```
 
-For a full local installation:
+Architecture tests enforce the layer direction and bounded-context rules. Domain/application code must not depend on Spring MVC, controller DTOs, JDBC/MyBatis implementations, HTTP SDKs or JSON transport types.
+
+## Requirements for local source development
 
 - JDK 17
 - Maven 3.9+
-- Node.js 20+ — used by bundled local MCP server processes
-- MySQL 8.x
-- PostgreSQL 16 with pgvector
-- Redis 7.x
-- an OpenAI-compatible chat model endpoint
-- an embedding endpoint if RAG ingestion/retrieval is enabled
+- Docker with Compose v2 for local infrastructure
+- Node.js 20 only when exercising bundled local MCP adapters
 
-A dependency-only `docker-compose.yml` is included for MySQL, pgvector, and Redis. It intentionally requires externally supplied credentials.
+## Start infrastructure
 
-## Quick start
-
-### 1. Start local dependencies
-
-Provide strong local credentials in your shell and start the dependency stack. Values below are placeholders and must be replaced locally:
+Prepare the repository deployment file from the root:
 
 ```bash
-export MYSQL_PASSWORD='[REDACTED_SECRET]'
-export MYSQL_ROOT_PASSWORD='[REDACTED_SECRET]'
-export PGVECTOR_PASSWORD='[REDACTED_SECRET]'
-export REDIS_PASSWORD='[REDACTED_SECRET]'
-
-docker compose up -d
+cp deploy/orbisops.env.example deploy/orbisops.env
 ```
 
-The Compose file contains no default password.
-
-### 2. Apply database migrations
-
-The authoritative migration inventory is `db/migrations/manifest.tsv`. Migration `001` is schema-only and creates no default users, model providers, projects, or MCP bindings.
-
-Store MySQL client credentials outside this repository:
-
-```ini
-# ~/.config/orbisops/mysql.cnf
-[client]
-user=orbisops
-password=[REDACTED_SECRET]
-```
-
-Protect the file and run migrations:
+Replace infrastructure secret placeholders, then validate it:
 
 ```bash
-chmod 600 ~/.config/orbisops/mysql.cnf
-MYSQL_DEFAULTS_FILE="$HOME/.config/orbisops/mysql.cnf" bash ./scripts/db-migrate.sh
+make deploy-preflight
 ```
 
-Every migration is SHA-256 checked before execution and recorded in `orbisops_schema_history`.
-
-### 3. Configure the server
-
-Use `config/orbisops.env.example` as the variable reference. Do not commit real credentials.
-
-Typical production configuration includes:
+Start only the data services:
 
 ```bash
-export SPRING_PROFILES_ACTIVE=prod
-export MYSQL_URL='jdbc:mysql://127.0.0.1:3306/orbisops?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true'
-export MYSQL_USERNAME='orbisops'
-export MYSQL_PASSWORD='[REDACTED_SECRET]'
-export PGVECTOR_URL='jdbc:postgresql://127.0.0.1:5432/orbisops'
-export PGVECTOR_USERNAME='orbisops'
-export PGVECTOR_PASSWORD='[REDACTED_SECRET]'
-export REDIS_PASSWORD='[REDACTED_SECRET]'
-export OPENAI_BASE_URL='https://your-openai-compatible-endpoint'
-export OPENAI_API_KEY='[REDACTED_SECRET]'
-export OPENAI_CHAT_MODEL='your-chat-model'
-export ADMIN_JWT_SECRET='[REDACTED_SECRET]'
-export OPS_ES_URL='http://127.0.0.1:9200'
-export OPS_PROMETHEUS_URL='http://127.0.0.1:9090'
-export OPS_ALLOWED_ORIGIN_PATTERNS='https://your-orbisops-web.example.com'
+docker compose --env-file deploy/orbisops.env up -d mysql pgvector redis
 ```
 
-`application-prod.yml` contains the complete set of optional runtime settings.
-
-### 4. Create the first administrator
-
-OrbisOps ships with **no default account and no default password**.
-
-For the first startup only, explicitly enable bootstrap creation:
+Run migrations through the same server image used by the full deployment:
 
 ```bash
-export ORBISOPS_BOOTSTRAP_ADMIN_ENABLED=true
-export ORBISOPS_BOOTSTRAP_ADMIN_USERNAME='your-admin-name'
-export ORBISOPS_BOOTSTRAP_ADMIN_PASSWORD='[REDACTED_SECRET]'
+docker compose --env-file deploy/orbisops.env run --rm migrate
 ```
 
-The password is validated and encoded by the normal account application service. After the first administrator exists, disable bootstrap:
+This avoids a second migration configuration path. The migration manifest is `db/migrations/manifest.tsv`; applied versions/checksums are recorded in `orbisops_schema_history`.
+
+## Build and test
 
 ```bash
-export ORBISOPS_BOOTSTRAP_ADMIN_ENABLED=false
+mvn -B test
+mvn -B -DskipTests package
 ```
 
-An existing account is never overwritten by bootstrap.
+From the repository root, `make verify` also runs the tracked-file release hygiene gate and frontend verification.
 
-### 5. Build and run
+## Run from source
+
+For day-to-day backend development, use the `dev` Spring profile and provide the database/model settings required by the feature you are exercising. The profile contains only local-development defaults; production deployment uses the root Compose configuration.
 
 ```bash
-mvn clean package
-java -jar orbisops-app/target/orbisops-app.jar --spring.profiles.active=prod
+mvn -pl orbisops-app -am spring-boot:run
 ```
 
-The default HTTP port is `8099` and can be overridden with `SERVER_PORT`.
+No developer-specific JDK/Maven path is required. Override endpoints and credentials with environment/Spring configuration instead of editing source files.
 
-## MCP and project onboarding
+## Models
 
-Generic local MCP server implementations are bundled under `scripts/mcp/`, including readonly adapters for MySQL, PostgreSQL, Redis, RabbitMQ, Prometheus, Elasticsearch, OpenAPI, and Git, plus controlled code/service adapters.
+Model execution is an external capability. The server does not install or start an LLM, embedding service or reranker as part of production deployment.
 
-Recommended onboarding flow:
+A local model helper under `tools/` may be used for development experiments. It is optional and must not be treated as a runtime dependency.
 
-1. Create a project and its resource catalog.
-2. Register credentials by reference; do not embed secrets in MCP transport metadata.
-3. Generate or register the MCP resource.
-4. Discover the real remote tool schema.
-5. Review or system-verify the resulting runtime policy.
-6. Bind the approved MCP capability to the project default Agent or a specialized Workflow node.
-7. Validate and publish the Agent definition before using it from schedules, alerts, channels, or user entry points.
+The administration APIs/UI own model-provider catalog configuration. The OpenAI-compatible transport in the backend is an adapter protocol, not a requirement to use a particular vendor or model name.
 
-A tool shown in configuration is not considered successful execution evidence unless the authoritative tool result records a real remote call.
+## MCP adapters
 
-## Workflow usage
+Bundled local MCP process adapters are under `scripts/mcp/`. The server Docker image includes the scripts plus the runtime CLIs required by the Git/MySQL/PostgreSQL adapters.
 
-Use a Workflow when humans already know the macro SOP but some steps still need model autonomy. Typical examples include scheduled health inspection, alert-specific incident diagnosis, user-selected specialized diagnosis, and release/preflight checks.
+Registering an MCP resource does not automatically authorize it. Project scope, credential resolution, tool discovery, capability binding, runtime authority and audit remain separate boundaries.
 
-Use the project default ReAct Agent for open-ended questions where the correct investigation path is not known in advance.
+## Database schema
 
-Workflow definitions are versioned and immutable after publication. Runtime execution pins the Agent version and definition hash. Durable execution persists node outputs, loop attempts, routes, tool checkpoints, authority snapshots, and runtime context so recovery can replay completed work safely.
+Never edit a migration that has already been released/applied. Add a new manifest entry and SQL file with its SHA-256 checksum.
 
-## Change governance
+The public Compose deployment executes migrations before backend health is considered ready.
 
-OrbisOps separates preparing a change from applying it:
+## First administrator
+
+There is no default user/password. The root deployment config provides a one-time bootstrap:
 
 ```text
-Diagnosis / Workflow
-        ↓
-PREPARE_CHANGE
-        ↓
-isolated code or configuration preparation
-        ↓
-Test / Build / Evidence
-        ↓
-ChangePackage
-        ↓
-Approval
-        ↓
-independent trusted Landing runtime
-        ↓
-Verification
-   ┌────┴────┐
- success   rollback
+ORBISOPS_BOOTSTRAP_ADMIN_ENABLED
+ORBISOPS_BOOTSTRAP_ADMIN_USER_ID
+ORBISOPS_BOOTSTRAP_ADMIN_USERNAME
+ORBISOPS_BOOTSTRAP_ADMIN_PASSWORD
 ```
 
-The original diagnostic run cannot self-promote to `PROD_FULL`.
+Bootstrap creates the account through the normal account application use case, which validates and hashes the credential. Disable bootstrap after the first successful startup. An existing username is never overwritten.
 
-## Build and verification
+## Architecture documentation
 
-Compile the backend reactor:
-
-```bash
-mvn -DskipTests compile
-```
-
-Run the complete test suite:
-
-```bash
-mvn test
-```
-
-Run architecture boundaries explicitly:
-
-```bash
-mvn -pl orbisops-app -am \
-  -Dtest='*ArchitectureTest' \
-  -Dsurefire.failIfNoSpecifiedTests=false test
-```
-
-Run public-release hygiene checks:
-
-```bash
-python3 scripts/release-hygiene.py
-bash -n scripts/db-migrate.sh
-```
-
-The release hygiene check rejects legacy branding, unrelated project fixtures, private local paths, legacy package names, and common secret-like literals in publishable source/configuration.
-
-## Docker image
-
-Build the application first, then build the image:
-
-```bash
-mvn -DskipTests package
-cd orbisops-app
-IMAGE_NAME=orbisops/server IMAGE_TAG=0.1.0 ./build.sh
-```
-
-The runtime image is based on Eclipse Temurin 17, includes Node.js for local MCP processes, and runs as the non-root `orbisops` user.
-
-## Security notes
-
-- No administrator, database password, provider key, service token, or JWT secret is embedded in the repository.
-- Production database identities should be non-privileged and scoped to required schemas/actions.
-- Generated MCP policies remain fail-closed when schema, effect, or review state is unresolved.
-- Readonly tools and completed external effects are tracked explicitly for safe durable recovery.
-- Runtime code does not infer successful external execution from a successful Java callback alone.
-- Keep deployment secrets in a secret manager or platform credential store, not in Git.
-
-## Repository hygiene
-
-Runtime logs, build outputs, local secrets, repair worktrees, process IDs, generated reports, historical evaluation dumps, and unrelated business sample projects are intentionally excluded from the public product tree.
-
-Before publishing a release, run the normal test suite and `scripts/release-hygiene.py`.
+- [`docs/architecture/strategic-ddd-context-map.md`](docs/architecture/strategic-ddd-context-map.md)
+- [`docs/architecture/ddd-convergence-status.md`](docs/architecture/ddd-convergence-status.md)
+- [`docs/architecture/adr/`](docs/architecture/adr/)
 
 ## License
 
-Apache License 2.0. See [LICENSE](../LICENSE).
+Apache License 2.0. See [`../LICENSE`](../LICENSE).

@@ -10,8 +10,8 @@ public class OpsSubAgentDecisionConfiguration {
 
     @Bean
     public OpsSubAgentDecisionSettings opsSubAgentDecisionSettings(
-            @Value("${ops.multi-agent.sub-agent-llm-enabled:true}") boolean decisionLlmEnabled,
-            @Value("${ops.multi-agent.reflection-llm-enabled:true}") boolean reflectionLlmEnabled) {
+            @Value("${orbisops.multi-agent.sub-agent-llm-enabled:true}") boolean decisionLlmEnabled,
+            @Value("${orbisops.multi-agent.reflection-llm-enabled:true}") boolean reflectionLlmEnabled) {
         return new OpsSubAgentDecisionSettings(decisionLlmEnabled, reflectionLlmEnabled);
     }
 }

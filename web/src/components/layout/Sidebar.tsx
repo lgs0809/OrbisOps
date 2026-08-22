@@ -18,7 +18,6 @@ import { currentUserRole, getStoredUserInfo, roleLabel } from '../../services/au
 import {
   canonicalPathFor,
   navigationRoutesForRole,
-  PLATFORM_NAVIGATION_GROUPS,
   routeByPath,
   type AppRouteMetadata,
   type NavigationIcon,
@@ -304,17 +303,20 @@ const iconForNavigation = (icon?: NavigationIcon): React.ReactNode => {
   switch (icon) {
     case 'home':
       return <IconApps />;
-    case 'incident':
-      return <IconAlertTriangle />;
-    case 'diagnosis':
+    case 'chat':
+      return <IconBranch />;
+    case 'workbench':
+      return <IconHistory />;
+    case 'workflow':
       return <IconBranch />;
     case 'automation':
       return <IconClock />;
     case 'project':
       return <IconFolder />;
-    case 'governance':
-      return <IconHistory />;
     case 'change':
+      return <IconAlertTriangle />;
+    case 'settings':
+    case 'governance':
     case 'integration':
     case 'model':
     case 'tool':
@@ -333,53 +335,10 @@ const routeItem = (route: AppRouteMetadata): SidebarNavItem => ({
   icon: iconForNavigation(route.navigation?.icon),
 });
 
-const routesInSection = (routes: AppRouteMetadata[], section: string, subgroup?: string) =>
-  routes
-    .filter((route) => route.navigation?.section === section && route.navigation?.subgroup === subgroup)
-    .sort((left, right) => (left.navigation?.order || 0) - (right.navigation?.order || 0));
-
-const buildMenuItems = (routes: AppRouteMetadata[]): SidebarNavItem[] => {
-  const menu: SidebarNavItem[] = routesInSection(routes, 'home').map(routeItem);
-  const work = routesInSection(routes, 'work');
-  const automations = routesInSection(routes, 'automations');
-  const projects = routesInSection(routes, 'projects');
-  const platform = routesInSection(routes, 'platform');
-  const platformGroups = PLATFORM_NAVIGATION_GROUPS
-    .map((group) => ({
-      ...group,
-      itemKey: `nav-platform-${group.key}`,
-      routes: routesInSection(routes, 'platform', group.key),
-    }))
-    .filter((group) => group.routes.length > 0);
-
-  if (work.length) {
-    menu.push({ itemKey: 'nav-work', text: 'Work', icon: <IconBranch />, items: work.map(routeItem) });
-  }
-  if (automations.length) {
-    menu.push({ itemKey: 'nav-automations', text: 'Automations', icon: <IconClock />, items: automations.map(routeItem) });
-  }
-  menu.push(...projects.map(routeItem));
-  if (platform.length || platformGroups.length) {
-    const platformItems = platform.map(routeItem);
-    platformGroups.forEach((group) => {
-      platformItems.push({
-        itemKey: group.itemKey,
-        text: group.label,
-        icon: <IconShield />,
-        items: group.routes.map(routeItem),
-      });
-    });
-    menu.push({ itemKey: 'nav-platform', text: 'Platform', icon: <IconShield />, items: platformItems });
-  }
-  return menu;
-};
-
-const nonNavigableKeys = new Set<string>([
-  'nav-work',
-  'nav-automations',
-  'nav-platform',
-  ...PLATFORM_NAVIGATION_GROUPS.map((group) => `nav-platform-${group.key}`),
-]);
+const buildMenuItems = (routes: AppRouteMetadata[]): SidebarNavItem[] =>
+  [...routes]
+    .sort((left, right) => (left.navigation?.order || 0) - (right.navigation?.order || 0))
+    .map(routeItem);
 
 export const Sidebar: React.FC<SidebarProps> = ({
   selectedKey = 'dashboard',
@@ -401,28 +360,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
         $visible={!collapsed}
         onClick={onMobileClose}
       />
-      <SidebarContainer id="orbisops-sidebar" role="complementary" aria-label="Application navigation" $collapsed={collapsed}>
+      <SidebarContainer id="orbisops-sidebar" role="complementary" aria-label="应用导航" $collapsed={collapsed}>
       <SidebarHeader $collapsed={collapsed}>
         <Logo>
           <IconBranch />
         </Logo>
         <BrandInfo $collapsed={collapsed}>
           <h4>OrbisOps</h4>
-          <p>运维智能体平台</p>
+          <p>受治理的智能运维</p>
         </BrandInfo>
       </SidebarHeader>
 
       <SidebarContent>
         <StyledNav
-          aria-label="Primary navigation"
+          aria-label="一级导航"
           $collapsed={collapsed}
           selectedKeys={[activeSelection]}
           isCollapsed={collapsed}
           onSelect={({ selectedKeys }: { selectedKeys: string[] }) => {
             const key = selectedKeys[0] as string;
-            if (nonNavigableKeys.has(key)) {
-              return;
-            }
             onMobileClose?.();
             onSelect?.(key);
           }}

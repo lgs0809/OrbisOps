@@ -6,7 +6,7 @@ import cn.lgs.orbisops.domain.source.model.SourceRepository;
 import cn.lgs.orbisops.domain.source.model.SourceRepositoryAccessMode;
 import cn.lgs.orbisops.domain.source.model.SourceRepositoryCandidate;
 import cn.lgs.orbisops.domain.source.model.SourceSearchHit;
-import cn.lgs.orbisops.infrastructure.adapter.repository.LocalGitSourceGateway;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
@@ -17,10 +17,12 @@ import java.util.List;
 @Component
 public final class RoutingSourceGitAdapter implements SourceGitPort {
 
-    private final LocalGitSourceGateway local;
-    private final McpSourceGitAdapter remote;
+    private final SourceGitPort local;
+    private final SourceGitPort remote;
 
-    public RoutingSourceGitAdapter(LocalGitSourceGateway local, McpSourceGitAdapter remote) {
+    public RoutingSourceGitAdapter(
+            @Qualifier("localGitSourceGateway") SourceGitPort local,
+            @Qualifier("mcpSourceGitAdapter") SourceGitPort remote) {
         if (local == null) throw new IllegalArgumentException("LOCAL_SOURCE_GIT_ADAPTER_REQUIRED");
         if (remote == null) throw new IllegalArgumentException("MCP_SOURCE_GIT_ADAPTER_REQUIRED");
         this.local = local;

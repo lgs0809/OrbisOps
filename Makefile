@@ -1,12 +1,29 @@
-.PHONY: verify acceptance verify-server verify-web build build-server build-web test-server install-web clean
+.PHONY: release-hygiene release-history-hygiene deploy-preflight compose-config up down verify acceptance verify-server verify-web build build-server build-web test-server install-web clean
 
-verify: verify-server verify-web
+release-hygiene:
+	python3 scripts/release-hygiene.py
+
+release-history-hygiene:
+	python3 scripts/history-hygiene.py
+
+deploy-preflight:
+	python3 scripts/deploy-preflight.py deploy/orbisops.env
+
+compose-config: deploy-preflight
+	docker compose --env-file deploy/orbisops.env config >/dev/null
+
+up: deploy-preflight
+	docker compose --env-file deploy/orbisops.env up -d --build
+
+down:
+	docker compose --env-file deploy/orbisops.env down
+
+verify: release-hygiene verify-server verify-web
 
 acceptance: verify
 	cd web && npm run test:e2e
 
 verify-server:
-	cd server && python3 scripts/release-hygiene.py
 	cd server && mvn -B test
 
 verify-web: install-web

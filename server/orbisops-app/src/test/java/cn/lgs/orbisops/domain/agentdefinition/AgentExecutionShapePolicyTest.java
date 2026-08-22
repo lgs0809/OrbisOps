@@ -45,7 +45,10 @@ class AgentExecutionShapePolicyTest {
     }
 
     @Test
-    void emptyDefinitionStillNormalizesToGraph() {
-        assertEquals("GRAPH", policy.decide(null).engine());
+    void emptyDefinitionRemainsStandaloneReactAgent() {
+        AgentExecutionShapeDecision decision = policy.decide(null);
+
+        assertEquals("AGENTSCOPE", decision.engine());
+        assertEquals(false, decision.clearLegacyAgentScope());
     }
 }

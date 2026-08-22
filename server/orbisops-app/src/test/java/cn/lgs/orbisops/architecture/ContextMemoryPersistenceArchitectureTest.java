@@ -68,7 +68,7 @@ class ContextMemoryPersistenceArchitectureTest {
                 () -> assertTrue(repository.contains("UPDATE ai_ops_context_memory")),
                 () -> assertFalse(repository.contains("CREATE TABLE IF NOT EXISTS ai_ops_context_memory")),
                 () -> assertTrue(initializer.contains("CREATE TABLE IF NOT EXISTS ai_ops_context_memory")),
-                () -> assertTrue(initializer.contains("ops.context-memory.auto-init")),
+                () -> assertTrue(initializer.contains("orbisops.context-memory.auto-init")),
                 () -> assertFalse(initializer.contains("INSERT INTO ai_ops_context_memory")),
                 () -> assertFalse(initializer.contains("SELECT id, memory_id")));
     }

@@ -25,7 +25,7 @@ public class AiAgentConfig {
     @ConditionalOnMissingBean(name = "openAiChatModel")
     public OpenAiChatModel openAiChatModel(@Value("${spring.ai.openai.base-url}") String baseUrl,
                                            @Value("${spring.ai.openai.api-key}") String apiKey,
-                                           @Value("${spring.ai.openai.chat.options.model:gpt-5.4-mini}") String chatModelName,
+                                           @Value("${spring.ai.openai.chat.options.model:unconfigured}") String chatModelName,
                                            @Value("${spring.ai.openai.chat.connect-timeout-seconds:5}") int connectTimeoutSeconds,
                                            @Value("${spring.ai.openai.chat.read-timeout-seconds:45}") int readTimeoutSeconds) {
         String resolvedApiKey = StringUtils.hasText(apiKey) ? apiKey : "dev-placeholder-key";
@@ -47,19 +47,19 @@ public class AiAgentConfig {
     /**
      * -- 删除旧的表（如果存在）
      * -- 创建新的表，使用UUID作为主键
-     * CREATE TABLE public.vector_store_qwen_vl_2048 (
+     * CREATE TABLE public.orbisops_vector_store (
      * id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
      * content TEXT NOT NULL,
      * metadata JSONB,
      * embedding VECTOR(2048)
      * );
      * <p>
-     * SELECT * FROM vector_store_qwen_vl_2048
+     * SELECT * FROM orbisops_vector_store
      */
     @Bean("ragEmbeddingModel")
-    public OpenAiEmbeddingModel ragEmbeddingModel(@Value("${spring.ai.openai.embedding.base-url:http://127.0.0.1:8110}") String embeddingBaseUrl,
-                                                  @Value("${spring.ai.openai.embedding.api-key:local-rag-models}") String embeddingApiKey,
-                                                  @Value("${spring.ai.openai.embedding.options.model:Qwen/Qwen3-VL-Embedding-2B}") String embeddingModelName,
+    public OpenAiEmbeddingModel ragEmbeddingModel(@Value("${spring.ai.openai.embedding.base-url:}") String embeddingBaseUrl,
+                                                  @Value("${spring.ai.openai.embedding.api-key:}") String embeddingApiKey,
+                                                  @Value("${spring.ai.openai.embedding.options.model:unconfigured}") String embeddingModelName,
                                                   @Value("${spring.ai.openai.embedding.options.dimensions:2048}") Integer embeddingDimensions,
                                                   @Value("${spring.ai.openai.chat.connect-timeout-seconds:5}") int connectTimeoutSeconds,
                                                   @Value("${spring.ai.openai.chat.read-timeout-seconds:45}") int readTimeoutSeconds) {
@@ -75,19 +75,24 @@ public class AiAgentConfig {
                 .model(embeddingModelName)
                 .dimensions(embeddingDimensions)
                 .build();
-        return new OpenAiEmbeddingModel(openAiApi, MetadataMode.EMBED, embeddingOptions);
+        OpenAiEmbeddingModel delegate = new OpenAiEmbeddingModel(openAiApi, MetadataMode.NONE, embeddingOptions);
+        return new OpenAiCompatibleEmbeddingModel(delegate);
     }
 
     @Bean("vectorStore")
     @Profile("!test")
     public PgVectorStore pgVectorStore(@Qualifier("ragEmbeddingModel") OpenAiEmbeddingModel embeddingModel,
                                        @Value("${spring.ai.openai.embedding.options.dimensions:2048}") Integer embeddingDimensions,
-                                       @Value("${ops.rag.vector-table-name:vector_store_qwen_vl_2048}") String vectorTableName,
+                                       @Value("${orbisops.rag.vector-table-name:orbisops_vector_store}") String vectorTableName,
                                        @Qualifier("pgVectorJdbcTemplate") JdbcTemplate jdbcTemplate) {
 
         return PgVectorStore.builder(jdbcTemplate, embeddingModel)
                 .vectorTableName(vectorTableName)
                 .dimensions(embeddingDimensions)
+                .indexType(embeddingDimensions > 2000
+                        ? PgVectorStore.PgIndexType.NONE
+                        : PgVectorStore.PgIndexType.HNSW)
+                .initializeSchema(true)
                 .build();
     }
 

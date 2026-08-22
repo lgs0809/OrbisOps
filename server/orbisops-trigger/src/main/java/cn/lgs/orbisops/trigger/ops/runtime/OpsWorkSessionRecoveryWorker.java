@@ -52,7 +52,7 @@ public class OpsWorkSessionRecoveryWorker {
                 : settings;
     }
 
-    @Scheduled(fixedDelayString = "${ops.work-session.recovery.interval-ms:30000}")
+    @Scheduled(fixedDelayString = "${orbisops.work-session.recovery.interval-ms:30000}")
     public void recoverExpiredRuns() {
         if (!settings.enabled()) {
             return;

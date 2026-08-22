@@ -16,7 +16,7 @@ public class RagEvalRepository implements IRagEvalRepository {
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 
-    @Value("${ops.rag.eval.auto-init:true}")
+    @Value("${orbisops.rag.eval.auto-init:true}")
     private boolean autoInit;
 
     private volatile boolean initialized;

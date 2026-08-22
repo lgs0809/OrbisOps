@@ -4,6 +4,7 @@ import cn.lgs.orbisops.application.config.AiClientApiCatalogUseCase;
 import cn.lgs.orbisops.application.config.AiClientApiHealthCheckUseCase;
 import cn.lgs.orbisops.application.config.AiClientApiHealthRecordPort;
 import cn.lgs.orbisops.trigger.ops.OpsConfigAuditService;
+import cn.lgs.orbisops.trigger.ops.runtime.OpsSecretResolver;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -17,11 +18,12 @@ public class AiClientApiHealthConfiguration {
     public AiClientApiHealthCheckUseCase aiClientApiHealthCheckUseCase(
             AiClientApiCatalogUseCase catalogUseCase,
             AiClientApiHealthRecordPort healthRecordPort,
-            OpsConfigAuditService auditService) {
+            OpsConfigAuditService auditService,
+            OpsSecretResolver secretResolver) {
         OpsAiClientApiHealthResultAdapter auditAdapter =
                 new OpsAiClientApiHealthResultAdapter(auditService);
         return new AiClientApiHealthCheckUseCase(
-                new OpsAiClientApiHealthTargetAdapter(catalogUseCase),
+                new OpsAiClientApiHealthTargetAdapter(catalogUseCase, secretResolver),
                 new OpsAiClientApiHealthHttpProbeAdapter(HttpClient.newBuilder()
                         .connectTimeout(Duration.ofSeconds(8))
                         .build()),

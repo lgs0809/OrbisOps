@@ -64,12 +64,12 @@ test('390px shell supports skip navigation, accessible menus, reduced motion, an
   await routeCommonBackend(page);
 
   await page.goto('/home?projectId=mobile-project');
-  const navigationToggle = page.getByRole('button', { name: 'Open navigation menu' });
+  const navigationToggle = page.getByRole('button', { name: '打开导航菜单' });
   await expect(navigationToggle).toBeVisible();
   await expect(navigationToggle).toHaveAttribute('aria-expanded', 'false');
   await expectNoDocumentOverflow(page);
 
-  const skipLink = page.getByRole('link', { name: 'Skip to main content' });
+  const skipLink = page.getByRole('link', { name: '跳到主要内容' });
   await page.keyboard.press('Tab');
   await expect(skipLink).toBeFocused();
   await expect(skipLink).toBeVisible();
@@ -77,13 +77,13 @@ test('390px shell supports skip navigation, accessible menus, reduced motion, an
   await expect(page.locator('#main-content')).toBeFocused();
 
   await navigationToggle.click();
-  const collapseToggle = page.getByRole('button', { name: 'Collapse navigation menu' });
+  const collapseToggle = page.getByRole('button', { name: '收起导航菜单' });
   await expect(collapseToggle).toHaveAttribute('aria-expanded', 'true');
-  await expect(page.getByRole('complementary', { name: 'Application navigation' })).toBeVisible();
+  await expect(page.getByRole('complementary', { name: '应用导航' })).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('button', { name: 'Open navigation menu' })).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByRole('button', { name: '打开导航菜单' })).toHaveAttribute('aria-expanded', 'false');
 
-  const userMenu = page.getByRole('button', { name: 'Open user menu for e2e-admin' });
+  const userMenu = page.getByRole('button', { name: '打开 e2e-admin 的用户菜单' });
   await expect(userMenu).toBeVisible();
   await userMenu.press('Enter');
   await expect(page.getByText('退出登录', { exact: true })).toBeVisible();
@@ -113,8 +113,8 @@ test('820px tablet layout keeps navigation, provider cards, and compatibility ma
   await routeCommonBackend(page);
 
   await page.goto('/platform/integrations?projectId=mobile-project');
-  await expect(page.getByRole('complementary', { name: 'Application navigation' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Open navigation menu' })).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByRole('complementary', { name: '应用导航' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '打开导航菜单' })).toHaveAttribute('aria-expanded', 'false');
   await expect(page.getByTestId('channel-compatibility-matrix')).toBeVisible();
   await expectNoDocumentOverflow(page);
 

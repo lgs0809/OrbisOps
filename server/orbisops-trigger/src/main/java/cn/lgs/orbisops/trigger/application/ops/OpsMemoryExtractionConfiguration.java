@@ -10,10 +10,10 @@ public class OpsMemoryExtractionConfiguration {
 
     @Bean
     public OpsMemoryExtractionSettings opsMemoryExtractionSettings(
-            @Value("${ops.chat.memory.extraction-enabled:true}") boolean enabled,
-            @Value("${ops.chat.memory.extraction-max-items-per-message:6}") int maxItemsPerMessage,
-            @Value("${ops.chat.memory.llm-extraction-enabled:true}") boolean modelEnabled,
-            @Value("${ops.chat.memory.llm-extraction-max-input-chars:4000}") int modelMaxInputChars) {
+            @Value("${orbisops.chat.memory.extraction-enabled:true}") boolean enabled,
+            @Value("${orbisops.chat.memory.extraction-max-items-per-message:6}") int maxItemsPerMessage,
+            @Value("${orbisops.chat.memory.llm-extraction-enabled:true}") boolean modelEnabled,
+            @Value("${orbisops.chat.memory.llm-extraction-max-input-chars:4000}") int modelMaxInputChars) {
         return new OpsMemoryExtractionSettings(
                 enabled,
                 maxItemsPerMessage,

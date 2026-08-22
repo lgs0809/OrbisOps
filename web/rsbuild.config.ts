@@ -9,10 +9,8 @@ export default defineConfig({
       index: './src/app.tsx',
     },
     define: {
-      __API_BASE_DOMAIN__: JSON.stringify(process.env.API_BASE_DOMAIN || ''),
-      __PUBLIC_API_BASE_DOMAIN__: JSON.stringify(process.env.PUBLIC_API_BASE_DOMAIN || ''),
-      'import.meta.env.API_BASE_DOMAIN': JSON.stringify(process.env.API_BASE_DOMAIN || ''),
-      'import.meta.env.PUBLIC_API_BASE_DOMAIN': JSON.stringify(process.env.PUBLIC_API_BASE_DOMAIN || ''),
+      __ORBISOPS_API_BASE_URL__: JSON.stringify(process.env.ORBISOPS_API_BASE_URL || ''),
+      'import.meta.env.ORBISOPS_API_BASE_URL': JSON.stringify(process.env.ORBISOPS_API_BASE_URL || ''),
     },
   },
   html: {

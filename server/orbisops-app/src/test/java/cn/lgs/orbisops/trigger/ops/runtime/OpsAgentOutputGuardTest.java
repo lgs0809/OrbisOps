@@ -23,8 +23,26 @@ class OpsAgentOutputGuardTest {
 
     @Test
     void rejectsProviderEofReturnedAsAssistantText() {
-        assertThrows(IllegalStateException.class, () -> OpsAgentOutputGuard.assertSuccessful(
-                "Exception: I/O error on POST request for \"https://model.example.com/v1/chat/completions\": EOF reached while reading"));
+        IllegalStateException error = assertThrows(IllegalStateException.class,
+                () -> OpsAgentOutputGuard.assertSuccessful(
+                        "Exception: I/O error on POST request for \"https://model.example.com/v1/chat/completions\": EOF reached while reading"));
+        assertTrue(error.getMessage().startsWith("MODEL_PROVIDER_UNAVAILABLE"));
+    }
+
+    @Test
+    void preservesProviderQuotaReasonFromAssistantErrorEnvelope() {
+        IllegalStateException error = assertThrows(IllegalStateException.class,
+                () -> OpsAgentOutputGuard.assertSuccessful(
+                        "Exception: 403 - {\"code\":\"INSUFFICIENT_BALANCE\",\"message\":\"Insufficient account balance\"}"));
+        assertTrue(error.getMessage().startsWith("MODEL_PROVIDER_QUOTA_EXHAUSTED"));
+    }
+
+    @Test
+    void preservesProviderAuthReasonFromAssistantErrorEnvelope() {
+        IllegalStateException error = assertThrows(IllegalStateException.class,
+                () -> OpsAgentOutputGuard.assertSuccessful(
+                        "Exception: 401 - {\"message\":\"Unauthorized\"}"));
+        assertTrue(error.getMessage().startsWith("MODEL_PROVIDER_AUTH_FAILED"));
     }
 
     @Test

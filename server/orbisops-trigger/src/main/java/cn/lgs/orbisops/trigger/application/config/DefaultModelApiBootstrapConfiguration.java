@@ -12,8 +12,8 @@ public class DefaultModelApiBootstrapConfiguration {
 
     @Bean
     public DefaultModelApiBootstrapSettings defaultModelApiBootstrapSettings(
-            @Value("${ops.model-api-bootstrap.enabled:false}") boolean enabled,
-            @Value("${ops.model-api-bootstrap.api-id:1001}") String apiId,
+            @Value("${orbisops.model-api-bootstrap.enabled:false}") boolean enabled,
+            @Value("${orbisops.model-api-bootstrap.api-id:1001}") String apiId,
             @Value("${spring.ai.openai.base-url:}") String configuredBaseUrl,
             @Value("${spring.ai.openai.api-key:}") String configuredApiKey) {
         return new DefaultModelApiBootstrapSettings(

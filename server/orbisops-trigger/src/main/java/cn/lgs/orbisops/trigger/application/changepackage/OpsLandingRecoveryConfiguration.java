@@ -10,9 +10,9 @@ public class OpsLandingRecoveryConfiguration {
 
     @Bean
     public OpsLandingRecoverySettings opsLandingRecoverySettings(
-            @Value("${ops.approved-landing.recovery.enabled:true}") boolean enabled,
-            @Value("${ops.approved-landing.recovery.batch-size:20}") int batchSize,
-            @Value("${ops.approved-landing.recovery.reconciliation-timeout-seconds:120}")
+            @Value("${orbisops.approved-landing.recovery.enabled:true}") boolean enabled,
+            @Value("${orbisops.approved-landing.recovery.batch-size:20}") int batchSize,
+            @Value("${orbisops.approved-landing.recovery.reconciliation-timeout-seconds:120}")
             int reconciliationTimeoutSeconds) {
         return new OpsLandingRecoverySettings(
                 enabled,

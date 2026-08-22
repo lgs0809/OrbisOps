@@ -16,7 +16,7 @@ class RagVisualAnalysisAvailabilityTest {
     @Test
     void enabledConfigurationMustStillRespectHighValueGate() {
         RagVisualAnalysisAvailability availability = new RagVisualAnalysisAvailability(
-                settings(true, true, "openai", "https://api.example.com", "sk-test"),
+                settings(true, true, "openai", "https://api.example.com", "test-api-key"),
                 null);
 
         assertTrue(availability.shouldAnalyze(Map.of("high_value_candidate", true)));
@@ -42,14 +42,14 @@ class RagVisualAnalysisAvailabilityTest {
     @Test
     void modelAvailabilityPortMustGateConfiguredAnalyzer() {
         ModelAvailabilityPort models = mock(ModelAvailabilityPort.class);
-        when(models.isRerankAvailable("sk-test")).thenReturn(false, true);
+        when(models.isRerankAvailable("test-api-key")).thenReturn(false, true);
         RagVisualAnalysisAvailability availability = new RagVisualAnalysisAvailability(
-                settings(true, false, "openai", "https://api.example.com", "sk-test"),
+                settings(true, false, "openai", "https://api.example.com", "test-api-key"),
                 models);
 
         assertFalse(availability.shouldAnalyze(Map.of()));
         assertTrue(availability.shouldAnalyze(Map.of()));
-        verify(models, org.mockito.Mockito.times(2)).isRerankAvailable("sk-test");
+        verify(models, org.mockito.Mockito.times(2)).isRerankAvailable("test-api-key");
     }
 
     private RagVisualAnalysisSettings settings(

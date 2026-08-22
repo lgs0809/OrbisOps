@@ -57,6 +57,12 @@ class ProjectMcpGenerationApplicationServiceTest {
                 "type", "mysql",
                 "environment", "PROD",
                 "name", "Orders DB"));
+        resourceService.create(Map.of(
+                "projectId", "project-1",
+                "resourceId", "billing-db",
+                "type", "mysql",
+                "environment", "PROD",
+                "name", "Billing DB"));
 
         Map<String, ProjectMcpDefinition> definitions = new LinkedHashMap<>();
         ProjectMcpCatalogApplicationService catalogService =
@@ -86,14 +92,21 @@ class ProjectMcpGenerationApplicationServiceTest {
                 "projectId", "project-1",
                 "resourceId", "orders-db",
                 "profile", "READ ONLY"));
+        Map<String, Object> second = service.generate(Map.of(
+                "projectId", "project-1",
+                "resourceId", "billing-db",
+                "profile", "READ ONLY"));
 
-        assertEquals("project-1-mysql-prod-read-only-mcp", generated.get("mcpId"));
+        assertEquals("project-1-orders-db-read-only-mcp", generated.get("mcpId"));
+        assertEquals("project-1-billing-db-read-only-mcp", second.get("mcpId"));
         assertEquals("orders-db", generated.get("resourceId"));
         assertEquals("mysql-readonly-template", generated.get("templateId"));
         assertEquals(true, generated.get("readOnly"));
         assertEquals(15, generated.get("requestTimeout"));
         assertTrue(catalogService.find(
-                "project-1", "project-1-mysql-prod-read-only-mcp").isPresent());
+                "project-1", "project-1-orders-db-read-only-mcp").isPresent());
+        assertTrue(catalogService.find(
+                "project-1", "project-1-billing-db-read-only-mcp").isPresent());
     }
 
     private IProjectDefinitionRepository definitionRepository(

@@ -66,8 +66,8 @@ class RagDocumentParserFacadeBoundaryArchitectureTest {
                 () -> assertTrue(reader.contains("value.startsWith(\"\\uFEFF\")")),
                 () -> assertTrue(projector.contains("chunkMaterializer.materialize(drafts)")),
                 () -> assertTrue(projector.contains("new Document(document.id(), document.text(), document.metadata())")),
-                () -> assertTrue(configuration.contains("ops.rag.parse.max-chunk-chars")),
-                () -> assertTrue(configuration.contains("ops.rag.parse.max-pdf-images")));
+                () -> assertTrue(configuration.contains("orbisops.rag.parse.max-chunk-chars")),
+                () -> assertTrue(configuration.contains("orbisops.rag.parse.max-pdf-images")));
     }
 
     private String read(String relativePath) throws IOException {

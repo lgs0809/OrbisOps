@@ -179,7 +179,7 @@ async function handle(message) {
       return ok(id, {
         protocolVersion: params?.protocolVersion || "2024-11-05",
         capabilities: { tools: {} },
-        serverInfo: { name: "local-rabbitmq-readonly-mcp-server", version: "1.0.0" },
+        serverInfo: { name: "local-rabbitmq-readonly-mcp-server", version: "2.0.0" },
       });
     }
     if (method === "notifications/initialized") return;

@@ -4,22 +4,21 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RagQualityEvalSettingsTest {
 
     @Test
-    void springDefaultsAndLegacyConstructorDefaultsRemainDistinct() {
+    void defaultsRemainProviderNeutralUntilRerankIsConfigured() {
         RagQualityEvalSettings defaults = RagQualityEvalSettings.defaults();
         RagQualityEvalSettings legacy =
                 RagQualityEvalSettings.legacyConstructorDefaults();
 
-        assertTrue(defaults.rerankEnabled());
-        assertEquals("cohere", defaults.rerankProvider());
-        assertEquals("http://127.0.0.1:8110", defaults.rerankBaseUrl());
-        assertEquals("local-rag-models", defaults.rerankApiKey());
+        assertFalse(defaults.rerankEnabled());
+        assertEquals("", defaults.rerankProvider());
+        assertEquals("", defaults.rerankBaseUrl());
+        assertEquals("", defaults.rerankApiKey());
         assertEquals("v1/rerank", defaults.rerankPath());
-        assertEquals("Qwen/Qwen3-VL-Reranker-2B", defaults.rerankModel());
+        assertEquals("", defaults.rerankModel());
         assertFalse(legacy.rerankEnabled());
         assertEquals("", legacy.rerankProvider());
         assertEquals("", legacy.rerankModel());

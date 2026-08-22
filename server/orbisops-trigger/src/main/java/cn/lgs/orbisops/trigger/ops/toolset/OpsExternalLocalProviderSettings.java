@@ -49,15 +49,15 @@ public final class OpsExternalLocalProviderSettings {
     private final boolean forbidWildcardRollout;
 
     public OpsExternalLocalProviderSettings(
-            @Value("${ops.tool-runtime.mode:DEVELOPMENT}") String mode,
-            @Value("${ops.external-local.prometheus-enabled:true}") boolean prometheusEnabled,
-            @Value("${ops.external-local.elasticsearch-enabled:true}") boolean elasticsearchEnabled,
-            @Value("${ops.external-local.mysql-enabled:true}") boolean mysqlEnabled,
-            @Value("${ops.external-local.redis-enabled:true}") boolean redisEnabled,
-            @Value("${ops.external-local.docker-enabled:true}") boolean dockerEnabled,
-            @Value("${ops.tool-runtime.forbid-arbitrary-sql:false}") boolean forbidArbitrarySql,
-            @Value("${ops.tool-runtime.forbid-arbitrary-shell:false}") boolean forbidArbitraryShell,
-            @Value("${ops.tool-runtime.forbid-wildcard-rollout:false}") boolean forbidWildcardRollout) {
+            @Value("${orbisops.tool-runtime.mode:DEVELOPMENT}") String mode,
+            @Value("${orbisops.external-local.prometheus-enabled:true}") boolean prometheusEnabled,
+            @Value("${orbisops.external-local.elasticsearch-enabled:true}") boolean elasticsearchEnabled,
+            @Value("${orbisops.external-local.mysql-enabled:true}") boolean mysqlEnabled,
+            @Value("${orbisops.external-local.redis-enabled:true}") boolean redisEnabled,
+            @Value("${orbisops.external-local.docker-enabled:true}") boolean dockerEnabled,
+            @Value("${orbisops.tool-runtime.forbid-arbitrary-sql:false}") boolean forbidArbitrarySql,
+            @Value("${orbisops.tool-runtime.forbid-arbitrary-shell:false}") boolean forbidArbitraryShell,
+            @Value("${orbisops.tool-runtime.forbid-wildcard-rollout:false}") boolean forbidWildcardRollout) {
         this.mode = Mode.parse(mode);
         this.prometheusEnabled = prometheusEnabled;
         this.elasticsearchEnabled = elasticsearchEnabled;

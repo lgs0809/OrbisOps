@@ -4,6 +4,7 @@ import cn.lgs.orbisops.application.config.AiClientApiCatalogUseCase;
 import cn.lgs.orbisops.application.config.AiClientModelCatalogPort;
 import cn.lgs.orbisops.application.config.AiClientModelSyncUseCase;
 import cn.lgs.orbisops.trigger.ops.OpsConfigAuditService;
+import cn.lgs.orbisops.trigger.ops.runtime.OpsSecretResolver;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -17,9 +18,10 @@ public class AiClientModelSyncConfiguration {
     public AiClientModelSyncUseCase aiClientModelSyncUseCase(
             AiClientApiCatalogUseCase apiCatalogUseCase,
             AiClientModelCatalogPort modelCatalogPort,
-            OpsConfigAuditService auditService) {
+            OpsConfigAuditService auditService,
+            OpsSecretResolver secretResolver) {
         return new AiClientModelSyncUseCase(
-                new OpsAiClientModelSyncTargetAdapter(apiCatalogUseCase),
+                new OpsAiClientModelSyncTargetAdapter(apiCatalogUseCase, secretResolver),
                 new OpsAiClientModelSyncHttpProtocolAdapter(HttpClient.newBuilder()
                         .connectTimeout(Duration.ofSeconds(8))
                         .build()),

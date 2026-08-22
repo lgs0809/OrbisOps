@@ -28,7 +28,7 @@ class ControlledCodeRemoteApplicationServiceTest {
     private static final String AFTER = "c".repeat(64);
 
     @Test
-    void remoteReadAndEditUseMcpShaCasWithoutSampleProjectHostPath() {
+    void remoteReadAndEditUseMcpShaCasWithoutExternalHostPath() {
         Fixture fixture = fixture();
         when(fixture.remote.read(any(), any(), any(), eq("src/App.java")))
                 .thenReturn(new ControlledCodeRemotePort.RemoteRead("class App {}\n", BEFORE));

@@ -2,22 +2,18 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-describe('Project Workspace server-state boundary', () => {
-  it('reuses global Project Scope and keeps project capability/runtime reads behind Query hooks', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/pages/project-workspace.tsx'), 'utf8');
+describe('Project Workspace canonical boundary', () => {
+  it('keeps the legacy module as a thin compatibility shim over the canonical Project page', () => {
+    const legacySource = readFileSync(resolve(process.cwd(), 'src/pages/project-workspace.tsx'), 'utf8');
+    const source = readFileSync(resolve(process.cwd(), 'src/pages/project-product-workspace.tsx'), 'utf8');
 
-    expect(source).not.toContain('useEffect(');
-    expect(source).not.toContain('const loadSnapshot =');
-    expect(source).not.toContain('setProjects(');
-    expect(source).not.toContain('setProjectSkillDetails(');
-    expect(source).not.toContain('setProjectKnowledgeDetails(');
-    expect(source).not.toContain('setProjectMembers(');
-    expect(source).not.toContain('setRepositories(');
-    expect(source).not.toContain('setProjectServices(');
-    expect(source).not.toContain('setExecutionResources(');
-    expect(source).toContain('const projectScope = useProjectScope();');
-    expect(source).toContain("useProjectWorkspaceCapabilitiesQuery(selectedProject?.projectId || '')");
-    expect(source).toContain("useProjectWorkspaceRuntimeQuery(selectedProject?.projectId || '')");
+    expect(legacySource.trim()).toBe("export { ProjectProductWorkspacePage as ProjectWorkspacePage } from './project-product-workspace';");
+    expect(source).toContain('const scope = useProjectScope();');
+    expect(source).toContain('useProjectWorkspaceCapabilitiesQuery(projectId)');
+    expect(source).toContain('useProjectWorkspaceRuntimeQuery(projectId)');
+    expect(source).not.toContain('/absolute/path/');
+    expect(source).not.toContain('createPlatformAccount');
+    expect(source).not.toContain('newAccountForm');
   });
 
   it('keeps the shared project snapshot cache responsible for projects and templates', () => {

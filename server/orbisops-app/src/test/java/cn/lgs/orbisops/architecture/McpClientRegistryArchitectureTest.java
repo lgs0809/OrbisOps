@@ -48,8 +48,8 @@ class McpClientRegistryArchitectureTest {
                 () -> assertTrue(handleService.contains("SyncMcpToolCallbackProvider")),
                 () -> assertTrue(handleService.contains("void initialize(")),
                 () -> assertFalse(handleService.contains("@Service")),
-                () -> assertTrue(configuration.contains("ops.mcp.cache.ttl-seconds")),
-                () -> assertTrue(configuration.contains("ops.mcp.cache.cleanup-interval-ms")),
+                () -> assertTrue(configuration.contains("orbisops.mcp.cache.ttl-seconds")),
+                () -> assertTrue(configuration.contains("orbisops.mcp.cache.cleanup-interval-ms")),
                 () -> assertTrue(cleanupJob.contains("@Scheduled")),
                 () -> assertTrue(cleanupJob.contains("clientRegistry.cleanupExpiredClients()")));
     }

@@ -24,7 +24,7 @@ describe('channel provider cards', () => {
     expect(slack?.adapterAvailable).toBe(true);
     expect(slack?.connectionMode).toBe('LONG_CONNECTION');
     expect(slack?.readiness).toBe('ACTION_REQUIRED');
-    expect(slack?.actionRequired).toBe('Connect this provider to a project.');
+    expect(slack?.actionRequired).toBe('请先把该渠道接入 Project。');
   });
 
   it('treats DingTalk as an installed native adapter when the backend catalog exposes card/update capabilities', () => {
@@ -40,7 +40,7 @@ describe('channel provider cards', () => {
     expect(dingTalk?.adapterAvailable).toBe(true);
     expect(dingTalk?.connectionMode).toBe('LONG_CONNECTION');
     expect(dingTalk?.readiness).toBe('ACTION_REQUIRED');
-    expect(dingTalk?.actionRequired).toBe('Connect this provider to a project.');
+    expect(dingTalk?.actionRequired).toBe('请先把该渠道接入 Project。');
   });
 
   it('derives capability fallback from the backend descriptor instead of provider-name assumptions', () => {
@@ -71,7 +71,7 @@ describe('channel provider cards', () => {
     expect(discord?.capabilities.find((item) => item.key === 'ATTACHMENTS')?.supported).toBe(false);
     expect(qq?.capabilities.find((item) => item.key === 'APPROVAL')?.supported).toBe(true);
     expect(qq?.capabilities.find((item) => item.key === 'UPDATE')?.supported).toBe(false);
-    expect(qq?.capabilities.find((item) => item.key === 'UPDATE')?.fallback).toContain('new messages');
+    expect(qq?.capabilities.find((item) => item.key === 'UPDATE')?.fallback).toContain('新消息');
   });
 
   it('treats WeChat as an installed secure-webhook adapter without inventing unsupported capabilities', () => {
@@ -99,7 +99,7 @@ describe('channel provider cards', () => {
     const telegram = buildChannelProviderCards([], []).find((item) => item.type === 'TELEGRAM');
     expect(telegram?.capabilities).toHaveLength(6);
     expect(telegram?.capabilities.every((item) => item.supported === false)).toBe(true);
-    expect(telegram?.capabilities[0]?.fallback).toContain('not available');
+    expect(telegram?.capabilities[0]?.fallback).toContain('未安装');
   });
 
   it('keeps a configured active provider action-required until readiness is probed', () => {

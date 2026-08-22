@@ -41,7 +41,7 @@ public class JdbcToolExecutionIdempotencyAdapter implements ToolExecutionIdempot
 
     public JdbcToolExecutionIdempotencyAdapter(
             @Qualifier("mysqlJdbcTemplate") ObjectProvider<JdbcTemplate> provider,
-            @Value("${ops.tool-execution.idempotency.auto-init:true}") boolean autoInit) {
+            @Value("${orbisops.tool-execution.idempotency.auto-init:true}") boolean autoInit) {
         this.jdbc = provider.getIfAvailable();
         this.autoInit = autoInit;
     }

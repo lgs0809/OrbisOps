@@ -16,7 +16,7 @@ public final class JdbcAgentDefinitionSchemaInitializer {
 
     private final JdbcTemplate jdbcTemplate;
 
-    @Value("${ops.agents.auto-init:true}")
+    @Value("${orbisops.agents.auto-init:true}")
     private boolean autoInit = true;
 
     private volatile boolean initialized;

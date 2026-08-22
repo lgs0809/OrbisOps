@@ -56,7 +56,7 @@ public class OpsSkillReleaseService {
     }
 
     @Scheduled(fixedDelayString =
-            "${ops.skill-evolution.release.fixed-delay-ms:60000}")
+            "${orbisops.skill-evolution.release.fixed-delay-ms:60000}")
     public void evaluateReleases() {
         releaseService.evaluateReleases();
     }

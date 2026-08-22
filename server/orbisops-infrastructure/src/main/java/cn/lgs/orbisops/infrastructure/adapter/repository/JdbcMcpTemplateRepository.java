@@ -31,7 +31,7 @@ public class JdbcMcpTemplateRepository implements IMcpTemplateRepository {
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 
-    @Value("${ops.mcp-template.auto-init:true}")
+    @Value("${orbisops.mcp-template.auto-init:true}")
     private boolean autoInit = true;
 
     private volatile boolean initialized;

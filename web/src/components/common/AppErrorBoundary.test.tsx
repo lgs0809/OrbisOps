@@ -18,8 +18,8 @@ describe('AppErrorBoundary', () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     render(<AppErrorBoundary><Broken /></AppErrorBoundary>);
 
-    expect(screen.getByRole('alert')).toHaveTextContent('页面暂时无法显示');
-    expect(screen.getByText(/不会自动重放审批或生产执行操作/)).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('当前页面无法显示');
+    expect(screen.getByText(/审批或生产执行操作不会被自动重放/)).toBeInTheDocument();
     consoleSpy.mockRestore();
   });
 });

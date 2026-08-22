@@ -16,7 +16,7 @@ public class JdbcGovernedMemorySchemaInitializer {
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 
-    @Value("${ops.memory.auto-init:true}")
+    @Value("${orbisops.memory.auto-init:true}")
     private boolean autoInit = true;
 
     private volatile boolean initialized;

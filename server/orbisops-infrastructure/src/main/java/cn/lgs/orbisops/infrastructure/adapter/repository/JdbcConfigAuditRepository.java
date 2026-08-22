@@ -43,8 +43,8 @@ public class JdbcConfigAuditRepository implements IConfigAuditRepository {
 
     public JdbcConfigAuditRepository(
             @Qualifier("mysqlJdbcTemplate") ObjectProvider<JdbcTemplate> jdbcTemplateProvider,
-            @Value("${ops.config-audit.auto-init:true}") boolean autoInit,
-            @Value("${ops.safety.allow-in-memory-evidence-store:false}") boolean allowInMemoryEvidenceStore,
+            @Value("${orbisops.config-audit.auto-init:true}") boolean autoInit,
+            @Value("${orbisops.safety.allow-in-memory-evidence-store:false}") boolean allowInMemoryEvidenceStore,
             @Value("${spring.profiles.active:}") String activeProfiles) {
         this.jdbcTemplateProvider = jdbcTemplateProvider;
         this.autoInit = autoInit;

@@ -184,7 +184,6 @@ class OpsAnalysisChangePackageCoordinatorTest {
                 .filter(event -> "WORKFLOW_OUTCOME".equals(event.getEventType()))
                 .findFirst()
                 .orElseThrow();
-        assertEquals("REMEDIATE", workflowOutcome.getPayload().get("actionClassification"));
         assertEquals(true, workflowOutcome.getPayload().get("requiresAction"));
         assertEquals("NOT_APPLICABLE", workflowOutcome.getPayload().get("verificationStatus"));
     }
@@ -213,7 +212,6 @@ class OpsAnalysisChangePackageCoordinatorTest {
                 .eventType("REACT_OUTCOME")
                 .status("SUCCEEDED")
                 .payload(Map.of(
-                        "actionClassification", "REMEDIATE",
                         "requiresAction", true,
                         "verificationStatus", "NOT_APPLICABLE",
                         "abstained", false,

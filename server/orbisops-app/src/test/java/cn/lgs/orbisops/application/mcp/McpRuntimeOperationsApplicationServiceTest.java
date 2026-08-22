@@ -102,6 +102,26 @@ class McpRuntimeOperationsApplicationServiceTest {
     }
 
     @Test
+    void activationAllowsSystemVerifiedPlatformReadonlyPolicy() {
+        when(discovery.hydrateSchema(any(McpSchemaHydrationRequest.class)))
+                .thenReturn(schema(policy(
+                        McpToolPolicyStatus.ACTIVE,
+                        McpToolPolicyReviewStatus.SYSTEM_VERIFIED,
+                        true,
+                        "READ_EXTERNAL_STATE",
+                        "TARGET_RESOURCE_READ",
+                        "READ_ONLY",
+                        false,
+                        McpSchemaExposureTier.EXTENSION)));
+
+        McpRuntimeActivationResult result = service(true).activateRuntimeTool(activationCommand());
+
+        assertEquals("search", result.toolName());
+        verify(runtimeCatalog).saveActivation(argThat(activation ->
+                "run-1".equals(activation.runId()) && "search".equals(activation.toolName())));
+    }
+
+    @Test
     void activationRejectsPendingOrMutatingPolicies() {
         when(discovery.hydrateSchema(any(McpSchemaHydrationRequest.class)))
                 .thenReturn(schema(policy(

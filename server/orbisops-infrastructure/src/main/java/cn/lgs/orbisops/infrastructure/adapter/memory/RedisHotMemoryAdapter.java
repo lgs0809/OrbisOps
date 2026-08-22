@@ -25,7 +25,7 @@ import java.util.Objects;
 @Repository
 @ConditionalOnClass(StringRedisTemplate.class)
 @ConditionalOnProperty(
-        prefix = "ops.chat.memory",
+        prefix = "orbisops.chat.memory",
         name = "hot-store",
         havingValue = "redis")
 public class RedisHotMemoryAdapter implements
@@ -39,7 +39,7 @@ public class RedisHotMemoryAdapter implements
 
     public RedisHotMemoryAdapter(
             StringRedisTemplate redisTemplate,
-            @Value("${ops.chat.memory.hot-ttl-minutes:30}")
+            @Value("${orbisops.chat.memory.hot-ttl-minutes:30}")
             long ttlMinutes) {
         this.redisTemplate = redisTemplate;
         this.ttlMinutes = Math.max(1L, ttlMinutes);

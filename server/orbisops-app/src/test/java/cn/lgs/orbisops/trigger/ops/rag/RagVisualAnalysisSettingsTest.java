@@ -9,14 +9,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class RagVisualAnalysisSettingsTest {
 
     @Test
-    void defaultsMustPreserveHistoricalConfiguration() {
+    void defaultsMustRemainProviderNeutralUntilExplicitlyConfigured() {
         RagVisualAnalysisSettings settings = RagVisualAnalysisSettings.defaults();
 
         assertFalse(settings.enabled());
         assertTrue(settings.highValueOnly());
         assertEquals("openai", settings.provider());
         assertEquals("v1/chat/completions", settings.path());
-        assertEquals("gpt-5.4-mini", settings.model());
+        assertEquals("", settings.model());
         assertEquals("low", settings.detail());
         assertEquals(30, settings.timeoutSeconds());
         assertEquals(1200, settings.maxCompletionTokens());

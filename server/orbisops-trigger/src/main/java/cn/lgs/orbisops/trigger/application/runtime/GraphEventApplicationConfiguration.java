@@ -12,7 +12,7 @@ public class GraphEventApplicationConfiguration {
     @Bean
     public GraphEventApplicationService graphEventApplicationService(
             IGraphEventRepository repository,
-            @Value("${ops.graph-events.max-memory-events:500}") int maxMemoryEvents) {
+            @Value("${orbisops.graph-events.max-memory-events:500}") int maxMemoryEvents) {
         return new GraphEventApplicationService(repository, maxMemoryEvents);
     }
 }

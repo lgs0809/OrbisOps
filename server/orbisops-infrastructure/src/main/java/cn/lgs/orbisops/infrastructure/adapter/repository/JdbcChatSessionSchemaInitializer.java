@@ -12,7 +12,7 @@ public class JdbcChatSessionSchemaInitializer {
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 
-    @Value("${ops.chat.session.auto-init:true}")
+    @Value("${orbisops.chat.session.auto-init:true}")
     private boolean autoInit = true;
 
     private volatile boolean initialized;

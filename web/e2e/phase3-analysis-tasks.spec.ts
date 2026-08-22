@@ -70,18 +70,21 @@ test('completed Analysis Tasks stay cached until explicit refresh and detail is 
   });
 
   await page.goto('/platform/advanced/analysis-tasks');
-  await expect(page.getByRole('heading', { name: '分析任务' })).toBeVisible();
+  await expect(page).toHaveURL(/\/workbench$/);
+  await expect(page.getByRole('heading', { name: '工作台' })).toBeVisible();
   await expect(page.getByText('Investigate payment latency', { exact: true })).toBeVisible();
   expect(taskListRequests).toBe(1);
+  expect(detailRequests).toBe(0);
 
   await page.waitForTimeout(3300);
   expect(taskListRequests).toBe(1);
+  expect(detailRequests).toBe(0);
 
-  await page.getByRole('button', { name: '刷新' }).first().click();
+  await page.getByRole('button', { name: '刷新运行' }).click();
   await expect.poll(() => taskListRequests).toBe(2);
+  expect(detailRequests).toBe(0);
 
-  const taskRow = page.locator('tr').filter({ hasText: 'Investigate payment latency' }).first();
-  await taskRow.getByRole('button', { name: '查看' }).click();
+  await page.getByRole('button', { name: /Investigate payment latency/ }).click();
   await expect(page.getByText('Latency was caused by an upstream dependency.', { exact: true })).toBeVisible();
   expect(detailRequests).toBe(1);
 });

@@ -42,7 +42,7 @@ class BoundedContextDependencyArchitectureTest {
     private Map<String, Set<String>> domainMatrix() {
         Map<String, Set<String>> matrix = new LinkedHashMap<>();
         register(matrix, Set.of("project", "source", "shared"), "project", "source");
-        register(matrix, Set.of("agentdefinition", "agent", "shared"), "agentdefinition", "agent");
+        register(matrix, Set.of("agentdefinition", "shared"), "agentdefinition");
         register(matrix, Set.of(
                         "worksession", "runtime", "analysis", "investigation", "chatsession", "shared"),
                 "worksession", "runtime", "analysis", "investigation", "chatsession");

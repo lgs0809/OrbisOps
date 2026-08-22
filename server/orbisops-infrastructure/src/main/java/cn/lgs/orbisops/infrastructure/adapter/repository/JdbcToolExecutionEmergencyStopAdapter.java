@@ -33,8 +33,8 @@ public final class JdbcToolExecutionEmergencyStopAdapter
     public JdbcToolExecutionEmergencyStopAdapter(
             @Qualifier("mysqlJdbcTemplate") ObjectProvider<JdbcTemplate> jdbcProvider,
             ToolExecutionAuditPort audit,
-            @Value("${ops.tool-execution.emergency-stop:false}") boolean globalStop,
-            @Value("${ops.tool-execution.emergency-stop-auto-init:true}") boolean autoInit) {
+            @Value("${orbisops.tool-execution.emergency-stop:false}") boolean globalStop,
+            @Value("${orbisops.tool-execution.emergency-stop-auto-init:true}") boolean autoInit) {
         this.jdbc = jdbcProvider == null ? null : jdbcProvider.getIfAvailable();
         if (audit == null) throw new IllegalArgumentException("TOOL_EXECUTION_EMERGENCY_STOP_AUDIT_REQUIRED");
         this.audit = audit;

@@ -46,7 +46,7 @@ test('Execution Targets uses one template catalog query and explicit refresh', a
   });
 
   await page.goto('/platform/execution-targets');
-  await expect(page.getByRole('heading', { name: '执行目标模板' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '执行目标', exact: true })).toBeVisible();
   await expect(page.getByText('MySQL Controlled Execution', { exact: true }).first()).toBeVisible();
   expect(listCount).toBe(1);
 

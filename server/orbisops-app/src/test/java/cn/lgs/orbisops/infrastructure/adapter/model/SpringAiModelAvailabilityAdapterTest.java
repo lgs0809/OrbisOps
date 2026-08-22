@@ -21,7 +21,7 @@ class SpringAiModelAvailabilityAdapterTest {
     @Test
     void doesNotProbeRemoteEmbeddingEndpoint() {
         ModelAvailabilityPort availability = availability();
-        ReflectionTestUtils.setField(availability, "embeddingApiKey", "sk-real");
+        ReflectionTestUtils.setField(availability, "embeddingApiKey", "configured-api-key");
         ReflectionTestUtils.setField(availability, "embeddingBaseUrl", "https://api.example.com");
 
         assertTrue(availability.isEmbeddingAvailable());
@@ -32,7 +32,7 @@ class SpringAiModelAvailabilityAdapterTest {
         ModelAvailabilityPort availability = availability();
         ReflectionTestUtils.setField(availability, "openAiApiKey", "dev-placeholder-key");
         assertFalse(availability.isChatAvailable());
-        ReflectionTestUtils.setField(availability, "openAiApiKey", "sk-real");
+        ReflectionTestUtils.setField(availability, "openAiApiKey", "configured-api-key");
         ReflectionTestUtils.setField(availability, "modelCallsEnabled", false);
         assertFalse(availability.isChatAvailable());
     }
@@ -41,10 +41,10 @@ class SpringAiModelAvailabilityAdapterTest {
         SpringAiModelAvailabilityAdapter availability = new SpringAiModelAvailabilityAdapter();
         ReflectionTestUtils.setField(availability, "modelCallsEnabled", true);
         ReflectionTestUtils.setField(availability, "placeholderApiKey", "dev-placeholder-key");
-        ReflectionTestUtils.setField(availability, "openAiApiKey", "sk-real");
-        ReflectionTestUtils.setField(availability, "embeddingApiKey", "sk-real");
+        ReflectionTestUtils.setField(availability, "openAiApiKey", "configured-api-key");
+        ReflectionTestUtils.setField(availability, "embeddingApiKey", "configured-api-key");
         ReflectionTestUtils.setField(availability, "embeddingBaseUrl", "https://api.example.com");
-        ReflectionTestUtils.setField(availability, "rerankApiKey", "sk-real");
+        ReflectionTestUtils.setField(availability, "rerankApiKey", "configured-api-key");
         ReflectionTestUtils.setField(availability, "rerankBaseUrl", "https://api.example.com");
         ReflectionTestUtils.setField(availability, "localModelReadinessCacheMs", 1000L);
         ReflectionTestUtils.setField(availability, "localModelReadinessTimeoutMs", 100);

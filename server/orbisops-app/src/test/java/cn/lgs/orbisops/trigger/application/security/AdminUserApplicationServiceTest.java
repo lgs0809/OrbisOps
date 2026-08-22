@@ -11,6 +11,7 @@ import cn.lgs.orbisops.application.security.AdminUserCatalogUseCase;
 import cn.lgs.orbisops.application.security.AdminUserCommand;
 import cn.lgs.orbisops.application.security.AdminUserLoginCommand;
 import cn.lgs.orbisops.application.security.AdminUserLoginResult;
+import cn.lgs.orbisops.application.security.FirstTimeSetupUseCase;
 import cn.lgs.orbisops.domain.security.AdminUserAccount;
 import cn.lgs.orbisops.domain.security.AdminUserRole;
 import org.junit.jupiter.api.Test;
@@ -33,7 +34,8 @@ class AdminUserApplicationServiceTest {
     void createProjectsRequestToTypedCommand() {
         AdminUserCatalogUseCase catalog = mock(AdminUserCatalogUseCase.class);
         AdminUserAuthenticationUseCase authentication = mock(AdminUserAuthenticationUseCase.class);
-        AdminUserApplicationService service = new AdminUserApplicationService(catalog, authentication);
+        AdminUserApplicationService service = new AdminUserApplicationService(
+                catalog, authentication, new FirstTimeSetupUseCase(catalog, authentication));
         when(catalog.create(any())).thenReturn(true);
         AdminUserRequestDTO request = AdminUserRequestDTO.builder()
                 .id(7L)
@@ -58,7 +60,8 @@ class AdminUserApplicationServiceTest {
     void queryProjectsFiltersAndTypedAccountResponse() {
         AdminUserCatalogUseCase catalog = mock(AdminUserCatalogUseCase.class);
         AdminUserAuthenticationUseCase authentication = mock(AdminUserAuthenticationUseCase.class);
-        AdminUserApplicationService service = new AdminUserApplicationService(catalog, authentication);
+        AdminUserApplicationService service = new AdminUserApplicationService(
+                catalog, authentication, new FirstTimeSetupUseCase(catalog, authentication));
         AdminUserQueryRequestDTO request = AdminUserQueryRequestDTO.builder()
                 .userId("u-10001")
                 .username("ops")
@@ -84,7 +87,8 @@ class AdminUserApplicationServiceTest {
     void loginProjectsCommandTokenAndCompatibilityException() {
         AdminUserCatalogUseCase catalog = mock(AdminUserCatalogUseCase.class);
         AdminUserAuthenticationUseCase authentication = mock(AdminUserAuthenticationUseCase.class);
-        AdminUserApplicationService service = new AdminUserApplicationService(catalog, authentication);
+        AdminUserApplicationService service = new AdminUserApplicationService(
+                catalog, authentication, new FirstTimeSetupUseCase(catalog, authentication));
         AdminUserLoginRequestDTO request = AdminUserLoginRequestDTO.builder()
                 .username("ops-admin")
                 .password("StrongPass1")

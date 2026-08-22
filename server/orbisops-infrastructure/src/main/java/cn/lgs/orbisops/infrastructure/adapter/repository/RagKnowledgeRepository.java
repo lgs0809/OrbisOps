@@ -39,10 +39,10 @@ public class RagKnowledgeRepository implements IRagKnowledgeRepository {
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 
-    @Value("${ops.rag.vector-table-name:vector_store_qwen_vl_2048}")
+    @Value("${orbisops.rag.vector-table-name:orbisops_vector_store}")
     private String ragVectorTableName;
 
-    @Value("${ops.rag.vector-index.auto-init:true}")
+    @Value("${orbisops.rag.vector-index.auto-init:true}")
     private boolean vectorIndexAutoInit;
 
     @Value("${spring.ai.openai.embedding.options.dimensions:2048}")
@@ -499,7 +499,7 @@ public class RagKnowledgeRepository implements IRagKnowledgeRepository {
     }
 
     private String qualifiedVectorTableName() {
-        String tableName = StringUtils.hasText(ragVectorTableName) ? ragVectorTableName.trim() : "vector_store_qwen_vl_2048";
+        String tableName = StringUtils.hasText(ragVectorTableName) ? ragVectorTableName.trim() : "orbisops_vector_store";
         if (!VECTOR_TABLE_PATTERN.matcher(tableName).matches()) {
             throw new IllegalArgumentException("非法 PgVector 表名：" + tableName);
         }
@@ -689,7 +689,7 @@ public class RagKnowledgeRepository implements IRagKnowledgeRepository {
     }
 
     private String vectorIndexNameSeed() {
-        String tableName = StringUtils.hasText(ragVectorTableName) ? ragVectorTableName.trim() : "vector_store_qwen_vl_2048";
+        String tableName = StringUtils.hasText(ragVectorTableName) ? ragVectorTableName.trim() : "orbisops_vector_store";
         return tableName.replace(".", "_").replaceAll("[^A-Za-z0-9_]", "_");
     }
 

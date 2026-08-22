@@ -18,6 +18,7 @@ import {
   useSkillEvolverOverviewQuery,
 } from '../features/skill-evolver/api/skill-evolver-queries';
 import { theme } from '../styles/theme';
+import { userFacingError } from '../utils/user-facing-error';
 
 const { Option } = Select;
 const { Text } = Typography;
@@ -316,7 +317,7 @@ export const SkillEvolverManagementPage: React.FC = () => {
       setPatchPage(1);
       Toast.success('已触发一次自动分析扫描');
     } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '触发自动分析失败');
+      Toast.error(userFacingError(error, '触发自动分析失败，请稍后重试。'));
     }
   };
 

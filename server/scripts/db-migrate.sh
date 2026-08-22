@@ -6,6 +6,7 @@ MANIFEST="${ORBISOPS_MIGRATION_MANIFEST:-${ROOT_DIR}/db/migrations/manifest.tsv}
 MYSQL_HOST="${MYSQL_HOST:-127.0.0.1}"
 MYSQL_PORT="${MYSQL_PORT:-3306}"
 MYSQL_DATABASE="${MYSQL_DATABASE:-orbisops}"
+MYSQL_USERNAME="${MYSQL_USERNAME:-orbisops}"
 MYSQL_DEFAULTS_FILE="${MYSQL_DEFAULTS_FILE:-}"
 
 command -v mysql >/dev/null 2>&1 || { echo "mysql client is required" >&2; exit 2; }
@@ -22,10 +23,10 @@ sha256_file() {
 mysql_exec() {
   if [[ -n "${MYSQL_DEFAULTS_FILE}" ]]; then
     [[ -f "${MYSQL_DEFAULTS_FILE}" ]] || { echo "MYSQL_DEFAULTS_FILE does not exist" >&2; exit 2; }
-    mysql --defaults-extra-file="${MYSQL_DEFAULTS_FILE}" --host="${MYSQL_HOST}" --port="${MYSQL_PORT}" --protocol=TCP "$@"
+    mysql --defaults-extra-file="${MYSQL_DEFAULTS_FILE}" --host="${MYSQL_HOST}" --port="${MYSQL_PORT}" --user="${MYSQL_USERNAME}" --protocol=TCP "$@"
     return
   fi
-  mysql --host="${MYSQL_HOST}" --port="${MYSQL_PORT}" --protocol=TCP "$@"
+  mysql --host="${MYSQL_HOST}" --port="${MYSQL_PORT}" --user="${MYSQL_USERNAME}" --protocol=TCP "$@"
 }
 
 mysql_exec -e "CREATE DATABASE IF NOT EXISTS \`${MYSQL_DATABASE}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"

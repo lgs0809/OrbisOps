@@ -8,7 +8,7 @@ import java.util.List;
 
 @Service
 @Primary
-@ConditionalOnProperty(prefix = "ops.chat.memory", name = "jdbc-enabled", havingValue = "false")
+@ConditionalOnProperty(prefix = "orbisops.chat.memory", name = "jdbc-enabled", havingValue = "false")
 public class OpsNoopColdMemoryStore implements OpsColdMemoryStore {
 
     @Override

@@ -10,7 +10,7 @@ public class OpsMemoryRuntimeInjectionConfiguration {
 
     @Bean
     public OpsMemoryRuntimeInjectionSettings opsMemoryRuntimeInjectionSettings(
-            @Value("${ops.memory.max-injection-count:8}") int maxInjectionCount) {
+            @Value("${orbisops.memory.max-injection-count:8}") int maxInjectionCount) {
         return new OpsMemoryRuntimeInjectionSettings(maxInjectionCount);
     }
 }

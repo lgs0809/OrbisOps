@@ -19,12 +19,12 @@ public final class SpringAiModelAvailabilityAdapter implements ModelAvailability
 
     private static final Set<String> PLACEHOLDER_KEYS = Set.of(
             "dev-placeholder-key", "dev-local-placeholder", "placeholder", "dummy",
-            "fake-key", "changeme", "change-me", "test");
+            "fake-key", "changeme", "change-me", "test", "[redacted_secret]", "unconfigured");
 
-    @Value("${ops.ai.model-calls-enabled:true}")
+    @Value("${orbisops.ai.model-calls-enabled:true}")
     private boolean modelCallsEnabled;
 
-    @Value("${ops.ai.placeholder-api-key:dev-placeholder-key}")
+    @Value("${orbisops.ai.placeholder-api-key:dev-placeholder-key}")
     private String placeholderApiKey;
 
     @Value("${spring.ai.openai.base-url:}")
@@ -33,10 +33,10 @@ public final class SpringAiModelAvailabilityAdapter implements ModelAvailability
     @Value("${spring.ai.openai.api-key:}")
     private String openAiApiKey;
 
-    @Value("${spring.ai.openai.embedding.base-url:http://127.0.0.1:8110}")
+    @Value("${spring.ai.openai.embedding.base-url:}")
     private String embeddingBaseUrl;
 
-    @Value("${spring.ai.openai.embedding.api-key:local-rag-models}")
+    @Value("${spring.ai.openai.embedding.api-key:}")
     private String embeddingApiKey;
 
     @Value("${spring.ai.openai.chat.options.model:}")
@@ -45,22 +45,22 @@ public final class SpringAiModelAvailabilityAdapter implements ModelAvailability
     @Value("${spring.ai.openai.embedding.options.model:}")
     private String embeddingModel;
 
-    @Value("${ops.rag.rerank.provider:cohere}")
+    @Value("${orbisops.rag.rerank.provider:}")
     private String rerankProvider;
 
-    @Value("${ops.rag.rerank.base-url:http://127.0.0.1:8110}")
+    @Value("${orbisops.rag.rerank.base-url:}")
     private String rerankBaseUrl;
 
-    @Value("${ops.rag.rerank.model:Qwen/Qwen3-VL-Reranker-2B}")
+    @Value("${orbisops.rag.rerank.model:}")
     private String rerankModel;
 
-    @Value("${ops.rag.rerank.api-key:local-rag-models}")
+    @Value("${orbisops.rag.rerank.api-key:}")
     private String rerankApiKey;
 
-    @Value("${ops.ai.local-model-readiness-cache-ms:10000}")
+    @Value("${orbisops.ai.local-model-readiness-cache-ms:10000}")
     private long localModelReadinessCacheMs;
 
-    @Value("${ops.ai.local-model-readiness-timeout-ms:500}")
+    @Value("${orbisops.ai.local-model-readiness-timeout-ms:500}")
     private int localModelReadinessTimeoutMs;
 
     private final ConcurrentMap<String, CachedEndpointReadiness> localEndpointReadiness = new ConcurrentHashMap<>();
@@ -103,9 +103,9 @@ public final class SpringAiModelAvailabilityAdapter implements ModelAvailability
     public String unavailableMessage(String feature) {
         String subject = StringUtils.hasText(feature) ? feature : "大模型功能";
         if (!modelCallsEnabled) {
-            return subject + "未启用：OPS_AI_MODEL_CALLS_ENABLED=false。需要调用大模型时请开启该开关并配置 OPENAI_API_KEY。";
+            return subject + "未启用：模型调用开关已关闭。需要调用模型时请在 OrbisOps 模型设置中启用并配置 Provider。";
         }
-        return subject + "需要真实模型密钥：当前未配置 OPENAI_API_KEY，或仍使用本地占位 key。请配置 OPENAI_API_KEY 后重试。";
+        return subject + "需要可用的模型 Provider：当前未配置有效 API Key，或仍使用占位配置。请在 OrbisOps 模型设置中完成配置后重试。";
     }
 
     @Override
@@ -147,8 +147,7 @@ public final class SpringAiModelAvailabilityAdapter implements ModelAvailability
     }
 
     private boolean requiresLocalReadinessProbe(String baseUrl, String apiKey) {
-        String normalizedKey = apiKey == null ? "" : apiKey.trim().toLowerCase(Locale.ROOT);
-        if ("local-rag-models".equals(normalizedKey)) return true;
+        if (!isApiKeyUsable(apiKey)) return false;
         String normalizedBaseUrl = baseUrl == null ? "" : baseUrl.trim().toLowerCase(Locale.ROOT);
         return normalizedBaseUrl.contains("127.0.0.1")
                 || normalizedBaseUrl.contains("localhost")
@@ -174,7 +173,7 @@ public final class SpringAiModelAvailabilityAdapter implements ModelAvailability
     }
 
     private String normalizeBaseUrl(String baseUrl) {
-        String value = StringUtils.hasText(baseUrl) ? baseUrl.trim() : "http://127.0.0.1:8110";
+        String value = StringUtils.hasText(baseUrl) ? baseUrl.trim() : "";
         while (value.endsWith("/")) value = value.substring(0, value.length() - 1);
         return value;
     }

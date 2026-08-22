@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.LongAdder;
 public final class OpsMcpRuntimeConfigResolutionTelemetry
         implements OpsMcpRuntimeConfigResolutionObserver {
 
-    public static final String METER_NAME = "ops.mcp.runtime.config.resolution";
+    public static final String METER_NAME = "orbisops.mcp.runtime.config.resolution";
 
     private final MeterRegistry registry;
     private final Map<String, LongAdder> counts = new ConcurrentHashMap<>();

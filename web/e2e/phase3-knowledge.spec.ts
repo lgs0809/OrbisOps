@@ -67,26 +67,26 @@ test('knowledge search stays separate from the selected knowledge context', asyn
   });
 
   await page.goto('/platform/knowledge');
-  await expect(page.getByRole('heading', { name: '通用知识库' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '知识库', exact: true }).first()).toBeVisible();
   await expect(page.getByText('Operations Knowledge', { exact: true })).toBeVisible();
 
   expect(requestedPaths.some((value) => value.includes('/ops-public/chunks'))).toBe(false);
   expect(requestedPaths.some((value) => value.includes('/ops-public/usage-projects'))).toBe(false);
 
-  const tagInput = page.getByPlaceholder('场景标签，如 payment-ops');
-  await tagInput.fill('ops');
-  await page.getByRole('button', { name: /搜索/ }).click();
+  const searchInput = page.getByPlaceholder('搜索知识库');
+  await searchInput.fill('ops');
   await expect(page.getByText('Operations Knowledge', { exact: true })).toBeVisible();
 
   expect(requestedPaths.some((value) => value.includes('/ops-public/chunks'))).toBe(false);
   expect(requestedPaths.some((value) => value.includes('/ops-public/usage-projects'))).toBe(false);
-  await expect(page.getByRole('button', { name: '编辑策略' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '检索策略' })).toHaveCount(0);
 
   const knowledgeRow = page.locator('tr').filter({ hasText: 'Operations Knowledge' }).first();
-  await knowledgeRow.getByRole('button', { name: '查看', exact: true }).click();
+  await knowledgeRow.getByRole('button', { name: '打开', exact: true }).click();
 
   await expect.poll(() => requestedPaths.some((value) => value.includes('/ops-public/chunks'))).toBe(true);
   await expect.poll(() => requestedPaths.some((value) => value.includes('/ops-public/usage-projects'))).toBe(true);
+  await page.getByRole('tab', { name: 'Project 授权' }).click();
   await expect(page.getByText('Core Platform', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: '编辑策略' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: '检索策略' })).toBeEnabled();
 });

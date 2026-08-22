@@ -58,20 +58,20 @@ test('WeChat setup exposes only the secure Official Account webhook contract', a
   });
 
   await page.goto('/platform/integrations?projectId=demo-project');
-  await page.getByRole('button', { name: '新建 Channel' }).click();
-  const modal = page.locator('.semi-modal').filter({ hasText: 'Connect' });
-  const providerSelect = modal.getByRole('combobox').first();
-  await providerSelect.click();
-  await page.getByRole('option', { name: 'WeChat' }).click();
+  await page.getByRole('button', { name: '接入渠道' }).first().click();
+  const modal = page.locator('.semi-modal').filter({ hasText: '接入渠道' });
 
-  await expect(modal.getByText('Official Account Secure Webhook')).toBeVisible();
-  await expect(modal.getByText('不支持个人微信号 QR 注入或非官方 Session Bridge。')).toBeVisible();
-  await expect(modal).toContainText('暂不宣称群聊、附件、卡片审批、原消息更新或无限制主动推送');
+  await expect(modal).toContainText('WeChat');
+  await expect(modal).toContainText('WEBHOOK');
+  await expect(modal).toContainText('校验凭据环境变量');
+  await expect(modal).toContainText('加密凭据环境变量');
 
-  await modal.getByPlaceholder('Production On-call').fill('WeChat Production');
-  await modal.getByPlaceholder('wx...').fill('wx-test-app');
-  await modal.getByRole('button', { name: 'Next' }).click();
-  await modal.getByRole('button', { name: 'Save & Test' }).click();
+  await modal.getByPlaceholder('生产值班群').fill('WeChat Production');
+  await modal.getByRole('textbox', { name: '凭据环境变量', exact: true }).fill('WECHAT_APP_SECRET');
+  await modal.getByRole('textbox', { name: 'App / Client ID' }).fill('wx-test-app');
+  await modal.getByRole('textbox', { name: '校验凭据环境变量' }).fill('WECHAT_VERIFY_TOKEN');
+  await modal.getByRole('textbox', { name: '加密凭据环境变量' }).fill('WECHAT_ENCODING_AES_KEY');
+  await modal.getByRole('button', { name: 'confirm' }).click();
 
   await expect.poll(() => createPayload).not.toBeNull();
   expect(createPayload.type).toBe('WECHAT');
@@ -81,6 +81,5 @@ test('WeChat setup exposes only the secure Official Account webhook contract', a
   expect(String(createPayload.config.verificationTokenRef)).toContain('WECHAT_VERIFY_TOKEN');
   expect(String(createPayload.config.encodingAesKeyRef)).toContain('WECHAT_ENCODING_AES_KEY');
 
-  await expect(modal.locator('input[value*="channel-wechat/wechat/callback"]')).toBeVisible();
-  await expect(modal).toContainText('没有真实 Provider 凭据或真实消息时');
+  await expect(page.getByText(/凭据使用部署环境变量引用/)).toBeVisible();
 });

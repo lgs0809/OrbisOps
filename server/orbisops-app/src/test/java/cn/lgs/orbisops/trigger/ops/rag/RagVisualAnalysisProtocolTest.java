@@ -85,7 +85,7 @@ class RagVisualAnalysisProtocolTest {
 
         HttpRequest request = requests.get(0);
         assertEquals("https://visual.example.com/v1/chat/completions", request.uri().toString());
-        assertEquals("Bearer sk-visual", request.headers()
+        assertEquals("Bearer visual-test-api-key", request.headers()
                 .firstValue("Authorization").orElseThrow());
         assertEquals("application/json", request.headers()
                 .firstValue("Content-Type").orElseThrow());
@@ -137,7 +137,7 @@ class RagVisualAnalysisProtocolTest {
                 false,
                 "openai",
                 "https://visual.example.com/",
-                "sk-visual",
+                "visual-test-api-key",
                 "/v1/chat/completions",
                 "visual-model",
                 "high",

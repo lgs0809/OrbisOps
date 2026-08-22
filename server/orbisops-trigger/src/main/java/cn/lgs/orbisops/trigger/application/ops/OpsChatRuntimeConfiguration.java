@@ -10,7 +10,7 @@ public class OpsChatRuntimeConfiguration {
 
     @Bean
     public OpsChatRuntimeSettings opsChatRuntimeSettings(
-            @Value("${ops.chat.sync-timeout-seconds:90}") long syncTimeoutSeconds) {
+            @Value("${orbisops.chat.sync-timeout-seconds:90}") long syncTimeoutSeconds) {
         return new OpsChatRuntimeSettings(syncTimeoutSeconds);
     }
 }

@@ -42,9 +42,9 @@ class OpsMainQuestionRewriteBoundaryArchitectureTest {
                 () -> assertTrue(protocol.contains("RewriteResult project(")),
                 () -> assertTrue(protocol.contains("resolvedReferences")),
                 () -> assertFalse(protocol.contains("@Service")),
-                () -> assertTrue(configuration.contains("ops.chat.query-rewrite.enabled")),
-                () -> assertTrue(configuration.contains("ops.chat.query-rewrite.max-memory-chars")),
-                () -> assertTrue(configuration.contains("ops.chat.query-rewrite.max-question-chars")));
+                () -> assertTrue(configuration.contains("orbisops.chat.query-rewrite.enabled")),
+                () -> assertTrue(configuration.contains("orbisops.chat.query-rewrite.max-memory-chars")),
+                () -> assertTrue(configuration.contains("orbisops.chat.query-rewrite.max-question-chars")));
     }
 
     private String read(String relativePath) throws IOException {

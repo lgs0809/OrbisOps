@@ -14,21 +14,21 @@ class RagRetrievalPlanPolicyTest {
     private final RagRetrievalPlanPolicy policy = new RagRetrievalPlanPolicy();
 
     @Test
-    void shouldPreserveDefaultSettingsAndRerankRecallExpansion() {
+    void shouldKeepProviderNeutralDefaultsWithoutRerankExpansion() {
         RagRetrievalSettings settings = new RagRetrievalSettings();
 
         RagRetrievalPlan plan = policy.resolve("普通知识查询", Map.of(), settings, 4);
 
         assertEquals("vector", plan.mode());
-        assertEquals(20, plan.vectorTopK());
-        assertEquals(20, plan.bm25TopK());
+        assertEquals(4, plan.vectorTopK());
+        assertEquals(6, plan.bm25TopK());
         assertEquals(6, plan.finalTopK());
         assertEquals(12000, plan.maxContextChars());
-        assertTrue(plan.rerankEnabled());
-        assertEquals("cohere", plan.rerankProvider());
-        assertEquals("http://127.0.0.1:8110", plan.rerankBaseUrl());
+        assertFalse(plan.rerankEnabled());
+        assertEquals("none", plan.rerankProvider());
+        assertEquals("", plan.rerankBaseUrl());
         assertEquals("v1/rerank", plan.rerankPath());
-        assertEquals("Qwen/Qwen3-VL-Reranker-2B", plan.rerankModel());
+        assertEquals("", plan.rerankModel());
         assertEquals(20, plan.rerankCandidateTopK());
         assertEquals(6, plan.rerankTopN());
         assertEquals(1200, plan.rerankMaxDocChars());

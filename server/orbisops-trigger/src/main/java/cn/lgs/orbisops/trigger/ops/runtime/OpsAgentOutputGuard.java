@@ -17,9 +17,14 @@ public final class OpsAgentOutputGuard {
     }
 
     public static void assertSuccessful(String output) {
-        if (isErrorEnvelope(output)) {
-            throw new IllegalStateException("Agent runtime returned an error envelope instead of a valid result");
+        if (!isErrorEnvelope(output)) return;
+        String normalized = StringUtils.hasText(output) ? output.trim() : "";
+        java.util.Optional<OpsModelProviderFailureClassifier.Failure> failure =
+                OpsModelProviderFailureClassifier.classify(normalized);
+        if (failure.isPresent()) {
+            throw new IllegalStateException(failure.get().code());
         }
+        throw new IllegalStateException("AGENT_RUNTIME_ERROR_ENVELOPE");
     }
 
     public static boolean isErrorEnvelope(String output) {

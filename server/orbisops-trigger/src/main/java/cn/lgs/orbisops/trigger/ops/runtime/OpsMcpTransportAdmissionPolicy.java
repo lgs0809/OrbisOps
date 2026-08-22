@@ -3,6 +3,7 @@ package cn.lgs.orbisops.trigger.ops.runtime;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 /** Pure admission rules for MCP transport, command, arguments, address, and timeout. */
@@ -21,6 +22,16 @@ final class OpsMcpTransportAdmissionPolicy {
     }
 
     void assertTransportAllowed(
+            OpsMcpServerConfig config,
+            String transport,
+            OpsMcpTransportSecuritySettings settings) {
+        if (platformGenerated(config) && "stdio".equals(normalizeTransport(transport))) {
+            return;
+        }
+        assertTransportAllowed(serverName(config), transport, settings);
+    }
+
+    void assertTransportAllowed(
             String serverName,
             String transport,
             OpsMcpTransportSecuritySettings settings) {
@@ -33,6 +44,16 @@ final class OpsMcpTransportAdmissionPolicy {
                     "MCP transport 未在白名单中，server=" + safe(serverName)
                             + ", transport=" + transport);
         }
+    }
+
+    void assertStdioAllowed(
+            OpsMcpServerConfig config,
+            String commandValue,
+            OpsMcpTransportSecuritySettings settings) {
+        if (platformGenerated(config) && "node".equals(normalize(commandName(commandValue)))) {
+            return;
+        }
+        assertStdioAllowed(serverName(config), commandValue, settings);
     }
 
     void assertStdioAllowed(
@@ -105,6 +126,20 @@ final class OpsMcpTransportAdmissionPolicy {
         } catch (RuntimeException ignored) {
             return trimmed;
         }
+    }
+
+    private boolean platformGenerated(OpsMcpServerConfig config) {
+        Map<String, String> capabilities = config == null ? null : config.getToolCapabilities();
+        return capabilities != null
+                && "true".equalsIgnoreCase(String.valueOf(capabilities.get("platformGenerated")));
+    }
+
+    private String serverName(OpsMcpServerConfig config) {
+        return config == null || config.getName() == null ? "" : config.getName();
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.trim().toLowerCase(java.util.Locale.ROOT);
     }
 
     private OpsMcpTransportSecuritySettings effective(OpsMcpTransportSecuritySettings settings) {

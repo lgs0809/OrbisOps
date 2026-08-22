@@ -108,22 +108,22 @@ test('Skills keeps detail auxiliaries on demand and refreshes catalog plus activ
   expect(counts.usage).toBe(0);
   const projectRequestBaseline = counts.projects;
 
-  await page.getByRole('button', { name: '查看版本' }).click();
+  await page.getByRole('button', { name: '版本' }).click();
   await expect.poll(() => counts.versions).toBe(1);
   await expect(page.getByText('Refine evidence order')).toBeVisible();
   await page.keyboard.press('Escape');
 
-  await page.getByRole('button', { name: '查看使用项目' }).click();
+  await page.getByRole('button', { name: '使用位置' }).click();
   await expect.poll(() => counts.usage).toBe(1);
   await expect(page.getByText('Default ReAct')).toBeVisible();
   await page.keyboard.press('Escape');
 
-  await page.getByRole('button', { name: '复制到项目' }).click();
+  await page.getByRole('button', { name: '复制到 Project' }).click();
   await expect.poll(() => counts.projects).toBe(projectRequestBaseline + 1);
   await expect(page.getByText('Demo Project（demo-project）')).toBeVisible();
   await page.keyboard.press('Escape');
 
-  await page.getByRole('button', { name: '刷新 Skill' }).click();
+  await page.getByRole('button', { name: '刷新' }).click();
   await expect.poll(() => counts.reload).toBe(1);
   await expect.poll(() => counts.global).toBe(2);
   await expect.poll(() => counts.detail).toBe(2);

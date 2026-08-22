@@ -4,5 +4,6 @@ package cn.lgs.orbisops.application.config;
 public record AiClientApiHealthTarget(
         String apiId,
         String baseUrl,
+        String completionsPath,
         String apiKey) {
 }

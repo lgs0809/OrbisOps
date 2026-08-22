@@ -37,8 +37,8 @@ test('Project Workspace reuses the shared project snapshot and keeps capability/
     return route.fulfill({ status: 200, contentType: 'application/json', body: response([]) });
   });
 
-  await page.goto('/projects/advanced?projectId=demo-project');
-  await expect(page.getByRole('button', { name: 'Overview' })).toBeVisible();
+  await page.goto('/projects?projectId=demo-project');
+  await expect(page.getByRole('tab', { name: '概览' })).toBeVisible();
   await expect(page.getByText('Demo Project').first()).toBeVisible();
   await expect.poll(() => snapshotRequests).toBe(1);
   await expect.poll(() => projectSkillRequests).toBe(1);
@@ -50,6 +50,6 @@ test('Project Workspace reuses the shared project snapshot and keeps capability/
 
   await page.getByRole('button', { name: '刷新' }).click();
   await expect.poll(() => snapshotRequests).toBe(2);
-  await expect.poll(() => projectSkillRequests).toBe(2);
-  await expect.poll(() => memberRequests).toBe(2);
+  expect(projectSkillRequests).toBe(1);
+  expect(memberRequests).toBe(1);
 });

@@ -32,7 +32,7 @@ public final class OpsMcpRuntimeSloTelemetry {
     OpsMcpRuntimeSloTelemetry(MeterRegistry registry) {
         this.registry = registry;
         if (registry != null) {
-            Gauge.builder("ops.mcp.circuits.open", openCircuits, AtomicLong::get)
+            Gauge.builder("orbisops.mcp.circuits.open", openCircuits, AtomicLong::get)
                     .description("Current number of open MCP runtime circuits")
                     .register(registry);
         }
@@ -51,18 +51,18 @@ public final class OpsMcpRuntimeSloTelemetry {
     public void circuitRejected() {
         circuitRejected.incrementAndGet();
         if (registry != null) {
-            registry.counter("ops.mcp.invocations", "outcome", "circuit_rejected").increment();
+            registry.counter("orbisops.mcp.invocations", "outcome", "circuit_rejected").increment();
         }
     }
 
     public void circuitOpened() {
         openCircuits.incrementAndGet();
-        if (registry != null) registry.counter("ops.mcp.circuit.transitions", "state", "open").increment();
+        if (registry != null) registry.counter("orbisops.mcp.circuit.transitions", "state", "open").increment();
     }
 
     public void circuitClosed() {
         openCircuits.updateAndGet(value -> Math.max(0L, value - 1L));
-        if (registry != null) registry.counter("ops.mcp.circuit.transitions", "state", "closed").increment();
+        if (registry != null) registry.counter("orbisops.mcp.circuit.transitions", "state", "closed").increment();
     }
 
     public Map<String, Object> snapshot() {
@@ -86,8 +86,8 @@ public final class OpsMcpRuntimeSloTelemetry {
         totalDurationMs.addAndGet(bounded);
         maxDurationMs.accumulateAndGet(bounded, Math::max);
         if (registry != null) {
-            registry.counter("ops.mcp.invocations", "outcome", outcome).increment();
-            Timer.builder("ops.mcp.invocation.duration")
+            registry.counter("orbisops.mcp.invocations", "outcome", outcome).increment();
+            Timer.builder("orbisops.mcp.invocation.duration")
                     .tag("outcome", outcome)
                     .register(registry)
                     .record(bounded, TimeUnit.MILLISECONDS);

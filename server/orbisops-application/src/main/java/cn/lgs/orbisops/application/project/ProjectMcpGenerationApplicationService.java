@@ -47,9 +47,8 @@ public final class ProjectMcpGenerationApplicationService {
         String profile = normalizeId(text(command.get("profile"), "readonly"));
         ProjectResourceDefinition resource = resourceService.requireResource(projectId, resourceId);
         String resourceType = resource.type().value();
-        String environment = resource.environment();
-        String mcpId = normalizeId(projectId + "-" + resourceType + "-"
-                + environment + "-" + profile + "-mcp");
+        String mcpId = normalizeId(projectId + "-" + resourceId + "-"
+                + profile + "-mcp");
         ProjectMcpGenerationPreparation preparation = preparationPort.prepare(
                 new ProjectMcpGenerationPreparationRequest(
                         projectId, resourceId, mcpId, profile, resource));

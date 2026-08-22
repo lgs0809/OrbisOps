@@ -16,7 +16,7 @@ public class FileRagBinaryAssetAdapter implements RagBinaryAssetPort {
     private final Path root;
 
     public FileRagBinaryAssetAdapter(
-            @Value("${ops.rag.parse.media-storage-dir:data/rag-media}") String storageDir) {
+            @Value("${orbisops.rag.parse.media-storage-dir:data/rag-media}") String storageDir) {
         this.root = Path.of(StringUtils.hasText(storageDir) ? storageDir : "data/rag-media")
                 .toAbsolutePath()
                 .normalize();

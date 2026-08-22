@@ -119,7 +119,7 @@ export const McpToolManagement: React.FC = () => {
 
   const submitForm = async () => {
     if (!form.templateName.trim()) {
-      Toast.error('请输入模板名称');
+      Toast.error('Template name is required.');
       return;
     }
     try {

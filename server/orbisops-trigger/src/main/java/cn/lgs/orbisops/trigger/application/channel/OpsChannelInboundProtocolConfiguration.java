@@ -9,9 +9,9 @@ public class OpsChannelInboundProtocolConfiguration {
 
     @Bean
     public OpsChannelInboundProtocolSettings opsChannelInboundProtocolSettings(
-            @Value("${ops.channel.webhook.max-clock-skew-seconds:300}") long maxClockSkewSeconds,
-            @Value("${ops.channel.inbound.max-message-chars:12000}") int maxMessageChars,
-            @Value("${ops.channel.inbound.max-metadata-chars:8192}") int maxMetadataChars) {
+            @Value("${orbisops.channel.webhook.max-clock-skew-seconds:300}") long maxClockSkewSeconds,
+            @Value("${orbisops.channel.inbound.max-message-chars:12000}") int maxMessageChars,
+            @Value("${orbisops.channel.inbound.max-metadata-chars:8192}") int maxMetadataChars) {
         return new OpsChannelInboundProtocolSettings(
                 maxClockSkewSeconds,
                 maxMessageChars,

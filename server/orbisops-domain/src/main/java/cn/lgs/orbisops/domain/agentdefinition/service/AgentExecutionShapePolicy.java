@@ -10,11 +10,15 @@ import java.util.Locale;
 public final class AgentExecutionShapePolicy {
 
     public AgentExecutionShapeDecision decide(List<AgentExecutionNodeFact> nodes) {
-        boolean hasReactNode = (nodes == null
-                ? List.<AgentExecutionNodeFact>of()
-                : nodes).stream()
+        List<AgentExecutionNodeFact> normalizedNodes = nodes == null
+                ? List.of()
+                : nodes.stream()
                 .filter(java.util.Objects::nonNull)
-                .anyMatch(this::isReactNode);
+                .toList();
+        if (normalizedNodes.isEmpty()) {
+            return new AgentExecutionShapeDecision("AGENTSCOPE", false);
+        }
+        boolean hasReactNode = normalizedNodes.stream().anyMatch(this::isReactNode);
         return new AgentExecutionShapeDecision(
                 hasReactNode ? "HYBRID" : "GRAPH",
                 true);

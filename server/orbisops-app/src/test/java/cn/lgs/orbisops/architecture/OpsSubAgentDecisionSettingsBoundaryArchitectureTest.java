@@ -35,8 +35,8 @@ class OpsSubAgentDecisionSettingsBoundaryArchitectureTest {
                 () -> assertTrue(service.lines().count() <= 150),
                 () -> assertTrue(settings.contains("public record OpsSubAgentDecisionSettings(")),
                 () -> assertTrue(settings.contains("legacyConstructorDefaults()")),
-                () -> assertTrue(configuration.contains("ops.multi-agent.sub-agent-llm-enabled")),
-                () -> assertTrue(configuration.contains("ops.multi-agent.reflection-llm-enabled")));
+                () -> assertTrue(configuration.contains("orbisops.multi-agent.sub-agent-llm-enabled")),
+                () -> assertTrue(configuration.contains("orbisops.multi-agent.reflection-llm-enabled")));
     }
 
     private String read(String relativePath) throws IOException {

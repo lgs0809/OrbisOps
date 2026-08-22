@@ -27,8 +27,7 @@ import {
   OpsTwoColumnGrid,
   TableScroll,
 } from '../components/ops-layout';
-import { AiClientApiCreateModal } from '../components/ai-client-api-create-modal';
-import { AiClientApiEditModal } from '../components/ai-client-api-edit-modal';
+import { AiClientProviderReferenceModal } from '../components/ai-client-provider-reference-modal';
 import type { AiClientApiResponseDTO } from '../services/ai-client-api-admin-service';
 import type {
   AiClientModelRequestDTO,
@@ -43,6 +42,7 @@ import {
   useUpdateDefaultModelPolicyMutation,
 } from '../features/models/api/model-queries';
 import { theme } from '../styles/theme';
+import { userFacingDetail, userFacingError } from '../utils/user-facing-error';
 
 const { Text, Title, Paragraph } = Typography;
 const { Option } = Select;
@@ -128,7 +128,7 @@ const providerTypeOf = (api: AiClientApiResponseDTO) => {
 };
 
 const statusTag = (status?: number) => (
-  <Tag color={status === 1 ? 'green' : 'red'}>{status === 1 ? '启用' : '停用'}</Tag>
+  <Tag color={status === 1 ? 'green' : 'red'}>{status === 1 ? '已启用' : '已停用'}</Tag>
 );
 
 const defaultModelForm = (apiId = ''): ModelForm => ({
@@ -209,40 +209,40 @@ export const ModelApiManagement: React.FC = () => {
     try {
       const saved = await policyMutation.mutateAsync(defaultPolicy);
       setPolicyDraft(saved || defaultPolicy);
-      Toast.success('默认模型策略已保存');
+      Toast.success('默认模型策略已保存。');
     } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '保存默认模型策略失败');
+      Toast.error(userFacingError(error, '保存默认模型策略失败，请稍后重试。'));
     }
   };
 
   const runProviderHealthCheck = async () => {
     if (!selectedProvider?.apiId) {
-      Toast.warning('请先选择 Provider');
+      Toast.warning('请先选择 Provider。');
       return;
     }
     try {
       const result = await healthMutation.mutateAsync(selectedProvider.apiId);
       setActiveTab('health');
       if (result?.status === 'SUCCESS') {
-        Toast.success(`Provider 可用，耗时 ${result.latencyMs ?? '-'}ms`);
+        Toast.success(`Provider 可用，延迟 ${result.latencyMs ?? '-'}ms。`);
       } else {
-        Toast.error(result?.errorMessage || 'Provider 健康检测失败');
+        Toast.error(userFacingDetail(result?.errorMessage, 'Provider 健康检查失败，请检查连接配置。'));
       }
     } catch (error) {
-      Toast.error(error instanceof Error ? error.message : 'Provider 健康检测失败');
+      Toast.error(userFacingError(error, 'Provider 健康检查失败，请检查连接配置。'));
     }
   };
 
   const syncProviderModels = async () => {
     if (!selectedProvider?.apiId) {
-      Toast.warning('请先选择 Provider');
+      Toast.warning('请先选择 Provider。');
       return;
     }
     try {
       const result = await modelSyncMutation.mutateAsync(selectedProvider.apiId);
-      Toast.success(`同步完成：新增 ${result?.createdCount ?? 0}，更新 ${result?.updatedCount ?? 0}，跳过 ${result?.skippedCount ?? 0}`);
+      Toast.success(`模型同步完成：新增 ${result?.createdCount ?? 0}，更新 ${result?.updatedCount ?? 0}，跳过 ${result?.skippedCount ?? 0}。`);
     } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '同步模型目录失败');
+      Toast.error(userFacingError(error, '同步模型目录失败，请稍后重试。'));
     }
   };
 
@@ -266,7 +266,7 @@ export const ModelApiManagement: React.FC = () => {
 
   const saveModel = async () => {
     if (!modelForm.modelId.trim() || !modelForm.modelName.trim() || !modelForm.apiId.trim()) {
-      Toast.warning('模型 ID、模型名称和 Provider ID 不能为空');
+      Toast.warning('Model ID、模型名称和 Provider ID 都不能为空。');
       return;
     }
     const payload: AiClientModelRequestDTO = {
@@ -281,11 +281,11 @@ export const ModelApiManagement: React.FC = () => {
     };
     try {
       await saveModelMutation.mutateAsync({ payload, editing: Boolean(modelForm.id) });
-      Toast.success(modelForm.id ? '模型已更新' : '模型已新增');
+      Toast.success(modelForm.id ? '模型已更新。' : '模型已创建。');
       setModelModalVisible(false);
     } catch (error) {
-      console.error('保存模型失败:', error);
-      Toast.error(error instanceof Error ? error.message : '保存模型失败');
+      console.error('Unable to save model:', error);
+      Toast.error(userFacingError(error, '保存模型失败，请稍后重试。'));
     }
   };
 
@@ -304,9 +304,9 @@ export const ModelApiManagement: React.FC = () => {
           status: record.status === 1 ? 0 : 1,
         },
       });
-      Toast.success(record.status === 1 ? '模型已停用' : '模型已启用');
+      Toast.success(record.status === 1 ? '模型已停用。' : '模型已启用。');
     } catch (error) {
-      Toast.error(error instanceof Error ? error.message : '更新状态失败');
+      Toast.error(userFacingError(error, '更新模型状态失败，请稍后重试。'));
     }
   };
 
@@ -340,9 +340,9 @@ export const ModelApiManagement: React.FC = () => {
       width: 260,
       render: (_: unknown, record: AiClientModelResponseDTO) => (
         <Space wrap>
-          <Tag color="blue">Tools: 需后端探测</Tag>
+          <Tag color="blue">Tool Calling：未验证</Tag>
           <Tag color={record.modelType === 'VISION' ? 'green' : 'grey'}>Vision</Tag>
-          <Tag color="grey">JsonMode: 需探测</Tag>
+          <Tag color="grey">JSON 模式：未验证</Tag>
         </Space>
       ),
     },
@@ -370,8 +370,8 @@ export const ModelApiManagement: React.FC = () => {
   return (
     <OpsPageShell selectedKey="model-api-management">
       <OpsPageHeader
-        title="模型接入"
-        description="模型目录必须依附 API Provider。这里统一维护 Provider API、Provider 下模型目录、可用性测试和默认模型策略。"
+        title="模型"
+        description="管理 API Provider、Provider 级模型目录、真实连通性检查和平台默认模型策略。"
         primaryAction={(
           <Button theme="solid" icon={<IconPlus />} onClick={() => setCreateProviderVisible(true)}>
             新建 Provider
@@ -412,7 +412,7 @@ export const ModelApiManagement: React.FC = () => {
               </ProviderItem>
             ))}
             {!filteredProviders.length && (
-              <OpsEmptyState title="暂无 Provider" description="先新建 API Provider，再在右侧维护它下面的模型目录。" />
+              <OpsEmptyState title="暂无 Provider" description="请先创建 API Provider，再在右侧详情中管理它的模型目录。" />
             )}
           </ProviderList>
         </OpsSectionCard>
@@ -442,9 +442,9 @@ export const ModelApiManagement: React.FC = () => {
                 </ProviderHeader>
                 <OpsResponsiveGrid $min="180px" style={{ marginTop: 16 }}>
                   <OpsStatusCard label="Provider 类型" value={providerTypeOf(selectedProvider)} />
-                  <OpsStatusCard label="模型数量" value={providerModels.length} description="仅统计 providerId/apiId 归属当前 Provider 的模型" />
-                  <OpsStatusCard label="Chat 默认" value={modelNameOf(defaultPolicy.defaultChatModelId)} />
-                  <OpsStatusCard label="Embedding 默认" value={modelNameOf(defaultPolicy.defaultEmbeddingModelId)} />
+                  <OpsStatusCard label="模型数量" value={providerModels.length} description="仅统计当前 Provider 下的模型。" />
+                  <OpsStatusCard label="默认 Chat" value={modelNameOf(defaultPolicy.defaultChatModelId)} />
+                  <OpsStatusCard label="默认 Embedding" value={modelNameOf(defaultPolicy.defaultEmbeddingModelId)} />
                 </OpsResponsiveGrid>
               </OpsSectionCard>
 
@@ -453,7 +453,7 @@ export const ModelApiManagement: React.FC = () => {
                   {[
                     ['api', 'API 配置'],
                     ['models', '模型目录'],
-                    ['health', '可用性测试'],
+                    ['health', '可用性'],
                     ['defaults', '默认模型策略'],
                   ].map(([key, label]) => (
                     <TabButton key={key} $active={activeTab === key} onClick={() => setActiveTab(key as TabKey)}>
@@ -465,20 +465,20 @@ export const ModelApiManagement: React.FC = () => {
                 {activeTab === 'api' && (
                   <OpsResponsiveGrid $min="260px">
                     <OpsStatusCard label="Base URL" value={selectedProvider.baseUrl} />
-                    <OpsStatusCard label="对话路径" value={selectedProvider.completionsPath || '-'} />
-                    <OpsStatusCard label="嵌入路径" value={selectedProvider.embeddingsPath || '-'} />
-                    <OpsStatusCard label="认证方式" value={selectedProvider.apiKey ? 'Bearer/API Key' : '未配置'} />
+                    <OpsStatusCard label="Completions 路径" value={selectedProvider.completionsPath || '-'} />
+                    <OpsStatusCard label="Embeddings 路径" value={selectedProvider.embeddingsPath || '-'} />
+                    <OpsStatusCard label="认证" value={selectedProvider.apiKey ? '凭据引用已配置' : '未配置'} />
                   </OpsResponsiveGrid>
                 )}
 
                 {activeTab === 'models' && (
                   <>
                     <OpsActionBar>
-                      <Text type="tertiary">Provider Models 只展示 `apiId/providerId = {selectedProvider.apiId}` 的模型。</Text>
+                      <Text type="tertiary">这里只展示当前 Provider 下的模型。</Text>
                       <OpsActionGroup>
                         <Button loading={modelSyncing} onClick={syncProviderModels}>同步模型</Button>
                         <Button theme="solid" icon={<IconPlus />} onClick={() => openModelModal()}>
-                          新增模型
+                          添加模型
                         </Button>
                       </OpsActionGroup>
                     </OpsActionBar>
@@ -503,31 +503,33 @@ export const ModelApiManagement: React.FC = () => {
                 {activeTab === 'health' && (
                   <Space vertical align="start" spacing="medium" style={{ width: '100%' }}>
                     <Text type="tertiary">
-                      这里会访问 Provider 的标准模型列表端点做真实连通性检测，并记录耗时、HTTP 状态和审计日志；不会触发聊天生成，也不会展示密钥。
+                      这里会调用 Provider 的标准模型列表接口进行真实连通性检查，并记录延迟、HTTP 状态和审计证据；不会生成对话内容，也不会暴露凭据。
                     </Text>
                     <Button theme="solid" loading={healthChecking} onClick={runProviderHealthCheck}>
-                      立即检测当前 Provider
+                      检查当前 Provider
                     </Button>
                     {selectedHealthResult ? (
                       <>
                         <OpsResponsiveGrid $min="180px">
                           <OpsStatusCard
-                            label="检测状态"
+                            label="检查状态"
                             value={selectedHealthResult.status === 'SUCCESS' ? '可用' : '失败'}
-                            description={selectedHealthResult.errorMessage || 'Provider 返回成功状态'}
+                            description={selectedHealthResult.status === 'SUCCESS'
+                              ? 'Provider 已成功返回响应。'
+                              : userFacingDetail(selectedHealthResult.errorMessage, 'Provider 当前不可用，请检查连接配置。')}
                           />
                           <OpsStatusCard label="HTTP 状态" value={selectedHealthResult.httpStatus ?? '-'} />
-                          <OpsStatusCard label="耗时" value={`${selectedHealthResult.latencyMs ?? '-'}ms`} />
-                          <OpsStatusCard label="检测时间" value={selectedHealthResult.testTime || selectedHealthResult.checkedAt || '-'} />
+                          <OpsStatusCard label="延迟" value={`${selectedHealthResult.latencyMs ?? '-'}ms`} />
+                          <OpsStatusCard label="检查时间" value={selectedHealthResult.testTime || selectedHealthResult.checkedAt || '-'} />
                         </OpsResponsiveGrid>
-                        <OpsAdvancedPreview title="健康检测详情">
+                        <OpsAdvancedPreview title="健康检查详情">
                           <JsonBlock>{JSON.stringify(selectedHealthResult, null, 2)}</JsonBlock>
                         </OpsAdvancedPreview>
                       </>
                     ) : (
                       <OpsEmptyState
-                        title="尚未检测当前 Provider"
-                        description="点击“立即检测当前 Provider”后，会展示真实 HTTP 状态、耗时和错误信息。"
+                        title="尚未检查 Provider"
+                        description="运行当前 Provider 检查后，可以查看真实 HTTP 状态、延迟和错误详情。"
                       />
                     )}
                   </Space>
@@ -536,7 +538,7 @@ export const ModelApiManagement: React.FC = () => {
                 {activeTab === 'defaults' && (
                   <Space vertical align="start" spacing="medium" style={{ width: '100%' }}>
                     <Text type="tertiary">
-                      这里保存全局默认策略。项目未覆盖时，运行时按用途选择对应模型；空值表示不设置平台默认。
+                      这里保存平台默认模型策略。Project 未显式覆盖时，Runtime 会按用途选择模型；留空表示该用途没有平台默认模型。
                     </Text>
                     <OpsResponsiveGrid $min="240px">
                       {([
@@ -580,7 +582,7 @@ export const ModelApiManagement: React.FC = () => {
           ) : (
             <OpsEmptyState
               title="还没有模型 Provider"
-              description="模型目录不能脱离 Provider 创建。先新建 Provider，再添加 Chat、Embedding、Rerank、Vision 等模型。"
+              description="模型目录隶属于 Provider。请先创建 Provider，再添加 Chat、Embedding、Rerank 或 Vision 模型。"
               actionText="新建 Provider"
               onAction={() => setCreateProviderVisible(true)}
             />
@@ -588,7 +590,7 @@ export const ModelApiManagement: React.FC = () => {
         </div>
       </OpsTwoColumnGrid>
 
-      <AiClientApiCreateModal
+      <AiClientProviderReferenceModal
         visible={createProviderVisible}
         onCancel={() => setCreateProviderVisible(false)}
         onSuccess={() => {
@@ -597,7 +599,7 @@ export const ModelApiManagement: React.FC = () => {
         }}
       />
 
-      <AiClientApiEditModal
+      <AiClientProviderReferenceModal
         visible={editProviderVisible}
         editingRecord={editingProvider}
         onCancel={() => {
@@ -612,11 +614,13 @@ export const ModelApiManagement: React.FC = () => {
       />
 
       <Modal
-        title={modelForm.id ? '编辑模型' : '新增模型'}
+        title={modelForm.id ? '编辑模型' : '添加模型'}
         visible={modelModalVisible}
         width={720}
         onCancel={() => setModelModalVisible(false)}
         onOk={saveModel}
+        okText="保存"
+        cancelText="取消"
       >
         <FieldGrid>
           <Field>
@@ -628,7 +632,7 @@ export const ModelApiManagement: React.FC = () => {
             </Select>
           </Field>
           <Field>
-            <Text strong>模型 ID</Text>
+            <Text strong>Model ID</Text>
             <Input value={modelForm.modelId} onChange={(modelId) => setModelForm({ ...modelForm, modelId })} />
           </Field>
           <Field>

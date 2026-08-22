@@ -39,7 +39,7 @@ class OpsMemoryRuntimeInjectionBoundaryArchitectureTest {
                 () -> assertTrue(projector.contains("用户陈述，尚未由工具验证")),
                 () -> assertTrue(projector.contains("ref.put(\"memoryHash\"")),
                 () -> assertFalse(projector.contains("@Service")),
-                () -> assertTrue(configuration.contains("ops.memory.max-injection-count")));
+                () -> assertTrue(configuration.contains("orbisops.memory.max-injection-count")));
     }
 
     private String read(String relativePath) throws IOException {

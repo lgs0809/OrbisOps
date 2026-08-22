@@ -39,12 +39,12 @@ public record OpsRagKnowledgeSettings(
 
     public static OpsRagKnowledgeSettings defaults() {
         return new OpsRagKnowledgeSettings(
-                true,
-                "cohere",
-                "http://127.0.0.1:8110",
-                "local-rag-models",
+                false,
+                "",
+                "",
+                "",
                 "v1/rerank",
-                "Qwen/Qwen3-VL-Reranker-2B",
+                "",
                 20,
                 6,
                 1200,
@@ -53,7 +53,7 @@ public record OpsRagKnowledgeSettings(
                 "",
                 "",
                 "v1/chat/completions",
-                "gpt-5.4-mini",
+                "",
                 4,
                 2,
                 18,

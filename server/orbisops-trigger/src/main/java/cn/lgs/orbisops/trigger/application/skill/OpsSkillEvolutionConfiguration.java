@@ -10,11 +10,11 @@ public class OpsSkillEvolutionConfiguration {
 
     @Bean
     public OpsSkillEvolutionSettings opsSkillEvolutionSettings(
-            @Value("${ops.skill-evolver.trigger.enabled:true}") boolean triggerEnabled,
-            @Value("${ops.skill-evolver.worker.enabled:false}") boolean workerEnabled,
-            @Value("${ops.skill-evolver.worker.batch-size:5}") int batchSize,
-            @Value("${ops.skill-evolver.worker.max-attempts:3}") int maxAttempts,
-            @Value("${ops.skill-evolver.worker.fixed-delay-ms:60000}") long fixedDelayMillis) {
+            @Value("${orbisops.skill-evolver.trigger.enabled:true}") boolean triggerEnabled,
+            @Value("${orbisops.skill-evolver.worker.enabled:false}") boolean workerEnabled,
+            @Value("${orbisops.skill-evolver.worker.batch-size:5}") int batchSize,
+            @Value("${orbisops.skill-evolver.worker.max-attempts:3}") int maxAttempts,
+            @Value("${orbisops.skill-evolver.worker.fixed-delay-ms:60000}") long fixedDelayMillis) {
         return new OpsSkillEvolutionSettings(
                 triggerEnabled,
                 workerEnabled,

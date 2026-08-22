@@ -79,6 +79,52 @@ class OpsMainAgentCoordinatorTest {
     }
 
     @Test
+    void providerQuotaFailureIsBlockedWithActionableMessage() {
+        OpsMainAgentCoordinator coordinator = new OpsMainAgentCoordinator(List.of(handler(
+                Set.of(OpsMainAgentActionType.AGENT),
+                command -> { throw new IllegalStateException("MODEL_PROVIDER_QUOTA_EXHAUSTED"); })));
+
+        OpsMainAgentOutcome outcome = coordinator.execute(command(OpsMainAgentActionType.AGENT));
+
+        assertEquals(OpsActionStatus.BLOCKED, outcome.status());
+        assertEquals("MODEL_PROVIDER_QUOTA_EXHAUSTED", outcome.failure().reasonCode());
+        assertEquals(OpsFailureCategory.DEPENDENCY, outcome.failure().category());
+        assertFalse(outcome.failure().retryable());
+        assertTrue(outcome.failure().safeUserMessage().contains("额度不足"));
+        assertTrue(outcome.failure().safeUserMessage().contains("没有因此绕过审批"));
+        assertTrue(outcome.failure().allowedRecoveryActions().contains("REFILL_OR_SWITCH_MODEL"));
+    }
+
+    @Test
+    void nestedProviderRateLimitIsRetryableWithoutClaimingSideEffectState() {
+        OpsMainAgentCoordinator coordinator = new OpsMainAgentCoordinator(List.of(handler(
+                Set.of(OpsMainAgentActionType.AGENT),
+                command -> { throw new IllegalStateException("runtime failed",
+                        new IllegalStateException("429 - rate limit exceeded")); })));
+
+        OpsMainAgentOutcome outcome = coordinator.execute(command(OpsMainAgentActionType.AGENT));
+
+        assertEquals(OpsActionStatus.RETRYABLE_FAILURE, outcome.status());
+        assertEquals("MODEL_PROVIDER_RATE_LIMITED", outcome.failure().reasonCode());
+        assertTrue(outcome.failure().retryable());
+        assertEquals(OpsSideEffectState.UNKNOWN, outcome.failure().sideEffectState());
+    }
+
+    @Test
+    void rawNestedUnauthorizedProviderFailureIsClassifiedAsAuthenticationFailure() {
+        OpsMainAgentCoordinator coordinator = new OpsMainAgentCoordinator(List.of(handler(
+                Set.of(OpsMainAgentActionType.AGENT),
+                command -> { throw new IllegalStateException("react failed",
+                        new IllegalStateException("401 Unauthorized from provider")); })));
+
+        OpsMainAgentOutcome outcome = coordinator.execute(command(OpsMainAgentActionType.AGENT));
+
+        assertEquals(OpsActionStatus.BLOCKED, outcome.status());
+        assertEquals("MODEL_PROVIDER_AUTH_FAILED", outcome.failure().reasonCode());
+        assertTrue(outcome.failure().safeUserMessage().contains("认证失败"));
+    }
+
+    @Test
     void explicitUnknownSideEffectIsPreserved() {
         OpsFailureDescriptor failure = new OpsFailureDescriptor(
                 "EXTERNAL_RESULT_UNKNOWN", "REMOTE_DISPATCH", OpsFailureCategory.DEPENDENCY,

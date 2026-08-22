@@ -57,7 +57,7 @@ class ColdMemoryStoreApplicationArchitectureTest {
                 () -> assertFalse(legacyStore.contains("repository.available")),
                 () -> assertFalse(legacyStore.contains("catch (RuntimeException")),
                 () -> assertTrue(configuration.contains("coldMemoryStoreApplicationService(")),
-                () -> assertTrue(configuration.contains("ops.chat.memory.jdbc-enabled")));
+                () -> assertTrue(configuration.contains("orbisops.chat.memory.jdbc-enabled")));
     }
 
     private String read(String relativePath) throws IOException {

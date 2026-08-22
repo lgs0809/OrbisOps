@@ -10,12 +10,12 @@ public class OpsCapabilityImportConfiguration {
 
     @Bean
     public OpsCapabilityImportSettings opsCapabilityImportSettings(
-            @Value("${ops.capability-import.max-artifact-bytes:262144}") long maxArtifactBytes,
-            @Value("${ops.capability-import.max-package-bytes:2097152}") long maxPackageBytes,
-            @Value("${ops.capability-import.max-artifacts:32}") int maxArtifacts,
-            @Value("${ops.capability-import.fetch-timeout-seconds:10}") int fetchTimeoutSeconds,
-            @Value("${ops.capability-import.allow-loopback:false}") boolean allowLoopback,
-            @Value("${ops.capability-import.allowed-hosts:}") String allowedHosts) {
+            @Value("${orbisops.capability-import.max-artifact-bytes:262144}") long maxArtifactBytes,
+            @Value("${orbisops.capability-import.max-package-bytes:2097152}") long maxPackageBytes,
+            @Value("${orbisops.capability-import.max-artifacts:32}") int maxArtifacts,
+            @Value("${orbisops.capability-import.fetch-timeout-seconds:10}") int fetchTimeoutSeconds,
+            @Value("${orbisops.capability-import.allow-loopback:false}") boolean allowLoopback,
+            @Value("${orbisops.capability-import.allowed-hosts:}") String allowedHosts) {
         return OpsCapabilityImportSettings.fromRaw(
                 maxArtifactBytes,
                 maxPackageBytes,

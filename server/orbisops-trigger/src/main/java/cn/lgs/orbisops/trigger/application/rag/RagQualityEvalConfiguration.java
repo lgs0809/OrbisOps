@@ -16,12 +16,12 @@ public class RagQualityEvalConfiguration {
 
     @Bean
     public RagQualityEvalSettings ragQualityEvalSettings(
-            @Value("${ops.rag.eval.rerank-enabled:true}") boolean rerankEnabled,
-            @Value("${ops.rag.eval.rerank-provider:${ops.rag.rerank.provider:cohere}}") String rerankProvider,
-            @Value("${ops.rag.eval.rerank-base-url:${ops.rag.rerank.base-url:http://127.0.0.1:8110}}") String rerankBaseUrl,
-            @Value("${ops.rag.eval.rerank-api-key:${ops.rag.rerank.api-key:local-rag-models}}") String rerankApiKey,
-            @Value("${ops.rag.eval.rerank-path:${ops.rag.rerank.path:v1/rerank}}") String rerankPath,
-            @Value("${ops.rag.eval.rerank-model:${ops.rag.rerank.model:Qwen/Qwen3-VL-Reranker-2B}}") String rerankModel) {
+            @Value("${orbisops.rag.eval.rerank-enabled:${orbisops.rag.rerank.enabled:false}}") boolean rerankEnabled,
+            @Value("${orbisops.rag.eval.rerank-provider:${orbisops.rag.rerank.provider:}}") String rerankProvider,
+            @Value("${orbisops.rag.eval.rerank-base-url:${orbisops.rag.rerank.base-url:}}") String rerankBaseUrl,
+            @Value("${orbisops.rag.eval.rerank-api-key:${orbisops.rag.rerank.api-key:}}") String rerankApiKey,
+            @Value("${orbisops.rag.eval.rerank-path:${orbisops.rag.rerank.path:v1/rerank}}") String rerankPath,
+            @Value("${orbisops.rag.eval.rerank-model:${orbisops.rag.rerank.model:}}") String rerankModel) {
         return new RagQualityEvalSettings(
                 rerankEnabled,
                 rerankProvider,

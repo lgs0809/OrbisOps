@@ -4,7 +4,7 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @Data
-@ConfigurationProperties(prefix = "thread.pool.executor.config", ignoreInvalidFields = true)
+@ConfigurationProperties(prefix = "orbisops.thread.pool.executor.config", ignoreInvalidFields = true)
 public class ThreadPoolConfigProperties {
 
     /** 核心线程数 */

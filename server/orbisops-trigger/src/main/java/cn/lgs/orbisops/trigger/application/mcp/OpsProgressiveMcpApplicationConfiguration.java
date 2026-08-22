@@ -86,7 +86,7 @@ public class OpsProgressiveMcpApplicationConfiguration {
             McpDiscoveryPort discovery,
             McpRuntimeAuditPort audit,
             McpRuntimePayloadSanitizerPort payloadSanitizer,
-            @Value("${ops.progressive-mcp.disclosure.enabled:true}") boolean progressiveDisclosureEnabled) {
+            @Value("${orbisops.progressive-mcp.disclosure.enabled:true}") boolean progressiveDisclosureEnabled) {
         return new McpRuntimeOperationsApplicationService(runtimeTools, catalog, runtimeCatalog,
                 discovery, audit, new McpJsonCodec(), payloadSanitizer, progressiveDisclosureEnabled);
     }

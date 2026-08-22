@@ -7,7 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
 
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "2.0.0";
 const GIT_BINARY = process.env.CODE_WORKSPACE_GIT_BINARY || "git";
 const STATE_ROOT = absolute(process.env.CODE_WORKSPACE_STATE_ROOT || path.join(os.tmpdir(), "orbisops-code-workspace-mcp"));
 const WORKTREE_ROOT = path.join(STATE_ROOT, "worktrees");
@@ -356,7 +356,7 @@ function validateCommand(tokens, currentWorkspace, expectedEffect = "READ_ONLY")
   if (tokens.some((token) => token === ".." || token.startsWith("../") || token.includes("/../"))) {
     throw new Error("command arguments cannot escape the workspace");
   }
-  if (tokens.some((token) => token.startsWith("/etc/") || token.startsWith("/usr/") || token.startsWith("/var/") || token.startsWith("/workspace/") || token.startsWith("/home/"))) {
+  if (tokens.some((token) => path.posix.isAbsolute(token) || path.win32.isAbsolute(token))) {
     throw new Error("host absolute paths are blocked");
   }
   if (lower === "git") {

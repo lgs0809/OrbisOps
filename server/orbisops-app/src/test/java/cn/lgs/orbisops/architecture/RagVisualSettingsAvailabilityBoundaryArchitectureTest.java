@@ -32,7 +32,7 @@ class RagVisualSettingsAvailabilityBoundaryArchitectureTest {
                 () -> assertTrue(analyzer.contains("return availability.shouldAnalyze(metadata)")),
                 () -> assertTrue(analyzer.contains("RagVisualAnalysisSettings settings")),
                 () -> assertFalse(analyzer.contains("@Value")),
-                () -> assertFalse(analyzer.contains("ops.rag.parse.visual.")),
+                () -> assertFalse(analyzer.contains("orbisops.rag.parse.visual.")),
                 () -> assertFalse(analyzer.contains("isRerankAvailable(")),
                 () -> assertFalse(analyzer.contains("high_value_candidate")),
                 () -> assertTrue(settings.contains("PROVIDER_OPENAI = \"openai\"")),
@@ -57,37 +57,37 @@ class RagVisualSettingsAvailabilityBoundaryArchitectureTest {
                 () -> assertFalse(availability.contains("PDFRenderer")),
                 () -> assertFalse(availability.contains("JSONObject")),
                 () -> assertTrue(configuration.contains(
-                        "${ops.rag.parse.visual.enabled:false}")),
+                        "${orbisops.rag.parse.visual.enabled:false}")),
                 () -> assertTrue(configuration.contains(
-                        "${ops.rag.parse.visual.high-value-only:true}")),
+                        "${orbisops.rag.parse.visual.high-value-only:true}")),
                 () -> assertTrue(configuration.contains(
-                        "${ops.rag.parse.visual.provider:openai}")),
+                        "${orbisops.rag.parse.visual.provider:openai}")),
                 () -> assertTrue(configuration.contains(
-                        "${ops.rag.parse.visual.base-url:${spring.ai.openai.base-url:}}")),
+                        "${orbisops.rag.parse.visual.base-url:${spring.ai.openai.base-url:}}")),
                 () -> assertTrue(configuration.contains(
-                        "${ops.rag.parse.visual.api-key:${spring.ai.openai.api-key:}}")),
+                        "${orbisops.rag.parse.visual.api-key:${spring.ai.openai.api-key:}}")),
                 () -> assertTrue(configuration.contains(
-                        "${ops.rag.parse.visual.path:v1/chat/completions}")),
+                        "${orbisops.rag.parse.visual.path:v1/chat/completions}")),
                 () -> assertTrue(configuration.contains(
-                        "${ops.rag.parse.visual.model:gpt-5.4-mini}")),
+                        "${orbisops.rag.parse.visual.model:}")),
                 () -> assertTrue(configuration.contains(
-                        "${ops.rag.parse.visual.detail:low}")),
+                        "${orbisops.rag.parse.visual.detail:low}")),
                 () -> assertTrue(configuration.contains(
-                        "${ops.rag.parse.visual.timeout-seconds:30}")),
+                        "${orbisops.rag.parse.visual.timeout-seconds:30}")),
                 () -> assertTrue(configuration.contains(
-                        "${ops.rag.parse.visual.max-completion-tokens:1200}")),
+                        "${orbisops.rag.parse.visual.max-completion-tokens:1200}")),
                 () -> assertTrue(configuration.contains(
-                        "${ops.rag.parse.visual.token-limit-field:max_completion_tokens}")),
+                        "${orbisops.rag.parse.visual.token-limit-field:max_completion_tokens}")),
                 () -> assertTrue(configuration.contains(
-                        "${ops.rag.parse.visual.response-format:json_schema}")),
+                        "${orbisops.rag.parse.visual.response-format:json_schema}")),
                 () -> assertTrue(configuration.contains(
-                        "${ops.rag.parse.visual.max-retries:1}")),
+                        "${orbisops.rag.parse.visual.max-retries:1}")),
                 () -> assertTrue(configuration.contains(
-                        "${ops.rag.parse.visual.max-images-per-document:3}")),
+                        "${orbisops.rag.parse.visual.max-images-per-document:3}")),
                 () -> assertTrue(configuration.contains(
-                        "${ops.rag.parse.visual.max-image-bytes:4194304}")),
+                        "${orbisops.rag.parse.visual.max-image-bytes:4194304}")),
                 () -> assertTrue(configuration.contains(
-                        "${ops.rag.parse.visual.pdf-render-dpi:144}")));
+                        "${orbisops.rag.parse.visual.pdf-render-dpi:144}")));
     }
 
     private String read(String relativePath) throws IOException {

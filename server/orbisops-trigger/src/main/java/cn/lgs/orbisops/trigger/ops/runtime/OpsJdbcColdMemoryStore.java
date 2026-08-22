@@ -9,7 +9,7 @@ import java.util.List;
 
 /** Legacy runtime compatibility adapter over the Cold Memory Application use case. */
 @Service
-@ConditionalOnProperty(prefix = "ops.chat.memory", name = "jdbc-enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(prefix = "orbisops.chat.memory", name = "jdbc-enabled", havingValue = "true", matchIfMissing = true)
 public class OpsJdbcColdMemoryStore implements OpsColdMemoryStore {
 
     private final ColdMemoryStoreApplicationService coldMemoryStore;

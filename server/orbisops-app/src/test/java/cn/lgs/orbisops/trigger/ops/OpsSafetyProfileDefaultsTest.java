@@ -19,9 +19,9 @@ class OpsSafetyProfileDefaultsTest {
 
     private void assertFallbackDefault(String resource) throws IOException {
         String yaml = resource(resource);
-        assertTrue(yaml.contains("allow-in-memory-evidence-store: ${OPS_SAFETY_ALLOW_IN_MEMORY_EVIDENCE_STORE:false}"),
+        assertTrue(yaml.contains("allow-in-memory-evidence-store: ${ORBISOPS_SAFETY_ALLOW_IN_MEMORY_EVIDENCE_STORE:false}"),
                 resource + " must require explicit opt-in for in-memory evidence fallback");
-        assertFalse(yaml.contains("allow-in-memory-evidence-store: ${OPS_SAFETY_ALLOW_IN_MEMORY_EVIDENCE_STORE:true}"),
+        assertFalse(yaml.contains("allow-in-memory-evidence-store: ${ORBISOPS_SAFETY_ALLOW_IN_MEMORY_EVIDENCE_STORE:true}"),
                 resource + " must not default safety-critical stores to memory fallback");
     }
 

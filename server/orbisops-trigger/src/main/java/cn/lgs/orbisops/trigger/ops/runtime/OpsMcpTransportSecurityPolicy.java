@@ -46,11 +46,11 @@ public class OpsMcpTransportSecurityPolicy {
     }
 
     public void assertTransportAllowed(OpsMcpServerConfig config, String transport) {
-        admissionPolicy.assertTransportAllowed(serverName(config), transport, settings);
+        admissionPolicy.assertTransportAllowed(config, transport, settings);
     }
 
     public void assertStdioAllowed(OpsMcpServerConfig config, String commandValue) {
-        admissionPolicy.assertStdioAllowed(serverName(config), commandValue, settings);
+        admissionPolicy.assertStdioAllowed(config, commandValue, settings);
     }
 
     public void assertArgsAllowed(OpsMcpServerConfig config, List<String> args) {

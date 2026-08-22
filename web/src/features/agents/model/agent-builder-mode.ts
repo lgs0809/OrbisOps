@@ -12,14 +12,14 @@ export type AgentBuilderModeDefinition = {
 export const AGENT_BUILDER_MODE_DEFINITIONS: readonly AgentBuilderModeDefinition[] = [
   {
     key: 'basic',
-    label: 'Basic',
-    description: '聚焦场景、画布、节点能力与测试，隐藏低频运行时细节。',
+    label: '基础',
+    description: '聚焦适用场景、画布流程、Agent Node 能力和测试，并隐藏低频 Runtime 细节。',
     panels: ['node', 'test'],
   },
   {
     key: 'advanced',
-    label: 'Advanced',
-    description: '开放条件连线、原始 JSON、版本运维和运行时高级配置。',
+    label: '高级',
+    description: '展示条件路由、原始 JSON、版本操作和高级 Runtime 配置。',
     panels: ['node', 'edge', 'json', 'test'],
   },
 ] as const;

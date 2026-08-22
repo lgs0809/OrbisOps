@@ -53,8 +53,8 @@ export interface OpsAdvancedPreviewProps {
 }
 
 export const OpsAdvancedPreview: React.FC<OpsAdvancedPreviewProps> = ({
-  title = '高级预览',
-  description = '高级预览，仅用于排查、审计和导入导出。日常配置请使用上方表单。',
+  title = '技术详情',
+  description = '用于排障、审计或导入导出的高级信息。日常操作请优先使用上方主要配置。',
   defaultOpen = false,
   children,
 }) => (

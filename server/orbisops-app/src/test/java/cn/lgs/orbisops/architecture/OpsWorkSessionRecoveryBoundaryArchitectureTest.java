@@ -41,8 +41,8 @@ class OpsWorkSessionRecoveryBoundaryArchitectureTest {
                 () -> assertTrue(reporter.contains("graphEventService.publishRunEvent(")),
                 () -> assertTrue(reporter.contains("auditService.recordRuntimeEvent(")),
                 () -> assertFalse(reporter.contains("@Component")),
-                () -> assertTrue(configuration.contains("ops.work-session.recovery.enabled")),
-                () -> assertTrue(configuration.contains("ops.work-session.recovery.batch-size")));
+                () -> assertTrue(configuration.contains("orbisops.work-session.recovery.enabled")),
+                () -> assertTrue(configuration.contains("orbisops.work-session.recovery.batch-size")));
     }
 
     private String read(String relativePath) throws IOException {

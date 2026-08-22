@@ -16,7 +16,7 @@ public final class JdbcSkillCatalogSchemaInitializer {
 
     private final JdbcTemplate jdbcTemplate;
 
-    @Value("${ops.skill-catalog.auto-init:true}")
+    @Value("${orbisops.skill-catalog.auto-init:true}")
     private boolean autoInit;
 
     public JdbcSkillCatalogSchemaInitializer(

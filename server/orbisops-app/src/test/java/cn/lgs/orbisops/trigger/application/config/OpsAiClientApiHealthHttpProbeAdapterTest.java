@@ -28,16 +28,16 @@ class OpsAiClientApiHealthHttpProbeAdapterTest {
         });
         server.start();
         try {
-            String baseUrl = "http://127.0.0.1:" + server.getAddress().getPort() + "/v1";
+            String baseUrl = "http://127.0.0.1:" + server.getAddress().getPort();
             OpsAiClientApiHealthHttpProbeAdapter adapter =
                     new OpsAiClientApiHealthHttpProbeAdapter(HttpClient.newHttpClient());
 
             AiClientApiHealthProbeOutcome outcome = adapter.probe(
-                    new AiClientApiHealthTarget("local-provider", baseUrl, "unit-test-api-key"));
+                    new AiClientApiHealthTarget("local-provider", baseUrl, "v1/chat/completions", "unit-test-api-key"));
 
             assertEquals("SUCCESS", outcome.status());
             assertEquals(200, outcome.httpStatus());
-            assertEquals(baseUrl + "/models", outcome.endpoint());
+            assertEquals(baseUrl + "/v1/models", outcome.endpoint());
             assertEquals("Bearer unit-test-api-key", authorization.get());
             assertTrue(outcome.latencyMs() >= 0L);
         } finally {
@@ -51,7 +51,7 @@ class OpsAiClientApiHealthHttpProbeAdapterTest {
                 new OpsAiClientApiHealthHttpProbeAdapter(HttpClient.newHttpClient());
 
         AiClientApiHealthProbeOutcome outcome = adapter.probe(
-                new AiClientApiHealthTarget("broken-provider", "", ""));
+                new AiClientApiHealthTarget("broken-provider", "", "v1/chat/completions", ""));
 
         assertEquals("FAILED", outcome.status());
         assertEquals("Provider Base URL 为空，无法检测", outcome.errorMessage());

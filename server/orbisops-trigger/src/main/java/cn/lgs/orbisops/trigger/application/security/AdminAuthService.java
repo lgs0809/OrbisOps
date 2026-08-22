@@ -59,7 +59,7 @@ public class AdminAuthService {
         String jwtSecret = settings.jwtSecret();
         if (!StringUtils.hasText(jwtSecret)
                 || jwtSecret.getBytes(StandardCharsets.UTF_8).length < 32) {
-            throw new IllegalStateException("admin.auth.jwt-secret must be configured with at least 32 bytes");
+            throw new IllegalStateException("orbisops.admin.auth.jwt-secret must be configured with at least 32 bytes");
         }
     }
 

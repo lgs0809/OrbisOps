@@ -35,7 +35,7 @@ public class JdbcTaskContextRepository implements ITaskContextRepository {
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 
-    @Value("${ops.task-context.auto-init:true}")
+    @Value("${orbisops.task-context.auto-init:true}")
     private boolean autoInit = true;
 
     private volatile boolean initialized;

@@ -10,9 +10,9 @@ public class OpsRateLimitConfiguration {
 
     @Bean
     public OpsRateLimitSettings opsRateLimitSettings(
-            @Value("${ops.rate-limit.enabled:true}") boolean enabled,
-            @Value("${ops.rate-limit.per-user-per-minute:120}") int perUserPerMinute,
-            @Value("${ops.rate-limit.per-agent-path-per-minute:240}") int perAgentPathPerMinute) {
+            @Value("${orbisops.rate-limit.enabled:true}") boolean enabled,
+            @Value("${orbisops.rate-limit.per-user-per-minute:120}") int perUserPerMinute,
+            @Value("${orbisops.rate-limit.per-agent-path-per-minute:240}") int perAgentPathPerMinute) {
         return new OpsRateLimitSettings(enabled, perUserPerMinute, perAgentPathPerMinute);
     }
 }

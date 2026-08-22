@@ -51,6 +51,50 @@ class AgentEvalPolicyTest {
     }
 
     @Test
+    void standaloneReactAgentIsTerminalWithoutWorkflowEndNode() {
+        AgentEvalDefinitionSnapshot standalone = new AgentEvalDefinitionSnapshot(
+                "project-1",
+                "agent-1",
+                1,
+                "a".repeat(64),
+                "VALIDATED",
+                "",
+                List.of(),
+                List.of(),
+                List.of("MAIN_ASSISTANT"));
+        AgentEvalCase evalCase = AgentEvalCase.fromMap(map(
+                "input", "帮我查问题",
+                "requiredRoles", List.of("MAIN_ASSISTANT")));
+
+        AgentEvalCaseResult result = policy.evaluate(standalone, evalCase);
+
+        assertTrue(result.passed(), result.reasonCodes().toString());
+        assertEquals(true, result.actual().get("graphEndReachable"));
+    }
+
+    @Test
+    void emptyDefinitionWithoutStandaloneAgentRoleStillFailsTerminationCheck() {
+        AgentEvalDefinitionSnapshot empty = new AgentEvalDefinitionSnapshot(
+                "project-1",
+                "agent-1",
+                1,
+                "a".repeat(64),
+                "VALIDATED",
+                "",
+                List.of(),
+                List.of(),
+                List.of());
+        AgentEvalCase evalCase = AgentEvalCase.fromMap(map(
+                "input", "帮我查问题",
+                "forbiddenEffects", List.of("MUTATE_TARGET_RESOURCE")));
+
+        AgentEvalCaseResult result = policy.evaluate(empty, evalCase);
+
+        assertFalse(result.passed());
+        assertTrue(result.reasonCodes().contains("GRAPH_END_UNREACHABLE"));
+    }
+
+    @Test
     void evaluatesEvidenceToolsSourcesEffectsOutputAndBudgets() {
         AgentEvalCase safeCase = AgentEvalCase.fromMap(map(
                 "input", "查错误日志并给出证据不足项",

@@ -52,7 +52,7 @@ class OpsMcpInvocationResiliencePolicyTest {
         assertEquals(2L, snapshot.get("circuitRejectedCalls"));
         assertEquals(0L, snapshot.get("openCircuits"));
         assertEquals(2.0d,
-                registry.get("ops.mcp.invocations")
+                registry.get("orbisops.mcp.invocations")
                         .tag("outcome", "circuit_rejected")
                         .counter()
                         .count());

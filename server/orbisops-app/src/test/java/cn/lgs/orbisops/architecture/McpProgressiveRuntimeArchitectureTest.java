@@ -22,8 +22,8 @@ class McpProgressiveRuntimeArchitectureTest {
 
         assertAll(
                 () -> assertTrue(settings.contains("final class OpsMcpProgressiveSettings")),
-                () -> assertTrue(settings.contains("ops.progressive-mcp.enforce-project-managed")),
-                () -> assertTrue(settings.contains("ops.progressive-mcp.disclosure.enabled")),
+                () -> assertTrue(settings.contains("orbisops.progressive-mcp.enforce-project-managed")),
+                () -> assertTrue(settings.contains("orbisops.progressive-mcp.disclosure.enabled")),
                 () -> assertTrue(settings.contains("forTest")),
                 () -> assertFalse(settings.contains("ObjectProvider")),
                 () -> assertFalse(settings.contains("ProgressiveMcpProcessManager")),
@@ -76,8 +76,8 @@ class McpProgressiveRuntimeArchitectureTest {
                 () -> assertFalse(provider.contains("ObjectProvider")),
                 () -> assertFalse(provider.contains("@Value")),
                 () -> assertFalse(provider.contains("McpCommands")),
-                () -> assertFalse(provider.contains("ops.progressive-mcp.enforce-project-managed")),
-                () -> assertFalse(provider.contains("ops.progressive-mcp.disclosure.enabled")),
+                () -> assertFalse(provider.contains("orbisops.progressive-mcp.enforce-project-managed")),
+                () -> assertFalse(provider.contains("orbisops.progressive-mcp.disclosure.enabled")),
                 () -> assertFalse(provider.contains("runtimeExecutableTools")),
                 () -> assertFalse(provider.contains("recordToolRoutingWarning")),
                 () -> assertTrue(provider.lines().count() < 180));

@@ -43,7 +43,7 @@ class ProjectWorkspaceReadinessPersistenceArchitectureTest {
         assertAll(
                 () -> assertTrue(repository.contains("implements IProjectWorkspaceReadinessRepository")),
                 () -> assertTrue(repository.contains("JdbcTemplate")),
-                () -> assertTrue(repository.contains("ops.project-workspace.jdbc-enabled")),
+                () -> assertTrue(repository.contains("orbisops.project-workspace.jdbc-enabled")),
                 () -> assertTrue(repository.contains("FROM ai_ops_source_repository")),
                 () -> assertTrue(repository.contains("status IN ('READY', 'ENABLED')")),
                 () -> assertTrue(repository.contains("FROM ai_ops_execution_resource")),

@@ -98,7 +98,7 @@ class DefaultModelApiBootstrapUseCaseTest {
                 useCase.bootstrap(plan(false)).action());
         assertEquals(DefaultModelApiBootstrapResult.Action.SKIPPED,
                 useCase.bootstrap(new DefaultModelApiBootstrapPlan(
-                        true, "1001", "https://proxy.example.com", "sk-test")).action());
+                        true, "1001", "https://proxy.example.com", "test-api-key")).action());
 
         verify(catalog, never()).findByApiId(any());
     }

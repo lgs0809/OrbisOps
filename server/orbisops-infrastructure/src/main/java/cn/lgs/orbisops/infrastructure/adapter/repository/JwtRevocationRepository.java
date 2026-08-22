@@ -18,10 +18,10 @@ public class JwtRevocationRepository implements JwtRevocationPort {
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 
-    @Value("${admin.auth.revocation.jdbc-enabled:true}")
+    @Value("${orbisops.admin.auth.revocation.jdbc-enabled:true}")
     private boolean jdbcEnabled;
 
-    @Value("${admin.auth.revocation.auto-init:true}")
+    @Value("${orbisops.admin.auth.revocation.auto-init:true}")
     private boolean autoInit;
 
     private volatile boolean initialized;

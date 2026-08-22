@@ -35,8 +35,8 @@ class OpsFinalReportSettingsBoundaryArchitectureTest {
                 () -> assertTrue(service.lines().count() <= 170),
                 () -> assertTrue(settings.contains("public record OpsFinalReportSettings(")),
                 () -> assertFalse(settings.contains("@Value")),
-                () -> assertTrue(configuration.contains("ops.multi-agent.final-report-llm-enabled")),
-                () -> assertTrue(configuration.contains("ops.multi-agent.final-report-max-chars")));
+                () -> assertTrue(configuration.contains("orbisops.multi-agent.final-report-llm-enabled")),
+                () -> assertTrue(configuration.contains("orbisops.multi-agent.final-report-max-chars")));
     }
 
     private String read(String relativePath) throws IOException {

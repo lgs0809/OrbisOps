@@ -67,7 +67,7 @@ export const AgentBuilderVersionSection: React.FC<Props> = ({
             <Space style={{ width: '100%', justifyContent: 'space-between' }}>
               <Text strong>v{version.version || '-'}</Text>
               <Tag color={version.lifecycle === 'PUBLISHED' ? 'green' : version.lifecycle === 'VALIDATED' ? 'blue' : 'grey'}>
-                {version.lifecycle || 'DRAFT'}
+                {version.lifecycle === 'PUBLISHED' ? '已发布' : version.lifecycle === 'VALIDATED' ? '已校验' : version.lifecycle === 'DISABLED' ? '已停用' : '草稿'}
               </Tag>
             </Space>
             <Text type="tertiary" size="small">{version.name || version.agentId}</Text>
@@ -80,7 +80,7 @@ export const AgentBuilderVersionSection: React.FC<Props> = ({
           </Space>
         </VersionItem>
       ))}
-      {!versions.length && <EmptyState>暂无版本，保存草稿后会出现在这里。</EmptyState>}
+      {!versions.length && <EmptyState>暂无版本。保存草稿后会创建第一个版本。</EmptyState>}
     </FormStack>
   </Section>
 );

@@ -39,8 +39,8 @@ class MutablePropertyBoundaryArchitectureTest {
                 () -> assertTrue(settings.contains(
                         "public record OpsChangePackageLandingSettings(boolean enabled)")),
                 () -> assertTrue(configuration.contains(
-                        "ops.approved-landing.enabled")),
-                () -> assertFalse(configuration.contains("ops.approved-landing.rollout.")));
+                        "orbisops.approved-landing.enabled")),
+                () -> assertFalse(configuration.contains("orbisops.approved-landing.rollout.")));
     }
 
     @Test
@@ -77,7 +77,7 @@ class MutablePropertyBoundaryArchitectureTest {
                 () -> assertTrue(configuration.contains(
                         "DefaultModelApiBootstrapUseCase defaultModelApiBootstrapUseCase")),
                 () -> assertTrue(configuration.contains(
-                        "ops.model-api-bootstrap.enabled")),
+                        "orbisops.model-api-bootstrap.enabled")),
                 () -> assertTrue(configuration.contains(
                         "spring.ai.openai.api-key")),
                 () -> assertFalse(test.contains("ReflectionTestUtils")),
@@ -120,11 +120,11 @@ class MutablePropertyBoundaryArchitectureTest {
                 () -> assertTrue(settings.contains(
                         "Math.max(1024, maxMetadataChars)")),
                 () -> assertTrue(configuration.contains(
-                        "ops.channel.webhook.max-clock-skew-seconds")),
+                        "orbisops.channel.webhook.max-clock-skew-seconds")),
                 () -> assertTrue(configuration.contains(
-                        "ops.channel.inbound.max-message-chars")),
+                        "orbisops.channel.inbound.max-message-chars")),
                 () -> assertTrue(configuration.contains(
-                        "ops.channel.inbound.max-metadata-chars")));
+                        "orbisops.channel.inbound.max-metadata-chars")));
     }
 
     @Test
@@ -148,13 +148,13 @@ class MutablePropertyBoundaryArchitectureTest {
                 () -> assertTrue(runtimeAdapter.contains("settings.selectedSkillLimit()")),
                 () -> assertFalse(runtimeAdapter.contains("@Value")),
                 () -> assertTrue(runtimeConfiguration.contains(
-                        "ops.skill-runtime.selected-limit")),
+                        "orbisops.skill-runtime.selected-limit")),
                 () -> assertTrue(sourceAdapter.contains(
                         "private final OpsSourceMcpProjectionSettings settings")),
                 () -> assertTrue(sourceAdapter.contains("settings.requestTimeoutSeconds()")),
                 () -> assertFalse(sourceAdapter.contains("@Value")),
                 () -> assertTrue(sourceConfiguration.contains(
-                        "ops.source-repository.command-timeout-seconds")));
+                        "orbisops.source-repository.command-timeout-seconds")));
     }
 
     @Test
@@ -173,12 +173,12 @@ class MutablePropertyBoundaryArchitectureTest {
                 () -> assertTrue(feedback.contains("OpsRagFeedbackManagementAssembly assembly")),
                 () -> assertFalse(feedback.contains("RagFeedbackSettings")),
                 () -> assertFalse(feedback.contains("@Value")),
-                () -> assertTrue(feedbackConfiguration.contains("ops.rag.feedback.auto-init")),
+                () -> assertTrue(feedbackConfiguration.contains("orbisops.rag.feedback.auto-init")),
                 () -> assertTrue(feedbackConfiguration.contains("OpsRagFeedbackManagementAssembly")),
                 () -> assertTrue(rateLimit.contains("private final OpsRateLimitSettings settings")),
                 () -> assertTrue(rateLimit.contains("settings.perUserPerMinute()")),
                 () -> assertFalse(rateLimit.contains("@Value")),
-                () -> assertTrue(rateLimitConfiguration.contains("ops.rate-limit.enabled")));
+                () -> assertTrue(rateLimitConfiguration.contains("orbisops.rate-limit.enabled")));
     }
 
     @Test
@@ -198,8 +198,8 @@ class MutablePropertyBoundaryArchitectureTest {
                 () -> assertTrue(configuration.contains("AdminCredentialRules adminCredentialRules")),
                 () -> assertTrue(configuration.contains("settings.minimumLength()")),
                 () -> assertTrue(configuration.contains("settings.prehashedAllowed()")),
-                () -> assertTrue(configuration.contains("admin.auth.password-min-length")),
-                () -> assertTrue(configuration.contains("admin.auth.allow-prehashed-passwords")));
+                () -> assertTrue(configuration.contains("orbisops.admin.auth.password-min-length")),
+                () -> assertTrue(configuration.contains("orbisops.admin.auth.allow-prehashed-passwords")));
     }
 
     private String read(String relativePath) throws IOException {

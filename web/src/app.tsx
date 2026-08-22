@@ -19,27 +19,18 @@ import { APP_ROUTES, pageTitleForPath } from './app/navigation/route-metadata';
 installHttpInterceptor();
 
 const LoginPage = React.lazy(() => import('./pages/login'));
-const ChatWorkspacePage = React.lazy(() =>
-  import('./pages/chat-workspace').then((module) => ({ default: module.ChatWorkspacePage })),
+const ChatPage = React.lazy(() =>
+  import('./pages/chat').then((module) => ({ default: module.ChatPage })),
 );
 const OpsDashboardPage = React.lazy(() =>
   import('./pages/ops-dashboard').then((module) => ({ default: module.OpsDashboardPage })),
-);
-const UserAuditRecordsPage = React.lazy(() =>
-  import('./pages/user-audit-records').then((module) => ({ default: module.UserAuditRecordsPage })),
-);
-const AnalysisTaskCenterPage = React.lazy(() =>
-  import('./pages/analysis-task-center').then((module) => ({ default: module.AnalysisTaskCenterPage })),
-);
-const IncidentCenterPage = React.lazy(() =>
-  import('./pages/incident-center').then((module) => ({ default: module.IncidentCenterPage })),
 );
 const AgentConfigProductPage = React.lazy(() =>
   import('./pages/agent-config-product-page').then((module) => ({ default: module.AgentConfigProductPage })),
 );
 const AgentListPage = React.lazy(() => import('./pages/agent-list').then((module) => ({ default: module.AgentListPage })));
-const SkillManagementPage = React.lazy(() =>
-  import('./pages/skill-management').then((module) => ({ default: module.SkillManagementPage })),
+const SkillsPage = React.lazy(() =>
+  import('./pages/skills').then((module) => ({ default: module.SkillsPage })),
 );
 const ModelApiManagement = React.lazy(() =>
   import('./pages/model-api-management').then((module) => ({ default: module.ModelApiManagement })),
@@ -47,35 +38,35 @@ const ModelApiManagement = React.lazy(() =>
 const PlatformSettingsPage = React.lazy(() =>
   import('./features/platform/pages/PlatformSettingsPage').then((module) => ({ default: module.PlatformSettingsPage })),
 );
-const RagOrderManagement = React.lazy(() =>
-  import('./pages/rag-order-management').then((module) => ({ default: module.RagOrderManagement })),
+const KnowledgePage = React.lazy(() =>
+  import('./pages/knowledge').then((module) => ({ default: module.KnowledgePage })),
 );
 const ChangeCenterPage = React.lazy(() =>
   import('./pages/change-package-center').then((module) => ({ default: module.ChangePackageCenterPage })),
 );
-const OpsStatusManagementPage = React.lazy(() =>
-  import('./pages/ops-status-management').then((module) => ({ default: module.OpsStatusManagementPage })),
+const GovernancePage = React.lazy(() =>
+  import('./pages/governance').then((module) => ({ default: module.GovernancePage })),
 );
 const ModelCatalogManagement = React.lazy(() =>
   import('./pages/model-catalog').then((module) => ({ default: module.ModelCatalogManagement })),
 );
-const McpToolManagement = React.lazy(() =>
-  import('./pages/mcp-tool-management').then((module) => ({ default: module.McpToolManagement })),
+const ToolsMcpPage = React.lazy(() =>
+  import('./pages/tools-mcp').then((module) => ({ default: module.ToolsMcpPage })),
 );
 const ProjectProductWorkspacePage = React.lazy(() =>
   import('./pages/project-product-workspace').then((module) => ({ default: module.ProjectProductWorkspacePage })),
 );
-const ProjectWorkspacePage = React.lazy(() =>
-  import('./pages/project-workspace').then((module) => ({ default: module.ProjectWorkspacePage })),
+const AutomationsPage = React.lazy(() =>
+  import('./pages/automations').then((module) => ({ default: module.AutomationsPage })),
 );
 const TaskScheduleManagement = React.lazy(() =>
   import('./pages/task-schedule-management').then((module) => ({ default: module.TaskScheduleManagement })),
 );
-const AlertTriggerManagementPage = React.lazy(() =>
-  import('./pages/alert-trigger-management').then((module) => ({ default: module.AlertTriggerManagementPage })),
+const AlertTriggersPage = React.lazy(() =>
+  import('./pages/alert-triggers').then((module) => ({ default: module.AlertTriggersPage })),
 );
-const ExecutionAdapterTemplatesPage = React.lazy(() =>
-  import('./pages/execution-adapter-templates').then((module) => ({ default: module.ExecutionAdapterTemplatesPage })),
+const ExecutionTargetsPage = React.lazy(() =>
+  import('./pages/execution-targets').then((module) => ({ default: module.ExecutionTargetsPage })),
 );
 const MemoryManagementPage = React.lazy(() =>
   import('./pages/memory-management').then((module) => ({ default: module.MemoryManagementPage })),
@@ -86,8 +77,14 @@ const SkillEvolverManagementPage = React.lazy(() =>
 const ToolRoutingObservabilityPage = React.lazy(() =>
   import('./pages/tool-routing-observability').then((module) => ({ default: module.ToolRoutingObservabilityPage })),
 );
-const ChannelManagementPage = React.lazy(() =>
-  import('./features/channels/pages/ChannelManagementPage').then((module) => ({ default: module.ChannelManagementPage })),
+const ChannelsPage = React.lazy(() =>
+  import('./pages/channels').then((module) => ({ default: module.ChannelsPage })),
+);
+const UsersAccessPage = React.lazy(() =>
+  import('./features/platform/pages/UsersAccessPage').then((module) => ({ default: module.UsersAccessPage })),
+);
+const WorkbenchPage = React.lazy(() =>
+  import('./pages/workbench').then((module) => ({ default: module.WorkbenchPage })),
 );
 
 const PageLoading: React.FC = () => (
@@ -115,36 +112,36 @@ const CanonicalRouteRedirect: React.FC<{ to: string }> = ({ to }) => {
 const PageTitleSync: React.FC = () => {
   const location = useLocation();
   useEffect(() => {
-    document.title = location.pathname === '/login' ? 'Sign in · OrbisOps' : pageTitleForPath(location.pathname);
+    document.title = location.pathname === '/login' ? '登录 · OrbisOps' : pageTitleForPath(location.pathname);
   }, [location.pathname]);
   return null;
 };
 
 const pageElementByRouteId: Record<string, React.ReactNode> = {
   home: <OpsDashboardPage />,
-  incidents: <IncidentCenterPage />,
-  diagnosis: <ChatWorkspacePage />,
-  changes: <ChangeCenterPage />,
+  chat: <ChatPage />,
+  workbench: <WorkbenchPage />,
   workflows: <AgentListPage />,
-  'workflow-editor': <AgentConfigProductPage />,
-  inspections: <TaskScheduleManagement />,
-  'alert-triggers': <AlertTriggerManagementPage />,
+  automations: <AutomationsPage />,
+  'automation-schedules': <TaskScheduleManagement />,
   projects: <ProjectProductWorkspacePage />,
-  'project-advanced': <ProjectWorkspacePage />,
-  'platform-settings': <PlatformSettingsPage />,
-  channels: <ChannelManagementPage />,
+  changes: <ChangeCenterPage />,
+  settings: <PlatformSettingsPage />,
+  'workflow-editor': <AgentConfigProductPage />,
+  'alert-triggers': <AlertTriggersPage />,
+  'project-advanced': <ProjectProductWorkspacePage />,
+  'settings-users': <UsersAccessPage />,
+  channels: <ChannelsPage />,
   models: <ModelApiManagement />,
-  tools: <McpToolManagement />,
-  knowledge: <RagOrderManagement />,
-  skills: <SkillManagementPage />,
-  'execution-targets': <ExecutionAdapterTemplatesPage />,
-  governance: <OpsStatusManagementPage />,
+  tools: <ToolsMcpPage />,
+  knowledge: <KnowledgePage />,
+  skills: <SkillsPage />,
+  'execution-targets': <ExecutionTargetsPage />,
+  governance: <GovernancePage />,
   'model-catalog': <ModelCatalogManagement />,
   memory: <MemoryManagementPage />,
   'skill-evolver': <SkillEvolverManagementPage />,
   'tool-routing': <ToolRoutingObservabilityPage />,
-  'analysis-tasks': <AnalysisTaskCenterPage />,
-  'my-audit': <UserAuditRecordsPage />,
 };
 
 const AppRoutes: React.FC = () => (

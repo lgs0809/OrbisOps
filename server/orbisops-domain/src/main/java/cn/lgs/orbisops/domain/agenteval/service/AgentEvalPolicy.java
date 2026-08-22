@@ -193,6 +193,9 @@ public final class AgentEvalPolicy {
     }
 
     private boolean reachesEnd(AgentEvalDefinitionSnapshot definition) {
+        if (definition.nodes().isEmpty() && !definition.agentRoles().isEmpty()) {
+            return true;
+        }
         String start = definition.startNodeId();
         if (start.isBlank()) {
             start = definition.nodes().stream()

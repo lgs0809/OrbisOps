@@ -22,7 +22,7 @@ final class OpsChangePackageRunEvidenceCollector {
     private static final String PREPARE_TOOL_NAME = "PrepareChangePackage";
     private static final String SOURCE_QUERY_FINISHED = "SOURCE_QUERY_FINISHED";
     private static final Set<String> AUTHORITATIVE_DATASOURCE_TYPES = Set.of(
-            "PROMETHEUS", "ELASTICSEARCH", "MYSQL_SLOW_SQL");
+            "PROMETHEUS", "ELASTICSEARCH", "MYSQL_SLOW_SQL", "MYSQL", "RABBITMQ", "REDIS");
     private static final int MAX_EVIDENCE = 20;
     private static final int MAX_SUMMARY_CHARS = 1800;
 
@@ -103,13 +103,24 @@ final class OpsChangePackageRunEvidenceCollector {
             if (PREPARE_TOOL_NAME.equals(toolName) || "Skill".equals(toolName)) return null;
             String output = text(payload.get("output"));
             if (output.isBlank()) return null;
-            sourceType = "mcp".equalsIgnoreCase(text(payload.get("toolKind"))) ? "MCP" : "TOOL";
-            sourceId = runId + ":" + index + ":" + toolName;
+            String toolKind = text(payload.get("toolKind"));
+            String authoritativeMcpType = authoritativeMcpSourceType(payload);
+            sourceType = !authoritativeMcpType.isBlank()
+                    ? authoritativeMcpType
+                    : "mcp".equalsIgnoreCase(toolKind) ? "MCP" : "TOOL";
+            String resultId = text(payload.get("resultId"));
+            sourceId = !resultId.isBlank() ? resultId : runId + ":" + index + ":" + toolName;
             summary = text(event.getSummary()) + "\n" + abbreviate(output);
             metadata.put("toolName", toolName);
             metadata.put("nodeId", text(event.getNodeId()));
             metadata.put("owner", text(payload.get("owner")));
             metadata.put("durationMs", payload.getOrDefault("durationMs", 0));
+            if (!authoritativeMcpType.isBlank()) {
+                metadata.put("verified", true);
+                metadata.put("resultId", resultId);
+                metadata.put("mcpId", text(payload.get("mcpId")));
+                metadata.put("remoteToolName", text(payload.get("remoteToolName")));
+            }
         } else if ("RAG_RETRIEVE".equals(event.getEventType())) {
             sourceType = "RAG";
             sourceId = runId + ":rag:" + index;
@@ -128,6 +139,26 @@ final class OpsChangePackageRunEvidenceCollector {
                 observedAt,
                 "sha256:" + sha256(summary),
                 metadata);
+    }
+
+    private String authoritativeMcpSourceType(Map<String, Object> payload) {
+        if (payload == null
+                || !"mcp".equalsIgnoreCase(text(payload.get("toolKind")))
+                || !Boolean.TRUE.equals(payload.get("remoteCallExecuted"))
+                || Boolean.FALSE.equals(payload.get("allowed"))
+                || text(payload.get("resultId")).isBlank()) {
+            return "";
+        }
+        String name = text(payload.get("remoteToolName")).toLowerCase();
+        if (name.startsWith("rabbitmq_")) return "RABBITMQ";
+        if (name.startsWith("redis_")) return "REDIS";
+        if (name.startsWith("prometheus_")) return "PROMETHEUS";
+        if (name.startsWith("elasticsearch_") || name.startsWith("es_")) return "ELASTICSEARCH";
+        if (name.contains("mysql") && (name.contains("slow") || name.contains("digest"))) {
+            return "MYSQL_SLOW_SQL";
+        }
+        if (name.startsWith("mysql_")) return "MYSQL";
+        return "";
     }
 
     private String abbreviate(String value) {

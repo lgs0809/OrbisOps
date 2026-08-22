@@ -52,10 +52,10 @@ export const CHANNEL_ACCESS_POLICY_OPTIONS: Array<{
   label: string;
   description: string;
 }> = [
-  { value: 'DENY_UNKNOWN', label: 'Deny unknown', description: '未绑定发送人默认拒绝，适合生产环境。' },
-  { value: 'PAIRING', label: 'Pairing', description: '未绑定发送人只收到绑定提示，不进入 Agent Runtime。' },
-  { value: 'ALLOWLIST', label: 'Allowlist', description: '仅显式绑定或授权身份允许进入 Runtime。' },
-  { value: 'OBSERVE_ONLY_UNKNOWN', label: 'Observe only unknown', description: '未知发送人可调查，但 Runtime 被硬降权为只读。' },
+  { value: 'DENY_UNKNOWN', label: '拒绝未知身份', description: '默认拒绝未绑定身份，适合生产环境。' },
+  { value: 'PAIRING', label: '首次配对', description: '未绑定身份先收到配对指引，完成绑定后才能进入 Agent Runtime。' },
+  { value: 'ALLOWLIST', label: '白名单', description: '仅允许显式绑定或已授权的身份进入 Runtime。' },
+  { value: 'OBSERVE_ONLY_UNKNOWN', label: '未知身份仅观察', description: '允许未知身份发起只读排查，不授予变更权限。' },
 ];
 
 const capabilityDimensions: Array<{
@@ -64,12 +64,12 @@ const capabilityDimensions: Array<{
   backendCapability: string;
   fallback: string;
 }> = [
-  { key: 'INBOUND', label: 'Inbound', backendCapability: 'INBOUND', fallback: 'This provider cannot receive messages in the current build.' },
-  { key: 'OUTBOUND', label: 'Outbound', backendCapability: 'OUTBOUND', fallback: 'This provider cannot deliver outbound messages in the current build.' },
-  { key: 'APPROVAL', label: 'Approval', backendCapability: 'INTERACTIVE_ACTIONS', fallback: 'Approval actions fall back to the OrbisOps web approval surface.' },
-  { key: 'UPDATE', label: 'Live update', backendCapability: 'MESSAGE_UPDATE', fallback: 'Progress is sent as new messages instead of editing the original message.' },
-  { key: 'ATTACHMENTS', label: 'Files', backendCapability: 'ATTACHMENTS', fallback: 'File ingestion is unavailable for this provider.' },
-  { key: 'PROACTIVE', label: 'Proactive', backendCapability: 'PROACTIVE_PUSH', fallback: 'Only reply-scoped delivery is available.' },
+  { key: 'INBOUND', label: '接收消息', backendCapability: 'INBOUND', fallback: '当前版本暂不支持通过该渠道接收消息。' },
+  { key: 'OUTBOUND', label: '发送消息', backendCapability: 'OUTBOUND', fallback: '当前版本暂不支持通过该渠道发送消息。' },
+  { key: 'APPROVAL', label: '审批交互', backendCapability: 'INTERACTIVE_ACTIONS', fallback: '该渠道不支持审批交互，请在 OrbisOps 网页中处理。' },
+  { key: 'UPDATE', label: '进度更新', backendCapability: 'MESSAGE_UPDATE', fallback: '该渠道不支持编辑原消息，进度会以新消息发送。' },
+  { key: 'ATTACHMENTS', label: '文件', backendCapability: 'ATTACHMENTS', fallback: '该渠道暂不支持文件接入。' },
+  { key: 'PROACTIVE', label: '主动推送', backendCapability: 'PROACTIVE_PUSH', fallback: '该渠道仅支持在已有会话中回复。' },
 ];
 
 const providers: Array<{ type: OpsChannelType; name: string; phase: 0 | 1 | 2 | 3 | 4 }> = [
@@ -107,7 +107,7 @@ export const buildChannelCompatibilityMatrix = (
       type: provider.type,
       name: provider.name,
       installed: Boolean(descriptor),
-      connectionMode: descriptor?.connectionModes?.join(' / ') || 'Not installed',
+      connectionMode: descriptor?.connectionModes?.join(' / ') || '未安装',
       capabilities: Object.fromEntries(
         compatibilityCapabilities.map((capability) => [capability, Boolean(descriptor && supported.has(capability))]),
       ) as Record<ChannelCompatibilityCapability, boolean>,
@@ -140,29 +140,29 @@ export const buildChannelProviderCards = (
       supported: adapterAvailable && actualCapabilities.has(dimension.backendCapability),
       fallback: adapterAvailable
         ? dimension.fallback
-        : 'Provider adapter is not available in the current build.',
+        : '当前版本未安装该渠道能力。',
     }));
     return {
       ...provider,
       configured,
       adapterAvailable,
       readiness,
-      connectionMode: descriptor?.connectionModes?.join(' / ') || 'Not installed',
+      connectionMode: descriptor?.connectionModes?.join(' / ') || '未安装',
       capabilities,
       actionRequired: !adapterAvailable
-        ? `Provider adapter is not available in the current build (Phase ${provider.phase}).`
+        ? '当前版本未安装该渠道。'
         : active
-          ? 'Run readiness checks for credentials, connection, inbound, outbound, and identity/access.'
+          ? '请检查凭据、连接、收发消息和身份访问状态。'
           : configured
-            ? 'Enable the provider and run readiness checks.'
-            : 'Connect this provider to a project.',
+            ? '请先启用该渠道并执行就绪检查。'
+            : '请先把该渠道接入 Project。',
     };
   });
 };
 
 export const channelReadinessLabel = (state: ChannelReadinessState): string => ({
-  READY: 'Ready',
-  ACTION_REQUIRED: 'Action required',
-  BLOCKED_EXTERNAL: 'Blocked external',
-  DISABLED: 'Disabled',
+  READY: '已就绪',
+  ACTION_REQUIRED: '需要处理',
+  BLOCKED_EXTERNAL: '外部条件阻塞',
+  DISABLED: '已停用',
 }[state]);

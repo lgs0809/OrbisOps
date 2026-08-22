@@ -13,7 +13,7 @@ import java.util.List;
 /** Trigger compatibility facade over the typed Semantic Memory application use case. */
 @Service
 @ConditionalOnProperty(
-        prefix = "ops.chat.memory",
+        prefix = "orbisops.chat.memory",
         name = "semantic-enabled",
         havingValue = "true")
 public class OpsPgVectorSemanticMemoryStore implements OpsSemanticMemoryStore {

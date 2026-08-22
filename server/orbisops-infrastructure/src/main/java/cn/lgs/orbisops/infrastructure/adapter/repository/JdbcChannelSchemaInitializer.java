@@ -14,10 +14,10 @@ public final class JdbcChannelSchemaInitializer {
     private final OpsChannelOutboxRepository outboxRepository;
     private final OpsChannelApprovalActionRepository approvalActionRepository;
 
-    @Value("${ops.channel.auto-init:false}")
+    @Value("${orbisops.channel.auto-init:false}")
     private boolean channelAutoInit;
 
-    @Value("${ops.channel.notification.outbox.auto-init:false}")
+    @Value("${orbisops.channel.notification.outbox.auto-init:false}")
     private boolean outboxAutoInit;
 
     public JdbcChannelSchemaInitializer(OpsChannelRepository channelRepository,

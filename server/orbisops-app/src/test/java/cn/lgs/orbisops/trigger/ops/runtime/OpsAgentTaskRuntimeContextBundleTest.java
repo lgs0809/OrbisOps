@@ -63,8 +63,7 @@ class OpsRuntimeContextBundleTest {
                         "check order errors",
                         false,
                         "already standalone",
-                        List.of(),
-                        "DIAGNOSE"));
+                        List.of()));
         OpsWorkSessionContextPreparationService preparationService = preparationService(
                 rewriteService, bundleService);
         OpsAgentChatRequest request = request();
@@ -83,7 +82,6 @@ class OpsRuntimeContextBundleTest {
 
         assertEquals("rcb-1", request.getMetadata().get("contextBundleId"));
         assertEquals("hash-1", request.getMetadata().get("contextBundleHash"));
-        assertEquals("DIAGNOSE", request.getMetadata().get("_taskActionClassification"));
         verify(rewriteService).rewrite(eq("check order errors"), eq(""));
         verify(bundleService).createBundle(any(), eq(""), any());
     }

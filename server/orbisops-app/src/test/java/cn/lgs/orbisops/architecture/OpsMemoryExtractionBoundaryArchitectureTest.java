@@ -36,9 +36,9 @@ class OpsMemoryExtractionBoundaryArchitectureTest {
                 () -> assertTrue(extractor.lines().count() <= 75),
                 () -> assertTrue(settings.contains("public record OpsMemoryExtractionSettings(")),
                 () -> assertTrue(settings.contains("legacyConstructorDefaults()")),
-                () -> assertTrue(configuration.contains("ops.chat.memory.extraction-enabled")),
-                () -> assertTrue(configuration.contains("ops.chat.memory.extraction-max-items-per-message")),
-                () -> assertTrue(configuration.contains("ops.chat.memory.llm-extraction-max-input-chars")));
+                () -> assertTrue(configuration.contains("orbisops.chat.memory.extraction-enabled")),
+                () -> assertTrue(configuration.contains("orbisops.chat.memory.extraction-max-items-per-message")),
+                () -> assertTrue(configuration.contains("orbisops.chat.memory.llm-extraction-max-input-chars")));
     }
 
     private String read(String relativePath) throws IOException {

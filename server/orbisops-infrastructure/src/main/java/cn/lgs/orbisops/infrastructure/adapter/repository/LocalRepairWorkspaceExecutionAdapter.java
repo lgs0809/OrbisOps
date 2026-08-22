@@ -55,16 +55,16 @@ public class LocalRepairWorkspaceExecutionAdapter implements RepairWorkspaceExec
     private final ProjectServicePolicy servicePolicy = new ProjectServicePolicy();
 
     public LocalRepairWorkspaceExecutionAdapter(
-            @Value("${ops.repair.enabled:false}") boolean enabled,
-            @Value("${ops.repair.worktree-root:${ops.repair.sandbox-root:${java.io.tmpdir}/ai-agent-repair/worktrees}}") String worktreeRoot,
-            @Value("${ops.repair.artifact-root:${java.io.tmpdir}/ai-agent-repair/artifacts}") String artifactRoot,
-            @Value("${ops.repair.command-timeout-seconds:900}") int commandTimeoutSeconds,
-            @Value("${ops.repair.max-log-bytes:1048576}") int maxLogBytes,
-            @Value("${ops.repair.runner:docker}") String runner,
-            @Value("${ops.repair.docker.binary:docker}") String dockerBinary,
-            @Value("${ops.repair.docker.maven-image:maven:3.9.9-eclipse-temurin-17}") String dockerMavenImage,
-            @Value("${ops.repair.docker.node-image:node:20-bookworm-slim}") String dockerNodeImage,
-            @Value("${ops.repair.docker.make-image:buildpack-deps:bookworm}") String dockerMakeImage) {
+            @Value("${orbisops.repair.enabled:false}") boolean enabled,
+            @Value("${orbisops.repair.worktree-root:${orbisops.repair.sandbox-root:${java.io.tmpdir}/orbisops-repair/worktrees}}") String worktreeRoot,
+            @Value("${orbisops.repair.artifact-root:${java.io.tmpdir}/orbisops-repair/artifacts}") String artifactRoot,
+            @Value("${orbisops.repair.command-timeout-seconds:900}") int commandTimeoutSeconds,
+            @Value("${orbisops.repair.max-log-bytes:1048576}") int maxLogBytes,
+            @Value("${orbisops.repair.runner:docker}") String runner,
+            @Value("${orbisops.repair.docker.binary:docker}") String dockerBinary,
+            @Value("${orbisops.repair.docker.maven-image:maven:3.9.9-eclipse-temurin-17}") String dockerMavenImage,
+            @Value("${orbisops.repair.docker.node-image:node:20-bookworm-slim}") String dockerNodeImage,
+            @Value("${orbisops.repair.docker.make-image:buildpack-deps:bookworm}") String dockerMakeImage) {
         this.enabled = enabled;
         this.worktreeRoot = worktreeRoot;
         this.artifactRoot = artifactRoot;

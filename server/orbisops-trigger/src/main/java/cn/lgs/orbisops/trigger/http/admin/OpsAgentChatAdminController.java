@@ -34,7 +34,7 @@ public class OpsAgentChatAdminController {
     private final ThreadPoolExecutor opsRunExecutor;
     private final OpsSseExecutionTemplate sseTemplate;
 
-    @Value("${ops.chat.stream.timeout-ms:360000}")
+    @Value("${orbisops.chat.stream.timeout-ms:360000}")
     private long chatStreamTimeoutMs;
 
     public OpsAgentChatAdminController(OpsChatApplicationService opsChatApplicationService,

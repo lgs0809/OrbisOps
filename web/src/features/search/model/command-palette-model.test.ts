@@ -11,7 +11,8 @@ describe('global command palette model', () => {
     expect(adminItems.some((item) => item.id === 'route:channels')).toBe(true);
     expect(adminItems.some((item) => item.id === 'route:models')).toBe(true);
     expect(userItems.some((item) => item.id === 'route:channels')).toBe(false);
-    expect(userItems.some((item) => item.id === 'route:diagnosis')).toBe(true);
+    expect(userItems.some((item) => item.id === 'route:chat')).toBe(true);
+    expect(userItems.some((item) => item.id === 'route:workbench')).toBe(true);
   });
 
   it('adds project switch and current-project actions without a second project catalog', () => {
@@ -22,9 +23,10 @@ describe('global command palette model', () => {
       'p2',
     );
 
-    expect(items.find((item) => item.id === 'project:p2')?.description).toBe('Current project');
-    expect(items.find((item) => item.id === 'action:start-diagnosis')?.path).toBe('/work/diagnosis?projectId=p2');
-    expect(items.find((item) => item.id === 'action:project-advanced')?.path).toBe('/projects/advanced?projectId=p2');
+    expect(items.find((item) => item.id === 'project:p2')?.description).toBe('当前 Project');
+    expect(items.find((item) => item.id === 'action:open-chat')?.path).toBe('/chat?projectId=p2');
+    expect(items.find((item) => item.id === 'action:open-workbench')?.path).toBe('/workbench?projectId=p2');
+    expect(items.find((item) => item.id === 'action:project-runtime')?.path).toBe('/projects?projectId=p2&view=runtime');
   });
 
   it('ranks labels before keyword/description matches and supports legacy route terms', () => {

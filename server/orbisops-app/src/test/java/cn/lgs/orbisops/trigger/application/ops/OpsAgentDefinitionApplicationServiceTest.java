@@ -165,6 +165,46 @@ class OpsAgentDefinitionApplicationServiceTest {
     }
 
     @Test
+    void standaloneReactPublishUsesRoleAssertionWhenWorkflowNodesAreAbsent() {
+        Fixture fixture = fixture();
+        allowProject(fixture);
+        OpsAgentDefinition validated = OpsAgentDefinition.builder()
+                .agentId("react-1")
+                .projectId("demo-project")
+                .version(2)
+                .definitionHash("hash-react-2")
+                .lifecycle("VALIDATED")
+                .engine("AGENTSCOPE")
+                .agentscopeAgents(List.of(
+                        OpsAgentScopeConfig.builder()
+                                .agentId("main-assistant")
+                                .role("MAIN_ASSISTANT")
+                                .build()))
+                .build();
+        when(fixture.definitionRegistry.listVersions("react-1")).thenReturn(List.of(validated));
+        when(fixture.agentEvalService.createSuite(eq("demo-project"), eq("react-1"), any(), eq("alice")))
+                .thenReturn(Map.of("suiteId", "suite-react-1"));
+        when(fixture.agentEvalService.run("demo-project", "react-1", 2, "suite-react-1", "alice"))
+                .thenReturn(Map.of("status", "PASSED", "definitionHash", "hash-react-2"));
+        when(fixture.lifecycleUseCase.publish("react-1", 2)).thenAnswer(invocation -> {
+            validated.setLifecycle("PUBLISHED");
+            return validated;
+        });
+
+        Map<String, Object> result = fixture.service.publishVersion("react-1", 2, "alice");
+
+        assertEquals("PUBLISHED", result.get("lifecycle"));
+        ArgumentCaptor<Map<String, Object>> suiteRequest = ArgumentCaptor.forClass(Map.class);
+        verify(fixture.agentEvalService).createSuite(eq("demo-project"), eq("react-1"), suiteRequest.capture(), eq("alice"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> cases = (List<Map<String, Object>>) suiteRequest.getValue().get("cases");
+        assertEquals(List.of("MAIN_ASSISTANT"), cases.get(0).get("requiredRoles"));
+        assertFalse(cases.get(0).containsKey("requiredNodes"));
+        verify(fixture.agentEvalService).run("demo-project", "react-1", 2, "suite-react-1", "alice");
+        verify(fixture.lifecycleUseCase).publish("react-1", 2);
+    }
+
+    @Test
     void defaultAgentEnsureIsIdempotentWhenPublishedVersionExists() {
         Fixture fixture = fixture();
         allowProject(fixture);

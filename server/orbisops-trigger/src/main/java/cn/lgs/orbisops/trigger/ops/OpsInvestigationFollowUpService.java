@@ -93,7 +93,7 @@ final class OpsInvestigationFollowUpService {
             OpsQuestionContext context) {
         OpsQuestionContext safe = context == null ? OpsQuestionContext.from("") : context;
         boolean explicitRuntimeFilter = !safe.traceIds().isEmpty()
-                || !safe.orderIds().isEmpty()
+                || !safe.entityIds().isEmpty()
                 || !safe.uris().isEmpty()
                 || !safe.logLevels().isEmpty();
         return new InvestigationQuestionSignals(

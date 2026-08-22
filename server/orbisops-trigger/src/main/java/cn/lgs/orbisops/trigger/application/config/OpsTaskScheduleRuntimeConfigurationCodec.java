@@ -14,6 +14,7 @@ public final class OpsTaskScheduleRuntimeConfigurationCodec {
         }
         JSONObject value = new JSONObject(true);
         value.put("projectId", configuration.projectId());
+        value.put("executionType", configuration.executionType());
         value.put("agentBindingMode", configuration.agentBindingMode());
         value.put("agentVersion", configuration.agentVersion());
         value.put("agentDefinitionHash", configuration.agentDefinitionHash());
@@ -63,6 +64,7 @@ public final class OpsTaskScheduleRuntimeConfigurationCodec {
                     screening.getDouble("minInstanceUpRatio"));
             return new TaskScheduleRuntimeConfiguration(
                     config.getString("projectId"),
+                    config.getString("executionType"),
                     config.getString("agentBindingMode"),
                     config.getInteger("agentVersion"),
                     config.getString("agentDefinitionHash"),

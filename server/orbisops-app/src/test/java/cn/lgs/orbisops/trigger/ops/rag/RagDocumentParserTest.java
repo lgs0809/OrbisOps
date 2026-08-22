@@ -453,14 +453,14 @@ class RagDocumentParserTest {
     @Test
     void shouldGateVisualAnalyzerByEnabledApiKeyAndHighValue() {
         RagVisualDocumentAnalyzer analyzer = new RagVisualDocumentAnalyzer(
-                visualSettings(true, true, "openai", "https://api.openai.com", "sk-test"),
+                visualSettings(true, true, "openai", "https://api.openai.com", "test-api-key"),
                 (cn.lgs.orbisops.application.model.ModelAvailabilityPort) null);
 
         assertTrue(analyzer.shouldAnalyze(Map.of("high_value_candidate", true)));
         assertFalse(analyzer.shouldAnalyze(Map.of("high_value_candidate", false)));
 
         RagVisualDocumentAnalyzer disabled = new RagVisualDocumentAnalyzer(
-                visualSettings(false, true, "openai", "https://api.openai.com", "sk-test"),
+                visualSettings(false, true, "openai", "https://api.openai.com", "test-api-key"),
                 (cn.lgs.orbisops.application.model.ModelAvailabilityPort) null);
         assertFalse(disabled.shouldAnalyze(Map.of("high_value_candidate", true)));
     }
@@ -468,7 +468,7 @@ class RagDocumentParserTest {
     @Test
     void shouldBuildOpenAiCompatibleVisualRequestWithMaxTokens() {
         RagVisualAnalysisSettings settings = new RagVisualAnalysisSettings(
-                true, false, "openai", "https://api.example.com", "sk-test",
+                true, false, "openai", "https://api.example.com", "test-api-key",
                 "v1/chat/completions", "llava:7b", "low", 30, 800,
                 "max_tokens", "json_object", 1, 3, 4_194_304L, 144);
         RagVisualAnalysisProtocol protocol = new RagVisualAnalysisProtocol(settings);

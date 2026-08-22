@@ -58,7 +58,7 @@ class RagFeedbackBoundaryArchitectureTest {
                 () -> assertTrue(assembly.contains("qualityAssembly.caseCatalogUseCase()")),
                 () -> assertTrue(assembly.contains("resolvedSettings.autoInit()")),
                 () -> assertTrue(configuration.contains("OpsRagFeedbackManagementAssembly opsRagFeedbackManagementAssembly")),
-                () -> assertTrue(configuration.contains("ops.rag.feedback.auto-init")),
+                () -> assertTrue(configuration.contains("orbisops.rag.feedback.auto-init")),
                 () -> assertTrue(service.contains("private final RagFeedbackUseCase useCase")),
                 () -> assertTrue(service.contains("private final OpsRagFeedbackViewMapper viewMapper")),
                 () -> assertTrue(service.contains("RagFeedbackService(OpsRagFeedbackManagementAssembly assembly)")),

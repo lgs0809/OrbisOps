@@ -27,16 +27,17 @@ const authenticateAdmin = async (page: import('@playwright/test').Page) => {
 
 test('Platform Settings groups capability catalogs and preserves canonical deep links', async ({ page }) => {
   await authenticateAdmin(page);
-  await page.goto('/platform');
+  await page.goto('/settings');
 
-  await expect(page.getByRole('heading', { name: 'Platform Settings' })).toBeVisible();
-  await expect(page.getByText('平台目录 ≠ 项目授权。', { exact: false })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Integrations' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Intelligence' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Execution & Governance' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Advanced' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '设置' })).toBeVisible();
+  await expect(page.getByText('共享能力需要在项目中显式启用。', { exact: false })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '用户与访问控制' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '连接' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '智能能力' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '执行与治理' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '高级' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /用户与访问控制/ })).toBeVisible();
 
-  await page.getByRole('button', { name: /Knowledge/ }).click();
-  await expect(page).toHaveURL(/\/platform\/knowledge$/);
-  await expect(page.getByRole('heading', { name: '通用知识库' })).toBeVisible();
+  await page.getByRole('button', { name: /知识库/ }).click();
+  await expect(page).toHaveURL(/\/settings\/knowledge$/);
 });

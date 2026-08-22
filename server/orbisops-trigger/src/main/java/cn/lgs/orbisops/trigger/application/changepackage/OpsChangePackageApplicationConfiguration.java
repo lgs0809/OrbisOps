@@ -47,7 +47,7 @@ public class OpsChangePackageApplicationConfiguration {
     public LandingOperationJournalApplicationService landingOperationJournalApplicationService(
             LandingOperationJournalPort journalPort,
             ChangePackageTransactionPort transactionPort,
-            @Value("${ops.approved-landing.operation-lease-seconds:300}") int leaseSeconds) {
+            @Value("${orbisops.approved-landing.operation-lease-seconds:300}") int leaseSeconds) {
         return new LandingOperationJournalApplicationService(
                 journalPort,
                 transactionPort,

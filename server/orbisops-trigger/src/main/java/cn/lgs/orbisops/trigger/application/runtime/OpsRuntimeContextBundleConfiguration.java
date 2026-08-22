@@ -10,7 +10,7 @@ public class OpsRuntimeContextBundleConfiguration {
 
     @Bean
     public OpsRuntimeContextBundleSettings opsRuntimeContextBundleSettings(
-            @Value("${ops.skill-runtime.selected-limit:6}") int selectedSkillLimit) {
+            @Value("${orbisops.skill-runtime.selected-limit:6}") int selectedSkillLimit) {
         return new OpsRuntimeContextBundleSettings(selectedSkillLimit);
     }
 }

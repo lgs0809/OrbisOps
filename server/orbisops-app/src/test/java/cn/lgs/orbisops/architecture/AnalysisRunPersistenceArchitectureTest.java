@@ -47,8 +47,8 @@ class AnalysisRunPersistenceArchitectureTest {
                 () -> assertTrue(repository.contains("INSERT INTO ai_ops_analysis_task")),
                 () -> assertTrue(repository.contains("SELECT run_id, project_id, trigger_source")),
                 () -> assertTrue(repository.contains("CREATE TABLE IF NOT EXISTS ai_ops_analysis_task")),
-                () -> assertTrue(repository.contains("ops.runs.jdbc-enabled")),
-                () -> assertTrue(repository.contains("ops.runs.auto-init")),
+                () -> assertTrue(repository.contains("orbisops.runs.jdbc-enabled")),
+                () -> assertTrue(repository.contains("orbisops.runs.auto-init")),
                 () -> assertTrue(repository.contains("new AnalysisRunSnapshot(")));
     }
 
@@ -101,9 +101,9 @@ class AnalysisRunPersistenceArchitectureTest {
                 () -> assertTrue(settings.contains("public record OpsAnalysisRunSettings(")),
                 () -> assertTrue(settings.contains("public static OpsAnalysisRunSettings defaults()")),
                 () -> assertTrue(settingsConfiguration.contains("OpsAnalysisRunSettings opsAnalysisRunSettings(")),
-                () -> assertTrue(settingsConfiguration.contains("${ops.runs.max-memory-records:200}")),
-                () -> assertTrue(settingsConfiguration.contains("${ops.runs.allow-in-memory-fallback:false}")),
-                () -> assertTrue(settingsConfiguration.contains("${ops.runs.reject-when-queue-full:true}")),
+                () -> assertTrue(settingsConfiguration.contains("${orbisops.runs.max-memory-records:200}")),
+                () -> assertTrue(settingsConfiguration.contains("${orbisops.runs.allow-in-memory-fallback:false}")),
+                () -> assertTrue(settingsConfiguration.contains("${orbisops.runs.reject-when-queue-full:true}")),
                 () -> assertTrue(assembly.contains("AsyncAnalysisRunProcessManager<OpsAgentRunRequestDTO, OpsAnalysisResponseDTO>")),
                 () -> assertTrue(assembly.contains("new OpsAsyncAnalysisRunStoreAdapter")),
                 () -> assertTrue(assembly.contains("new OpsAsyncAnalysisExecutionAdapter")),

@@ -17,6 +17,7 @@ import { isAdminUser } from '../services/auth-session';
 import { OpsChangePackage } from '../services/ops-admin-service';
 import { OpsProjectWorkspace } from '../services/ops-project-service';
 import { theme } from '../styles/theme';
+import { userFacingError } from '../utils/user-facing-error';
 
 const { Text, Title } = Typography;
 
@@ -178,14 +179,33 @@ const CRITICAL_SEVERITY = new Set(['P0', 'P1', 'CRITICAL', 'HIGH', 'SEV0', 'SEV1
 const CLOSED_INCIDENT = new Set(['RESOLVED', 'CLOSED']);
 const upper = (value?: string) => String(value || '').trim().toUpperCase();
 
+const activityStatusLabel = (status?: string) => ({
+  ACTION_REQUIRED: '需要处理',
+  INVESTIGATING: '排查中',
+  VERIFYING: '验证中',
+  RESOLVED: '已解决',
+  CLOSED: '已关闭',
+  DRAFT: '草稿',
+  READY_FOR_REVIEW: '待提交审批',
+  REVIEWING: '审批中',
+  APPROVED: '已批准',
+  LANDING_RUNNING: '执行中',
+  LANDED: '已执行',
+  VERIFIED: '已验证',
+  VALIDATION_FAILED: '校验失败',
+  LANDING_FAILED: '执行失败',
+  VERIFICATION_FAILED: '验证失败',
+  NEEDS_REPLAN: '需要重新规划',
+}[upper(status)] || '状态已更新');
+
 const attentionLabel = (item: AttentionItem) => ({
-  ACTION_REQUIRED: 'Action Required',
-  CRITICAL_INCIDENT: 'P0/P1 Incident',
-  PENDING_DECISION: 'Pending Decision',
-  FAILED_CHANGE: 'Execution Failure',
-  READINESS_BLOCKER: 'Readiness Blocker',
-  PENDING_OPERATION: 'Pending Operation',
-  AUDIT_REMINDER: 'Audit Reminder',
+  ACTION_REQUIRED: '需要处理',
+  CRITICAL_INCIDENT: '高优先级事件',
+  PENDING_DECISION: '待决策',
+  FAILED_CHANGE: '变更执行失败',
+  READINESS_BLOCKER: '项目配置阻塞',
+  PENDING_OPERATION: '待执行操作',
+  AUDIT_REMINDER: '审计提醒',
 }[item.kind]);
 
 export const OpsDashboardPage: React.FC = () => {
@@ -194,7 +214,7 @@ export const OpsDashboardPage: React.FC = () => {
   const overviewQuery = useDashboardOverviewQuery(admin);
   const loading = overviewQuery.isLoading;
   const error = overviewQuery.isError
-    ? (overviewQuery.error instanceof Error ? overviewQuery.error.message : '工作台数据加载失败')
+    ? userFacingError(overviewQuery.error, '首页数据暂时不可用，请稍后重试。')
     : '';
   const adminOverview = overviewQuery.data?.adminOverview || null;
   const userOverview = overviewQuery.data?.userOverview || null;
@@ -228,60 +248,60 @@ export const OpsDashboardPage: React.FC = () => {
   const summary = admin
     ? [
         {
-          label: 'Action Required',
+          label: '需要处理',
           value: adminOverview?.actionRequiredIncidentCount ?? 0,
-          hint: `${adminOverview?.unownedActionRequiredIncidentCount ?? 0} 个尚未分配责任人`,
+          hint: `${adminOverview?.unownedActionRequiredIncidentCount ?? 0} 项仍未分配负责人`,
           tone: 'danger' as const,
           icon: <IconAlertTriangle />,
         },
         {
-          label: 'P0 / P1 Incident',
+          label: '高优先级事件',
           value: criticalIncidentCount,
-          hint: '当前高严重度且尚未关闭的问题',
+          hint: '仍未关闭的高严重度事件',
           tone: 'warning' as const,
           icon: <IconShield />,
         },
         {
-          label: 'Pending Decision',
+          label: '待决策',
           value: (adminOverview?.pendingChangeCount ?? 0) + (adminOverview?.pendingWorkflowDecisionCount ?? 0),
-          hint: 'ChangePackage 审批 + Workflow Human Decision',
+          hint: '变更审批与 Workflow 人工决策',
           tone: 'warning' as const,
           icon: <IconClock />,
         },
         {
-          label: 'Failed / Blocked',
+          label: '失败 / 阻塞',
           value: (adminOverview?.failedChangeCount ?? 0) + readinessBlockers.length,
-          hint: 'Landing / Verification failure 与 Project Readiness blocker',
+          hint: '生产执行、验证失败或项目配置未就绪',
           tone: 'danger' as const,
           icon: <IconAlertTriangle />,
         },
       ]
     : [
         {
-          label: '需要我处理',
+          label: '需要处理',
           value: userOverview?.actionRequiredIncidents?.length ?? 0,
-          hint: '已形成明确人工动作的 Incident',
+          hint: '需要你显式处理的事件',
           tone: 'danger' as const,
           icon: <IconAlertTriangle />,
         },
         {
-          label: 'P0 / P1 Incident',
+          label: '高优先级事件',
           value: criticalIncidentCount,
-          hint: '当前授权范围内的高严重度问题',
+          hint: '你有权限查看的 Project 中仍未关闭的高严重度事件',
           tone: 'warning' as const,
           icon: <IconShield />,
         },
         {
-          label: '待我决策',
+          label: '待决策',
           value: (userOverview?.pendingApprovals?.length ?? 0) + (userOverview?.pendingWorkflowDecisions?.length ?? 0),
-          hint: 'ChangePackage 审批 + Workflow Human Decision',
+          hint: '变更审批与 Workflow 人工决策',
           tone: 'warning' as const,
           icon: <IconClock />,
         },
         {
-          label: '待我执行 / 验证',
+          label: '待执行操作',
           value: userOverview?.pendingOperations?.length ?? 0,
-          hint: '已审批或恢复验证阶段需要你的任务',
+          hint: '已批准但仍需要你处理的 Landing 或 Verification 工作',
           tone: 'info' as const,
           icon: <IconBranch />,
         },
@@ -291,17 +311,17 @@ export const OpsDashboardPage: React.FC = () => {
   const healthChecks = Array.isArray(health.checks) ? health.checks : [];
 
   return (
-    <OpsPageShell selectedKey="dashboard">
+    <OpsPageShell selectedKey="home">
       <OpsPageHeader
-        title="Attention & Action"
-        description="首页只回答一个问题：现在最值得我处理什么？高风险事件、人工决策、失败处置和 Readiness blocker 会按优先级排在最前。"
-        primaryAction={<Button icon={<IconBranch />} onClick={() => navigate('/chat')}>AI 对话</Button>}
-        extra={admin && <Button onClick={() => navigate('/incidents')}>Incident Center</Button>}
+        title="首页"
+        description="快速查看当前需要处理的任务、待决策事项、失败变更和项目配置问题。"
+        primaryAction={<Button icon={<IconBranch />} onClick={() => navigate('/chat')}>打开对话</Button>}
+        extra={<Button onClick={() => navigate('/workbench')}>打开工作台</Button>}
       />
 
       <Spin spinning={loading}>
         {error && (
-          <OpsSectionCard title="工作台数据不可用">
+          <OpsSectionCard title="首页数据不可用">
             <Text type="danger">{error}</Text>
           </OpsSectionCard>
         )}
@@ -317,9 +337,9 @@ export const OpsDashboardPage: React.FC = () => {
         </SummaryGrid>
 
         <ContentGrid>
-          <OpsSectionCard title="现在最值得处理">
+          <OpsSectionCard title="需要关注">
             <CardToolbar>
-              <Button icon={<IconHistory />} onClick={() => navigate('/executions')}>执行中心</Button>
+              <Button icon={<IconHistory />} onClick={() => navigate('/workbench')}>打开工作台</Button>
             </CardToolbar>
             {attentionItems.length ? (
               <Queue>
@@ -341,26 +361,26 @@ export const OpsDashboardPage: React.FC = () => {
             ) : (
               <Empty
                 title="当前没有阻塞事项"
-                description="没有待人工动作、高严重度 Incident、待决策方案或失败处置。可以从 AI 对话发起新的诊断。"
+                description="目前没有待人工处理事项、高优先级事件、待决策或失败变更；需要时可以从对话发起新的排查。"
               />
             )}
           </OpsSectionCard>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.base }}>
-            <OpsSectionCard title="Recent Activity">
+            <OpsSectionCard title="最近活动">
               {admin ? (
                 (adminOverview?.recentIncidents?.length || changes.length) ? (
                   <ActivityList>
                     {(adminOverview?.recentIncidents || []).slice(0, 4).map((incident) => (
                       <ActivityItem key={`activity-incident-${incident.incidentId}`}>
                         <strong>{incident.title || incident.incidentId}</strong>
-                        <span>{incident.projectId || '-'} · {incident.status} · {incident.updateTime || incident.lastSeenAt || '-'}</span>
+                        <span>{incident.projectId || '-'} · {activityStatusLabel(incident.status)} · {incident.updateTime || incident.lastSeenAt || '-'}</span>
                       </ActivityItem>
                     ))}
                     {changes.slice(0, 4).map((pkg) => (
                       <ActivityItem key={`activity-change-${pkg.packageId}`}>
                         <strong>{pkg.objective || pkg.summary || pkg.packageId}</strong>
-                        <span>{pkg.projectId || '-'} · {pkg.status} · ChangePackage</span>
+                        <span>{pkg.projectId || '-'} · {activityStatusLabel(pkg.status)} · 变更</span>
                       </ActivityItem>
                     ))}
                   </ActivityList>
@@ -375,37 +395,37 @@ export const OpsDashboardPage: React.FC = () => {
                       </ActivityItem>
                     ))}
                   </ActivityList>
-                ) : <Empty title="暂无最近会话" />
+                ) : <Empty title="暂无最近对话" />
               )}
             </OpsSectionCard>
 
             {admin && activation && (
               <div data-testid="project-activation">
-                <OpsSectionCard title="Project Activation">
-                  <HealthRow><Text>Projects</Text><Title heading={6} style={{ margin: 0 }}>{activation.projectCount}</Title></HealthRow>
-                  <HealthRow><Text>Evidence connected</Text><Title heading={6} style={{ margin: 0 }}>{activation.evidenceConnectedProjects}</Title></HealthRow>
-                  <HealthRow><Text>Real query proof</Text><Title heading={6} style={{ margin: 0 }}>{activation.queryProofVerifiedProjects}</Title></HealthRow>
-                  <HealthRow><Text>Default Agent ready</Text><Title heading={6} style={{ margin: 0 }}>{activation.defaultAgentReadyProjects}</Title></HealthRow>
-                  <HealthRow><Text>Activated</Text><Title heading={6} style={{ margin: 0 }}>{activation.activatedProjects}</Title></HealthRow>
-                  <HealthRow><Text>Diagnosis ready now</Text><Title heading={6} style={{ margin: 0 }}>{activation.diagnosisReadyProjects}</Title></HealthRow>
-                  <HealthRow><Text>Activation rate</Text><Title heading={6} style={{ margin: 0 }}>{activationRateLabel(activation)}</Title></HealthRow>
+                <OpsSectionCard title="项目激活情况">
+                  <HealthRow><Text>项目数量</Text><Title heading={6} style={{ margin: 0 }}>{activation.projectCount}</Title></HealthRow>
+                  <HealthRow><Text>已连接证据源</Text><Title heading={6} style={{ margin: 0 }}>{activation.evidenceConnectedProjects}</Title></HealthRow>
+                  <HealthRow><Text>真实查询证据</Text><Title heading={6} style={{ margin: 0 }}>{activation.queryProofVerifiedProjects}</Title></HealthRow>
+                  <HealthRow><Text>默认执行能力已就绪</Text><Title heading={6} style={{ margin: 0 }}>{activation.defaultAgentReadyProjects}</Title></HealthRow>
+                  <HealthRow><Text>已激活</Text><Title heading={6} style={{ margin: 0 }}>{activation.activatedProjects}</Title></HealthRow>
+                  <HealthRow><Text>当前可诊断</Text><Title heading={6} style={{ margin: 0 }}>{activation.diagnosisReadyProjects}</Title></HealthRow>
+                  <HealthRow><Text>激活率</Text><Title heading={6} style={{ margin: 0 }}>{activationRateLabel(activation)}</Title></HealthRow>
                   <Text type="tertiary" size="small">
-                    Activated 只在 Project 的所有必选 onboarding 事实均完成时计数；不使用前端点击或 projectId/userId 高基数埋点。
+                    完成必要的资源连接、默认执行能力和基础配置后，项目才会计为已激活。
                   </Text>
                 </OpsSectionCard>
               </div>
             )}
 
             {admin && (
-              <OpsSectionCard title="Platform Health">
+              <OpsSectionCard title="平台健康">
                 <CardToolbar>
-                  <Button size="small" onClick={() => navigate('/platform/governance')}>查看治理</Button>
+                  <Button size="small" onClick={() => navigate('/settings/governance')}>打开治理与审计</Button>
                 </CardToolbar>
-                <HealthRow><Text>Healthy capability</Text><Title heading={6} style={{ margin: 0 }}>{Number(health.healthyCount || 0)}</Title></HealthRow>
-                <HealthRow><Text>Degraded capability</Text><Title heading={6} style={{ margin: 0 }}>{Number(health.degradedCount || 0)}</Title></HealthRow>
-                <HealthRow><Text>Readiness blocker</Text><Title heading={6} style={{ margin: 0 }}>{readinessBlockers.length}</Title></HealthRow>
+                <HealthRow><Text>健康能力</Text><Title heading={6} style={{ margin: 0 }}>{Number(health.healthyCount || 0)}</Title></HealthRow>
+                <HealthRow><Text>降级能力</Text><Title heading={6} style={{ margin: 0 }}>{Number(health.degradedCount || 0)}</Title></HealthRow>
+                <HealthRow><Text>项目配置阻塞</Text><Title heading={6} style={{ margin: 0 }}>{readinessBlockers.length}</Title></HealthRow>
                 {healthChecks.length > 0 && (
-                  <Text type="tertiary">健康详情由 Resource Health 权威快照提供；首页只展示汇总，不复制平台治理控制面。</Text>
+                  <Text type="tertiary">首页仅展示健康摘要；详细检查和治理操作请前往“治理与审计”。</Text>
                 )}
               </OpsSectionCard>
             )}

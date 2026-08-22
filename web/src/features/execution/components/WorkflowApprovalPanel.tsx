@@ -8,6 +8,7 @@ import type {
   OpsWorkflowApprovalScope,
   OpsWorkflowApprovalView,
 } from '../../../services/ops-workflow-approval-service';
+import { userFacingError } from '../../../utils/user-facing-error';
 
 const { Text } = Typography;
 
@@ -20,6 +21,13 @@ interface Props {
 
 const queryKey = (scope: OpsWorkflowApprovalScope, projectId: string, runId: string) =>
   ['workflow-approval', scope, projectId, runId] as const;
+
+const approvalStatusLabel = (status?: string) => ({
+  WAITING: '等待审批',
+  APPROVED: '已批准',
+  REJECTED: '已驳回',
+  EXPIRED: '已过期',
+}[String(status || '').toUpperCase()] || '状态未知');
 
 export const WorkflowApprovalPanel: React.FC<Props> = ({ runId, projectId, scope, onChanged }) => {
   const queryClient = useQueryClient();
@@ -44,24 +52,24 @@ export const WorkflowApprovalPanel: React.FC<Props> = ({ runId, projectId, scope
     onSuccess: (view, decision) => {
       updateView(view);
       Toast.success(decision === 'APPROVE'
-        ? '审批已记录，Workflow 正在从 durable checkpoint 恢复'
-        : '驳回已记录，Workflow 正在从 durable checkpoint 恢复');
+        ? '审批已记录，Workflow 正在继续执行。'
+        : '驳回已记录，Workflow 将按已配置的分支继续处理。');
     },
-    onError: (error) => Toast.error(error instanceof Error ? error.message : 'Workflow 审批失败'),
+    onError: (error) => Toast.error(userFacingError(error, 'Workflow 审批失败，请稍后重试。')),
   });
 
   const resumeMutation = useMutation({
     mutationFn: async () => (await opsWorkflowApprovalService.retryResume(runId, projectId, scope)).data,
     onSuccess: (view) => {
       updateView(view);
-      Toast.success('已重新调度 Workflow approval resume');
+      Toast.success('Workflow 已重新调度继续执行。');
     },
-    onError: (error) => Toast.error(error instanceof Error ? error.message : 'Workflow 恢复重试失败'),
+    onError: (error) => Toast.error(userFacingError(error, 'Workflow 恢复重试失败，请稍后重试。')),
   });
 
   if (approvalQuery.isLoading) return null;
   if (approvalQuery.isError) {
-    return <Banner type="warning" description="Workflow approval 状态暂时不可用，请稍后重试。" />;
+    return <Banner type="warning" description="Workflow 审批状态暂时不可用，请稍后重试。" />;
   }
   const approval = approvalQuery.data;
   if (!approval?.available) return null;
@@ -71,45 +79,45 @@ export const WorkflowApprovalPanel: React.FC<Props> = ({ runId, projectId, scope
   const busy = decisionMutation.isPending || resumeMutation.isPending;
 
   return (
-    <OpsSectionCard title="Workflow Approval">
+    <OpsSectionCard title="Workflow 人工审批">
       <Space vertical align="start" spacing="medium" style={{ width: '100%' }}>
         <Space wrap align="center">
           <OpsAuthorityBadge authority="APPROVAL" />
           <Tag color={waiting ? 'amber' : approval.status === 'APPROVED' ? 'green' : approval.status === 'REJECTED' ? 'red' : 'grey'}>
-            {approval.status || 'UNKNOWN'}
+            {approvalStatusLabel(approval.status)}
           </Tag>
-          {approval.channelBound && <Tag color="blue">Channel linked</Tag>}
-          <Text type="tertiary">Node {approval.nodeId || '-'}</Text>
+          {approval.channelBound && <Tag color="blue">已关联 Channel</Tag>}
+          <Text type="tertiary">节点 {approval.nodeId || '-'}</Text>
         </Space>
 
         <div style={{ width: '100%' }}>
-          <Text strong>Approval request</Text>
+          <Text strong>审批请求</Text>
           <div style={{ marginTop: 6, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-            {approval.requestSummary || 'Workflow requests human approval before continuing.'}
+            {approval.requestSummary || 'Workflow 需要人工确认后才能继续执行。'}
           </div>
         </div>
 
         <Space wrap>
-          <Text type="tertiary">Requested {approval.requestedAt || '-'}</Text>
-          <Text type="tertiary">Expires {approval.expiresAt || '-'}</Text>
-          {approval.decidedBy && <Text type="tertiary">Decided by {approval.decidedBy}</Text>}
+          <Text type="tertiary">申请时间 {approval.requestedAt || '-'}</Text>
+          <Text type="tertiary">有效期至 {approval.expiresAt || '-'}</Text>
+          {approval.decidedBy && <Text type="tertiary">处理人 {approval.decidedBy}</Text>}
         </Space>
 
         {waiting && approval.canDecide && (
           <Space wrap>
             <Popconfirm
-              title="Approve this workflow step?"
-              content="This records the human decision and resumes the durable workflow. It does not bypass downstream runtime permissions."
+              title="批准这个 Workflow 步骤？"
+              content="确认后会记录人工决策并继续执行，但不会绕过后续权限和安全控制。"
               onConfirm={() => decisionMutation.mutate('APPROVE')}
             >
-              <Button type="primary" loading={decisionMutation.isPending} disabled={busy}>Approve & Resume</Button>
+              <Button type="primary" loading={decisionMutation.isPending} disabled={busy}>批准并继续</Button>
             </Popconfirm>
             <Popconfirm
-              title="Reject this workflow step?"
-              content="The workflow will resume with decision=REJECTED so its configured conditional route can handle the rejection."
+              title="驳回这个 Workflow 步骤？"
+              content="确认后会记录驳回结果，Workflow 将按已配置的条件分支继续处理。"
               onConfirm={() => decisionMutation.mutate('REJECT')}
             >
-              <Button type="danger" disabled={busy}>Reject</Button>
+              <Button type="danger" disabled={busy}>驳回</Button>
             </Popconfirm>
           </Space>
         )}
@@ -117,7 +125,7 @@ export const WorkflowApprovalPanel: React.FC<Props> = ({ runId, projectId, scope
         {waiting && !approval.canDecide && (
           <Banner
             type="info"
-            description="You can inspect this approval, but only the current Work Session owner/editor can decide it."
+            description="你可以查看这条审批，但只有当前 Work Session 的负责人或编辑者可以处理。"
           />
         )}
 
@@ -126,9 +134,9 @@ export const WorkflowApprovalPanel: React.FC<Props> = ({ runId, projectId, scope
             type="warning"
             description={
               <Space wrap>
-                <span>The decision is committed, but the outer Work Session is still waiting. Retry only schedules resume; it cannot change the decision.</span>
+                <span>审批结果已经记录，但外层 Work Session 仍在等待。重新调度只会继续执行，不会改变已有审批结果。</span>
                 <Button loading={resumeMutation.isPending} disabled={busy} onClick={() => resumeMutation.mutate()}>
-                  Retry Resume
+                  重新调度继续执行
                 </Button>
               </Space>
             }

@@ -3,6 +3,7 @@ import { API_CONFIG, DEFAULT_HEADERS } from '../config/api';
 export interface TaskScheduleRequestDTO {
   id?: number;
   projectId?: string;
+  executionType?: 'DEFAULT_REACT' | 'WORKFLOW';
   agentId?: string;
   agentBindingMode?: 'LATEST_PUBLISHED' | 'PINNED_VERSION';
   agentVersion?: number;
@@ -33,6 +34,7 @@ export interface TaskScheduleRequestDTO {
 export interface TaskScheduleResponseDTO {
   id: number;
   projectId?: string;
+  executionType?: 'DEFAULT_REACT' | 'WORKFLOW';
   agentId: string;
   agentBindingMode?: 'LATEST_PUBLISHED' | 'PINNED_VERSION';
   agentVersion?: number;

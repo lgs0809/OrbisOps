@@ -43,7 +43,7 @@ public class JdbcChangePackageQueryAdapter implements ChangePackageQueryPort {
     private final IChangePackageEventRepository eventRepository;
     private final JdbcTemplate jdbcTemplate;
 
-    @Value("${ops.approved-landing.enabled:false}")
+    @Value("${orbisops.approved-landing.enabled:false}")
     private boolean approvedLandingEnabled;
 
     public JdbcChangePackageQueryAdapter(IChangePackageCurrentRepository currentRepository,

@@ -86,8 +86,8 @@ const ResultCopy = styled.div`
 `;
 
 const kindLabel: Record<CommandPaletteItem['kind'], string> = {
-  action: 'Action',
-  route: 'Page',
+  action: '操作',
+  route: '页面',
   project: 'Project',
 };
 
@@ -157,14 +157,14 @@ export const GlobalCommandPalette: React.FC = () => {
       <Trigger
         icon={<IconSearch />}
         theme="light"
-        aria-label="Open global search"
+        aria-label="打开全局搜索"
         onClick={() => setOpen(true)}
       >
-        <span className="command-search-label">Search</span>
+        <span className="command-search-label">搜索</span>
         <Text className="command-search-shortcut" type="tertiary" size="small">⌘K / Ctrl⇧K</Text>
       </Trigger>
       <Modal
-        title="Search OrbisOps"
+        title="搜索 OrbisOps"
         visible={open}
         footer={null}
         width={680}
@@ -176,8 +176,8 @@ export const GlobalCommandPalette: React.FC = () => {
           autoFocus
           prefix={<IconSearch />}
           value={query}
-          aria-label="Search pages, actions, and projects"
-          placeholder="Search pages, actions, and projects..."
+          aria-label="搜索页面、操作和 Project"
+          placeholder="搜索页面、操作和 Project..."
           onChange={setQuery}
           onKeyDown={(event) => {
             if (event.key === 'ArrowDown') {
@@ -192,9 +192,9 @@ export const GlobalCommandPalette: React.FC = () => {
             }
           }}
         />
-        <Results role="listbox" aria-label="Search results">
+        <Results role="listbox" aria-label="搜索结果">
           {filtered.length === 0 ? (
-            <Empty title="No matching commands" description="Try a page name, project name, MCP, incident, or diagnosis." />
+            <Empty title="没有匹配结果" description="可以尝试页面名称、Project 名称、MCP、事件或排障关键词。" />
           ) : filtered.map((item, index) => (
             <ResultButton
               key={item.id}
@@ -214,7 +214,7 @@ export const GlobalCommandPalette: React.FC = () => {
           ))}
         </Results>
         <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 12 }}>
-          ↑↓ navigate · Enter open · Esc close
+          ↑↓ 选择 · Enter 打开 · Esc 关闭
         </Text>
       </Modal>
     </>

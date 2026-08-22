@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Normal CI skips it. Enable only on a prepared local workstation with the
  * production-like MySQL/Redis/RabbitMQ dependencies running.
  */
-@EnabledIfSystemProperty(named = "ops.prodlike.landing.acceptance", matches = "true")
+@EnabledIfSystemProperty(named = "orbisops.prodlike.landing.acceptance", matches = "true")
 class OpsProdLikeJavaLandingAcceptanceTest {
 
     private static final String PROJECT = "demo-project";
@@ -49,10 +49,10 @@ class OpsProdLikeJavaLandingAcceptanceTest {
 
     @Test
     void deploysVerifiedArtifactTo8092AndRollsBackBaseline() throws Exception {
-        Path root = Path.of(requiredProperty("ops.prodlike.repository.root")).toAbsolutePath().normalize();
-        Path candidate = Path.of(requiredProperty("ops.prodlike.candidate.artifact")).toAbsolutePath().normalize();
-        Path baseline = Path.of(requiredProperty("ops.prodlike.baseline.artifact")).toAbsolutePath().normalize();
-        String candidateSha = requiredProperty("ops.prodlike.candidate.sha256").toLowerCase();
+        Path root = Path.of(requiredProperty("orbisops.prodlike.repository.root")).toAbsolutePath().normalize();
+        Path candidate = Path.of(requiredProperty("orbisops.prodlike.candidate.artifact")).toAbsolutePath().normalize();
+        Path baseline = Path.of(requiredProperty("orbisops.prodlike.baseline.artifact")).toAbsolutePath().normalize();
+        String candidateSha = requiredProperty("orbisops.prodlike.candidate.sha256").toLowerCase();
         assertEquals(candidateSha, sha(candidate));
         assertNotEquals(candidateSha, sha(baseline));
         assertFalse(healthy(), "8092 must be stopped before the opt-in physical Landing acceptance");

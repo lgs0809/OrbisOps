@@ -23,10 +23,10 @@ public class LocalSourceMcpRuntimeAdapter implements SourceMcpRuntimePort {
     private final long maxOutputBytes;
 
     public LocalSourceMcpRuntimeAdapter(
-            @Value("${ops.source-repository.git-binary:git}") String gitBinary,
-            @Value("${ops.source-repository.command-timeout-seconds:8}") int timeoutSeconds,
-            @Value("${ops.source-repository.max-file-bytes:1048576}") long maxFileBytes,
-            @Value("${ops.source-repository.max-command-output-bytes:2097152}") long maxOutputBytes) {
+            @Value("${orbisops.source-repository.git-binary:git}") String gitBinary,
+            @Value("${orbisops.source-repository.command-timeout-seconds:8}") int timeoutSeconds,
+            @Value("${orbisops.source-repository.max-file-bytes:1048576}") long maxFileBytes,
+            @Value("${orbisops.source-repository.max-command-output-bytes:2097152}") long maxOutputBytes) {
         this.gitBinary = gitBinary;
         this.timeoutSeconds = timeoutSeconds;
         this.maxFileBytes = maxFileBytes;

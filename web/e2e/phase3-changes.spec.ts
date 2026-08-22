@@ -73,8 +73,8 @@ test('Change Center loads execution list first and detail proof streams only on 
     return route.fulfill({ status: 200, contentType: 'application/json', body: response([]) });
   });
 
-  await page.goto('/work/changes?projectId=demo-project');
-  await expect(page.getByRole('heading', { name: '执行中心' })).toBeVisible();
+  await page.goto('/changes?projectId=demo-project');
+  await expect(page.getByRole('heading', { name: '变更', exact: true })).toBeVisible();
   const row = page.getByRole('row').filter({ hasText: 'Restart checkout deployment after validation' });
   await expect(row).toBeVisible();
   await expect.poll(() => listRequests).toBe(1);
@@ -86,8 +86,8 @@ test('Change Center loads execution list first and detail proof streams only on 
   await expect.poll(() => detailRequests).toBe(1);
   await expect.poll(() => eventRequests).toBe(1);
   await expect.poll(() => landingOperationRequests).toBe(1);
-  await expect(page.getByText('Approval Cockpit')).toBeVisible();
-  await expect(page.getByText('运行审核前验证')).toBeVisible();
+  await expect(page.getByText('审批工作台')).toBeVisible();
+  await expect(page.getByText('执行审批前校验')).toBeVisible();
 
   await page.keyboard.press('Escape');
   await row.getByRole('button', { name: '查看' }).click();

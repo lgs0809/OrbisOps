@@ -111,11 +111,11 @@ class InvestigationSchedulingRetryProjectionBoundaryArchitectureTest {
                 () -> assertFalse(executorSettings.contains("@Value")),
                 () -> assertTrue(executionConfiguration.contains("@Configuration")),
                 () -> assertTrue(executionConfiguration.contains("OpsInvestigationExecutorSettings opsInvestigationExecutorSettings(")),
-                () -> assertTrue(executionConfiguration.contains("${ops.multi-agent.main-reflection-llm-enabled:true}")),
-                () -> assertTrue(executionConfiguration.contains("${ops.multi-agent.parallel-execution-enabled:true}")),
-                () -> assertTrue(executionConfiguration.contains("${ops.multi-agent.max-task-executions:8}")),
-                () -> assertTrue(executionConfiguration.contains("${ops.multi-agent.max-adjustments:3}")),
-                () -> assertTrue(executionConfiguration.contains("${ops.multi-agent.max-evidence-items:12}")));
+                () -> assertTrue(executionConfiguration.contains("${orbisops.multi-agent.main-reflection-llm-enabled:true}")),
+                () -> assertTrue(executionConfiguration.contains("${orbisops.multi-agent.parallel-execution-enabled:true}")),
+                () -> assertTrue(executionConfiguration.contains("${orbisops.multi-agent.max-task-executions:8}")),
+                () -> assertTrue(executionConfiguration.contains("${orbisops.multi-agent.max-adjustments:3}")),
+                () -> assertTrue(executionConfiguration.contains("${orbisops.multi-agent.max-evidence-items:12}")));
     }
 
     private String read(String relativePath) throws IOException {

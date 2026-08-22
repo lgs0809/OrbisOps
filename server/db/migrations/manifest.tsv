@@ -68,3 +68,5 @@ orbisops	071	ops-model-provider-name-utf8-repair	db/migrations/sql/ops-model-pro
 orbisops	072	ops-config-audit-result-status-width	db/migrations/sql/ops-config-audit-result-status-width.sql	17bedb9df5a8024b26e4dbbacd590967592d93d44986ef867f647aeb019ecdd3	2026-08-15
 orbisops	073	ops-agent-node-trace-id-width	db/migrations/sql/ops-agent-node-trace-id-width.sql	93155b48586f7582d983b97b24e11aac341fab5eee731bced617eed3e6391d1f	2026-08-15
 orbisops	074	ops-agent-node-trace-identity-width	db/migrations/sql/ops-agent-node-trace-identity-width.sql	316d0af9b7e9e5c1ef203c52d3e8b9b91273480604fbcf1cf2791d393c9c68b5	2026-08-15
+orbisops	075	ops-source-repository-access-mode	db/migrations/sql/ops-source-repository-access-mode.sql	078f6be590e8e3b54de72517895c1ee37d381e36ff97de9adea4bf8ffaffed8d	2026-08-19
+orbisops	076	ops-agent-edge-schema-convergence	db/migrations/sql/ops-agent-edge-schema-convergence.sql	14f91fd46e39b1508ffee87bc483ff1f291b554385b7908ca2d0c1fb7159ddee	2026-08-19

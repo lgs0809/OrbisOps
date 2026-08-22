@@ -37,10 +37,20 @@ public final class OpsProgressiveMcpCallbackAdapter {
                 .filter(StringUtils::hasText)
                 .distinct()
                 .toList();
-        String allowedTools = activeToolNames.isEmpty()
-                ? "扩展工具需要先查询 tool_catalog 并用 enable_tool 激活。"
-                : "可直接请求的核心工具：" + String.join(", ", activeToolNames)
-                + "；扩展工具先用 enable_tool 激活。";
+        List<String> extensionToolNames = runtimeTools == null ? List.of() : runtimeTools.stream()
+                .filter(item -> "EXTENSION".equalsIgnoreCase(value(item.get("disclosureTier"), "EXTENSION")))
+                .map(item -> value(item.get("toolName")))
+                .filter(StringUtils::hasText)
+                .distinct()
+                .toList();
+        String allowedTools = "只能使用当前 MCP 目录中的 toolName，禁止借用其他 MCP 的工具名。"
+                + (activeToolNames.isEmpty()
+                ? "当前没有可直接调用的 CORE 工具。"
+                : "可直接请求的 CORE 工具：" + String.join(", ", activeToolNames) + "。")
+                + (extensionToolNames.isEmpty()
+                ? "当前没有 EXTENSION 工具。"
+                : "EXTENSION 工具：" + String.join(", ", extensionToolNames)
+                + "；必须先调用与本 dispatcher 同一 MCP 对应的 enable_mcp_tool_* 激活，再调用本 dispatcher。") ;
         String toolPolicySummary = runtimeTools == null || runtimeTools.isEmpty()
                 ? ""
                 : "\n这些工具均已由平台 Tool Policy 审核为审核前可执行；未审核、过期、禁用或需要 ChangePackage 的工具不会暴露给模型。";
@@ -91,7 +101,7 @@ public final class OpsProgressiveMcpCallbackAdapter {
         return callback(
                 safeToolCallbackName("enable_mcp_tool_"
                         + value(config.getToolId(), value(config.getMcpId(), config.getName()))),
-                "按需激活当前项目工具目录中的一个扩展 MCP 工具。激活后返回审核策略和完整 schema，下一次推理才可调用。",
+                "按需激活当前 MCP 自己目录中的一个 EXTENSION 工具。toolName 必须来自同一 MCP 的 mcp_tool_catalog_*；激活后返回审核策略和完整 schema，下一次推理再通过同一 MCP 的 project_mcp_* 调用。",
                 """
                         {"type":"object","properties":{"toolName":{"type":"string"},"reason":{"type":"string"}},"required":["toolName"]}
                         """,

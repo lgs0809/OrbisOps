@@ -20,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /** In-memory hot-message window used when Redis is not selected. */
 @Repository
 @ConditionalOnProperty(
-        prefix = "ops.chat.memory",
+        prefix = "orbisops.chat.memory",
         name = "hot-store",
         havingValue = "memory",
         matchIfMissing = true)
@@ -35,7 +35,7 @@ public class InMemoryHotMemoryAdapter implements
     private final long ttlMinutes;
 
     public InMemoryHotMemoryAdapter(
-            @Value("${ops.chat.memory.hot-ttl-minutes:30}")
+            @Value("${orbisops.chat.memory.hot-ttl-minutes:30}")
             long ttlMinutes) {
         this.ttlMinutes = Math.max(1L, ttlMinutes);
     }

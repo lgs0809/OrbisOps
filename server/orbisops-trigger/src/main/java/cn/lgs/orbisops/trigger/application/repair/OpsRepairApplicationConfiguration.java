@@ -34,9 +34,9 @@ public class OpsRepairApplicationConfiguration {
             RepairWorkspaceExecutionPort execution,
             RepairAuditPort audit,
             RepairTransactionPort transactions,
-            @Value("${ops.repair.enabled:false}") boolean enabled,
-            @Value("${ops.repair.runner:docker}") String runner,
-            @Value("${ops.repair.writer-lease-seconds:300}") long writerLeaseSeconds) {
+            @Value("${orbisops.repair.enabled:false}") boolean enabled,
+            @Value("${orbisops.repair.runner:docker}") String runner,
+            @Value("${orbisops.repair.writer-lease-seconds:300}") long writerLeaseSeconds) {
         return new RepairWorkspaceApplicationService(
                 workspaces, sources, execution, audit, transactions,
                 enabled, runner, writerLeaseSeconds);

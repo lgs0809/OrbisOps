@@ -40,9 +40,9 @@ class McpRuntimeResilienceArchitectureTest {
                 () -> assertTrue(resilience.contains("MCP_RESILIENCE_PERMIT_FENCED")),
                 () -> assertTrue(configuration.contains(
                         "OpsMcpInvocationResiliencePolicy resilience")),
-                () -> assertTrue(telemetry.contains("ops.mcp.invocations")),
-                () -> assertTrue(telemetry.contains("ops.mcp.invocation.duration")),
-                () -> assertTrue(telemetry.contains("ops.mcp.circuits.open")),
+                () -> assertTrue(telemetry.contains("orbisops.mcp.invocations")),
+                () -> assertTrue(telemetry.contains("orbisops.mcp.invocation.duration")),
+                () -> assertTrue(telemetry.contains("orbisops.mcp.circuits.open")),
                 () -> assertFalse(telemetry.contains("projectId")),
                 () -> assertFalse(telemetry.contains("mcpId")),
                 () -> assertTrue(redaction.contains("IdentityHashMap")),

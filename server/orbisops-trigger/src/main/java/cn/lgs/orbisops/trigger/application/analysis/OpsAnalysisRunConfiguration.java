@@ -11,9 +11,9 @@ public class OpsAnalysisRunConfiguration {
 
     @Bean
     public OpsAnalysisRunSettings opsAnalysisRunSettings(
-            @Value("${ops.runs.max-memory-records:200}") int maxMemoryRecords,
-            @Value("${ops.runs.allow-in-memory-fallback:false}") boolean allowInMemoryFallback,
-            @Value("${ops.runs.reject-when-queue-full:true}") boolean rejectWhenQueueFull) {
+            @Value("${orbisops.runs.max-memory-records:200}") int maxMemoryRecords,
+            @Value("${orbisops.runs.allow-in-memory-fallback:false}") boolean allowInMemoryFallback,
+            @Value("${orbisops.runs.reject-when-queue-full:true}") boolean rejectWhenQueueFull) {
         return new OpsAnalysisRunSettings(
                 maxMemoryRecords,
                 allowInMemoryFallback,

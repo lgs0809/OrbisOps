@@ -36,8 +36,8 @@ class OpsAlertOutboxJobBoundaryArchitectureTest {
                 () -> assertFalse(job.contains("Number.class.cast")),
                 () -> assertTrue(job.lines().count() <= 85),
                 () -> assertTrue(settings.contains("legacyConstructorDefaults()")),
-                () -> assertTrue(configuration.contains("ops.alert-triggers.outbox.enabled")),
-                () -> assertTrue(configuration.contains("ops.alert-triggers.outbox.batch-size")));
+                () -> assertTrue(configuration.contains("orbisops.alert-triggers.outbox.enabled")),
+                () -> assertTrue(configuration.contains("orbisops.alert-triggers.outbox.batch-size")));
     }
 
     private String read(String relativePath) throws IOException {

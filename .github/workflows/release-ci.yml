@@ -1,0 +1,27 @@
+name: Release Hygiene
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  hygiene:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check working tree release hygiene
+        run: python3 scripts/release-hygiene.py
+
+      - name: Check Git history release hygiene
+        run: python3 scripts/history-hygiene.py
+
+      - name: Validate public Compose template
+        run: docker compose --env-file deploy/orbisops.env.example config --quiet

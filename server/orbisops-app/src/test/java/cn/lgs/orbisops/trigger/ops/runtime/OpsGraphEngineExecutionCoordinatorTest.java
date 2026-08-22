@@ -70,6 +70,41 @@ class OpsGraphEngineExecutionCoordinatorTest {
     }
 
     @Test
+    void graphNodesPreserveStandaloneAgentScopeAndProjectCapabilityInheritance() {
+        Fixture fixture = fixture();
+        OpsAgentDefinition definition = OpsAgentDefinition.builder()
+                .agentId("ops-agent")
+                .engine("AGENTSCOPE")
+                .agentscopeAgents(List.of(OpsAgentScopeConfig.builder()
+                        .agentId("main-assistant")
+                        .name("平台主助手")
+                        .role("MAIN_ASSISTANT")
+                        .instruction("连续 ReAct 调查")
+                        .maxDepth(1)
+                        .maxIterations(12)
+                        .outputKey("final_answer")
+                        .inheritProjectCapabilities(true)
+                        .allowedToolNames(List.of("project_mcp_*", "mcp_tool_catalog_*"))
+                        .build()))
+                .build();
+
+        List<OpsWorkflowNode> nodes = fixture.coordinator().graphNodes(definition);
+
+        assertEquals(1, nodes.size());
+        OpsWorkflowNode node = nodes.get(0);
+        assertEquals("main-assistant", node.getNodeId());
+        assertEquals("AGENTSCOPE", node.getType());
+        assertEquals("REACT", node.getMode());
+        assertEquals("main-assistant", node.getAgent());
+        assertEquals("连续 ReAct 调查", node.getInstruction());
+        assertEquals("final_answer", node.getOutputKey());
+        assertEquals("MAIN_ASSISTANT", node.getConfig().get("role"));
+        assertEquals(true, node.getConfig().get("inheritProjectCapabilities"));
+        assertEquals(List.of("project_mcp_*", "mcp_tool_catalog_*"),
+                node.getConfig().get("allowedToolNames"));
+    }
+
+    @Test
     void compilerFailurePublishesFailedLifecycleRecordsRunFailureAndCleansState() {
         Fixture fixture = fixture();
         OpsAgentGraphCompilerAdapter compiler = mock(OpsAgentGraphCompilerAdapter.class);

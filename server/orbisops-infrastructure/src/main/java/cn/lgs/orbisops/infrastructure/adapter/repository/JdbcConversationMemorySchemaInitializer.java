@@ -12,7 +12,7 @@ public class JdbcConversationMemorySchemaInitializer {
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 
-    @Value("${ops.chat.memory.auto-init:true}")
+    @Value("${orbisops.chat.memory.auto-init:true}")
     private boolean autoInit = true;
 
     private volatile boolean initialized;

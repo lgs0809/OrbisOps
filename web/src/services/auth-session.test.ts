@@ -28,12 +28,12 @@ describe('auth session product routing', () => {
     expect(normalizeUserRole('approver')).toBe('unknown');
   });
 
-  it('lands both authenticated personas in the operations inbox rather than forcing chat', () => {
+  it('lands both authenticated personas directly in chat', () => {
     localStorage.setItem('userInfo', JSON.stringify({ username: 'operator', userRole: 'user' }));
-    expect(defaultRouteForCurrentUser()).toBe('/home');
+    expect(defaultRouteForCurrentUser()).toBe('/chat');
 
     localStorage.setItem('userInfo', JSON.stringify({ username: 'platform-admin', userRole: 'admin' }));
-    expect(defaultRouteForCurrentUser()).toBe('/home');
+    expect(defaultRouteForCurrentUser()).toBe('/chat');
   });
 
   it('keeps project duties out of the global platform role label', () => {

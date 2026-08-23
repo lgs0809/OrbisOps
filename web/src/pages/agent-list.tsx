@@ -1,101 +1,254 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Table,
   Button,
   Input,
-  Space,
-  Typography,
-  Toast,
-  Popconfirm,
-  Card,
   Modal,
+  Popconfirm,
   Select,
+  Space,
   Tag,
+  Toast,
+  Typography,
 } from '@douyinfe/semi-ui';
 import {
-  IconSearch,
-  IconPlus,
-  IconEdit,
-  IconDelete,
+  IconBranch,
   IconCopy,
+  IconDelete,
+  IconEdit,
+  IconPlus,
+  IconRefresh,
+  IconSearch,
 } from '@douyinfe/semi-icons';
 import styled from 'styled-components';
-import { theme } from '../styles/theme';
-import { OpsPageHeader, OpsPageShell } from '../components/ops-layout';
-import type { OpsAgentDefinition } from '../services/ops-admin-service';
+
+import { OpsPageShell } from '../components/ops-layout';
 import {
   useAgentListQuery,
   useCloneAgentMutation,
   useDisableAgentMutation,
 } from '../features/agents/api/agent-list-queries';
-import { ProjectScopeBar } from '../components/project-scope-bar';
 import { useProjectScope } from '../hooks/use-project-scope';
+import type { OpsAgentDefinition } from '../services/ops-admin-service';
+import { theme } from '../styles/theme';
 import { generatedId } from '../utils/generated-id';
 import { userFacingError } from '../utils/user-facing-error';
 
-const displayAgentName = (agent: OpsAgentDefinition) => {
-  return agent.name || agent.agentId;
-};
+const { Text } = Typography;
 
-const displayAgentDescription = (agent: OpsAgentDefinition) => {
-  return agent.description || '-';
-};
+const displayAgentName = (agent: OpsAgentDefinition) => agent.name || agent.agentId;
+const displayAgentDescription = (agent: OpsAgentDefinition) => agent.description || '暂无说明';
 
-const SearchSection = styled(Card)`
-  box-sizing: border-box;
-  margin-bottom: ${theme.spacing.lg};
-  width: 100%;
-  max-width: 100%;
-  margin-left: auto;
-  margin-right: auto;
-  min-width: 0;
+const LibraryHeader = styled.header`
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: end;
+  padding: 22px 0 20px;
 
-  .semi-card-body {
-    box-sizing: border-box;
-    width: 100%;
-    min-width: 0;
-    padding: ${theme.spacing.lg};
+  h1 {
+    margin: 0;
+    color: ${theme.colors.text.primary};
+    font-size: 36px;
+    font-weight: 650;
+    letter-spacing: -0.04em;
+  }
+
+  p {
+    max-width: 720px;
+    margin: 8px 0 0;
+    color: ${theme.colors.text.tertiary};
+    font-size: 12px;
+    line-height: 1.65;
+  }
+
+  @media (max-width: ${theme.breakpoints.md}) {
+    grid-template-columns: 1fr;
+    align-items: start;
   }
 `;
 
-const SearchRow = styled.div`
+const ContextBar = styled.div`
   display: flex;
-  width: 100%;
-  min-width: 0;
   align-items: center;
-  gap: ${theme.spacing.base};
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid ${theme.colors.border.secondary};
+  border-radius: 11px;
+  background: #fff;
+  flex-wrap: wrap;
+
+  .semi-select { min-width: 220px; }
+`;
+
+const Toolbar = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 18px 0;
+  flex-wrap: wrap;
+`;
+
+const SearchGroup = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex-wrap: wrap;
 
   @media (max-width: ${theme.breakpoints.sm}) {
+    width: 100%;
+
     .semi-input-wrapper {
       width: 100% !important;
-      max-width: 100%;
     }
   }
 `;
 
-const TableCard = styled(Card)`
-  box-sizing: border-box;
-  width: 100%;
-  max-width: 100%;
-  margin-left: auto;
-  margin-right: auto;
-  min-width: 0;
+const WorkflowGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
 
-  .semi-card-body {
-    padding: 0;
-    overflow-x: auto;
+  @media (max-width: 1280px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .semi-table-container,
-  .semi-table-body {
-    overflow-x: auto;
+  @media (max-width: ${theme.breakpoints.md}) {
+    grid-template-columns: 1fr;
   }
 `;
 
-const ActionButton = styled(Button)`
-  margin-right: 0;
+const WorkflowCard = styled.article`
+  min-width: 0;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  padding: 18px;
+  border: 1px solid ${theme.colors.border.secondary};
+  border-radius: 13px;
+  background: #fff;
+  transition: border-color ${theme.animation.duration.fast} ease, box-shadow ${theme.animation.duration.fast} ease, transform ${theme.animation.duration.fast} ease;
+
+  &:hover {
+    border-color: #d4d7dc;
+    box-shadow: ${theme.shadows.card};
+    transform: translateY(-1px);
+  }
+`;
+
+const CardTop = styled.div`
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+`;
+
+const WorkflowIdentity = styled.button`
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid ${theme.colors.primary};
+    outline-offset: 3px;
+    border-radius: 8px;
+  }
+`;
+
+const WorkflowIcon = styled.div`
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: #eef2ff;
+  color: #4f46e5;
+
+  .semi-icon {
+    font-size: 19px;
+  }
+`;
+
+const WorkflowName = styled.div`
+  min-width: 0;
+
+  strong {
+    display: block;
+    overflow: hidden;
+    color: ${theme.colors.text.primary};
+    font-size: 14px;
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  span {
+    display: block;
+    margin-top: 3px;
+    color: ${theme.colors.text.tertiary};
+    font-size: 11px;
+  }
+`;
+
+const Description = styled.p`
+  flex: 1;
+  margin: 16px 0 14px;
+  color: ${theme.colors.text.secondary};
+  font-size: 13px;
+  line-height: 1.65;
+`;
+
+const ReferenceRow = styled.div`
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+`;
+
+const Footer = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid ${theme.colors.border.tertiary};
+`;
+
+const Scale = styled(Text)`
+  && {
+    color: ${theme.colors.text.tertiary};
+    font-size: 11px;
+  }
+`;
+
+const EmptyGrid = styled.div`
+  padding: 64px 20px;
+  border: 1px dashed ${theme.colors.border.primary};
+  border-radius: 13px;
+  background: #fafbfc;
+  color: ${theme.colors.text.tertiary};
+  text-align: center;
+`;
+
+const PaginationBar = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+  color: ${theme.colors.text.tertiary};
+  font-size: 12px;
 `;
 
 export const AgentListPage: React.FC = () => {
@@ -105,10 +258,7 @@ export const AgentListPage: React.FC = () => {
     configName?: string;
     pageNum?: number;
     pageSize?: number;
-  }>({
-    pageNum: 1,
-    pageSize: 10,
-  });
+  }>({ pageNum: 1, pageSize: 12 });
   const listQuery = useAgentListQuery(projectScope.projectId);
   const cloneMutation = useCloneAgentMutation();
   const disableMutation = useDisableAgentMutation(projectScope.projectId);
@@ -122,111 +272,13 @@ export const AgentListPage: React.FC = () => {
     ));
   }, [listQuery.data?.workflows, searchParams.configName]);
   const pageNum = searchParams.pageNum || 1;
-  const pageSize = searchParams.pageSize || 10;
+  const pageSize = searchParams.pageSize || 12;
   const dataSource = filteredWorkflows.slice((pageNum - 1) * pageSize, pageNum * pageSize);
   const total = filteredWorkflows.length;
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const loading = listQuery.isLoading || cloneMutation.isPending || disableMutation.isPending;
   const [cloneSource, setCloneSource] = useState<OpsAgentDefinition | null>(null);
   const [cloneForm, setCloneForm] = useState({ projectId: '', agentId: '', name: '' });
-
-  const columns = [
-    {
-      title: '名称',
-      dataIndex: 'name',
-      key: 'name',
-      width: 150,
-      render: (text: string, record: OpsAgentDefinition) => (
-        <span style={{ fontWeight: 500 }}>{displayAgentName(record)}</span>
-      )
-    },
-    {
-      title: '调用方式',
-      key: 'invocation',
-      width: 120,
-      render: () => <Tag color="grey">显式选择</Tag>,
-    },
-    {
-      title: '引用关系',
-      key: 'references',
-      width: 220,
-      render: (_: unknown, record: OpsAgentDefinition) => {
-        const impact = referenceImpacts[record.agentId || ''];
-        if (!impact?.totalCount) return <Tag color="grey">暂无自动化引用</Tag>;
-        return (
-          <Space wrap spacing={4}>
-            <Tag color="blue">定时 {impact.scheduleCount}</Tag>
-            <Tag color="orange">告警 {impact.alertCount}</Tag>
-            <Tag color="green">Channel {impact.channelCount}</Tag>
-            {impact.pinnedVersionCount > 0 && <Tag color="grey">固定版本 {impact.pinnedVersionCount}</Tag>}
-          </Space>
-        );
-      },
-    },
-    {
-      title: '流程规模',
-      key: 'nodes',
-      width: 80,
-      render: (_: unknown, record: OpsAgentDefinition) => `${record.nodes?.length || 0} / ${record.edges?.length || 0}`
-    },
-    {
-      title: '状态',
-      dataIndex: 'lifecycle',
-      width: 90,
-      render: (lifecycle: string) => (
-        <Tag color={lifecycle === 'PUBLISHED' ? 'green' : lifecycle === 'DISABLED' ? 'grey' : 'blue'}>
-          {lifecycle === 'PUBLISHED' ? '已发布' : lifecycle === 'DISABLED' ? '已停用' : '草稿'}
-        </Tag>
-      ),
-    },
-    {
-      title: '说明',
-      dataIndex: 'description',
-      key: 'description',
-      width: 260,
-      render: (_text: string, record: OpsAgentDefinition) => displayAgentDescription(record)
-    },
-    {
-      title: '操作',
-      key: 'action',
-      width: 210,
-      fixed: 'right' as const,
-      render: (_: any, record: OpsAgentDefinition) => (
-        <Space wrap spacing={4}>
-          <ActionButton
-            type="tertiary"
-            size="small"
-            icon={<IconEdit />}
-            onClick={() => handleEdit(record)}
-          >
-            编辑
-          </ActionButton>
-          <ActionButton
-            type="tertiary"
-            size="small"
-            icon={<IconCopy />}
-            onClick={() => openClone(record)}
-          >
-            复制
-          </ActionButton>
-          <Popconfirm
-            title="停用这个工作流？"
-            content={referenceImpacts[record.agentId || '']?.totalCount
-              ? `该工作流仍被 ${referenceImpacts[record.agentId || ''].scheduleCount} 个定时自动化、${referenceImpacts[record.agentId || ''].alertCount} 个告警触发器和 ${referenceImpacts[record.agentId || ''].channelCount} 个渠道引用；其中 ${referenceImpacts[record.agentId || ''].pinnedVersionCount} 个引用固定到特定版本。停用工作流不会静默改写这些绑定，每次执行仍按原绑定策略和生命周期校验处理。`
-              : '当前没有自动化或渠道引用该工作流。已发布版本和审计历史会继续保留。'}
-            onConfirm={() => handleDelete(record)}
-          >
-            <ActionButton
-              type="danger"
-              size="small"
-              icon={<IconDelete />}
-            >
-              停用
-            </ActionButton>
-          </Popconfirm>
-        </Space>
-      )
-    }
-  ];
 
   // 搜索/分页都是已加载项目目录的本地派生，不重复请求后端。
   const handleSearch = () => {
@@ -234,19 +286,17 @@ export const AgentListPage: React.FC = () => {
   };
 
   const handleReset = () => {
-    setSearchParams({ pageNum: 1, pageSize: 10 });
+    setSearchParams({ pageNum: 1, pageSize: 12 });
   };
 
-  const handlePageChange = (nextPageNum: number, nextPageSize: number) => {
+  const handlePageChange = (nextPageNum: number, nextPageSize = pageSize) => {
     setSearchParams((current) => ({ ...current, pageNum: nextPageNum, pageSize: nextPageSize }));
   };
 
-  // 新建
   const handleCreate = () => {
     navigate(`/workflows/config?projectId=${encodeURIComponent(projectScope.projectId)}`);
   };
 
-  // 编辑
   const handleEdit = (record: OpsAgentDefinition) => {
     navigate(`/workflows/config?projectId=${encodeURIComponent(projectScope.projectId)}&agentId=${encodeURIComponent(record.agentId || '')}`);
   };
@@ -289,58 +339,115 @@ export const AgentListPage: React.FC = () => {
       Toast.success(`工作流已停用：${record.name || '未命名'}`);
     } catch (error) {
       Toast.error(userFacingError(error, '停用工作流失败，请稍后重试。'));
-      console.error('Unable to disable Workflow:', error);
     }
   };
 
   return (
     <OpsPageShell selectedKey="workflows">
-      <OpsPageHeader
-        title="工作流"
-        description="创建并发布可复用工作流，用于稳定、可重复的标准执行流程；开放式排查仍使用默认模型。"
-      />
+      <LibraryHeader>
+        <div>
+          <h1>工作流</h1>
+          <p>把稳定、可重复的运维过程做成显式可选、可发布、可复用的流程资产。开放式排查仍然直接使用默认助手。</p>
+        </div>
+        <Button type="primary" icon={<IconPlus />} disabled={!projectScope.projectId} onClick={handleCreate}>新建工作流</Button>
+      </LibraryHeader>
 
-      <ProjectScopeBar
-        projects={projectScope.projects}
-        projectId={projectScope.projectId}
-        onChange={projectScope.selectProject}
-        loading={projectScope.loading}
-        onRefresh={() => listQuery.refetch()}
-        actions={<Button type="primary" icon={<IconPlus />} disabled={!projectScope.projectId} onClick={handleCreate}>新建工作流</Button>}
-      />
+      <ContextBar>
+        <Text type="tertiary">项目</Text>
+        <Select
+          value={projectScope.projectId || undefined}
+          placeholder="选择项目"
+          loading={projectScope.loading}
+          onChange={(value) => projectScope.selectProject(String(value || ''))}
+        >
+          {projectScope.projects.map((project) => <Select.Option key={project.projectId} value={project.projectId}>{project.name}</Select.Option>)}
+        </Select>
+        <Button icon={<IconRefresh />} onClick={() => void listQuery.refetch()}>刷新</Button>
+        <Text type="tertiary">{projectScope.selectedProject?.description || '选择项目后查看工作流资产。'}</Text>
+      </ContextBar>
 
-      <SearchSection>
-        <SearchRow>
+      <Toolbar>
+        <SearchGroup>
           <Input
             placeholder="搜索名称或说明"
             value={searchParams.configName || ''}
-            onChange={(value) => setSearchParams(prev => ({ ...prev, configName: value }))}
-            style={{ width: 200 }}
+            onChange={(value) => setSearchParams((current) => ({ ...current, configName: value }))}
+            style={{ width: 260 }}
             prefix={<IconSearch />}
+            showClear
           />
           <Button type="primary" onClick={handleSearch} loading={loading}>搜索</Button>
           <Button onClick={handleReset}>重置</Button>
-        </SearchRow>
-      </SearchSection>
+        </SearchGroup>
+        <Text type="tertiary">{total} 个工作流</Text>
+      </Toolbar>
 
-      <TableCard>
-        <Table
-          columns={columns}
-          dataSource={dataSource}
-          loading={loading}
-          pagination={{
-            currentPage: searchParams.pageNum || 1,
-            pageSize: searchParams.pageSize || 10,
-            total: total,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            onChange: handlePageChange
-          }}
-          rowKey="agentId"
-          scroll={{ x: 820 }}
-          size="middle"
-        />
-      </TableCard>
+      {dataSource.length === 0 && !loading ? (
+        <EmptyGrid>当前项目还没有匹配的工作流。可以新建一个，或清除搜索条件。</EmptyGrid>
+      ) : (
+        <WorkflowGrid>
+          {dataSource.map((record) => {
+            const impact = referenceImpacts[record.agentId || ''];
+            const lifecycle = String(record.lifecycle || '').toUpperCase();
+            return (
+              <WorkflowCard key={record.agentId}>
+                <CardTop>
+                  <WorkflowIdentity type="button" onClick={() => handleEdit(record)}>
+                    <WorkflowIcon><IconBranch /></WorkflowIcon>
+                    <WorkflowName>
+                      <strong>{displayAgentName(record)}</strong>
+                      <span>显式运行 · {record.nodes?.length || 0} 个节点 / {record.edges?.length || 0} 条连接</span>
+                    </WorkflowName>
+                  </WorkflowIdentity>
+                  <Tag color={lifecycle === 'PUBLISHED' ? 'green' : lifecycle === 'DISABLED' ? 'grey' : 'blue'}>
+                    {lifecycle === 'PUBLISHED' ? '已发布' : lifecycle === 'DISABLED' ? '已停用' : '草稿'}
+                  </Tag>
+                </CardTop>
+
+                <Description>{displayAgentDescription(record)}</Description>
+
+                <ReferenceRow>
+                  {!impact?.totalCount ? (
+                    <Tag color="grey">暂无自动化引用</Tag>
+                  ) : (
+                    <>
+                      {impact.scheduleCount > 0 && <Tag color="blue">定时 {impact.scheduleCount}</Tag>}
+                      {impact.alertCount > 0 && <Tag color="orange">告警 {impact.alertCount}</Tag>}
+                      {impact.channelCount > 0 && <Tag color="green">渠道 {impact.channelCount}</Tag>}
+                      {impact.pinnedVersionCount > 0 && <Tag color="grey">固定版本 {impact.pinnedVersionCount}</Tag>}
+                    </>
+                  )}
+                </ReferenceRow>
+
+                <Footer>
+                  <Scale>可复用流程资产</Scale>
+                  <Space spacing={4}>
+                    <Button type="tertiary" size="small" icon={<IconEdit />} onClick={() => handleEdit(record)}>编辑</Button>
+                    <Button type="tertiary" size="small" icon={<IconCopy />} onClick={() => openClone(record)}>复制</Button>
+                    <Popconfirm
+                      title="停用这个工作流？"
+                      content={impact?.totalCount
+                        ? `该工作流仍被 ${impact.scheduleCount} 个定时自动化、${impact.alertCount} 个告警触发器和 ${impact.channelCount} 个渠道引用；停用不会静默改写这些绑定。`
+                        : '当前没有自动化或渠道引用该工作流。已发布版本和审计历史会继续保留。'}
+                      onConfirm={() => handleDelete(record)}
+                    >
+                      <Button type="danger" size="small" icon={<IconDelete />}>停用</Button>
+                    </Popconfirm>
+                  </Space>
+                </Footer>
+              </WorkflowCard>
+            );
+          })}
+        </WorkflowGrid>
+      )}
+
+      {total > pageSize && (
+        <PaginationBar>
+          <Button size="small" disabled={pageNum <= 1} onClick={() => handlePageChange(pageNum - 1)}>上一页</Button>
+          <span>{pageNum} / {pageCount}</span>
+          <Button size="small" disabled={pageNum >= pageCount} onClick={() => handlePageChange(pageNum + 1)}>下一页</Button>
+        </PaginationBar>
+      )}
 
       <Modal
         title="复制工作流"

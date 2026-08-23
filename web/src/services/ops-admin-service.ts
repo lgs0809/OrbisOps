@@ -706,6 +706,14 @@ export interface OpsAgentChatRequest {
   metadata?: Record<string, any>;
 }
 
+export interface OpsSelectableModel {
+  modelId: string;
+  modelName?: string;
+  modelType?: string;
+  modelUsage?: string;
+  description?: string;
+}
+
 export interface OpsAgentChatResponse {
   sessionId?: string;
   userId?: string;
@@ -2198,6 +2206,15 @@ export class OpsAdminService {
 
   async listChatAgents(projectId: string): Promise<ApiResponse<OpsAgentDefinition[]>> {
     const response = await fetch(`${this.userChatBaseUrl}/catalog/projects/${encodeURIComponent(projectId)}/agents`, {
+      method: 'GET',
+      headers: buildHeaders(),
+    });
+    await assertOk(response);
+    return await response.json();
+  }
+
+  async listChatModels(): Promise<ApiResponse<OpsSelectableModel[]>> {
+    const response = await fetch(`${this.userChatBaseUrl}/catalog/models`, {
       method: 'GET',
       headers: buildHeaders(),
     });

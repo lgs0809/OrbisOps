@@ -8,10 +8,10 @@ const { Text, Title } = Typography;
 
 const CardWrap = styled.div`
   min-width: 0;
-  padding: ${theme.spacing.base};
+  padding: 15px 16px;
   border: 1px solid ${theme.colors.border.secondary};
-  border-radius: ${theme.borderRadius.base};
-  background: ${theme.colors.bg.primary};
+  border-radius: 12px;
+  background: #fff;
 `;
 
 export interface OpsStatusCardProps {

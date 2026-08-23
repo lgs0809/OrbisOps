@@ -55,22 +55,22 @@ export const AgentConfigProductPage: React.FC = () => {
   return (
     <>
       <WorkflowBuilderPage />
-      <ImpactPanel aria-label="Workflow 发布影响">
+      <ImpactPanel aria-label="工作流发布影响">
         <Card>
           <Spin spinning={loading}>
             <Space vertical align="start" style={{ width: '100%' }}>
               <Space wrap>
                 <IconAlertTriangle />
                 <Text strong>发布影响</Text>
-                {!agentId && <Tag color="grey">新建 Workflow</Tag>}
+                {!agentId && <Tag color="grey">新建工作流</Tag>}
               </Space>
               {!agentId ? (
                 <Paragraph type="tertiary" style={{ margin: 0 }}>
-                  当前 Workflow 还没有被自动化或 Channel 引用。发布后可以在工作流列表查看引用影响。
+                  当前工作流还没有被自动化或渠道引用。发布后可以在工作流列表查看引用影响。
                 </Paragraph>
               ) : impact.totalCount === 0 ? (
                 <Paragraph type="tertiary" style={{ margin: 0 }}>
-                  当前没有自动化或 Channel 引用该 Workflow，因此发布新版本不会切换任何执行绑定。
+                  当前没有自动化或渠道引用该工作流，因此发布新版本不会切换任何执行绑定。
                 </Paragraph>
               ) : (
                 <>
@@ -89,7 +89,7 @@ export const AgentConfigProductPage: React.FC = () => {
                 size="small"
                 onClick={() => navigate(`/workflows${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`)}
               >
-                查看全部 Workflow 引用
+                查看全部工作流引用
               </Button>
             </Space>
           </Spin>

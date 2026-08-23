@@ -68,7 +68,7 @@ test('Home dashboard loads one role-scoped overview query', async ({ page }) => 
   await expect.poll(() => overviewRequests).toBe(1);
   await expect.poll(() => productMetricsRequests).toBe(1);
   const activation = page.getByTestId('project-activation');
-  await expect(activation.getByText('项目激活情况', { exact: true })).toBeVisible();
+  await expect(activation.getByText('项目激活', { exact: true })).toBeVisible();
   await expect(activation).toContainText('40%');
   await expect(activation).toContainText('真实查询证据');
 });

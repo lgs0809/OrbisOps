@@ -9,11 +9,12 @@ import { theme } from '../../styles/theme';
 import { useResponsiveSidebar } from '../../hooks/use-responsive-sidebar';
 
 const PageLayout = styled(Layout)`
-  min-height: 100vh;
+  height: 100dvh;
+  min-height: 0;
   min-width: 0;
   width: 100%;
-  background: ${theme.colors.bg.secondary};
-  overflow-x: hidden;
+  background: #fbfbfa;
+  overflow: hidden;
 `;
 
 const SkipLink = styled.a`
@@ -23,8 +24,8 @@ const SkipLink = styled.a`
   z-index: 2000;
   transform: translateY(-160%);
   padding: 8px 12px;
-  border-radius: ${theme.borderRadius.base};
-  background: ${theme.colors.bg.primary};
+  border-radius: 8px;
+  background: #fff;
   color: ${theme.colors.primary};
   box-shadow: ${theme.shadows.md};
 
@@ -36,7 +37,8 @@ const SkipLink = styled.a`
 `;
 
 const MainContent = styled.div<{ $collapsed: boolean }>`
-  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
   min-width: 0;
   width: ${(props) =>
     props.$collapsed
@@ -44,10 +46,10 @@ const MainContent = styled.div<{ $collapsed: boolean }>`
       : `calc(100vw - ${SIDEBAR_WIDTH}px)`};
   margin-left: ${(props) => (props.$collapsed ? `${SIDEBAR_COLLAPSED_WIDTH}px` : `${SIDEBAR_WIDTH}px`)};
   display: flex;
+  flex: 1;
   flex-direction: column;
-  background: ${theme.colors.bg.secondary};
+  background: #fbfbfa;
   overflow-x: hidden;
-  overflow-y: auto;
   transition:
     width ${theme.animation.duration.normal} ${theme.animation.easing.cubic},
     margin-left ${theme.animation.duration.normal} ${theme.animation.easing.cubic};
@@ -65,14 +67,21 @@ const MainContent = styled.div<{ $collapsed: boolean }>`
 const ContentArea = styled.main<{ $maxWidth?: string; $padding?: string }>`
   box-sizing: border-box;
   width: 100%;
-  max-width: ${(props) => props.$maxWidth || '1440px'};
+  max-width: ${(props) => props.$maxWidth || 'none'};
   min-width: 0;
+  min-height: 0;
+  flex: 1;
   margin: 0 auto;
-  padding: ${(props) => props.$padding || '24px'};
+  padding: ${(props) => props.$padding || '24px 28px 40px'};
   overflow-x: hidden;
+  overflow-y: auto;
 
   @media (max-width: 1280px) {
-    padding: 16px;
+    padding: ${(props) => props.$padding || '20px 20px 32px'};
+  }
+
+  @media (max-width: ${theme.breakpoints.sm}) {
+    padding: ${(props) => props.$padding || '16px 12px 28px'};
   }
 `;
 
@@ -97,7 +106,7 @@ export const OpsPageShell: React.FC<OpsPageShellProps> = ({
 }) => {
   const navigate = useNavigate();
   const { mobile, mobileOpen, collapsed, sidebarCollapsed, toggleSidebar, closeMobileSidebar } =
-    useResponsiveSidebar(defaultCollapsed);
+    useResponsiveSidebar(defaultCollapsed ?? true);
 
   useEffect(() => {
     if (!mobile || !mobileOpen) return undefined;
@@ -138,10 +147,13 @@ export const OpsPageShell: React.FC<OpsPageShellProps> = ({
         onSelect={handleNavigation}
         collapsed={sidebarCollapsed}
         onMobileClose={closeMobileSidebar}
+        onLogout={handleLogout}
       />
       <MainContent $collapsed={collapsed} data-ops-scroll-region="true">
         <Header collapsed={sidebarCollapsed} onToggleSidebar={toggleSidebar} onLogout={handleLogout} />
-        <ContentArea id="main-content" tabIndex={-1} $maxWidth={maxWidth} $padding={padding}>{children}</ContentArea>
+        <ContentArea id="main-content" tabIndex={-1} $maxWidth={maxWidth} $padding={padding}>
+          {children}
+        </ContentArea>
       </MainContent>
     </PageLayout>
   );

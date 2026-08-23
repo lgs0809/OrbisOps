@@ -226,7 +226,7 @@ const publishedWorkflows = (workflows: OpsAgentDefinition[]) => workflows.filter
 
 const executionLabel = (channel: OpsChannel, workflows: OpsAgentDefinition[]) => {
   if (channel.executionType === 'NONE') return '仅发送通知';
-  if (channel.executionType === 'REACT') return '默认模型';
+  if (channel.executionType === 'REACT') return '默认助手';
   const workflow = workflows.find((item) => item.agentId === channel.workflowId);
   return `Workflow · ${workflow?.name || channel.workflowId || '-'}`;
 };
@@ -576,7 +576,7 @@ export const ChannelsPage: React.FC = () => {
               style={{ width: '100%' }}
             >
               <Option value="NONE">仅出站</Option>
-              <Option value="REACT">默认模型</Option>
+              <Option value="REACT">默认助手</Option>
               <Option value="WORKFLOW">专用工作流</Option>
             </Select>
             <Text type="tertiary" size="small">仅出站模式不会进入智能执行；入站消息始终先路由到所选项目，并创建可在工作台查看的运行记录。</Text>

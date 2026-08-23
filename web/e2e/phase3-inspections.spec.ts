@@ -74,7 +74,7 @@ test('Inspection schedules use project queries and load execution history on dem
   await page.goto('/automations/schedules?projectId=demo-project');
   await expect(page.getByRole('heading', { name: '定时自动化' })).toBeVisible();
   await expect(page.getByText('生产运行巡检')).toBeVisible();
-  await expect(page.getByText('默认模型', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('默认助手', { exact: true }).first()).toBeVisible();
   await expect.poll(() => scheduleRequests).toBe(1);
   expect(agentRequests).toBe(1);
   expect(channelRequests).toBe(1);

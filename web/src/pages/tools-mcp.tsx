@@ -212,7 +212,7 @@ export const ToolsMcpPage: React.FC = () => {
     <OpsPageShell selectedKey="settings">
       <OpsPageHeader
         title="工具 / MCP"
-        description="维护可复用的 MCP 接入模板。模板只定义接入形态和默认风险边界；只有 Project 完成资源绑定与授权后，才会生成可被 Agent 调用的项目工具。"
+        description="在这里统一维护工具接入方式。接入模板本身不会自动开放给所有项目；项目完成资源绑定后，Chat 和工作流才能在自己的权限范围内使用对应工具。"
         extra={(
           <Space>
             <Button icon={<IconRefresh />} loading={templatesQuery.isFetching} onClick={() => void templatesQuery.refetch()}>刷新</Button>
@@ -223,9 +223,9 @@ export const ToolsMcpPage: React.FC = () => {
 
       <Stack>
         <Card>
-          <Title heading={6} style={{ marginTop: 0 }}>模板 ≠ Project 授权</Title>
+          <Title heading={6} style={{ marginTop: 0 }}>接入模板和项目可用工具是两回事</Title>
           <Paragraph type="tertiary" style={{ marginBottom: 0 }}>
-            MCP 模板属于平台级复用元数据。Project 还必须绑定实际资源、凭据引用、可见范围和允许动作，Runtime 才会把生成后的工具暴露给 Agent Node。
+            模板只负责保存一种可复用的接入方式。真正使用时，还需要由具体项目绑定实际资源、凭据和允许范围，项目里的 Chat 与工作流才会看到对应工具。
           </Paragraph>
         </Card>
 

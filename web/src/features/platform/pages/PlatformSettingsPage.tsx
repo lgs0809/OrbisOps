@@ -1,6 +1,5 @@
-import React from 'react';
-import { Typography } from '@douyinfe/semi-ui';
-import { IconChevronRight } from '@douyinfe/semi-icons';
+import React, { useMemo, useState } from 'react';
+import { IconChevronRight, IconSetting } from '@douyinfe/semi-icons';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 
@@ -9,95 +8,235 @@ import {
   PLATFORM_NAVIGATION_GROUPS,
   type NavigationSubgroup,
 } from '../../../app/navigation/route-metadata';
-import { OpsPageHeader, OpsPageShell, OpsSectionCard } from '../../../components/ops-layout';
+import { OpsPageShell } from '../../../components/ops-layout';
 import { theme } from '../../../styles/theme';
 
-const GroupDescription = styled(Typography.Text)`
-  display: block;
-  padding: 0 ${theme.spacing.lg} ${theme.spacing.base};
-  color: ${theme.colors.text.tertiary};
-  line-height: 1.6;
-`;
-
-const SettingsGrid = styled.div`
+const SettingsWorkspace = styled.div`
+  height: 100dvh;
+  min-height: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: ${theme.spacing.base};
-  padding: 0 ${theme.spacing.lg} ${theme.spacing.lg};
+  grid-template-columns: 220px minmax(0, 1fr);
+  border: 1px solid ${theme.colors.border.secondary};
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+
+  @media (max-width: ${theme.breakpoints.md}) {
+    height: calc(100dvh - 52px);
+    grid-template-columns: 1fr;
+  }
 `;
 
-const SettingCard = styled.button`
+const SettingsRail = styled.aside`
+  padding: 18px 10px;
+  border-right: 1px solid ${theme.colors.border.secondary};
+  background: #f7f8fa;
+
+  @media (max-width: ${theme.breakpoints.md}) {
+    border-right: 0;
+    border-bottom: 1px solid ${theme.colors.border.secondary};
+  }
+`;
+
+const RailTitle = styled.div`
+  padding: 0 8px 14px;
+
+  h1 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 650;
+    letter-spacing: -0.025em;
+  }
+
+  p {
+    margin: 4px 0 0;
+    color: ${theme.colors.text.tertiary};
+    font-size: 10px;
+  }
+`;
+
+const CategoryButton = styled.button<{ $active: boolean }>`
+  width: 100%;
+  min-height: 40px;
   display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 2px 0;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 9px;
+  background: ${(props) => (props.$active ? '#e5e8ec' : 'transparent')};
+  color: ${(props) => (props.$active ? theme.colors.text.primary : theme.colors.text.secondary)};
+  font: inherit;
+  font-size: 12px;
+  font-weight: ${(props) => (props.$active ? 600 : 500)};
+  text-align: left;
+  cursor: pointer;
+
+  &:hover { background: ${(props) => (props.$active ? '#e0e3e7' : '#eceef1')}; }
+`;
+
+const SettingsMain = styled.main`
   min-width: 0;
-  align-items: flex-start;
+  min-height: 0;
+  overflow: auto;
+  padding: 28px 30px 36px;
+
+  @media (max-width: ${theme.breakpoints.sm}) {
+    padding: 20px 16px 28px;
+  }
+`;
+
+const MainHeader = styled.header`
+  max-width: 760px;
+  margin-bottom: 24px;
+
+  h2 {
+    margin: 0;
+    color: ${theme.colors.text.primary};
+    font-size: 28px;
+    font-weight: 650;
+    letter-spacing: -0.035em;
+  }
+
+  p {
+    margin: 7px 0 0;
+    color: ${theme.colors.text.tertiary};
+    font-size: 12px;
+    line-height: 1.65;
+  }
+`;
+
+const ResourceFlowHint = styled.div`
+  display: flex;
+  align-items: center;
   justify-content: space-between;
-  gap: ${theme.spacing.base};
-  padding: ${theme.spacing.base};
+  gap: 18px;
+  max-width: 820px;
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border: 1px solid ${theme.colors.border.tertiary};
+  border-radius: 10px;
+  background: #fafafa;
+  color: ${theme.colors.text.secondary};
+  font-size: 11px;
+  line-height: 1.6;
+
+  > div {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    min-width: 0;
+  }
+
+  strong {
+    display: block;
+    margin-bottom: 1px;
+    color: ${theme.colors.text.primary};
+    font-weight: 600;
+  }
+
+  .semi-icon { margin-top: 2px; color: ${theme.colors.text.tertiary}; }
+
+  @media (max-width: ${theme.breakpoints.sm}) {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+`;
+
+const ResourceFlowAction = styled.button`
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: ${theme.colors.primary};
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover { background: #f0f2f5; }
+  &:focus-visible { outline: 2px solid ${theme.colors.primary}; outline-offset: 2px; }
+`;
+
+const SettingsList = styled.section`
+  max-width: 820px;
   border: 1px solid ${theme.colors.border.secondary};
-  border-radius: ${theme.borderRadius.base};
-  background: ${theme.colors.bg.primary};
+  border-radius: 12px;
+  overflow: hidden;
+`;
+
+const SettingRow = styled.button`
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 15px;
+  border: 0;
+  border-bottom: 1px solid ${theme.colors.border.tertiary};
+  background: #fff;
   color: inherit;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 
-  &:hover {
-    border-color: ${theme.colors.border.primary};
-    box-shadow: ${theme.shadows.sm};
-    transform: translateY(-1px);
-  }
+  &:last-child { border-bottom: 0; }
+  &:hover { background: #fafbfc; }
+  &:focus-visible { outline: 2px solid ${theme.colors.primary}; outline-offset: -2px; }
 
-  &:focus-visible {
-    outline: 2px solid ${theme.colors.primary};
-    outline-offset: 2px;
-  }
+  > .semi-icon:last-child { color: #a0a6af; }
 `;
 
-const SettingBody = styled.div`
+const SettingIcon = styled.span`
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: #f0f2f5;
+  color: #5e6672;
+`;
+
+const RowCopy = styled.div`
   min-width: 0;
-`;
 
-const SettingTitle = styled(Typography.Text)`
-  display: block;
-  color: ${theme.colors.text.primary};
-  font-weight: ${theme.typography.fontWeight.semibold};
-`;
+  strong {
+    display: block;
+    color: ${theme.colors.text.primary};
+    font-size: 12px;
+    font-weight: 600;
+  }
 
-const SettingDescription = styled(Typography.Text)`
-  display: block;
-  margin-top: ${theme.spacing.xs};
-  color: ${theme.colors.text.tertiary};
-  line-height: 1.55;
-`;
-
-const ScopeNotice = styled.div`
-  padding: ${theme.spacing.base} ${theme.spacing.lg};
-  border: 1px solid ${theme.colors.border.secondary};
-  border-radius: ${theme.borderRadius.base};
-  background: ${theme.colors.bg.secondary};
-  color: ${theme.colors.text.secondary};
-  line-height: 1.65;
+  span {
+    display: block;
+    margin-top: 3px;
+    color: ${theme.colors.text.tertiary};
+    font-size: 11px;
+    line-height: 1.5;
+  }
 `;
 
 const groupDescriptions: Record<NavigationSubgroup, string> = {
-  integrations: '配置外部交互入口。每个渠道最终能执行什么，仍由项目路由、成员关系和权限共同决定。',
-  intelligence: '注册模型、知识库和技能等平台能力，由项目按需显式启用。',
-  'execution-governance': '配置 MCP 工具、生产执行目标和治理能力，但不会绕过受控变更包安全门禁。',
-  advanced: '模型目录、记忆、技能进化和工具路由观测等低频平台能力。',
+  integrations: '连接外部消息和协作平台，把渠道消息带入 OrbisOps。',
+  intelligence: '接入和维护模型、知识库与技能，供项目按需使用。',
+  'execution-governance': '维护工具、执行目标与安全策略，并控制它们可在哪些项目中使用。',
+  advanced: '低频运行能力和内部观测配置，通常无需日常调整。',
 };
 
 const routeDescriptions: Record<string, string> = {
-  channels: '配置飞书、企业微信、钉钉、Slack、Telegram、Discord、QQ 等渠道接入。',
-  models: '配置对话、向量化、重排服务商与模型连接。',
-  tools: '管理平台级 MCP / 工具能力目录。',
-  knowledge: '管理可复用知识库、文档入库、检索策略和质量验证。',
-  skills: '管理可被项目或工作流智能节点启用的可复用技能。',
-  'execution-targets': '配置落地、验证和回滚执行所使用的目标模板。',
-  governance: '查看平台治理、审计和安全控制。',
-  'model-catalog': '维护底层模型元数据与服务商能力。',
-  memory: '配置并观察平台级智能执行记忆行为。',
+  channels: '接入飞书、企业微信、钉钉、Slack、Telegram、Discord、QQ 等渠道。',
+  models: '配置对话、向量化、重排服务商和默认模型。',
+  tools: '维护可供项目和运行使用的 MCP / 工具目录。',
+  knowledge: '管理知识库、文档入库、检索策略与质量验证。',
+  skills: '管理可被项目、默认助手和工作流启用的技能。',
+  'execution-targets': '配置受控落地、验证和回滚所使用的执行目标。',
+  governance: '查看安全策略、审批边界和审计记录。',
+  'model-catalog': '维护底层模型目录和服务商能力元数据。',
+  memory: '配置并观察智能运行中的记忆行为。',
   'skill-evolver': '查看技能进化候选和受治理版本。',
-  'tool-routing': '观察工具候选生成、路由和运行时选择证据。',
+  'tool-routing': '观察工具候选、路由与运行时选择证据。',
 };
 
 export const platformSettingsGroups = PLATFORM_NAVIGATION_GROUPS.map((group) => ({
@@ -107,49 +246,58 @@ export const platformSettingsGroups = PLATFORM_NAVIGATION_GROUPS.map((group) => 
     .sort((left, right) => (left.navigation?.order || 0) - (right.navigation?.order || 0)),
 }));
 
+type SettingsCategory = 'account' | NavigationSubgroup;
+
 export const PlatformSettingsPage: React.FC = () => {
   const navigate = useNavigate();
+  const [category, setCategory] = useState<SettingsCategory>('account');
+  const selectedGroup = useMemo(() => platformSettingsGroups.find((group) => group.key === category), [category]);
+  const title = category === 'account' ? '用户与访问控制' : selectedGroup?.label || '设置';
+  const description = category === 'account' ? '平台账号与项目成员关系分别管理。' : groupDescriptions[category as NavigationSubgroup];
+  const routes = category === 'account'
+    ? [{ id: 'users-access', title: '用户与访问控制', path: '/settings/users-access' }]
+    : selectedGroup?.routes || [];
+  const showResourceFlowHint = category === 'intelligence' || category === 'execution-governance';
 
   return (
-    <OpsPageShell selectedKey="settings">
-      <OpsPageHeader
-        title="设置"
-        description="管理平台用户、渠道、共享能力、执行目标和治理配置。"
-      />
+    <OpsPageShell selectedKey="settings" maxWidth="none" padding="0">
+      <SettingsWorkspace>
+        <SettingsRail>
+          <RailTitle><h1>设置</h1><p>平台级能力与治理</p></RailTitle>
+          <CategoryButton type="button" $active={category === 'account'} onClick={() => setCategory('account')}>用户与访问控制</CategoryButton>
+          {platformSettingsGroups.map((group) => (
+            <CategoryButton key={group.key} type="button" $active={category === group.key} onClick={() => setCategory(group.key)}>{group.label}</CategoryButton>
+          ))}
+        </SettingsRail>
 
-      <ScopeNotice>
-        <strong>共享能力需要在项目中显式启用。</strong> 在这里注册模型、知识库、技能、工具或执行目标，不会自动授予任何项目；请在对应项目中按需配置和授权。
-      </ScopeNotice>
-
-      <OpsSectionCard title="用户与访问控制">
-        <GroupDescription>平台账号与项目成员关系独立管理。</GroupDescription>
-        <SettingsGrid>
-          <SettingCard type="button" onClick={() => navigate('/settings/users-access')}>
-            <SettingBody>
-              <SettingTitle>用户与访问控制</SettingTitle>
-              <SettingDescription>创建和管理平台用户。项目只能添加已经存在的平台账号。</SettingDescription>
-            </SettingBody>
-            <IconChevronRight aria-hidden="true" />
-          </SettingCard>
-        </SettingsGrid>
-      </OpsSectionCard>
-
-      {platformSettingsGroups.map((group) => (
-        <OpsSectionCard key={group.key} title={group.label}>
-          <GroupDescription>{groupDescriptions[group.key]}</GroupDescription>
-          <SettingsGrid>
-            {group.routes.map((route) => (
-              <SettingCard key={route.id} type="button" onClick={() => navigate(route.path)}>
-                <SettingBody>
-                  <SettingTitle>{route.title}</SettingTitle>
-                  <SettingDescription>{routeDescriptions[route.id] || route.title}</SettingDescription>
-                </SettingBody>
+        <SettingsMain>
+          <MainHeader><h2>{title}</h2><p>{description}</p></MainHeader>
+          {showResourceFlowHint && (
+            <ResourceFlowHint data-testid="platform-resource-flow-hint">
+              <div>
+                <IconSetting />
+                <span>
+                  <strong>先接入平台，再按项目使用</strong>
+                  这里负责统一维护平台资源。接入后的资源不会自动影响现有项目；项目会按自己的资源绑定与权限配置决定实际可用能力。
+                </span>
+              </div>
+              <ResourceFlowAction type="button" onClick={() => navigate('/projects?view=capabilities')}>查看项目能力</ResourceFlowAction>
+            </ResourceFlowHint>
+          )}
+          <SettingsList>
+            {routes.map((route) => (
+              <SettingRow key={route.id} type="button" aria-label={route.title} onClick={() => navigate(route.path)}>
+                <SettingIcon><IconSetting /></SettingIcon>
+                <RowCopy>
+                  <strong>{route.title}</strong>
+                  <span>{route.id === 'users-access' ? '创建和管理平台用户；项目只能添加已经存在的平台账号。' : routeDescriptions[route.id] || route.title}</span>
+                </RowCopy>
                 <IconChevronRight aria-hidden="true" />
-              </SettingCard>
+              </SettingRow>
             ))}
-          </SettingsGrid>
-        </OpsSectionCard>
-      ))}
+          </SettingsList>
+        </SettingsMain>
+      </SettingsWorkspace>
     </OpsPageShell>
   );
 };

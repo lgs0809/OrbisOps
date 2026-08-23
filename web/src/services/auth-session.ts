@@ -53,10 +53,10 @@ export const isAdminUser = (): boolean => currentUserRole() === 'admin';
 export const defaultRouteForCurrentUser = (): string => {
   const role = currentUserRole();
   if (role === 'admin') {
-    return '/home';
+    return '/chat';
   }
   if (role === 'user') {
-    return '/home';
+    return '/chat';
   }
   return '/login';
 };

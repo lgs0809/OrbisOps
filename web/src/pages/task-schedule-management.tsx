@@ -290,7 +290,7 @@ export const TaskScheduleManagement: React.FC = () => {
         return;
       }
       if (!form.agentId) {
-        Toast.error('当前 Project 没有可用的 默认模型 或已发布 Workflow。');
+        Toast.error('当前 Project 没有可用的 默认助手 或已发布 Workflow。');
         return;
       }
       if (!reactSelected && form.agentBindingMode === 'PINNED_VERSION' && !form.agentVersion) {
@@ -382,7 +382,7 @@ export const TaskScheduleManagement: React.FC = () => {
       width: 260,
       render: (agentId: string, record: TaskScheduleResponseDTO) => {
         if (record.executionType === 'DEFAULT_REACT' || agentId === projectScope.selectedProject?.defaultAgentId) {
-          return <AgentBadge>默认模型</AgentBadge>;
+          return <AgentBadge>默认助手</AgentBadge>;
         }
         const agent = workflowDefinitions.find((item) => item.agentId === agentId);
         return <AgentBadge>{analysisFlowName(agent, agentId)}</AgentBadge>;
@@ -480,7 +480,7 @@ export const TaskScheduleManagement: React.FC = () => {
     <OpsPageShell selectedKey="automations" maxWidth="1280px">
       <OpsPageHeader
         title="定时自动化"
-        description="按计划运行 默认模型 或已发布 Workflow；每次执行都会形成正式 Run，并进入工作台统一查看。"
+        description="按计划运行 默认助手 或已发布 Workflow；每次执行都会形成正式 Run，并进入工作台统一查看。"
       />
 
       <ProjectScopeBar
@@ -547,7 +547,7 @@ export const TaskScheduleManagement: React.FC = () => {
                   value={reactSelected ? '__REACT__' : (form.agentId || '')}
                   filter
                   style={{ width: '100%' }}
-                  placeholder="选择 默认模型 或已发布 Workflow"
+                  placeholder="选择 默认助手 或已发布 Workflow"
                   onSelect={(value) => {
                     const selectedValue = String(value || '');
                     if (selectedValue === '__REACT__') {
@@ -569,13 +569,13 @@ export const TaskScheduleManagement: React.FC = () => {
                     });
                   }}
                 >
-                  {defaultReactAgentId && <Option value="__REACT__">默认模型</Option>}
+                  {defaultReactAgentId && <Option value="__REACT__">默认助手</Option>}
                   {workflowDefinitions.map((agent) => (
                     <Option key={agent.agentId} value={agent.agentId}>{analysisFlowName(agent)}</Option>
                   ))}
                 </Select>
                 <Typography.Text type="tertiary" size="small">
-                  默认模型 会动态决定排查步骤；已发布 Workflow 则按固定宏观流程执行。
+                  默认助手 会动态决定排查步骤；已发布 Workflow 则按固定宏观流程执行。
                 </Typography.Text>
               </Field>
               <Field>

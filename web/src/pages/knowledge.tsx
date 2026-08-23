@@ -286,7 +286,7 @@ export const KnowledgePage: React.FC = () => {
     <OpsPageShell selectedKey="settings">
       <OpsPageHeader
         title="知识库"
-        description="管理可复用的平台知识库。只有 Project 显式授权后，Agent Runtime 才能从对应知识库检索。"
+        description="统一管理可复用的知识库。知识库接入平台后，由具体项目决定是否使用；只有当前项目可用的知识库，Chat 和工作流才会进行检索。"
         extra={(
           <Space>
             <Button icon={<IconRefresh />} onClick={() => { void basesQuery.refetch(); void jobsQuery.refetch(); }}>刷新</Button>
@@ -298,7 +298,7 @@ export const KnowledgePage: React.FC = () => {
       <Stack>
         <Card>
           <Paragraph type="tertiary" style={{ margin: 0 }}>
-            平台目录 ≠ Project 授权。在这里创建或入库知识库，并不会自动授权给任何 Project；最终由 Project 能力配置决定 Runtime 可以看到哪些知识源。
+            这里负责知识库本身的创建、入库和维护。项目是否使用某个知识库，由项目自己的能力配置决定；没有加入当前项目的知识库不会出现在它的 Chat 或工作流中。
           </Paragraph>
         </Card>
 

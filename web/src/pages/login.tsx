@@ -15,28 +15,30 @@ const { Title, Text } = Typography;
 // 样式组件
 const LoginContainer = styled.div`
   min-height: 100vh;
-  background:
-    linear-gradient(120deg, rgba(37, 99, 235, 0.08), rgba(15, 118, 110, 0.1)),
-    ${theme.colors.bg.secondary};
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: ${theme.spacing.lg};
+  padding: 32px;
   position: relative;
+  background: #f6f7f9;
+
+  @media (max-width: ${theme.breakpoints.sm}) {
+    padding: 18px;
+  }
 `;
 
 const LoginWrapper = styled.div`
   width: 100%;
-  max-width: 1120px;
+  max-width: 980px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 420px;
-  gap: ${theme.spacing['2xl']};
+  grid-template-columns: minmax(0, 1fr) 400px;
+  gap: 72px;
   align-items: center;
 
   @media (max-width: ${theme.breakpoints.lg}) {
     grid-template-columns: 1fr;
-    max-width: 440px;
-    gap: ${theme.spacing.xl};
+    max-width: 420px;
+    gap: 24px;
   }
 `;
 
@@ -44,7 +46,7 @@ const BrandSection = styled.div`
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: ${theme.spacing.lg};
+  gap: 18px;
 
   @media (max-width: ${theme.breakpoints.lg}) {
     display: none;
@@ -52,17 +54,17 @@ const BrandSection = styled.div`
 `;
 
 const BrandLogo = styled.div`
-  width: 72px;
-  height: 72px;
-  background: ${theme.colors.gradient.primary};
-  border-radius: ${theme.borderRadius['2xl']};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: ${theme.shadows.lg};
+  width: 50px;
+  height: 50px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  background: #111827;
+  color: #fff;
+  box-shadow: ${theme.shadows.sm};
 
   .semi-icon {
-    font-size: 48px;
+    font-size: 28px;
     color: white;
   }
 `;
@@ -74,49 +76,55 @@ const BrandTitle = styled(Title)`
 `;
 
 const BrandDescription = styled(Text)`
+  max-width: 560px;
   color: ${theme.colors.text.secondary};
-  font-size: ${theme.typography.fontSize.lg};
-  line-height: ${theme.typography.lineHeight.relaxed};
-  max-width: 620px;
+  font-size: 16px;
+  line-height: 1.7;
 `;
 
 const CapabilityGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: ${theme.spacing.base};
+  grid-template-columns: 1fr;
+  gap: 0;
   width: 100%;
-  max-width: 680px;
+  max-width: 560px;
+  margin-top: 6px;
 `;
 
 const CapabilityItem = styled.div`
-  border: 1px solid ${theme.colors.border.secondary};
-  border-radius: ${theme.borderRadius.base};
-  background: rgba(255, 255, 255, 0.76);
-  padding: ${theme.spacing.base};
+  padding: 11px 0;
+  border-bottom: 1px solid ${theme.colors.border.secondary};
+
+  &:last-child {
+    border-bottom: 0;
+  }
 
   strong {
     display: block;
+    margin-bottom: 3px;
     color: ${theme.colors.text.primary};
-    font-size: ${theme.typography.fontSize.base};
-    margin-bottom: ${theme.spacing.xs};
+    font-size: 13px;
+    font-weight: 600;
   }
 
   span {
     color: ${theme.colors.text.tertiary};
-    font-size: ${theme.typography.fontSize.sm};
+    font-size: 12px;
     line-height: 1.6;
   }
 `;
 
 const LoginCard = styled(Card)`
-  padding: ${theme.spacing['2xl']} !important;
-  box-shadow: ${theme.shadows.lg} !important;
+  padding: 30px !important;
   border: 1px solid ${theme.colors.border.secondary} !important;
+  border-radius: 14px !important;
+  background: #fff !important;
+  box-shadow: 0 12px 34px rgb(15 23 42 / 7%) !important;
 `;
 
 const LoginHeader = styled.div`
-  text-align: center;
-  margin-bottom: ${theme.spacing.xl};
+  text-align: left;
+  margin-bottom: 24px;
 `;
 
 const LoginTitle = styled(Title)`
@@ -138,17 +146,16 @@ const StyledForm = styled(Form)`
 
 const LoginButton = styled(Button)`
   width: 100%;
-  height: 48px;
-  border-radius: ${theme.borderRadius.base};
-  background: ${theme.colors.gradient.primary} !important;
+  height: 44px;
+  border-radius: 10px;
+  background: ${theme.colors.primary} !important;
   border: none !important;
   color: white !important;
-  font-weight: ${theme.typography.fontWeight.medium};
-  font-size: ${theme.typography.fontSize.base};
+  font-weight: 600;
+  font-size: 14px;
 
   &:hover {
-    opacity: 0.9;
-    transform: translateY(-1px);
+    background: ${theme.colors.primaryHover} !important;
   }
 `;
 

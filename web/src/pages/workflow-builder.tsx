@@ -19,7 +19,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import styled from 'styled-components';
 
 import { OpsAgentCanvas } from '../components/ops-agent-canvas';
-import { OpsPageHeader, OpsPageShell } from '../components/ops-layout';
+import { OpsPageShell } from '../components/ops-layout';
 import { useProjectScope } from '../hooks/use-project-scope';
 import {
   opsAdminService,
@@ -43,21 +43,10 @@ import {
 const { Text, Title } = Typography;
 const { Option } = Select;
 
-const BuilderGrid = styled.div`
-  display: grid;
-  grid-template-columns: minmax(0, 1.8fr) minmax(340px, 0.8fr);
-  gap: ${theme.spacing.base};
-  align-items: start;
-
-  @media (max-width: 1180px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
 const Stack = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${theme.spacing.base};
+  gap: 14px;
   min-width: 0;
 `;
 
@@ -83,15 +72,10 @@ const WideField = styled(Field)`
 `;
 
 const Inspector = styled(Card)`
-  position: sticky;
-  top: 84px;
-  max-height: calc(100vh - 104px);
-  overflow: auto;
-
-  @media (max-width: 1180px) {
-    position: static;
-    max-height: none;
-  }
+  position: static;
+  max-height: none;
+  overflow: visible;
+  border-radius: 12px;
 `;
 
 const EdgeList = styled.div`
@@ -124,6 +108,139 @@ const JsonBox = styled.pre`
   overflow: auto;
   font-size: 12px;
   line-height: 1.55;
+`;
+
+const Editor = styled.div`
+  height: 100dvh;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #f4f5f7;
+  overflow: hidden;
+
+  @media (max-width: ${theme.breakpoints.md}) {
+    height: calc(100dvh - 52px);
+  }
+`;
+
+const EditorToolbar = styled.header`
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  border-bottom: 1px solid ${theme.colors.border.secondary};
+  background: #fff;
+
+  @media (max-width: ${theme.breakpoints.md}) {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+`;
+
+const EditorIdentity = styled.div`
+  min-width: 0;
+
+  .eyebrow {
+    display: block;
+    margin-bottom: 2px;
+    color: ${theme.colors.text.tertiary};
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+  }
+
+  strong {
+    display: block;
+    overflow: hidden;
+    color: ${theme.colors.text.primary};
+    font-size: 14px;
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+`;
+
+const DefinitionBar = styled.section`
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(220px, 1.2fr) auto;
+  gap: 10px;
+  align-items: end;
+  padding: 11px 16px;
+  border-bottom: 1px solid ${theme.colors.border.secondary};
+  background: #fafbfc;
+
+  @media (max-width: 980px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const EditorBody = styled.div`
+  min-height: 0;
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 0;
+
+  @media (max-width: 1180px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const CanvasColumn = styled.div`
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+`;
+
+const CanvasSurface = styled.div`
+  min-width: 0;
+  min-height: 520px;
+  flex: 1;
+  overflow: hidden;
+  border: 1px solid ${theme.colors.border.secondary};
+  border-radius: 12px;
+  background: #fff;
+`;
+
+const GuideSlot = styled.div`
+  margin-bottom: 10px;
+`;
+
+const InspectorRail = styled.div`
+  min-width: 0;
+  min-height: 0;
+  padding: 12px;
+  border-left: 1px solid ${theme.colors.border.secondary};
+  background: #f7f8fa;
+  overflow: auto;
+
+  @media (max-width: 1180px) {
+    border-left: 0;
+    border-top: 1px solid ${theme.colors.border.secondary};
+  }
+`;
+
+const MetadataDetails = styled.details`
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid ${theme.colors.border.secondary};
+  border-radius: 10px;
+  background: #fff;
+
+  summary {
+    color: ${theme.colors.text.secondary};
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  > div {
+    margin-top: 10px;
+  }
 `;
 
 type CapabilityOption = { value: string; label: string };
@@ -842,80 +959,66 @@ export const WorkflowBuilderPage: React.FC = () => {
 
   if (!projectId) {
     return (
-      <OpsPageShell selectedKey="workflows">
-        <OpsPageHeader title="Workflow 编辑器" description="创建并发布可复用执行流程。" />
-        <Banner type="warning" description="请先在工作流页面选择 Project，再打开编辑器。" />
+      <OpsPageShell selectedKey="workflows" maxWidth="none" padding="0">
+        <Editor>
+          <EditorToolbar>
+            <EditorIdentity><span className="eyebrow">WORKFLOW EDITOR</span><strong>工作流编辑器</strong></EditorIdentity>
+            <Button icon={<IconArrowLeft />} onClick={() => navigate('/workflows')}>返回工作流</Button>
+          </EditorToolbar>
+          <div style={{ padding: 20 }}><Banner type="warning" description="请先在工作流页面选择项目，再打开编辑器。" /></div>
+        </Editor>
       </OpsPageShell>
     );
   }
 
   return (
-    <OpsPageShell selectedKey="workflows">
-      <OpsPageHeader
-        title="Workflow 编辑器"
-        description="设计可复用执行流程。Agent Node 只提供 DIRECT、LLM、REACT 三种执行模式；Tool / MCP、知识库和 Skill 都是节点能力，而不是独立节点类型。"
-        extra={(
+    <OpsPageShell selectedKey="workflows" maxWidth="none" padding="0">
+      <Editor>
+        <EditorToolbar>
+          <EditorIdentity>
+            <span className="eyebrow">WORKFLOW EDITOR</span>
+            <strong>{definition.name || '新建工作流'}</strong>
+          </EditorIdentity>
           <Space wrap>
-            <Button icon={<IconArrowLeft />} onClick={() => navigate(`/workflows?projectId=${encodeURIComponent(projectId)}`)}>返回工作流</Button>
+            <Button icon={<IconArrowLeft />} onClick={() => navigate(`/workflows?projectId=${encodeURIComponent(projectId)}`)}>返回</Button>
             <Button icon={<IconRefresh />} onClick={() => void loadDefinition()} loading={loading}>重新加载</Button>
             <Button icon={<IconSave />} onClick={() => void saveDraft()} loading={operating}>保存草稿</Button>
             <Button type="primary" onClick={() => void publish()} loading={operating}>校验并发布</Button>
           </Space>
-        )}
-      />
+        </EditorToolbar>
 
-      <Spin spinning={loading}>
-        <Stack>
-          <Card>
-            <FieldGrid>
-              <Field>
-                <Text strong>Workflow 名称</Text>
-                <Input value={definition.name || ''} onChange={(name) => updateDefinition({ name })} />
-              </Field>
-              <Field>
-                <Text strong>Workflow ID</Text>
-                <Input value={definition.agentId} disabled />
-              </Field>
-              <WideField>
-                <Text strong>说明</Text>
-                <Input value={definition.description || ''} onChange={(description) => updateDefinition({ description })} />
-              </WideField>
-              <Field>
-                <Text strong>适用场景</Text>
-                <TextArea value={listText(definition.whenToUse)} onChange={(value) => updateDefinition({ whenToUse: parseList(value) })} autosize={{ minRows: 3, maxRows: 6 }} />
-              </Field>
-              <Field>
-                <Text strong>不适用场景</Text>
-                <TextArea value={listText(definition.whenNotToUse)} onChange={(value) => updateDefinition({ whenNotToUse: parseList(value) })} autosize={{ minRows: 3, maxRows: 6 }} />
-              </Field>
-            </FieldGrid>
-            <Divider margin="16px" />
-            <Space wrap style={{ justifyContent: 'space-between', width: '100%' }}>
-              <AgentBuilderModeSwitch
-                value={mode}
-                onChange={(nextMode) => {
-                  setMode(nextMode);
-                  setActivePanel((panel) => agentBuilderPanelForMode(nextMode, panel));
-                }}
-              />
-              <Space wrap>
-                <Tag color="grey">仅显式选择</Tag>
-                <Tag color={definition.lifecycle === 'PUBLISHED' ? 'green' : 'blue'}>{definition.lifecycle === 'PUBLISHED' ? '已发布' : definition.lifecycle === 'DISABLED' ? '已停用' : '草稿'}</Tag>
-                {definition.version && <Tag>v{definition.version}</Tag>}
-              </Space>
-            </Space>
-          </Card>
+        <DefinitionBar>
+          <Field>
+            <Text strong>工作流名称</Text>
+            <Input value={definition.name || ''} onChange={(name) => updateDefinition({ name })} />
+          </Field>
+          <Field>
+            <Text strong>说明</Text>
+            <Input value={definition.description || ''} onChange={(description) => updateDefinition({ description })} />
+          </Field>
+          <Space wrap style={{ justifyContent: 'flex-end' }}>
+            <AgentBuilderModeSwitch
+              value={mode}
+              onChange={(nextMode) => {
+                setMode(nextMode);
+                setActivePanel((panel) => agentBuilderPanelForMode(nextMode, panel));
+              }}
+            />
+            <Tag color={definition.lifecycle === 'PUBLISHED' ? 'green' : 'blue'}>{definition.lifecycle === 'PUBLISHED' ? '已发布' : definition.lifecycle === 'DISABLED' ? '已停用' : '草稿'}</Tag>
+            {definition.version && <Tag>v{definition.version}</Tag>}
+          </Space>
+        </DefinitionBar>
 
-          <AgentBuilderGuide />
-
-          <BuilderGrid>
-            <Stack>
-              <Card bodyStyle={{ padding: 0, overflow: 'hidden' }}>
+        <Spin spinning={loading}>
+          <EditorBody>
+            <CanvasColumn>
+              <GuideSlot><AgentBuilderGuide /></GuideSlot>
+              <CanvasSurface>
                 <OpsAgentCanvas
                   definition={definition}
                   selectedNodeId={selectedNodeId}
                   selectedEdgeKey={selectedEdgeKey}
-                  height="calc(100vh - 330px)"
+                  height="100%"
                   onSelectNode={(nodeId) => {
                     setSelectedNodeId(nodeId);
                     setSelectedEdgeKey('');
@@ -933,31 +1036,56 @@ export const WorkflowBuilderPage: React.FC = () => {
                   onConnectEdge={connectEdge}
                   onCreateNode={addNode}
                 />
-              </Card>
-            </Stack>
+              </CanvasSurface>
+            </CanvasColumn>
 
-            <Inspector>
-              <AgentBuilderPropertyPanel
-                mode={mode}
-                activePanel={activePanel}
-                onPanelChange={setActivePanel}
-                nodePanel={nodePanel}
-                edgePanel={edgePanel}
-                jsonPanel={jsonPanel}
-                testPanel={testPanel}
-              />
-              <Divider margin="16px" />
-              <AgentBuilderVersionSection
-                versions={versions}
-                loading={loading}
-                operating={operating}
-                onRefresh={() => void loadVersions(definition.agentId)}
-                onAction={(action, version) => void handleVersionAction(action, version)}
-              />
-            </Inspector>
-          </BuilderGrid>
-        </Stack>
-      </Spin>
+            <InspectorRail>
+              <MetadataDetails>
+                <summary>目录信息与适用范围</summary>
+                <div>
+                  <FieldGrid>
+                    <Field>
+                      <Text strong>工作流 ID</Text>
+                      <Input value={definition.agentId} disabled />
+                    </Field>
+                    <Field>
+                      <Text strong>调用方式</Text>
+                      <Input value="仅显式选择" disabled />
+                    </Field>
+                    <WideField>
+                      <Text strong>适用场景</Text>
+                      <TextArea value={listText(definition.whenToUse)} onChange={(value) => updateDefinition({ whenToUse: parseList(value) })} autosize={{ minRows: 2, maxRows: 5 }} />
+                    </WideField>
+                    <WideField>
+                      <Text strong>不适用场景</Text>
+                      <TextArea value={listText(definition.whenNotToUse)} onChange={(value) => updateDefinition({ whenNotToUse: parseList(value) })} autosize={{ minRows: 2, maxRows: 5 }} />
+                    </WideField>
+                  </FieldGrid>
+                </div>
+              </MetadataDetails>
+              <Inspector>
+                <AgentBuilderPropertyPanel
+                  mode={mode}
+                  activePanel={activePanel}
+                  onPanelChange={setActivePanel}
+                  nodePanel={nodePanel}
+                  edgePanel={edgePanel}
+                  jsonPanel={jsonPanel}
+                  testPanel={testPanel}
+                />
+                <Divider margin="16px" />
+                <AgentBuilderVersionSection
+                  versions={versions}
+                  loading={loading}
+                  operating={operating}
+                  onRefresh={() => void loadVersions(definition.agentId)}
+                  onAction={(action, version) => void handleVersionAction(action, version)}
+                />
+              </Inspector>
+            </InspectorRail>
+          </EditorBody>
+        </Spin>
+      </Editor>
     </OpsPageShell>
   );
 };

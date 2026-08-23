@@ -538,7 +538,7 @@ export const ModelApiManagement: React.FC = () => {
                 {activeTab === 'defaults' && (
                   <Space vertical align="start" spacing="medium" style={{ width: '100%' }}>
                     <Text type="tertiary">
-                      这里保存平台默认模型策略。Project 未显式覆盖时，Runtime 会按用途选择模型；留空表示该用途没有平台默认模型。
+                      这里设置平台默认模型。项目没有单独指定模型时，会按用途使用这些默认值；留空表示该用途暂不设置平台默认模型。
                     </Text>
                     <OpsResponsiveGrid $min="240px">
                       {([

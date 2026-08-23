@@ -63,7 +63,7 @@ test('Project Workspace Advanced exposes five feature tabs and switches domain c
     await expect(page.getByRole('tab', { name: tab })).toBeVisible();
   }
 
-  await expect(page.getByText('默认模型：', { exact: false })).toBeVisible();
+  await expect(page.getByText('默认助手：', { exact: false })).toBeVisible();
   await page.getByRole('tab', { name: '成员' }).click();
   await expect(page.getByText('项目成员', { exact: true })).toBeVisible();
   await expect(page.getByText('当前项目尚未分配用户。', { exact: true })).toBeVisible();
@@ -72,7 +72,7 @@ test('Project Workspace Advanced exposes five feature tabs and switches domain c
   await expect(page.getByText(/生产变更仍必须经过受控变更包/)).toBeVisible();
 
   await page.getByRole('tab', { name: '能力' }).click();
-  await expect(page.getByText('默认模型', { exact: true })).toBeVisible();
+  await expect(page.getByText('默认助手', { exact: true })).toBeVisible();
   await expect(page.getByText(/可用工作流/)).toBeVisible();
 });
 

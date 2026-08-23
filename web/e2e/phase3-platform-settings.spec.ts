@@ -30,14 +30,18 @@ test('Platform Settings groups capability catalogs and preserves canonical deep 
   await page.goto('/settings');
 
   await expect(page.getByRole('heading', { name: '设置' })).toBeVisible();
-  await expect(page.getByText('共享能力需要在项目中显式启用。', { exact: false })).toBeVisible();
+  await expect(page.getByTestId('platform-resource-flow-hint')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: '用户与访问控制' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '连接' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '智能能力' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '执行与治理' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '高级' })).toBeVisible();
-  await expect(page.getByRole('button', { name: /用户与访问控制/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: '用户与访问控制', exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: '连接', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '智能能力', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '执行与治理', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '高级', exact: true })).toBeVisible();
 
+  await page.getByRole('button', { name: '智能能力', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '智能能力' })).toBeVisible();
+  await expect(page.getByText('先接入平台，再按项目使用', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '查看项目能力', exact: true })).toBeVisible();
   await page.getByRole('button', { name: /知识库/ }).click();
   await expect(page).toHaveURL(/\/settings\/knowledge$/);
 });

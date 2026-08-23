@@ -91,7 +91,7 @@ test('Channel is transport-first and can be output-only, ReAct, or Workflow', as
   await expect(inboundSection).toHaveAttribute('data-workflow-count', '1');
   await inboundSelect.click();
   await expect(page.getByRole('option', { name: '仅出站' })).toBeVisible();
-  await expect(page.getByRole('option', { name: '默认模型' })).toBeVisible();
+  await expect(page.getByRole('option', { name: '默认助手' })).toBeVisible();
   await expect(page.getByRole('option', { name: '专用工作流' })).toBeVisible();
   await page.getByRole('option', { name: '专用工作流' }).click();
 

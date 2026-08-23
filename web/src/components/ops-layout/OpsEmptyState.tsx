@@ -8,10 +8,10 @@ const { Text } = Typography;
 
 const EmptyWrap = styled.div`
   min-width: 0;
-  padding: ${theme.spacing.lg};
-  border: 1px dashed ${theme.colors.border.secondary};
-  border-radius: ${theme.borderRadius.base};
-  background: ${theme.colors.bg.secondary};
+  padding: 40px 24px;
+  border: 1px solid ${theme.colors.border.tertiary};
+  border-radius: 12px;
+  background: #fafbfc;
   text-align: center;
 `;
 

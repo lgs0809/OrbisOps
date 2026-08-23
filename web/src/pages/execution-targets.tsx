@@ -216,7 +216,7 @@ export const ExecutionTargetsPage: React.FC = () => {
     <OpsPageShell selectedKey="settings">
       <OpsPageHeader
         title="执行目标"
-        description="维护执行目标蓝图。真实执行目标必须在 Project 内创建，并继续受 ChangePackage、Approval、Landing、Verification 和回滚控制。"
+        description="维护平台支持的受控执行方式。真正的执行目标由具体项目绑定环境和资源范围；涉及生产变更时，仍必须经过变更包、审批、执行验证和回滚保护。"
         extra={(
           <Space>
             <Button icon={<IconRefresh />} loading={templatesQuery.isFetching} onClick={() => void templatesQuery.refetch()}>刷新</Button>
@@ -234,9 +234,9 @@ export const ExecutionTargetsPage: React.FC = () => {
           <Space wrap>
             <Tag color="blue">模板 {templates.length}</Tag>
             <Tag color="green">已启用 {enabledCount}</Tag>
-            <Tag>Project 执行目标</Tag>
-            <Tag color="orange">ChangePackage</Tag>
-            <Tag color="red">Approval → Landing → Verification</Tag>
+            <Tag>项目执行目标</Tag>
+            <Tag color="orange">变更包</Tag>
+            <Tag color="red">审批 → 执行 → 验证</Tag>
           </Space>
         </Card>
 
@@ -264,7 +264,7 @@ export const ExecutionTargetsPage: React.FC = () => {
         onCancel={() => setFormVisible(false)}
       >
         <Paragraph type="tertiary">
-          不要在模板中填写真实地址和凭据。Project 创建具体执行目标时再绑定环境、资源范围和 credentialRef。
+          不要在模板中填写真实地址和凭据。具体项目创建执行目标时，再绑定环境、资源范围和凭据引用。
         </Paragraph>
         <FormGrid>
           <Field>

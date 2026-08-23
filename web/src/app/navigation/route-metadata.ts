@@ -59,7 +59,7 @@ export const APP_ROUTES: readonly AppRouteMetadata[] = [
     roles: everyone,
     breadcrumbs: ['首页'],
     legacyPaths: ['/dashboard'],
-    navigation: { section: 'primary', label: '首页', order: 10, icon: 'home' },
+    navigation: { section: 'primary', label: '首页', order: 20, icon: 'home' },
   },
   {
     id: 'chat',
@@ -68,7 +68,7 @@ export const APP_ROUTES: readonly AppRouteMetadata[] = [
     roles: everyone,
     breadcrumbs: ['对话'],
     legacyPaths: ['/work/diagnosis', '/chat-workspace'],
-    navigation: { section: 'primary', label: '对话', order: 20, icon: 'chat' },
+    navigation: { section: 'primary', label: '对话', order: 10, icon: 'chat' },
   },
   {
     id: 'workbench',

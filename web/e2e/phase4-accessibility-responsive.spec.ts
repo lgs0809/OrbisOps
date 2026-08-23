@@ -113,8 +113,10 @@ test('820px tablet layout keeps navigation, provider cards, and compatibility ma
   await routeCommonBackend(page);
 
   await page.goto('/platform/integrations?projectId=mobile-project');
-  await expect(page.getByRole('complementary', { name: '应用导航' })).toBeVisible();
-  await expect(page.getByRole('button', { name: '打开导航菜单' })).toHaveAttribute('aria-expanded', 'false');
+  const navigation = page.getByRole('complementary', { name: '应用导航' });
+  await expect(navigation).toBeVisible();
+  await expect(page.getByRole('button', { name: '打开导航菜单' })).toHaveCount(0);
+  await expect.poll(async () => navigation.evaluate((element) => Math.round(element.getBoundingClientRect().width))).toBe(84);
   await expect(page.getByTestId('channel-compatibility-matrix')).toBeVisible();
   await expectNoDocumentOverflow(page);
 

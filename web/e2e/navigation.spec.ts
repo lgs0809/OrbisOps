@@ -29,13 +29,13 @@ test('protected product routes fail closed to Sign in without a session', async 
   await expect(page.getByRole('heading', { name: '登录' })).toBeVisible();
 });
 
-test('authenticated project members land on Home', async ({ page }) => {
+test('authenticated project members land directly in Chat', async ({ page }) => {
   await authenticate(page, 'user');
   await page.goto('/login');
 
-  await expect(page).toHaveURL(/\/home/);
-  await expect(page.getByRole('heading', { name: '首页' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '需要关注' })).toBeVisible();
+  await expect(page).toHaveURL(/\/chat/);
+  await expect(page.getByText('今天需要处理什么？', { exact: true })).toBeVisible();
+  await expect(page.getByPlaceholder('给 OrbisOps 发消息...')).toBeVisible();
 });
 
 test('legacy user execution route converges on canonical Changes', async ({ page }) => {
@@ -44,7 +44,7 @@ test('legacy user execution route converges on canonical Changes', async ({ page
 
   await expect(page).toHaveURL(/\/changes$/);
   await expect(page.getByRole('heading', { name: '变更', exact: true })).toBeVisible();
-  await expect(page.getByText(/当前账号权限与变更状态/)).toBeVisible();
+  await expect(page.getByText(/当前账号权限、审批状态与运行边界/)).toBeVisible();
 });
 
 test('legacy admin change route converges on canonical Changes', async ({ page }) => {
@@ -100,10 +100,10 @@ test('historical Chat restores the conversation while runtime evidence stays out
   });
 
   await page.goto('/chat?projectId=demo-project&sessionId=history-session');
-  await expect(page.getByText('Historical acceptance conversation', { exact: true })).toBeVisible();
+  await expect(page.getByText('Historical acceptance conversation', { exact: true })).toHaveCount(2);
   await expect(page.getByText('Historical investigation completed.', { exact: true })).toBeVisible();
   await expect(page.getByText('PROMETHEUS authoritative datasource query succeeded', { exact: true })).toHaveCount(0);
-  await expect(page.getByText('执行方式仅对当前对话生效。')).toBeVisible();
+  await expect(page.getByTestId('model-selector')).toBeVisible();
 });
 
 test('administrator shell exposes exactly the eight product-level navigation entries', async ({ page }) => {
@@ -163,7 +163,7 @@ test('Workbench deep-links to a Run and continues its linked Conversation in Cha
 
   await page.goto('/workbench?projectId=demo-project&runId=run-2');
   await expect(page.getByRole('heading', { name: '工作台' })).toBeVisible();
-  await expect(page.getByText('Selected automation run', { exact: true })).toBeVisible();
+  await expect(page.getByText('Selected automation run', { exact: true })).toHaveCount(2);
   await expect(page.getByText('已关联，可继续对话', { exact: true })).toBeVisible();
   await expect(page.getByText('证据摘要（1）', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '继续对话' }).click();

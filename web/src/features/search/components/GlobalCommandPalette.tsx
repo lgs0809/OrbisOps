@@ -16,16 +16,26 @@ import {
 
 const { Text } = Typography;
 
-const Trigger = styled(Button)`
-  min-width: 190px;
-  justify-content: space-between;
+const Trigger = styled(Button)<{ $compact?: boolean }>`
+  min-width: ${(props) => (props.$compact ? '38px' : '190px')};
+  width: ${(props) => (props.$compact ? '38px' : 'auto')};
+  height: ${(props) => (props.$compact ? '38px' : 'auto')};
+  padding: ${(props) => (props.$compact ? '0' : undefined)};
+  justify-content: ${(props) => (props.$compact ? 'center' : 'space-between')};
   border: 1px solid ${theme.colors.border.primary};
   color: ${theme.colors.text.secondary};
-  background: ${theme.colors.bg.secondary};
+  background: ${(props) => (props.$compact ? 'transparent' : theme.colors.bg.secondary)};
+
+  ${(props) => props.$compact ? `
+    .command-search-label,
+    .command-search-shortcut {
+      display: none;
+    }
+  ` : ''}
 
   @media (max-width: ${theme.breakpoints.lg}) {
-    min-width: 42px;
-    width: 42px;
+    min-width: 38px;
+    width: 38px;
     padding: 0;
 
     .command-search-label,
@@ -99,7 +109,7 @@ const withProjectContext = (path: string, projectId: string): string => {
   return `${path}${separator}projectId=${encodeURIComponent(projectId)}`;
 };
 
-export const GlobalCommandPalette: React.FC = () => {
+export const GlobalCommandPalette: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   const navigate = useNavigate();
   const projectScope = useProjectScope();
   const [open, setOpen] = useState(false);
@@ -155,6 +165,7 @@ export const GlobalCommandPalette: React.FC = () => {
   return (
     <>
       <Trigger
+        $compact={compact}
         icon={<IconSearch />}
         theme="light"
         aria-label="打开全局搜索"

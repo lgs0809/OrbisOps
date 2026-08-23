@@ -153,7 +153,7 @@ export const AlertTriggersPage: React.FC = () => {
       return;
     }
     if (!form.agentDefinitionId) {
-      Toast.error('请选择 默认模型 或已发布 Workflow。');
+      Toast.error('请选择 默认助手 或已发布 Workflow。');
       return;
     }
     if (form.agentDefinitionId !== defaultReactAgentId && form.agentBindingMode === 'PINNED_VERSION' && !form.agentVersion) {
@@ -211,7 +211,7 @@ export const AlertTriggersPage: React.FC = () => {
       title: '执行方式',
       width: 230,
       render: (_: unknown, rule: OpsAlertTriggerRule) => {
-        if (rule.agentDefinitionId === defaultReactAgentId) return <Tag color="green">默认模型</Tag>;
+        if (rule.agentDefinitionId === defaultReactAgentId) return <Tag color="green">默认助手</Tag>;
         const workflow = workflows.find((item) => item.agentId === rule.agentDefinitionId);
         return <Space wrap><Tag color="blue">Workflow</Tag><Text>{workflowName(workflow, rule.agentDefinitionId)}</Text></Space>;
       },
@@ -322,7 +322,7 @@ export const AlertTriggersPage: React.FC = () => {
             <Select
               aria-label="执行方式"
               value={executionValue || undefined}
-              placeholder="默认模型 或已发布 Workflow"
+              placeholder="默认助手 或已发布 Workflow"
               onChange={(value) => {
                 const selected = String(value || '');
                 if (selected === '__DEFAULT_REACT__') {
@@ -338,7 +338,7 @@ export const AlertTriggersPage: React.FC = () => {
                 });
               }}
             >
-              {defaultReactAgentId && <Option value="__DEFAULT_REACT__">默认模型</Option>}
+              {defaultReactAgentId && <Option value="__DEFAULT_REACT__">默认助手</Option>}
               {workflows.map((workflow) => <Option key={workflow.agentId} value={workflow.agentId}>Workflow · {workflowName(workflow)}</Option>)}
             </Select>
           </Field>

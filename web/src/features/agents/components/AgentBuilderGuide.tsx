@@ -36,7 +36,7 @@ const GuideTitle = styled.div`
 `;
 
 const ITEMS = [
-  ['1. 默认模型是默认入口', '除非用户显式选择 Workflow，否则请求由默认模型处理；自然语言表述不会静默切换执行方式。'],
+  ['1. 默认助手是默认入口', '除非用户显式选择工作流，否则请求由默认助手处理；自然语言表述不会静默切换执行方式。'],
   ['2. Workflow 用于可重复流程', '巡检、固定诊断、报告等稳定重复任务适合使用 Workflow；临时性工作无需先创建 Workflow。'],
   ['3. 说明 Workflow 的适用边界', '适用与排除说明用于帮助人选择 Workflow，不参与 Runtime 自动路由。'],
   ['4. 画布定义内部执行过程', 'Start / Agent / Router / End 定义执行顺序；Skill、RAG、MCP 能力绑定在真正需要它们的 Agent Node 上。'],

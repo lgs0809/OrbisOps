@@ -6,46 +6,68 @@ import styled from 'styled-components';
 import { OpsProjectWorkspace } from '../services/ops-project-service';
 import { theme } from '../styles/theme';
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 
 const Container = styled.section`
   box-sizing: border-box;
-  display: grid;
-  grid-template-columns: minmax(260px, 420px) minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
-  gap: ${theme.spacing.lg};
-  padding: ${theme.spacing.base} ${theme.spacing.lg};
-  margin: 0 auto ${theme.spacing.lg};
+  gap: 12px;
   width: 100%;
-  max-width: 100%;
   min-width: 0;
-  background: ${theme.colors.bg.primary};
+  margin: 0 0 16px;
+  padding: 10px 12px;
   border: 1px solid ${theme.colors.border.secondary};
-  border-radius: ${theme.borderRadius.base};
+  border-radius: 11px;
+  background: #fff;
 
-  @media (max-width: ${theme.breakpoints.lg}) {
-    grid-template-columns: 1fr;
-    padding: ${theme.spacing.base};
+  @media (max-width: ${theme.breakpoints.md}) {
+    align-items: stretch;
+    flex-direction: column;
   }
 `;
 
+const ScopeLabel = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  color: ${theme.colors.text.tertiary};
+  font-size: 12px;
+`;
+
 const ProjectSelect = styled(Select)`
-  width: 100%;
-  min-width: 0;
+  width: min(280px, 100%);
+  min-width: 180px;
+
+  @media (max-width: ${theme.breakpoints.md}) {
+    width: 100%;
+  }
 `;
 
 const ProjectMeta = styled.div`
   min-width: 0;
-
-  .project-name {
-    margin: 0 0 ${theme.spacing.xs} !important;
-  }
+  flex: 1;
+  overflow: hidden;
+  color: ${theme.colors.text.tertiary};
 
   .semi-typography {
     display: block;
-    max-width: 100%;
-    white-space: normal;
-    overflow-wrap: anywhere;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  @media (max-width: ${theme.breakpoints.sm}) {
+    display: none;
+  }
+`;
+
+const Actions = styled(Space)`
+  flex-shrink: 0;
+
+  @media (max-width: ${theme.breakpoints.md}) {
+    justify-content: flex-end;
   }
 `;
 
@@ -70,32 +92,26 @@ export const ProjectScopeBar: React.FC<ProjectScopeBarProps> = ({
 
   return (
     <Container aria-label="当前项目">
-      <div>
-        <Text strong>当前项目</Text>
-        <ProjectSelect
-          value={projectId || undefined}
-          placeholder="选择项目"
-          loading={loading}
-          prefix={<IconFolder />}
-          onChange={(value) => onChange(String(value || ''))}
-        >
-          {projects.map((item) => (
-            <Select.Option key={item.projectId} value={item.projectId}>
-              {item.name}
-            </Select.Option>
-          ))}
-        </ProjectSelect>
-      </div>
+      <ScopeLabel><IconFolder />项目</ScopeLabel>
+      <ProjectSelect
+        value={projectId || undefined}
+        placeholder="选择项目"
+        loading={loading}
+        onChange={(value) => onChange(String(value || ''))}
+      >
+        {projects.map((item) => (
+          <Select.Option key={item.projectId} value={item.projectId}>
+            {item.name}
+          </Select.Option>
+        ))}
+      </ProjectSelect>
       <ProjectMeta>
-        <Title className="project-name" heading={6}>{project?.name || '尚未选择项目'}</Title>
-        <Text type="tertiary">
-          {project ? `${project.projectId} · ${project.description || '暂无项目说明'}` : '列表、创建操作和权限都会限定在当前选择的项目范围内。'}
-        </Text>
+        <Text type="tertiary">{project?.description || (project ? '暂无项目说明' : '请选择项目后继续')}</Text>
       </ProjectMeta>
-      <Space wrap>
-        {onRefresh && <Button icon={<IconRefresh />} onClick={onRefresh}>刷新</Button>}
+      <Actions wrap spacing="tight">
+        {onRefresh && <Button theme="borderless" icon={<IconRefresh />} aria-label="刷新" onClick={onRefresh}>刷新</Button>}
         {actions}
-      </Space>
+      </Actions>
     </Container>
   );
 };

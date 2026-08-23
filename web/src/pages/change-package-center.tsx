@@ -20,9 +20,7 @@ import {
   OpsAdvancedPreview,
   OpsDangerZone,
   OpsEmptyState,
-  OpsPageHeader,
   OpsPageShell,
-  OpsResponsiveGrid,
   OpsSectionCard,
   TableScroll,
 } from '../components/ops-layout';
@@ -47,7 +45,57 @@ import {
 } from './change-package-ui';
 
 const { Option } = Select;
-const { Text, Title } = Typography;
+const { Text } = Typography;
+
+const ChangeWorkspace = styled.div`
+  max-width: 1480px;
+  margin: 0 auto;
+`;
+
+const ChangeHeader = styled.header`
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: end;
+  padding: 22px 0 24px;
+
+  h1 {
+    margin: 0;
+    color: ${theme.colors.text.primary};
+    font-size: 36px;
+    font-weight: 650;
+    line-height: 1.1;
+    letter-spacing: -0.04em;
+  }
+
+  p {
+    max-width: 760px;
+    margin: 8px 0 0;
+    color: ${theme.colors.text.tertiary};
+    font-size: 12px;
+    line-height: 1.65;
+  }
+
+  @media (max-width: ${theme.breakpoints.md}) {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+`;
+
+const QueuePanel = styled.section`
+  overflow: hidden;
+  border: 1px solid ${theme.colors.border.secondary};
+  border-radius: 13px;
+  background: #fff;
+`;
+
+const QueueToolbar = styled.div`
+  padding: 12px 14px 0;
+`;
+
+const QueueBody = styled.div`
+  padding: 0 14px 14px;
+`;
 
 const Toolbar = styled.div`
   display: flex;
@@ -57,6 +105,68 @@ const Toolbar = styled.div`
   width: 100%;
   min-width: 0;
   margin-bottom: ${theme.spacing.base};
+`;
+
+const QueueTabs = styled.div`
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+
+  @media (max-width: ${theme.breakpoints.md}) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (max-width: ${theme.breakpoints.sm}) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const QueueTab = styled.button<{ $active: boolean; $attention?: boolean }>`
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px;
+  border: 1px solid ${(props) => (props.$active ? '#cdd5e1' : theme.colors.border.secondary)};
+  border-radius: 10px;
+  background: ${(props) => (props.$active ? '#f1f3f5' : '#fff')};
+  color: ${theme.colors.text.primary};
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: #f7f8fa;
+  }
+
+  .copy {
+    min-width: 0;
+  }
+
+  strong {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  span {
+    display: block;
+    margin-top: 2px;
+    overflow: hidden;
+    color: ${theme.colors.text.tertiary};
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .count {
+    min-width: 28px;
+    color: ${(props) => (props.$attention ? theme.colors.error : theme.colors.text.primary)};
+    font-size: 18px;
+    font-weight: 650;
+    text-align: right;
+  }
 `;
 
 const DetailGrid = styled.div`
@@ -449,38 +559,38 @@ export const ChangePackageCenterPage: React.FC = () => {
 
   return (
     <OpsPageShell selectedKey="changes">
-      <OpsPageHeader
-        title="变更"
-        description={admin
-          ? '在一个受治理工作区中查看受控变更包、审批、落地、验证、失败与恢复证据。'
-          : '查看你所在项目的受控变更包；可执行的审批和生产操作始终以当前账号权限与变更状态为准。'}
-        primaryAction={<Button onClick={loadPackages}>刷新</Button>}
-      />
+      <ChangeWorkspace>
+        <ChangeHeader>
+          <div>
+            <h1>变更</h1>
+            <p>{admin
+              ? '受控变更包从这里进入审批、落地、验证和恢复。列表只呈现需要做决策的业务状态，技术证据在详情中按需展开。'
+              : '查看你所在项目的受控变更；可执行动作始终由当前账号权限、审批状态与运行边界共同决定。'}</p>
+          </div>
+          <Button onClick={loadPackages}>刷新</Button>
+        </ChangeHeader>
 
-      <OpsResponsiveGrid $min="220px">
-        <OpsSectionCard title="待审批">
-          <Title heading={4} style={{ margin: 0 }}>{queueItems('pending').length}</Title>
-          <Text type="tertiary">等待校验、提交审批或审批处理</Text>
-          <div style={{ marginTop: 8 }}><Button theme="borderless" onClick={() => setQueue('pending')}>查看待审批</Button></div>
-        </OpsSectionCard>
-        <OpsSectionCard title="落地">
-          <Title heading={4} style={{ margin: 0 }}>{queueItems('running').length}</Title>
-          <Text type="tertiary">已批准等待落地，或正在执行</Text>
-          <div style={{ marginTop: 8 }}><Button theme="borderless" onClick={() => setQueue('running')}>查看落地任务</Button></div>
-        </OpsSectionCard>
-        <OpsSectionCard title="需要人工处理">
-          <Title heading={4} style={{ margin: 0 }}>{queueItems('intervention').length}</Title>
-          <Text type="tertiary">{needsReplanCount} 个需要重规划，{landingFailedCount} 个落地失败；两类都不会自动重试。</Text>
-          <div style={{ marginTop: 8 }}><Button theme="borderless" onClick={() => setQueue('intervention')}>查看待处理</Button></div>
-        </OpsSectionCard>
-        <OpsSectionCard title="历史">
-          <Title heading={4} style={{ margin: 0 }}>{queueItems('history').length}</Title>
-          <Text type="tertiary">已落地或已关闭的受控变更包及其审计证据</Text>
-          <div style={{ marginTop: 8 }}><Button theme="borderless" onClick={() => setQueue('history')}>查看历史</Button></div>
-        </OpsSectionCard>
-      </OpsResponsiveGrid>
+      <QueueTabs aria-label="变更队列">
+        <QueueTab type="button" $active={queue === 'pending'} onClick={() => setQueue('pending')}>
+          <div className="copy"><strong>待审批</strong><span>校验、提交审批或等待决策</span></div>
+          <div className="count">{queueItems('pending').length}</div>
+        </QueueTab>
+        <QueueTab type="button" $active={queue === 'running'} onClick={() => setQueue('running')}>
+          <div className="copy"><strong>落地</strong><span>已批准待执行或正在执行</span></div>
+          <div className="count">{queueItems('running').length}</div>
+        </QueueTab>
+        <QueueTab type="button" $active={queue === 'intervention'} $attention={queueItems('intervention').length > 0} onClick={() => setQueue('intervention')}>
+          <div className="copy"><strong>需要处理</strong><span>{needsReplanCount} 个重规划 · {landingFailedCount} 个落地失败</span></div>
+          <div className="count">{queueItems('intervention').length}</div>
+        </QueueTab>
+        <QueueTab type="button" $active={queue === 'history'} onClick={() => setQueue('history')}>
+          <div className="copy"><strong>历史</strong><span>已落地或已关闭的变更</span></div>
+          <div className="count">{queueItems('history').length}</div>
+        </QueueTab>
+      </QueueTabs>
 
-      <OpsSectionCard title={`变更队列 · ${{ pending: '待审批', running: '落地', intervention: '需要人工处理', history: '历史' }[queue]}`}>
+      <QueuePanel>
+        <QueueToolbar>
         <Toolbar>
           <Select
             value={projectId}
@@ -507,6 +617,8 @@ export const ChangePackageCenterPage: React.FC = () => {
           </Select>
           <Text type="tertiary">列表只展示业务状态；打开受控变更包后可查看版本、内容哈希、落地、验证与审计证据。</Text>
         </Toolbar>
+        </QueueToolbar>
+        <QueueBody>
         <Spin spinning={loading}>
           {packageQuery.isError ? (
             <OpsEmptyState
@@ -602,7 +714,9 @@ export const ChangePackageCenterPage: React.FC = () => {
             </TableScroll>
           )}
         </Spin>
-      </OpsSectionCard>
+        </QueueBody>
+      </QueuePanel>
+      </ChangeWorkspace>
 
       <Modal
         title={selected ? `受控变更包 - ${selected.summary || selected.objective || selected.packageId}` : '受控变更包'}

@@ -349,14 +349,14 @@ export const SkillsPage: React.FC = () => {
     <OpsPageShell selectedKey="settings">
       <OpsPageHeader
         title="Skill"
-        description="维护可跨 Project 复用的诊断经验、SOP 和报告能力。平台 Skill 不会自动授权给 Project；Project 专属 Skill 在对应 Project 能力中管理。"
+        description="维护可复用的诊断经验、SOP 和报告方法。平台 Skill 接入后不会自动用于所有项目；具体项目只会使用自己已经启用的 Skill。"
         extra={<Space><Button icon={<IconRefresh />} loading={reloadMutation.isPending} onClick={() => void reload()}>刷新</Button><Button type="primary" icon={<IconPlus />} onClick={() => { resetCreate(); setCreateVisible(true); }}>新建 Skill</Button></Space>}
       />
 
       <Stack>
         <Card>
           <Paragraph type="tertiary" style={{ margin: 0 }}>
-            Skill 是 Agent Node 的能力，不是独立 Workflow 节点。自动沉淀与人工维护都进入版本体系；是否自动更新由每个 Skill 的策略决定。
+            Skill 是助手和工作流执行任务时按需加载的方法包，不需要把它作为独立流程节点拖进 Workflow。自动沉淀和人工维护都会进入版本体系，是否跟随新版本由每个 Skill 的更新策略决定。
           </Paragraph>
         </Card>
         <Input placeholder="搜索 Skill 名称或说明" value={keyword} onChange={setKeyword} style={{ maxWidth: 420 }} />

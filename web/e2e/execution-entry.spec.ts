@@ -16,11 +16,11 @@ const authenticate = async (page: import('@playwright/test').Page) => {
   });
 };
 
-test('Chat binds each conversation to 默认模型 or a Published Workflow', async ({ page }) => {
+test('Chat binds each conversation to 默认助手 or a Published Workflow and streams the selected model', async ({ page }) => {
   await authenticate(page);
 
   const createRequests: Json[] = [];
-  const messageRequests: Json[] = [];
+  const streamRequests: Json[] = [];
   let sequence = 0;
   let sessions: Json[] = [];
 
@@ -63,6 +63,18 @@ test('Chat binds each conversation to 默认模型 or a Published Workflow', asy
         }),
       });
     }
+    if (path.endsWith('/api/v1/user/chat/catalog/models')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: '0000', info: 'success', data: [
+            { modelId: 'model-fast', modelName: 'Fast Model', modelUsage: 'CHAT', modelType: 'CHAT' },
+            { modelId: 'model-deep', modelName: 'Deep Model', modelUsage: 'CHAT', modelType: 'CHAT' },
+          ],
+        }),
+      });
+    }
     if (path.endsWith('/api/v1/user/chat/session') && method === 'POST') {
       const body = request.postDataJSON() as Json;
       createRequests.push(body);
@@ -88,21 +100,20 @@ test('Chat binds each conversation to 默认模型 or a Published Workflow', asy
         body: JSON.stringify({ code: '0000', info: 'success', data: sessions }),
       });
     }
-    if (/\/api\/v1\/user\/chat\/sessions\/[^/]+\/messages$/.test(path) && method === 'POST') {
+    if (path.endsWith('/api/v1/user/chat/stream') && method === 'POST') {
       const body = request.postDataJSON() as Json;
-      messageRequests.push(body);
-      const sessionId = path.split('/').at(-2) || '';
+      streamRequests.push(body);
+      const runId = `run-${streamRequests.length}`;
       return route.fulfill({
         status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          code: '0000', info: 'success', data: {
-            sessionId,
-            status: 'SUCCEEDED',
-            metadata: { runId: `run-${messageRequests.length}` },
-            events: [],
-          },
-        }),
+        contentType: 'text/event-stream',
+        body: [
+          `data: ${JSON.stringify({ eventType: 'RUN_ACCEPTED', status: 'RUNNING', runId })}`,
+          `data: ${JSON.stringify({ eventType: 'TEXT_DELTA', status: 'RUNNING', runId, content: 'Streaming ' })}`,
+          `data: ${JSON.stringify({ eventType: 'TEXT_DELTA', status: 'RUNNING', runId, content: 'reply' })}`,
+          `data: ${JSON.stringify({ eventType: 'FINAL_OUTPUT', status: 'SUCCEEDED', runId, content: 'Streaming reply' })}`,
+          '',
+        ].join('\n\n'),
       });
     }
     if (/\/api\/v1\/user\/chat\/sessions\/[^/]+\/(messages|events)$/.test(path) && method === 'GET') {
@@ -122,15 +133,38 @@ test('Chat binds each conversation to 默认模型 or a Published Workflow', asy
 
   await page.goto('/chat?projectId=demo-project');
 
+  const composer = page.getByTestId('chat-composer');
+  const messageScroll = page.getByTestId('chat-message-scroll');
+  const projectRoot = page.getByTestId('project-selector');
+  await expect(composer).toBeVisible();
+  await expect(messageScroll).toBeVisible();
+  await expect(projectRoot).toBeVisible();
+  await expect(projectRoot).toHaveAttribute('data-project', 'demo-project');
+  await expect.poll(async () => page.evaluate(() => document.scrollingElement?.scrollHeight === document.scrollingElement?.clientHeight)).toBe(true);
+  const composerBox = await composer.boundingBox();
+  const viewport = page.viewportSize();
+  expect(composerBox).not.toBeNull();
+  expect(viewport).not.toBeNull();
+  expect((composerBox?.y || 0) + (composerBox?.height || 0)).toBeLessThanOrEqual((viewport?.height || 0) + 1);
+
   const executionRoot = page.getByTestId('execution-selector');
   const executionSelect = executionRoot.getByRole('combobox');
+  const modelRoot = page.getByTestId('model-selector');
+  const modelSelect = modelRoot.getByRole('combobox');
   await expect(executionSelect).toBeVisible();
+  await expect(modelSelect).toBeVisible();
   await expect(executionRoot).toHaveAttribute('data-execution', 'DEFAULT_REACT');
+  await expect(modelRoot).toHaveAttribute('data-model', 'DEFAULT');
   await expect(page.getByText('Internal Default Agent', { exact: true })).toHaveCount(0);
   await expect(page.getByText('Draft Workflow', { exact: true })).toHaveCount(0);
 
+  await modelSelect.click();
+  await expect(page.getByText('Fast Model', { exact: true }).last()).toBeVisible();
+  await page.getByText('Fast Model', { exact: true }).last().click();
+  await expect(modelRoot).toHaveAttribute('data-model', 'model-fast');
+
   await executionSelect.click();
-  await expect(page.getByText('默认模型', { exact: true }).last()).toBeVisible();
+  await expect(page.getByText('默认助手', { exact: true }).last()).toBeVisible();
   await expect(page.getByText('Daily Production Inspection', { exact: true }).last()).toBeVisible();
   await page.getByText('Daily Production Inspection', { exact: true }).last().click();
   await expect(executionRoot).toHaveAttribute('data-execution', 'daily-inspection');
@@ -141,27 +175,29 @@ test('Chat binds each conversation to 默认模型 or a Published Workflow', asy
     executionName: 'Daily Production Inspection',
   });
 
-  await page.getByPlaceholder('给 OrbisOps 发消息...').fill('Run the inspection');
+  await page.getByPlaceholder('给 OrbisOps 发消息...').fill('帮我按平时的巡检流程看一下今天线上有没有明显异常，有的话把重点告诉我');
   await page.getByRole('button', { name: '发送' }).click();
-  await expect.poll(() => messageRequests.length).toBe(1);
-  expect(messageRequests[0].agentDefinitionId).toBe('daily-inspection');
-  expect(messageRequests[0].metadata).toMatchObject({ executionType: 'WORKFLOW', triggerSource: 'CHAT' });
-  await expect(page.getByRole('button', { name: '打开当前运行' })).toBeVisible();
+  await expect.poll(() => streamRequests.length).toBe(1);
+  expect(streamRequests[0].agentDefinitionId).toBe('daily-inspection');
+  expect(streamRequests[0].modelId).toBe('model-fast');
+  expect(streamRequests[0].metadata).toMatchObject({ executionType: 'WORKFLOW', triggerSource: 'CHAT' });
+  await expect(page.getByRole('button', { name: '查看运行' })).toBeVisible();
 
   // Changing execution creates a new conversation instead of mutating the existing Workflow conversation.
   await executionSelect.click();
-  await page.getByText('默认模型', { exact: true }).last().click();
+  await page.getByText('默认助手', { exact: true }).last().click();
   await expect.poll(() => createRequests.length).toBe(2);
   expect(createRequests[1].agentId).toBeUndefined();
   expect(createRequests[1].metadata).toMatchObject({
     executionType: 'DEFAULT_REACT',
-    executionName: '默认模型',
+    executionName: '默认助手',
   });
   await expect(executionRoot).toHaveAttribute('data-execution', 'DEFAULT_REACT');
 
-  await page.getByPlaceholder('给 OrbisOps 发消息...').fill('Investigate dynamically');
+  await page.getByPlaceholder('给 OrbisOps 发消息...').fill('这个先别按固定流程了，你自己看看刚才提到的问题到底怎么回事');
   await page.getByRole('button', { name: '发送' }).click();
-  await expect.poll(() => messageRequests.length).toBe(2);
-  expect(messageRequests[1].agentDefinitionId).toBeUndefined();
-  expect(messageRequests[1].metadata).toMatchObject({ executionType: 'DEFAULT_REACT', triggerSource: 'CHAT' });
+  await expect.poll(() => streamRequests.length).toBe(2);
+  expect(streamRequests[1].agentDefinitionId).toBeUndefined();
+  expect(streamRequests[1].modelId).toBe('model-fast');
+  expect(streamRequests[1].metadata).toMatchObject({ executionType: 'DEFAULT_REACT', triggerSource: 'CHAT' });
 });

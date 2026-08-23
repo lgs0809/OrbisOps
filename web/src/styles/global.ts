@@ -16,13 +16,24 @@ export const GlobalStyle = createGlobalStyle`
     min-width: 0;
     min-height: 100%;
     margin: 0;
-    background: ${theme.colors.bg.secondary};
+    background: #fbfbfa;
     overflow-x: hidden;
+  }
+
+  html {
+    font-size: 15px;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
   }
 
   body {
     color: ${theme.colors.text.primary};
     font-family: ${theme.typography.fontFamily};
+  }
+
+  ::selection {
+    background: #dbeafe;
+    color: #172554;
   }
 
   .semi-layout,
@@ -48,10 +59,18 @@ export const GlobalStyle = createGlobalStyle`
     overflow-x: hidden;
   }
 
+  .semi-card {
+    border-color: ${theme.colors.border.secondary};
+    border-radius: 12px;
+    box-shadow: none;
+  }
+
   .semi-modal-content {
     display: flex;
     max-height: min(92vh, 860px);
     flex-direction: column;
+    border-radius: 14px;
+    box-shadow: ${theme.shadows.modal};
   }
 
   .semi-modal-body {
@@ -77,6 +96,22 @@ export const GlobalStyle = createGlobalStyle`
     width: 100%;
   }
 
+  .semi-table-thead > .semi-table-row > .semi-table-row-head {
+    background: #fafbfc;
+    color: ${theme.colors.text.secondary};
+    font-size: 12px;
+    font-weight: 600;
+    border-bottom-color: ${theme.colors.border.secondary};
+  }
+
+  .semi-table-tbody > .semi-table-row > .semi-table-row-cell {
+    border-bottom-color: ${theme.colors.border.tertiary};
+  }
+
+  .semi-table-tbody > .semi-table-row:hover > .semi-table-row-cell {
+    background: #fafbfc;
+  }
+
   .semi-typography,
   .semi-typography-paragraph,
   .semi-input,
@@ -95,8 +130,33 @@ export const GlobalStyle = createGlobalStyle`
     word-break: normal;
   }
 
+  .semi-input-wrapper,
+  .semi-input-textarea-wrapper,
+  .semi-select {
+    border-radius: 9px;
+  }
+
   .semi-button {
+    min-height: 32px;
+    border-radius: 9px;
     white-space: nowrap;
+    font-weight: 500;
+  }
+
+  .semi-button-primary {
+    box-shadow: none;
+  }
+
+  .semi-tabs-bar {
+    border-bottom-color: ${theme.colors.border.secondary};
+  }
+
+  .semi-tabs-tab {
+    font-size: 13px;
+  }
+
+  .semi-tag {
+    border-radius: 999px;
   }
 
   .semi-space {

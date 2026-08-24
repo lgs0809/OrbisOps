@@ -5,8 +5,6 @@ import cn.lgs.orbisops.domain.changepackage.model.ChangePackageLandingOperation;
 import cn.lgs.orbisops.domain.changepackage.model.ChangePackageLandingPlan;
 import cn.lgs.orbisops.domain.changepackage.model.ChangePackageVersion;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -17,6 +15,19 @@ public final class ChangePackageLandingPlanFactory {
             new ChangePackageLandingOperationSafetyPolicy();
 
     public ChangePackageLandingPlan create(ChangePackageCurrent current, ChangePackageVersion approvedVersion) {
+        var snapshot = approvedSnapshot(current, approvedVersion);
+        return plan(current, approvedVersion, snapshot, operations(snapshot));
+    }
+
+    /** Only for an already recorded execution's read-only PostCheck; never used by land(). */
+    public ChangePackageLandingPlan createForVerification(ChangePackageCurrent current, ChangePackageVersion approvedVersion,
+                                                          String landingRunId, List<Map<String, Object>> facts) {
+        var snapshot = approvedSnapshot(current, approvedVersion);
+        return plan(current, approvedVersion, snapshot,
+                new ChangePackageExecutablePlanPolicy().recordedOperations(snapshot, landingRunId, facts));
+    }
+
+    private Map<String, Object> approvedSnapshot(ChangePackageCurrent current, ChangePackageVersion approvedVersion) {
         if (current == null) throw new IllegalArgumentException("CHANGE_PACKAGE_CURRENT_REQUIRED");
         if (approvedVersion == null) throw new IllegalArgumentException("CHANGE_PACKAGE_VERSION_REQUIRED");
         if (!current.pointer().approved()) {
@@ -42,7 +53,12 @@ public final class ChangePackageLandingPlanFactory {
                 || !approvedVersion.packageHash().equals(embeddedHash)) {
             throw new IllegalStateException("CHANGE_PACKAGE_LANDING_SNAPSHOT_IDENTITY_MISMATCH");
         }
-        List<ChangePackageLandingOperation> operations = operations(snapshot).stream()
+        return snapshot;
+    }
+
+    private ChangePackageLandingPlan plan(ChangePackageCurrent current, ChangePackageVersion approvedVersion,
+                                         Map<String, Object> snapshot, List<Map<String, Object>> selected) {
+        List<ChangePackageLandingOperation> operations = selected.stream()
                 .filter(SAFETY_POLICY::targetWrite)
                 .map(this::operation)
                 .toList();
@@ -65,38 +81,7 @@ public final class ChangePackageLandingPlanFactory {
     }
 
     private List<Map<String, Object>> operations(Map<String, Object> snapshot) {
-        Map<String, Object> landingPlan = map(firstNonNull(snapshot.get("landingPlan"), snapshot.get("landingPlanJson")));
-        Map<String, Object> preferred = map(landingPlan.get("preferredPlan"));
-        List<Map<String, Object>> result = list(firstNonNull(
-                preferred.get("steps"), preferred.get("operations"), preferred.get("mcpSteps")));
-        if (!result.isEmpty()) return result;
-        result = list(firstNonNull(landingPlan.get("steps"), landingPlan.get("operations"), landingPlan.get("mcpSteps")));
-        if (!result.isEmpty()) return result;
-        return list(firstNonNull(snapshot.get("mcpSteps"), snapshot.get("mcpStepsJson")));
-    }
-
-    private Map<String, Object> map(Object raw) {
-        Object value = ChangePackageLegacyStructuredValue.decode(raw);
-        if (!(value instanceof Map<?, ?> source)) return Map.of();
-        Map<String, Object> result = new LinkedHashMap<>();
-        source.forEach((key, item) -> result.put(String.valueOf(key), item));
-        return result;
-    }
-
-    private List<Map<String, Object>> list(Object raw) {
-        Object value = ChangePackageLegacyStructuredValue.decode(raw);
-        if (!(value instanceof Iterable<?> iterable)) return List.of();
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (Object item : iterable) {
-            Map<String, Object> mapped = map(item);
-            if (!mapped.isEmpty()) result.add(mapped);
-        }
-        return result;
-    }
-
-    private Object firstNonNull(Object... values) {
-        for (Object value : values) if (value != null) return value;
-        return null;
+        return new ChangePackageExecutablePlanPolicy().resolve(snapshot);
     }
 
     private String firstNonBlank(Object... values) {

@@ -54,8 +54,22 @@ public class OpsToolExecutionService {
     }
 
     public Map<String, Object> execute(Map<String, Object> request, String actor) {
+        if (request != null && Boolean.TRUE.equals(request.get("requireReadOnly"))) return executeReadOnly(request, actor);
         return toolMapper.view(toolExecution.execute(
                 toolMapper.request(request, actor, false)));
+    }
+
+    public Map<String, Object> executeReadOnly(Map<String, Object> request, String actor) {
+        Map<String, Object> restricted = new LinkedHashMap<>(request);
+        restricted.put("requireReadOnly", true);
+        String toolset = value(restricted.get("toolsetId"));
+        if (toolset.startsWith("mcp.")) {
+            // Compatibility identity only. The downstream MCP boundary checks the reviewed policy again.
+            restricted.put(OpsMcpToolExecutionBinding.CONTEXT_KEY,
+                    new OpsMcpToolExecutionBinding(toolset.substring(4), value(restricted.get("toolName")), true));
+            restricted.put("mcpCompatibilityFacade", true);
+        }
+        return toolMapper.view(toolExecution.execute(toolMapper.request(restricted, actor, false)));
     }
 
     public Map<String, Object> executeLanding(Map<String, Object> request, String actor) {
@@ -142,7 +156,23 @@ public class OpsToolExecutionService {
             String actor,
             String idempotencyKey,
             boolean readOnlyHint) {
-        return executeTypedMcp(config, toolInput, actor, true, idempotencyKey, readOnlyHint);
+        return executeTypedMcp(config, toolInput, actor, true, idempotencyKey, readOnlyHint, null);
+    }
+
+    /**
+     * Executes one Landing MCP call with the frozen operation identity selected by the runtime.
+     * The operation id is carried only for the corresponding target-write tool; auxiliary
+     * diagnostics (including receipt reads) deliberately leave it blank so they cannot be
+     * projected as a second completion of the frozen operation.
+     */
+    public Map<String, Object> executeLandingMcp(
+            OpsMcpServerConfig config,
+            String toolInput,
+            String actor,
+            String idempotencyKey,
+            boolean readOnlyHint,
+            String operationId) {
+        return executeTypedMcp(config, toolInput, actor, true, idempotencyKey, readOnlyHint, operationId);
     }
 
     private Map<String, Object> executeTypedMcp(
@@ -152,6 +182,18 @@ public class OpsToolExecutionService {
             boolean trustedLandingRuntime,
             String idempotencyKey,
             Boolean readOnlyHint) {
+        return executeTypedMcp(
+                config, toolInput, actor, trustedLandingRuntime, idempotencyKey, readOnlyHint, null);
+    }
+
+    private Map<String, Object> executeTypedMcp(
+            OpsMcpServerConfig config,
+            String toolInput,
+            String actor,
+            boolean trustedLandingRuntime,
+            String idempotencyKey,
+            Boolean readOnlyHint,
+            String operationId) {
         McpExecutionRequest mcpRequest = mcpMapper.request(
                 config,
                 toolInput,
@@ -167,6 +209,7 @@ public class OpsToolExecutionService {
                 OpsMcpToolExecutionBinding.CONTEXT_KEY,
                 new OpsMcpToolExecutionBinding(mcpId, remoteToolName, readOnlyHint));
         requestContext.put("mcpCompatibilityFacade", true);
+        requestContext.put("allowReadOnlyActivation", Boolean.TRUE.equals(readOnlyHint));
         if (config != null && config.getWorkSessionClaim() != null
                 && !config.getWorkSessionClaim().isEmpty()) {
             requestContext.put("metadata", new LinkedHashMap<>(config.getWorkSessionClaim()));
@@ -193,7 +236,7 @@ public class OpsToolExecutionService {
                 "",
                 mcpRequest.config().runId(),
                 requestContext,
-                landingContext(mcpRequest, trustedLandingRuntime));
+                landingContext(mcpRequest, trustedLandingRuntime, operationId));
         try {
             ToolExecutionResponse response = toolExecution.execute(toolRequest);
             Map<String, Object> envelope = toolMapper.view(response);
@@ -213,7 +256,8 @@ public class OpsToolExecutionService {
 
     private Map<String, Object> landingContext(
             McpExecutionRequest request,
-            boolean trustedLandingRuntime) {
+            boolean trustedLandingRuntime,
+            String operationId) {
         if (!trustedLandingRuntime) return Map.of();
         Map<String, Object> context = new LinkedHashMap<>();
         context.put("landingApproved", request.config().landingApproved());
@@ -222,7 +266,7 @@ public class OpsToolExecutionService {
         if (request.config().approvedPackageVersion() > 0) {
             context.put("approvedPackageVersion", request.config().approvedPackageVersion());
         }
-        putText(context, "operationId", request.config().operationId());
+        putText(context, "operationId", first(operationId, request.config().operationId()));
         context.put("internalCaller", OpsToolsetRouter.LANDING_INTERNAL_CALLER);
         context.put("landingRuntimeToken", OpsToolsetRouter.LANDING_RUNTIME_TOKEN);
         return context;

@@ -63,6 +63,10 @@ public class OpsWorkSessionLifecycleCoordinator {
             } catch (OpsWorkflowApprovalPendingException pending) {
                 heartbeat.suspendForApproval();
                 throw pending;
+            } catch (OpsRunCanceledException canceled) {
+                // Durable finish still checks the same claim/fence. A requested cancel
+                // deliberately stops heartbeats and must not be reclassified as model failure.
+                throw canceled;
             } catch (RuntimeException error) {
                 heartbeat.assertHealthy();
                 throw error;
@@ -74,6 +78,15 @@ public class OpsWorkSessionLifecycleCoordinator {
     public OpsAgentChatResponse succeedWorkSession(
             OpsWorkSessionRuntimeContext context) {
         return terminalCoordinator.success(context);
+    }
+
+    public boolean isWorkSessionSuspension(RuntimeException error) {
+        return error instanceof OpsWorkflowApprovalPendingException;
+    }
+
+    public OpsAgentChatResponse suspendWorkSession(OpsWorkSessionRuntimeContext context, RuntimeException error) {
+        if (!(error instanceof OpsWorkflowApprovalPendingException pending)) throw error;
+        return terminalCoordinator.waitingApproval(context, pending);
     }
 
     public boolean isWorkSessionCancellation(RuntimeException error) {

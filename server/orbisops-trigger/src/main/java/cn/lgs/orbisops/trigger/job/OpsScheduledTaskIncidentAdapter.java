@@ -34,6 +34,7 @@ public final class OpsScheduledTaskIncidentAdapter implements ScheduledTaskIncid
             ScheduledTaskExecutionCommand command,
             Long executionId,
             ScheduledTaskScreeningResult screening) {
+        if (text(command.createdBy()).isBlank()) throw new IllegalArgumentException("TASK_SCHEDULE_CREATOR_MISSING");
         TaskScheduleRuntimeConfiguration runtime = runtimeCodec.decode(command.runtimePayload());
         String projectId = runtime.projectId();
         String title = text(command.taskName()).isBlank()
@@ -60,6 +61,9 @@ public final class OpsScheduledTaskIncidentAdapter implements ScheduledTaskIncid
                         "conditionFingerprint", conditionFingerprint,
                         "abnormalSources", screening.abnormalSources()),
                 screening.abnormalSources()), ACTOR);
+        if (text(incident.ownerUserId()).isBlank()) {
+            incidents.assignOwner(incident.incidentId(), command.createdBy(), ACTOR);
+        }
         incidents.appendTimeline(
                 incident.incidentId(),
                 new AppendIncidentTimelineCommand(

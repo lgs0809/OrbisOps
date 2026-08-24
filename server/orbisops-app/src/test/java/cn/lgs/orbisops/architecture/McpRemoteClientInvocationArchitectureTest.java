@@ -34,7 +34,9 @@ class McpRemoteClientInvocationArchitectureTest {
                 () -> assertFalse(adapter.contains("ToolContext")),
                 () -> assertFalse(adapter.contains("SENSITIVE_KEY_PATTERN")),
                 () -> assertFalse(adapter.contains("ObjectProvider")),
-                () -> assertTrue(adapter.lines().count() < 150));
+                // Session recovery belongs here; line count does not enforce the dispatch boundary.
+                () -> assertFalse(adapter.contains("callback.call(")),
+                () -> assertFalse(adapter.contains("client().callTool(")));
     }
 
     @Test
@@ -47,7 +49,7 @@ class McpRemoteClientInvocationArchitectureTest {
                 () -> assertTrue(adapter.contains("ToolCallback serialized(")),
                 () -> assertTrue(adapter.contains("public String invoke(")),
                 () -> assertTrue(adapter.contains("Callable<String> call")),
-                () -> assertTrue(adapter.contains("handle.lock().lock()")),
+                () -> assertTrue(adapter.contains("OpsMcpRequestScope.acquire(handle.lock())")),
                 () -> assertTrue(adapter.contains("handle.touch()")),
                 () -> assertTrue(adapter.contains("SENSITIVE_KEY_PATTERN")),
                 () -> assertTrue(adapter.contains("McpCommands.RuntimeCall")),
@@ -93,7 +95,7 @@ class McpRemoteClientInvocationArchitectureTest {
 
         assertAll(
                 () -> assertTrue(configuration.contains("OpsMcpRemoteClientAdapter opsMcpRemoteClientAdapter")),
-                () -> assertTrue(configuration.contains("new OpsMcpRemoteClientAdapter(clientRegistry, clientFactory)")),
+                () -> assertTrue(configuration.contains("new OpsMcpRemoteCatalog(service,catalogs,clientFactory)")),
                 () -> assertTrue(configuration.contains("OpsMcpRemoteInvocationAdapter opsMcpRemoteInvocationAdapter")),
                 () -> assertTrue(configuration.contains("ObjectProvider<ProgressiveMcpProcessManager>")),
                 () -> assertTrue(configuration.contains("progressiveMcpProcessManagerProvider::getIfAvailable")),

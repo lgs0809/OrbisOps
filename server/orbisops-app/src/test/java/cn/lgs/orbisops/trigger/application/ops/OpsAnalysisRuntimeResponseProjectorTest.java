@@ -19,6 +19,16 @@ class OpsAnalysisRuntimeResponseProjectorTest {
     private final OpsAnalysisRuntimeResponseProjector projector =
             new OpsAnalysisRuntimeResponseProjector();
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"WAITING_APPROVAL", "CANCELED", "FAILED", "SUCCEEDED"})
+    void retainsRuntimeStatusInsteadOfInferringSuccessFromReport(String status) {
+        var response = new OpsAnalysisResponseDTO();
+        projector.project(new OpsAgentRunRequestDTO(), response,
+                OpsAgentChatResponse.builder().content("report exists")
+                        .metadata(Map.of("status", status)).build());
+        assertEquals(status, response.getRuntimeStatus());
+    }
+
     @Test
     void shouldProjectRuntimeIdentityEventsAndMarkdownFallback() {
         OpsAnalysisResponseDTO response = new OpsAnalysisResponseDTO();
@@ -55,6 +65,7 @@ class OpsAnalysisRuntimeResponseProjectorTest {
                         .build());
 
         assertAll(
+                () -> assertEquals("SUCCEEDED", response.getRuntimeStatus()),
                 () -> assertEquals("ops-agent", response.getAgentDefinitionId()),
                 () -> assertEquals(7, response.getAgentVersion()),
                 () -> assertEquals("GRAPH", response.getAgentRuntime()),

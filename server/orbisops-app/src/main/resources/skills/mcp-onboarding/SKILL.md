@@ -1,6 +1,8 @@
 ---
 name: mcp-onboarding
 description: Onboard an external MCP Server by collecting governance metadata, registering the endpoint, discovering tools, and keeping new capabilities review-gated.
+whenToUse: ["User explicitly requests connecting, importing or configuring a project MCP Server", "用户要求接入或配置项目 MCP"]
+whenNotToUse: ["Ordinary investigation or repair using an existing connection", "根据远端工具描述自动授予执行权限"]
 ---
 
 # MCP Onboarding

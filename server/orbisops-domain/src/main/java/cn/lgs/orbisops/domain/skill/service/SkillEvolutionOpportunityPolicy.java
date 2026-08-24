@@ -2,7 +2,6 @@ package cn.lgs.orbisops.domain.skill.service;
 
 import cn.lgs.orbisops.domain.skill.model.SkillEvolutionOpportunityInput;
 
-import java.util.List;
 import java.util.Locale;
 
 /** Classifies trusted runtime facts into reusable Skill Evolution opportunities. */
@@ -17,7 +16,7 @@ public class SkillEvolutionOpportunityPolicy {
                 || trigger.contains("USER_EXPLICIT_REMEMBER")) {
             return "USER_ASSERTED_PROCEDURE";
         }
-        if (input.userNegativeFeedback() && hasReusableText(input.finalOutput())) {
+        if (input.userNegativeFeedback() && !input.finalOutput().isBlank()) {
             return "USER_NEGATIVE_FEEDBACK";
         }
         if (input.routingCorrected() && trustedEvidence) {
@@ -25,13 +24,13 @@ public class SkillEvolutionOpportunityPolicy {
         }
         if (input.completed()
                 && trustedEvidence
-                && input.failedThenRecovered()
-                && hasReusableText(input.finalOutput())) {
+                && input.failedThenRecovered()) {
             return "FAILED_THEN_RECOVERED_PATTERN";
         }
-        if (input.completed()
-                && trustedEvidence
-                && hasReusableText(input.finalOutput())) {
+        // Reusability belongs to semantic extraction, not the wording of the report.
+        // This signal only schedules a candidate; verified source and publication
+        // policy are checked independently by the evolution pipeline.
+        if (input.completed() && trustedEvidence) {
             return "SUCCESSFUL_DIAGNOSTIC_PATTERN";
         }
         if (input.completed()
@@ -41,25 +40,4 @@ public class SkillEvolutionOpportunityPolicy {
         return "NO_SIGNAL";
     }
 
-    private boolean hasReusableText(String value) {
-        if (value == null || value.isBlank() || value.length() < 80) return false;
-        String normalized = value.toLowerCase(Locale.ROOT);
-        return List.of(
-                        "因为",
-                        "根因",
-                        "证据",
-                        "步骤",
-                        "先",
-                        "然后",
-                        "验证",
-                        "修复",
-                        "回滚",
-                        "cause",
-                        "evidence",
-                        "step",
-                        "verify",
-                        "rollback")
-                .stream()
-                .anyMatch(normalized::contains);
-    }
 }

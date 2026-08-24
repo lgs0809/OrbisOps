@@ -1,6 +1,7 @@
 package cn.lgs.orbisops.application.security;
 
 import cn.lgs.orbisops.domain.security.AdminUserAccount;
+import cn.lgs.orbisops.domain.security.AdminPhoneNumber;
 import cn.lgs.orbisops.domain.security.AdminUserStatus;
 
 import java.time.Clock;
@@ -54,13 +55,17 @@ public final class AdminUserAuthenticationUseCase {
     }
 
     private AdminUserAccount authenticatedAccount(AdminUserLoginCommand command) {
-        if (command == null || !hasText(command.username()) || !hasText(command.credential())) {
-            throw new IllegalArgumentException("用户名或密码不能为空");
+        if (command == null || (!hasText(command.username()) && command.phone() == null)
+                || !hasText(command.credential())) {
+            throw new IllegalArgumentException("登录账号或密码不能为空");
         }
-        AdminUserAccount account = catalogPort.findByUsername(command.username());
+        boolean phoneLogin = command.phone() != null;
+        AdminUserAccount account = phoneLogin
+                ? catalogPort.findByPhone(AdminPhoneNumber.required(command.phone()))
+                : catalogPort.findByUsername(command.username());
         if (account == null
                 || !authenticationPort.matches(command.credential(), account.credential())) {
-            throw new AdminUserAuthenticationException("用户名或密码错误");
+            throw new AdminUserAuthenticationException(phoneLogin ? "手机号或密码错误" : "用户名或密码错误");
         }
         if (AdminUserStatus.isDisabled(account.status())) {
             throw new AdminUserAuthenticationException("用户已被禁用");

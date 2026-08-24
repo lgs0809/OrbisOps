@@ -13,7 +13,15 @@ public record TaskScheduleDefinition(
         TaskScheduleRuntimeConfiguration runtimeConfiguration,
         Integer status,
         LocalDateTime createTime,
-        LocalDateTime updateTime) {
+        LocalDateTime updateTime,
+        String createdBy) {
+
+    public TaskScheduleDefinition(Long id, String projectId, String agentId, String taskName,
+            String description, String cronExpression, TaskScheduleRuntimeConfiguration runtimeConfiguration,
+            Integer status, LocalDateTime createTime, LocalDateTime updateTime) {
+        this(id, projectId, agentId, taskName, description, cronExpression, runtimeConfiguration,
+                status, createTime, updateTime, null);
+    }
 
     public TaskScheduleDefinition withStatus(Integer resolvedStatus, LocalDateTime resolvedUpdateTime) {
         return new TaskScheduleDefinition(
@@ -26,6 +34,6 @@ public record TaskScheduleDefinition(
                 runtimeConfiguration,
                 resolvedStatus,
                 createTime,
-                resolvedUpdateTime);
+                resolvedUpdateTime, createdBy);
     }
 }

@@ -126,6 +126,50 @@ class OpsPreApprovalValidationServiceTest {
         verify(writebackUseCase).writeBack(any(ChangePackageCommands.ValidationWriteback.class));
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"NO_ACTION_REQUIRED", "MANUAL_REQUIRED", "NEEDS_HUMAN_DESIGN"})
+    void humanOnlyTypeCannotHideRetainedExecutableSteps(String type) {
+        Map<String, Object> source = new LinkedHashMap<>(snapshotWithExplicitValidationStep());
+        source.put("packageType", type);
+        Fixture fixture = packageFixture("VALIDATION_FAILED", source);
+        var service = new OpsPreApprovalValidationService(fixture.queryService(), fixture.writebackUseCase(),
+                provider(null), provider(null));
+        service.validate("cp-1", 1, "alice");
+        var capture = org.mockito.ArgumentCaptor.forClass(ChangePackageCommands.ValidationWriteback.class);
+        verify(fixture.writebackUseCase()).writeBack(capture.capture());
+        org.junit.jupiter.api.Assertions.assertFalse(capture.getValue().passed());
+        org.junit.jupiter.api.Assertions.assertTrue(capture.getValue().validationReport().toString()
+                .contains("HUMAN_ONLY_PACKAGE_HAS_EXECUTABLE_OPERATIONS"));
+    }
+
+    @Test void emptyTopLevelStepsCannotHideExecutableLandingPlan() {
+        Map<String, Object> source = new LinkedHashMap<>(snapshot());
+        Object steps = source.get("mcpSteps");
+        source.put("packageType", "NEEDS_HUMAN_DESIGN");
+        source.put("mcpSteps", List.of());
+        source.put("landingPlan", Map.of("steps", List.of(), "operations", steps));
+        Fixture fixture = packageFixture("VALIDATION_FAILED", source);
+        var service = new OpsPreApprovalValidationService(fixture.queryService(), fixture.writebackUseCase(),
+                provider(null), provider(null));
+        service.validate("cp-1", 1, "alice");
+        var capture = org.mockito.ArgumentCaptor.forClass(ChangePackageCommands.ValidationWriteback.class);
+        verify(fixture.writebackUseCase()).writeBack(capture.capture());
+        org.junit.jupiter.api.Assertions.assertFalse(capture.getValue().passed());
+    }
+
+    @Test void genuinelyEmptyNoActionPackageStillValidatesWithoutToolExecution() {
+        Map<String, Object> source = new LinkedHashMap<>(snapshot());
+        source.put("packageType", "NO_ACTION_REQUIRED");
+        source.put("mcpSteps", List.of());
+        Fixture fixture = packageFixture("READY_FOR_REVIEW", source);
+        var service = new OpsPreApprovalValidationService(fixture.queryService(), fixture.writebackUseCase(),
+                provider(null), provider(null));
+        service.validate("cp-1", 1, "alice");
+        var capture = org.mockito.ArgumentCaptor.forClass(ChangePackageCommands.ValidationWriteback.class);
+        verify(fixture.writebackUseCase()).writeBack(capture.capture());
+        org.junit.jupiter.api.Assertions.assertTrue(capture.getValue().passed());
+    }
+
     private Fixture packageFixture(String finalStatus) {
         return packageFixture(finalStatus, snapshot());
     }

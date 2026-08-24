@@ -35,7 +35,11 @@ final class OpsAgentScopeFlowPolicy {
     }
 
     int recursionLimit(int maxToolRounds) {
-        return Math.max(8, maxToolRounds * 2 + 8);
+        // A business round can first search the catalog and disclose its schema.
+        // Each of those calls traverses both the native model and tool nodes.
+        // Keep a bounded graph guard for those control steps while the synthesis
+        // interceptor independently enforces the unchanged business-call budget.
+        return Math.max(8, maxToolRounds * 6 + 8);
     }
 
     private String firstText(String... values) {

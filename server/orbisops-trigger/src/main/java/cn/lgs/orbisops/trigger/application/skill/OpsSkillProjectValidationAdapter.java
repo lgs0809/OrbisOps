@@ -22,4 +22,10 @@ public class OpsSkillProjectValidationAdapter implements SkillProjectValidationP
             throw new IllegalArgumentException("项目不存在：" + normalized);
         }
     }
+
+    @Override
+    public java.util.List<String> configuredSkillIds(String projectId) {
+        requireExisting(projectId);
+        return projectDefinitionService.findDefinition(projectId).orElseThrow().skillIds();
+    }
 }

@@ -37,6 +37,10 @@ final class OpsChangePackageToolRequestFactory {
                 context.contextBundleHash(),
                 "PrepareChangePackage 缺少后端 Runtime Context Bundle Hash"));
         request.put("incidentId", input.getIncidentId());
+        if (!text(input.getServiceId()).isBlank()) request.put("serviceId", text(input.getServiceId()));
+        if (input.getVerificationCriteria() != null && !input.getVerificationCriteria().isEmpty()) {
+            request.put("verificationCriteria", verificationCriteria(input, actions));
+        }
         request.put("objective", text(input.getTitle()));
         request.put("question", text(input.getSummary()));
         request.put("summary", text(input.getSummary()));
@@ -55,10 +59,32 @@ final class OpsChangePackageToolRequestFactory {
         request.put("dryRunResult", mapOrDefault(
                 input.getDryRunResult(), Map.of("status", "NOT_SUPPORTED", "executed", false)));
         request.put("approvalBoundary", mapOrDefault(input.getApprovalBoundary(), Map.of()));
-        request.put("preferredPlan", mapOrDefault(
-                input.getPreferredPlan(), Map.of("steps", actions)));
+        request.put("preferredPlan", new cn.lgs.orbisops.domain.changepackage.service.ChangePackageExecutablePlanPolicy()
+                .canonicalPreferredPlan(mapOrDefault(input.getPreferredPlan(), Map.of("steps", actions)), actions));
         request.put("adjustmentPolicy", mapOrDefault(input.getAdjustmentPolicy(), Map.of()));
         return request;
+    }
+
+    private List<Map<String, Object>> verificationCriteria(OpsChangePackageToolInput input, List<Map<String, Object>> actions) {
+        var criteria = list(input.getVerificationCriteria());
+        if (criteria.size() > 16) throw new IllegalArgumentException("VERIFICATION_CRITERIA_LIMIT_EXCEEDED");
+        var observable = criteria.stream().filter(item -> item != null &&
+                "OBSERVABILITY_SLO_V1".equals(item.get("kind"))).toList();
+        if (observable.size() > 1) throw new IllegalArgumentException("OBSERVABILITY_CRITERIA_MUST_BE_UNIQUE");
+        for (var item : observable) {
+            new cn.lgs.orbisops.domain.runtime.workflow.service.WorkflowChangeVerificationPolicy().validateCriteria(item);
+            if (!text(input.getServiceId()).equals(item.get("serviceId")) || !item.containsKey("minQps") || !item.containsKey("maxQps")) {
+                throw new IllegalArgumentException("VERIFICATION_SERVICE_AND_LOAD_RANGE_REQUIRED");
+            }
+            var writes = actions.stream().filter(action ->
+                    new cn.lgs.orbisops.domain.changepackage.service.ChangePackageLandingOperationSafetyPolicy().targetWrite(action)).toList();
+            if (writes.isEmpty() || writes.stream().anyMatch(action ->
+                    !item.get("environment").equals(action.get("targetEnvironment")) ||
+                    !item.get("resourceIdentity").equals(action.get("resourceScope")))) {
+                throw new IllegalArgumentException("VERIFICATION_TARGET_MUST_MATCH_GOVERNED_ACTION");
+            }
+        }
+        return criteria.stream().map(item -> Collections.unmodifiableMap(new LinkedHashMap<>(item))).toList();
     }
 
     private List<Map<String, Object>> list(List<Map<String, Object>> source) {

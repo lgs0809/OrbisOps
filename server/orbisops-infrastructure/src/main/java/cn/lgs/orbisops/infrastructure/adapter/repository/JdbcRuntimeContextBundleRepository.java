@@ -60,12 +60,12 @@ public class JdbcRuntimeContextBundleRepository implements IRuntimeContextBundle
                 snapshot.agentId(),
                 snapshot.actor(),
                 snapshot.memoryContextHash(),
-                JSON.toJSONString(snapshot.memoryRefs()),
-                JSON.toJSONString(snapshot.usedSkillVersionRefs()),
+                JSON.toJSONString(snapshot.memoryRefs(), com.alibaba.fastjson.serializer.SerializerFeature.DisableCircularReferenceDetect),
+                JSON.toJSONString(snapshot.usedSkillVersionRefs(), com.alibaba.fastjson.serializer.SerializerFeature.DisableCircularReferenceDetect),
                 snapshot.usedSkillRefsHash(),
                 snapshot.toolsetBoundaryHash(),
                 snapshot.runtimeBoundaryHash(),
-                JSON.toJSONString(snapshot.compatiblePayload()),
+                JSON.toJSONString(snapshot.compatiblePayload(), com.alibaba.fastjson.serializer.SerializerFeature.DisableCircularReferenceDetect),
                 Timestamp.from(snapshot.createdAt()));
         return snapshot;
     }
@@ -126,7 +126,14 @@ public class JdbcRuntimeContextBundleRepository implements IRuntimeContextBundle
         payload.put("contextBundleHash", bundleHash);
         payload.putIfAbsent("memoryContextRefs", memoryRefs);
         payload.putIfAbsent("memoryContextHash", memoryHash);
-        payload.putIfAbsent("usedSkillVersionRefs", skillRefs);
+        // Older JSON may encode shared immutable lists as $ref objects. The dedicated
+        // columns retain the same frozen references; never substitute a live selection.
+        Object selected = payload.get("usedSkillVersionRefs");
+        if (selected instanceof Map<?, ?> ref && ref.size() == 1 && ref.containsKey("$ref")) {
+            payload.put("usedSkillVersionRefs", skillRefs);
+        } else {
+            payload.putIfAbsent("usedSkillVersionRefs", skillRefs);
+        }
         payload.putIfAbsent("usedSkillRefsHash", skillHash);
         payload.putIfAbsent("toolsetBoundaryHash", toolsetHash);
         payload.putIfAbsent("runtimeBoundaryHash", runtimeHash);

@@ -3,7 +3,7 @@ package cn.lgs.orbisops.domain.skill.model;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/** Immutable authoritative facts for one authored Skill patch candidate. */
+/** Immutable snapshot of a candidate. Unpublished corrections retain each prior snapshot and hash. */
 public record SkillPatchCandidate(
         String candidateId,
         String candidateHash,

@@ -25,6 +25,8 @@ public final class SelectRuntimeSkillsQuery {
     private final SkillRuntimeSelectionPolicy selectionPolicy;
     private final SkillRuntimeRecallPolicy recallPolicy;
     private final SkillRuntimeSelectionViewMapper selectionViews;
+    private final SkillRuntimePublishedVersionPort publishedVersions;
+    private final SkillApplicabilityPort applicability;
 
     public SelectRuntimeSkillsQuery(SkillCatalogPort catalogPort,
                                     SkillSemanticScorePort semanticScorePort,
@@ -33,6 +35,20 @@ public final class SelectRuntimeSkillsQuery {
                 new SkillRuntimeCandidateAssembler(), new SkillRuntimeSelectionPolicy(),
                 new SkillRuntimeRecallPolicy(),
                 new SkillRuntimeSelectionViewMapper(new SkillBoundReferenceMapper()));
+    }
+
+    public SelectRuntimeSkillsQuery(SkillCatalogPort catalogPort, SkillSemanticScorePort semanticScorePort,
+                                   SkillRerankPort rerankPort, SkillRuntimeSelectionSettings settings,
+                                   SkillRuntimePublishedVersionPort publishedVersions) {
+        this(catalogPort,semanticScorePort,rerankPort,settings,publishedVersions,SkillApplicabilityPort.UNAVAILABLE);
+    }
+
+    public SelectRuntimeSkillsQuery(SkillCatalogPort catalogPort, SkillSemanticScorePort semanticScorePort,
+                                   SkillRerankPort rerankPort, SkillRuntimeSelectionSettings settings,
+                                   SkillRuntimePublishedVersionPort publishedVersions, SkillApplicabilityPort applicability) {
+        this(catalogPort, semanticScorePort, rerankPort, settings, new SkillRuntimeCandidateAssembler(),
+                new SkillRuntimeSelectionPolicy(), new SkillRuntimeRecallPolicy(),
+                new SkillRuntimeSelectionViewMapper(new SkillBoundReferenceMapper()), publishedVersions, applicability);
     }
 
     public SelectRuntimeSkillsQuery(SkillCatalogPort catalogPort,
@@ -65,6 +81,28 @@ public final class SelectRuntimeSkillsQuery {
                              SkillRuntimeSelectionPolicy selectionPolicy,
                              SkillRuntimeRecallPolicy recallPolicy,
                              SkillRuntimeSelectionViewMapper selectionViews) {
+        this(catalogPort, semanticScorePort, rerankPort, settings, candidateAssembler,
+                selectionPolicy, recallPolicy, selectionViews, (project, candidates) -> candidates);
+    }
+
+    private SelectRuntimeSkillsQuery(SkillCatalogPort catalogPort,
+                             SkillSemanticScorePort semanticScorePort,
+                             SkillRerankPort rerankPort,
+                             SkillRuntimeSelectionSettings settings,
+                             SkillRuntimeCandidateAssembler candidateAssembler,
+                             SkillRuntimeSelectionPolicy selectionPolicy,
+                             SkillRuntimeRecallPolicy recallPolicy,
+                             SkillRuntimeSelectionViewMapper selectionViews,
+                             SkillRuntimePublishedVersionPort publishedVersions) {
+        this(catalogPort,semanticScorePort,rerankPort,settings,candidateAssembler,selectionPolicy,recallPolicy,
+                selectionViews,publishedVersions,SkillApplicabilityPort.UNAVAILABLE);
+    }
+
+    private SelectRuntimeSkillsQuery(SkillCatalogPort catalogPort, SkillSemanticScorePort semanticScorePort,
+                             SkillRerankPort rerankPort, SkillRuntimeSelectionSettings settings,
+                             SkillRuntimeCandidateAssembler candidateAssembler, SkillRuntimeSelectionPolicy selectionPolicy,
+                             SkillRuntimeRecallPolicy recallPolicy, SkillRuntimeSelectionViewMapper selectionViews,
+                             SkillRuntimePublishedVersionPort publishedVersions, SkillApplicabilityPort applicability) {
         if (catalogPort == null) throw new IllegalArgumentException("SKILL_CATALOG_PORT_REQUIRED");
         if (semanticScorePort == null) throw new IllegalArgumentException("SKILL_SEMANTIC_SCORE_PORT_REQUIRED");
         if (rerankPort == null) throw new IllegalArgumentException("SKILL_RERANK_PORT_REQUIRED");
@@ -81,6 +119,8 @@ public final class SelectRuntimeSkillsQuery {
         this.selectionPolicy = selectionPolicy;
         this.recallPolicy = recallPolicy;
         this.selectionViews = selectionViews;
+        this.publishedVersions = java.util.Objects.requireNonNull(publishedVersions);
+        this.applicability = java.util.Objects.requireNonNull(applicability);
     }
 
     public Result select(Request request) {
@@ -89,39 +129,45 @@ public final class SelectRuntimeSkillsQuery {
             throw new IllegalArgumentException("TOO_MANY_EXPLICIT_SKILLS: 最多显式选择 "
                     + settings.maxExplicitSkills() + " 个 Skill");
         }
-        List<SkillRuntimeCandidate> candidates = runtimeCandidates(request.projectId());
-        List<SkillRuntimeCandidate> recalled = recallPolicy.recall(
-                request.query(), candidates, new LinkedHashSet<>(request.requestedSkillIds()),
-                settings.semanticRecallLimit());
-        Map<String, Double> semanticScores = semanticScorePort.scores(request.query(), recalled);
-        Map<String, Double> rerankScores = settings.llmRerankEnabled()
-                ? rerankPort.scores(
-                        request.query(),
-                        recalled.stream().limit(settings.llmRerankCandidateLimit()).toList())
-                : Map.of();
-        Map<String, Double> retrievalScores = retrievalScores(
-                semanticScores, rerankScores, settings.llmRerankWeight());
-        int selectedLimit = Math.min(settings.selectedLimit(), request.maxSelected());
-        SkillRuntimeSelection selection = selectionPolicy.select(
-                new SkillRuntimeSelectionRequest(
-                        request.projectId(), request.agentId(), request.query(),
-                        new LinkedHashSet<>(request.requestedSkillIds()),
-                        settings.catalogCandidateLimit(), selectedLimit, settings.maxExplicitSkills(),
-                        settings.minRelevanceScore(), settings.similarSuppressionThreshold(), settings.semanticWeight(),
-                        settings.semanticRecallLimit(), settings.categoryBoost(), settings.negativePenaltyWeight()),
-                candidates, retrievalScores);
+        SkillRuntimeCatalogAccess access = new SkillRuntimeCatalogAccess(catalogPort);
+        List<SkillRuntimeCandidate> candidates = publishedVersions.visible(request.projectId(), access.active(request.projectId()),new LinkedHashSet<>(request.requestedSkillIds()));
+        SkillRuntimeSelection selection = new SkillHybridRetrieval(semanticScorePort,rerankPort,settings,applicability).select(
+                request.projectId(),request.query(),candidates,new LinkedHashSet<>(request.requestedSkillIds()),Math.min(3,Math.min(settings.selectedLimit(),request.maxSelected())));
+        selection=retainCurrent(selection,publishedVersions.visible(request.projectId(), access.active(request.projectId()),new LinkedHashSet<>(request.requestedSkillIds())));
         return selectionViews.result(selection);
     }
 
     public Result selectFrozen(FrozenRequest request) {
         if (request == null) throw new IllegalArgumentException("SKILL_FROZEN_SELECTION_REQUEST_REQUIRED");
-        List<SkillRuntimeCandidate> candidates = request.catalogRefs().stream()
-                .map(candidateAssembler::fromView)
-                .map(this::requireRoutingReady)
-                .toList();
-        List<SkillRuntimeSelection.RankedSkill> ranked = selectionPolicy.rankFrozenCatalog(
-                candidates, request.query(), request.maxSelected());
-        return selectionViews.frozenResult(request.catalogRefs(), ranked);
+        if(request.projectId().isBlank()) throw new IllegalArgumentException("SKILL_FROZEN_PROJECT_CONTEXT_REQUIRED");
+        List<SkillRuntimeCandidate> candidates = request.catalogRefs().stream().map(candidateAssembler::fromView)
+                .map(this::requireRoutingReady).toList();
+        if(publishedVersions.usableFrozen(request.projectId(),candidates).size()!=candidates.size())
+            throw new SkillRuntimeAccessRevokedException();
+        if(candidates.stream().map(SkillRuntimeCandidate::skillId).distinct().count()!=candidates.size())
+            throw new IllegalArgumentException("SKILL_FROZEN_DUPLICATE_ID");
+        if(candidates.stream().anyMatch(c->!"GLOBAL".equals(c.scope()) && !request.projectId().equals(c.projectId())))
+            throw new SecurityException("SKILL_FROZEN_PROJECT_CONTEXT_MISMATCH");
+        SkillRuntimeCatalogAccess access=new SkillRuntimeCatalogAccess(catalogPort);
+        candidates=access.retain(request.projectId(),candidates,false);
+        var selection=new SkillHybridRetrieval(semanticScorePort,rerankPort,settings,applicability).select(
+                request.projectId(),request.query(),candidates,Set.of(),Math.min(3,request.maxSelected()));
+        selection=retainCurrent(selection,publishedVersions.usableFrozen(request.projectId(),access.retain(request.projectId(),candidates,false)));
+        return selectionViews.frozenResult(selection);
+    }
+
+    private SkillRuntimeSelection retainCurrent(SkillRuntimeSelection selection,List<SkillRuntimeCandidate> current) {
+        Map<String,SkillRuntimeCandidate> identities=new LinkedHashMap<>();current.forEach(c->identities.put(c.skillId(),c));
+        java.util.function.Predicate<SkillRuntimeCandidate> retained=c->{
+            var now=identities.get(c.skillId());
+            return now!=null && now.scope().equals(c.scope()) && now.projectId().equals(c.projectId())
+                    && now.version()==c.version() && now.skillHash().equals(c.skillHash()) && now.packageHash().equals(c.packageHash());
+        };
+        if(selection.selected().stream().anyMatch(r->r.explicit() && !retained.test(r.candidate())))
+            throw new SecurityException("SKILL_RUNTIME_ACCESS_CHANGED_DURING_RETRIEVAL");
+        return new SkillRuntimeSelection(selection.catalog().stream().filter(r->retained.test(r.candidate())).toList(),
+                selection.selected().stream().filter(r->retained.test(r.candidate())).toList(),
+                selection.suppressed().stream().filter(r->retained.test(r.rankedSkill().candidate())).toList(),current.size());
     }
 
     private SkillRuntimeCandidate requireRoutingReady(SkillRuntimeCandidate candidate) {
@@ -131,56 +177,6 @@ public final class SelectRuntimeSkillsQuery {
                     "SKILL_ROUTING_PROFILE_REQUIRED_AT_RUNTIME:" + skillId);
         }
         return candidate;
-    }
-
-    private List<SkillRuntimeCandidate> runtimeCandidates(String projectId) {
-        Map<String, SkillRuntimeCandidate> unique = new LinkedHashMap<>();
-        Set<String> projectOwnedSkillIds = new LinkedHashSet<>();
-        if (!projectId.isBlank()) {
-            for (SkillCatalogSnapshot skill : catalogPort.listProjectEntries(projectId)) {
-                String skillId = normalizeId(skill == null ? null : skill.skillId());
-                if (skillId.isBlank()) continue;
-                projectOwnedSkillIds.add(skillId);
-                if (skill.activeAtUse() && skill.runtimeCandidate().routingReady()) {
-                    unique.put(skillId, skill.runtimeCandidate());
-                }
-            }
-        }
-        for (SkillCatalogSnapshot skill : catalogPort.listGlobalEntries()) {
-            String skillId = normalizeId(skill == null ? null : skill.skillId());
-            if (skillId.isBlank()
-                    || projectOwnedSkillIds.contains(skillId)
-                    || !skill.activeAtUse()
-                    || !skill.runtimeCandidate().routingReady()) continue;
-            unique.putIfAbsent(skillId, skill.runtimeCandidate());
-        }
-        return List.copyOf(unique.values());
-    }
-
-    private Map<String, Double> retrievalScores(Map<String, Double> semantic,
-                                                Map<String, Double> rerank,
-                                                double rerankWeight) {
-        Map<String, Double> safeSemantic = semantic == null ? Map.of() : semantic;
-        Map<String, Double> safeRerank = rerank == null ? Map.of() : rerank;
-        if (safeRerank.isEmpty()) return safeSemantic;
-        Map<String, Double> combined = new LinkedHashMap<>();
-        Set<String> ids = new LinkedHashSet<>(safeSemantic.keySet());
-        ids.addAll(safeRerank.keySet());
-        for (String id : ids) {
-            Double semanticScore = validScore(safeSemantic.get(id));
-            Double rerankScore = validScore(safeRerank.get(id));
-            if (semanticScore == null && rerankScore == null) continue;
-            double score = semanticScore == null ? rerankScore
-                    : rerankScore == null ? semanticScore
-                    : semanticScore * (1D - rerankWeight) + rerankScore * rerankWeight;
-            combined.put(id, Math.max(0D, Math.min(1D, score)));
-        }
-        return Map.copyOf(combined);
-    }
-
-    private Double validScore(Double value) {
-        return value == null || value.isNaN() || value.isInfinite()
-                ? null : Math.max(0D, Math.min(1D, value));
     }
 
     public record Request(String projectId,
@@ -201,10 +197,11 @@ public final class SelectRuntimeSkillsQuery {
         }
     }
 
-    public record FrozenRequest(List<Map<String, Object>> catalogRefs,
+    public record FrozenRequest(String projectId, List<Map<String, Object>> catalogRefs,
                                 String query,
                                 int maxSelected) {
         public FrozenRequest {
+            projectId = text(projectId);
             catalogRefs = copyMaps(catalogRefs);
             query = text(query);
             maxSelected = limit(maxSelected);

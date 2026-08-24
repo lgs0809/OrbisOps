@@ -3,6 +3,7 @@ package cn.lgs.orbisops.trigger.application.memory;
 import cn.lgs.orbisops.application.memory.CaptureMemoryUseCase;
 import cn.lgs.orbisops.application.memory.ColdMemoryStoreApplicationService;
 import cn.lgs.orbisops.application.memory.GovernedMemoryApplicationService;
+import cn.lgs.orbisops.domain.memory.adapter.repository.IConversationMemoryRepository;
 import cn.lgs.orbisops.application.memory.ContextMemoryAdminApplicationService;
 import cn.lgs.orbisops.application.memory.ContextMemoryApplicationFacade;
 import cn.lgs.orbisops.application.memory.ContextMemoryQueryApplicationService;
@@ -169,13 +170,14 @@ public class OpsMemoryApplicationConfiguration {
     public SemanticMemoryRetrievalApplicationService semanticMemoryRetrievalApplicationService(
             OpsSemanticVectorRecallAdapter vectorRecallAdapter,
             SemanticLexicalRecallPort lexicalRecallAdapter,
-            OpsSemanticRetrievalFailureAdapter failureAdapter) {
+            OpsSemanticRetrievalFailureAdapter failureAdapter,
+            cn.lgs.orbisops.domain.memory.adapter.repository.IConversationMemoryRepository sources) {
         SemanticMemoryPolicy semanticPolicy = new SemanticMemoryPolicy(new MemoryContentHashPolicy());
         return new SemanticMemoryRetrievalApplicationService(
                 vectorRecallAdapter,
                 lexicalRecallAdapter,
                 failureAdapter,
-                new SemanticMemoryFusionPolicy(semanticPolicy));
+                new SemanticMemoryFusionPolicy(semanticPolicy),sources);
     }
 
     @Bean
@@ -221,13 +223,13 @@ public class OpsMemoryApplicationConfiguration {
     public MemoryCompressionApplicationService memoryCompressionApplicationService(
             OpsMemoryModelSummaryAdapter modelSummaryAdapter,
             HotMemoryReplacePort hotMemoryReplacePort,
-            ColdMemoryStoreApplicationService coldMemoryStore) {
+            ColdMemoryStoreApplicationService coldMemoryStore,
+            IConversationMemoryRepository conversationRepository) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
         return new MemoryCompressionApplicationService(
                 new MemoryCompressionPolicy(new MemoryContentHashPolicy()),
                 modelSummaryAdapter,
-                hotMemoryReplacePort,
-                coldMemoryStore,
+                conversationRepository,
                 () -> formatter.format(LocalDateTime.now()));
     }
 
@@ -251,7 +253,8 @@ public class OpsMemoryApplicationConfiguration {
             ContextMemoryWritePort contextMemoryWritePort,
             MemoryCompressionPort memoryCompressionPort,
             @Qualifier("opsMemoryExecutor") ObjectProvider<Executor> memoryExecutorProvider,
-            OpsMemoryPostProcessingFailureAdapter failureAdapter) {
+            OpsMemoryPostProcessingFailureAdapter failureAdapter,
+            IConversationMemoryRepository conversationRepository) {
         return new MemoryPostProcessingApplicationService(
                 semanticMemoryWritePort,
                 memoryExtractionPort,
@@ -259,7 +262,8 @@ public class OpsMemoryApplicationConfiguration {
                 contextMemoryWritePort,
                 memoryCompressionPort,
                 memoryExecutorProvider == null ? () -> null : memoryExecutorProvider::getIfAvailable,
-                failureAdapter);
+                failureAdapter,
+                conversationRepository, Clock.systemUTC());
     }
 
     @Bean
@@ -267,14 +271,15 @@ public class OpsMemoryApplicationConfiguration {
             HotMemoryWritePort hotMemoryWritePort,
             ColdMemoryStoreApplicationService coldMemoryStore,
             MemoryPostProcessingApplicationService postProcessingService,
-            OpsMemoryCaptureFailureAdapter failureAdapter) {
+            OpsMemoryCaptureFailureAdapter failureAdapter,
+            IConversationMemoryRepository conversationRepository) {
         return new MemoryCaptureApplicationService(
                 hotMemoryWritePort,
                 coldMemoryStore,
                 postProcessingService,
                 new MemoryCapturePolicy(),
                 Clock.systemDefaultZone(),
-                failureAdapter);
+                failureAdapter, conversationRepository);
     }
 
     @Bean
@@ -299,14 +304,15 @@ public class OpsMemoryApplicationConfiguration {
             SemanticMemoryQueryPort semanticMemoryQueryPort,
             ContextMemoryQueryPort contextMemoryQueryPort,
             @Qualifier("opsMemoryExecutor") ObjectProvider<Executor> memoryExecutorProvider,
-            OpsMemoryRetrievalFailureAdapter failureAdapter) {
+            OpsMemoryRetrievalFailureAdapter failureAdapter,
+            IConversationMemoryRepository conversationRepository) {
         return new MemoryRetrievalApplicationService(
                 coldMemoryStore,
                 hotMemoryQueryPort,
                 semanticMemoryQueryPort,
                 contextMemoryQueryPort,
                 memoryExecutorProvider == null ? () -> null : memoryExecutorProvider::getIfAvailable,
-                failureAdapter);
+                failureAdapter, conversationRepository);
     }
 
     @Bean

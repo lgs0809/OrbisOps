@@ -1,13 +1,12 @@
 package cn.lgs.orbisops.trigger.ops.skill;
 
-import org.springframework.ai.embedding.EmbeddingModel;
+import cn.lgs.orbisops.trigger.application.skill.OpsSkillRetrievalHttpClient;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Batch embedding, cache population, and semantic score projection. */
+/** Pinned local embedding, revision-scoped cache population, and semantic score projection. */
 final class OpsSkillEmbeddingScoreCoordinator {
 
     private final OpsSkillSemanticSettings settings;
@@ -31,7 +30,7 @@ final class OpsSkillEmbeddingScoreCoordinator {
     }
 
     Map<String, Double> scores(
-            EmbeddingModel model,
+            OpsSkillRetrievalHttpClient model,
             String query,
             List<OpsSkillSemanticMatcher.SkillDocument> documents) {
         List<OpsSkillSemanticMatcher.SkillDocument> bounded =
@@ -39,29 +38,16 @@ final class OpsSkillEmbeddingScoreCoordinator {
         if (bounded.isEmpty()) {
             return Map.of();
         }
-        List<String> missingKeys = new ArrayList<>();
-        List<String> batch = new ArrayList<>();
-        batch.add(query);
+        // Query/document instructions differ. Never reuse vectors across model revisions.
+        String identity = model.modelIdentity() + ":";
+        float[] queryVector = model.embed(query, true);
         for (OpsSkillSemanticMatcher.SkillDocument document : bounded) {
-            String cacheKey = policy.cacheKey(document);
-            if (!cache.contains(cacheKey)) {
-                missingKeys.add(cacheKey);
-                batch.add(document.text());
-            }
-        }
-        List<float[]> vectors = model.embed(batch);
-        if (vectors == null
-                || vectors.size() != batch.size()
-                || vectors.get(0) == null) {
-            return Map.of();
-        }
-        float[] queryVector = vectors.get(0);
-        for (int index = 0; index < missingKeys.size(); index++) {
-            cache.put(missingKeys.get(index), vectors.get(index + 1));
+            String cacheKey = identity + policy.cacheKey(document);
+            if (!cache.contains(cacheKey)) cache.put(cacheKey, model.embed(document.text(), false));
         }
         Map<String, Double> result = new LinkedHashMap<>();
         for (OpsSkillSemanticMatcher.SkillDocument document : bounded) {
-            float[] vector = cache.get(policy.cacheKey(document));
+            float[] vector = cache.get(identity + policy.cacheKey(document));
             if (vector != null) {
                 result.put(document.id(), policy.cosine(queryVector, vector));
             }

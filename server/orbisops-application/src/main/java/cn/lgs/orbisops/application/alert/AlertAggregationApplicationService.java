@@ -57,10 +57,17 @@ public final class AlertAggregationApplicationService {
                 maxWaitSeconds);
         AlertAggregateSeed seed = policy.seed(signal);
         return transactions.required(() -> {
-            boolean inserted = aggregates.insertIfAbsent(seed);
-            AlertAggregateSnapshot current = aggregates.lock(seed.aggregateKey())
-                    .orElseThrow(() -> new IllegalStateException(
-                            "ALERT_AGGREGATE_WRITE_FAILED:聚合记录不存在"));
+            // Existing aggregates must acquire an exclusive lock before any insert.
+            // INSERT IGNORE on an existing InnoDB key first acquires a shared lock;
+            // concurrent duplicates then deadlock while upgrading it to FOR UPDATE.
+            AlertAggregateSnapshot current = aggregates.lock(seed.aggregateKey()).orElse(null);
+            boolean inserted = false;
+            if (current == null) {
+                inserted = aggregates.insertIfAbsent(seed);
+                current = aggregates.lock(seed.aggregateKey())
+                        .orElseThrow(() -> new IllegalStateException(
+                                "ALERT_AGGREGATE_WRITE_FAILED:聚合记录不存在"));
+            }
             AlertAggregationPlan plan = policy.plan(inserted, current, signal);
             if (plan.action() != AlertAggregationAction.NONE && !aggregates.apply(plan)) {
                 throw new IllegalStateException("ALERT_AGGREGATE_VERSION_CONFLICT:" + plan.aggregateKey());

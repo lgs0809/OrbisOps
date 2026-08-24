@@ -30,6 +30,9 @@ public class AdminWebSecurityConfig implements WebMvcConfigurer {
     private static final String USER_PATH_PATTERN = "/api/v1/user/**";
     private static final String LOGIN_PATH = "/api/v1/admin/admin-user/login";
     private static final String VALIDATE_LOGIN_PATH = "/api/v1/admin/admin-user/validate-login";
+    private static final String LOGOUT_PATH = "/api/v1/admin/admin-user/logout";
+    private static final String PASSWORD_PATH = "/api/v1/user/account/password";
+    private static final String ACCOUNT_PATH = "/api/v1/user/account";
     private static final String SERVICE_TOKEN_HEADER = "X-Admin-Service-Token";
     public static final String AUTH_PRINCIPAL_ATTRIBUTE = AdminWebSecurityConfig.class.getName() + ".principal";
 
@@ -115,12 +118,18 @@ public class AdminWebSecurityConfig implements WebMvcConfigurer {
             }
 
             String path = StringUtils.hasText(request.getServletPath()) ? request.getServletPath() : request.getRequestURI();
-            if (path != null && (path.startsWith("/api/v1/agent/") || path.startsWith("/api/v1/user/"))) {
+            boolean selfService = ("POST".equalsIgnoreCase(request.getMethod()) &&
+                    (LOGOUT_PATH.equals(path) || PASSWORD_PATH.equals(path)))
+                    || ("GET".equalsIgnoreCase(request.getMethod()) && ACCOUNT_PATH.equals(path));
+            if (path != null && (selfService || path.startsWith("/api/v1/agent/") || path.startsWith("/api/v1/user/"))) {
                 var principal = adminAuthService.verifyAuthorization(
                         request.getHeader("Authorization"),
                         AdminAuthService.SCOPE_ADMIN,
                         AdminAuthService.SCOPE_USER);
                 if (principal.isPresent()) {
+                    if (principal.get().passwordChangeRequired() && !selfService) {
+                        return requirePasswordChange(response);
+                    }
                     request.setAttribute(AUTH_PRINCIPAL_ATTRIBUTE, principal.get());
                     return checkRateLimit(request, response, principal.get());
                 }
@@ -130,6 +139,7 @@ public class AdminWebSecurityConfig implements WebMvcConfigurer {
                         AdminAuthService.SCOPE_ADMIN,
                         AdminAuthService.SCOPE_USER);
                 if (principal.isPresent()) {
+                    if (principal.get().passwordChangeRequired()) return requirePasswordChange(response);
                     if (!AdminAuthService.SCOPE_ADMIN.equals(principal.get().scope())) {
                         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                         response.setContentType("application/json;charset=UTF-8");
@@ -145,6 +155,13 @@ public class AdminWebSecurityConfig implements WebMvcConfigurer {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json;charset=UTF-8");
             response.getWriter().write("{\"code\":\"401\",\"info\":\"Unauthorized\"}");
+            return false;
+        }
+
+        private boolean requirePasswordChange(HttpServletResponse response) throws java.io.IOException {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.setContentType("application/json;charset=UTF-8");
+            response.getWriter().write("{\"code\":\"PASSWORD_CHANGE_REQUIRED\",\"info\":\"请先修改初始密码\"}");
             return false;
         }
 

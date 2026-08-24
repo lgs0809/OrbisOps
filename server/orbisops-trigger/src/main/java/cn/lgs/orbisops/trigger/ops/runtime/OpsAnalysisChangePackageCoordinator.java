@@ -2,8 +2,11 @@ package cn.lgs.orbisops.trigger.ops.runtime;
 
 import cn.lgs.orbisops.api.dto.OpsAgentRunRequestDTO;
 import cn.lgs.orbisops.api.dto.OpsAnalysisResponseDTO;
+import cn.lgs.orbisops.application.runtime.graph.GraphEventApplicationService;
+import cn.lgs.orbisops.domain.runtime.graph.model.GraphEvent;
 import cn.lgs.orbisops.domain.shared.service.CanonicalObjectHasher;
 import com.alibaba.fastjson.JSON;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.ToolCallback;
 
 import java.io.IOException;
@@ -16,10 +19,12 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 /** Evaluates whether an Analysis report should create a governed ChangePackage proposal. */
+@Slf4j
 final class OpsAnalysisChangePackageCoordinator {
 
     private static final Set<String> AUTHORITATIVE_DATASOURCE_TYPES = Set.of(
-            "PROMETHEUS", "ELASTICSEARCH", "MYSQL_SLOW_SQL", "MYSQL", "RABBITMQ", "REDIS");
+            "PROMETHEUS", "ELASTICSEARCH", "MYSQL_SLOW_SQL", "MYSQL", "RABBITMQ", "REDIS",
+            "SERVICE_CONTROL");
     private static final int MAX_RUNTIME_EVIDENCE = 20;
     private static final int MAX_RUNTIME_EVIDENCE_CHARS = 1800;
     private static final int MAX_EVIDENCE_COMPLETION_ATTEMPTS = 2;
@@ -29,17 +34,28 @@ final class OpsAnalysisChangePackageCoordinator {
     private final OpsRuntimeLlmInvoker llmInvoker;
     private final OpsAnalysisRuntimeStateManager analysisStateManager;
     private final OpsRuntimeEventJournal eventJournal;
+    private final GraphEventApplicationService graphEventService;
 
     OpsAnalysisChangePackageCoordinator(OpsRuntimeResourceAssembler resourceAssembler,
                                         OpsRuntimePromptAssembler promptAssembler,
                                         OpsRuntimeLlmInvoker llmInvoker,
                                         OpsAnalysisRuntimeStateManager analysisStateManager,
                                         OpsRuntimeEventJournal eventJournal) {
+        this(resourceAssembler, promptAssembler, llmInvoker, analysisStateManager, eventJournal, null);
+    }
+
+    OpsAnalysisChangePackageCoordinator(OpsRuntimeResourceAssembler resourceAssembler,
+                                        OpsRuntimePromptAssembler promptAssembler,
+                                        OpsRuntimeLlmInvoker llmInvoker,
+                                        OpsAnalysisRuntimeStateManager analysisStateManager,
+                                        OpsRuntimeEventJournal eventJournal,
+                                        GraphEventApplicationService graphEventService) {
         this.resourceAssembler = resourceAssembler;
         this.promptAssembler = promptAssembler;
         this.llmInvoker = llmInvoker;
         this.analysisStateManager = analysisStateManager;
         this.eventJournal = eventJournal;
+        this.graphEventService = graphEventService;
     }
 
     String evaluate(OpsAgentDefinition definition,
@@ -70,6 +86,14 @@ final class OpsAnalysisChangePackageCoordinator {
             return "";
         }
 
+        List<OpsRuntimeEvent> priorSessionEvidence = loadPriorSessionEvidence(request, events);
+        if (!priorSessionEvidence.isEmpty() && request != null) {
+            if (request.getMetadata() == null) request.setMetadata(new LinkedHashMap<>());
+            request.getMetadata().put(
+                    OpsChangePackageRuntimeToolContributor.SESSION_EVIDENCE_KEY,
+                    priorSessionEvidence);
+        }
+
         // Resource and policy assembly stay fail-closed, as they were outside the original LLM degradation block.
         OpsRuntimeResourceBundle bundle = assembleGovernanceResources(
                 definition, resourceNode, request, events, eventSink);
@@ -91,7 +115,7 @@ final class OpsAnalysisChangePackageCoordinator {
                     "ChangePackage 未创建：PREPARE 工具当前不可用，系统保持 fail-closed。"));
             return "";
         }
-        ensureOpenApiResourceCatalog(bundle, events, eventSink);
+        ensureOpenApiResourceCatalog(bundle, evidenceEvents(request, events), eventSink);
         if (!ensureAuthoritativeEvidence(
                 definition,
                 resourceNode,
@@ -110,7 +134,7 @@ final class OpsAnalysisChangePackageCoordinator {
                     .summary("权威实时证据不足，ChangePackage 保持 fail-closed。")
                     .payload(Map.of(
                             "reason", "INSUFFICIENT_AUTHORITATIVE_EVIDENCE",
-                            "sourceTypes", List.copyOf(authoritativeSourceTypes(events))))
+                            "sourceTypes", List.copyOf(authoritativeSourceTypes(evidenceEvents(request, events)))))
                     .build());
             analysisStateManager.appendExecutionNotes(response, List.of(
                     "ChangePackage 未创建：受控证据补全后仍缺少足够的独立权威实时证据。"));
@@ -143,8 +167,8 @@ final class OpsAnalysisChangePackageCoordinator {
                 """.formatted(
                         value(originalQuestion),
                         value(response == null ? null : response.getMarkdownReport()),
-                        runtimeEvidenceSnapshot(events),
-                        openApiResourceSnapshot(events));
+                        runtimeEvidenceSnapshot(evidenceEvents(request, events)),
+                        openApiResourceSnapshot(evidenceEvents(request, events)));
         try {
             String decision = callGovernanceWithSafeRetry(
                     promptAssembler.systemPrompt(definition, resourceNode, bundle),
@@ -330,17 +354,28 @@ final class OpsAnalysisChangePackageCoordinator {
             String originalQuestion,
             OpsRuntimeResourceBundle initialBundle) {
         Set<String> available = availableAuthoritativeSourceTypes(initialBundle);
-        Set<String> current = authoritativeSourceTypes(events);
+        Set<String> current = authoritativeSourceTypes(evidenceEvents(request, events));
         if (available.isEmpty()) return true;
-        int required = Math.min(2, Math.max(1, available.size()));
-        if (current.size() >= required) return true;
+        // SERVICE_CONTROL is an operation-specific authority, not a diagnostic
+        // source. Its status + dry-run pair is enforced after the proposed actions
+        // are policy-bound by PrepareChangePackage; it must not block unrelated
+        // proposals merely because the project exposes a control tool.
+        Set<String> diagnosticAvailable = new LinkedHashSet<>(available);
+        diagnosticAvailable.remove("SERVICE_CONTROL");
+        if (diagnosticAvailable.isEmpty()) return true;
+        Set<String> diagnosticCurrent = new LinkedHashSet<>(current);
+        diagnosticCurrent.retainAll(diagnosticAvailable);
+        int required = Math.min(2, Math.max(1, diagnosticAvailable.size()));
+        if (diagnosticCurrent.size() >= required) return true;
 
         OpsRuntimeResourceBundle evidenceBundle = evidenceCompletionBundle(initialBundle);
         for (int attempt = 1; attempt <= MAX_EVIDENCE_COMPLETION_ATTEMPTS; attempt++) {
-            current = authoritativeSourceTypes(events);
-            if (current.size() >= required) return true;
-            Set<String> missing = new LinkedHashSet<>(available);
-            missing.removeAll(current);
+            current = authoritativeSourceTypes(evidenceEvents(request, events));
+            diagnosticCurrent = new LinkedHashSet<>(current);
+            diagnosticCurrent.retainAll(diagnosticAvailable);
+            if (diagnosticCurrent.size() >= required) return true;
+            Set<String> missing = new LinkedHashSet<>(diagnosticAvailable);
+            missing.removeAll(diagnosticCurrent);
             String prompt = """
                     ### 用户原始请求
                     %s
@@ -357,6 +392,7 @@ final class OpsAnalysisChangePackageCoordinator {
                     - 不要创建 ChangePackage，不要调用 Skill/RAG/代码工具或任何写工具。
                     - 用户声称“故障已确认”只能作为上下文，不能替代本轮实时观测。
                     - 必须调用可用的权威实时数据源。若至少两个独立 sourceType 可用，则在结束前至少取得两个不同 sourceType 的真实查询结果。
+                    - SERVICE_CONTROL 是动作绑定阶段的专用权威来源；如果最终方案选择服务控制动作，PrepareChangePackage 会单独要求 get_service_status + restart_service_dry_run，不把它当作第二个诊断 sourceType。
                     - 对运行时服务故障，Prometheus 用于实例/请求量/错误率/延迟等数值证据，Elasticsearch 用于近期错误/异常样本；两者都可用时应交叉验证。
                     - 查询返回空结果仍是有效观测，不要为了填充内容改用稳定知识源。
                     - 完成工具查询后只简短说明已补齐哪些 sourceType；不要宣称执行了生产变更。
@@ -374,8 +410,8 @@ final class OpsAnalysisChangePackageCoordinator {
                         .payload(Map.of(
                                 "attempt", attempt,
                                 "requiredSourceCount", required,
-                                "currentSourceTypes", List.copyOf(current),
-                                "availableSourceTypes", List.copyOf(available)))
+                                "currentSourceTypes", List.copyOf(diagnosticCurrent),
+                                "availableSourceTypes", List.copyOf(diagnosticAvailable)))
                         .build());
                 llmInvoker.call(
                         promptAssembler.systemPrompt(definition, resourceNode, evidenceBundle),
@@ -384,7 +420,7 @@ final class OpsAnalysisChangePackageCoordinator {
                         events,
                         eventSink,
                         eventJournal.requestStartedNanos(request));
-                Set<String> after = authoritativeSourceTypes(events);
+                Set<String> after = authoritativeSourceTypes(evidenceEvents(request, events));
                 eventJournal.record(events, eventSink, OpsRuntimeEvent.builder()
                         .eventType("CHANGE_PACKAGE_EVIDENCE_COMPLETION_FINISHED")
                         .status(after.size() >= required ? "SUCCEEDED" : "INSUFFICIENT")
@@ -403,7 +439,106 @@ final class OpsAnalysisChangePackageCoordinator {
                 return false;
             }
         }
-        return authoritativeSourceTypes(events).size() >= required;
+        Set<String> completed = new LinkedHashSet<>(authoritativeSourceTypes(evidenceEvents(request, events)));
+        completed.retainAll(diagnosticAvailable);
+        return completed.size() >= required;
+    }
+
+    private List<OpsRuntimeEvent> evidenceEvents(
+            OpsAgentChatRequest request,
+            List<OpsRuntimeEvent> currentEvents) {
+        List<OpsRuntimeEvent> prior = priorSessionEvidence(request);
+        if (prior.isEmpty()) return currentEvents == null ? List.of() : currentEvents;
+        List<OpsRuntimeEvent> merged = new ArrayList<>(prior.size()
+                + (currentEvents == null ? 0 : currentEvents.size()));
+        merged.addAll(prior);
+        if (currentEvents != null) merged.addAll(currentEvents);
+        return merged;
+    }
+
+    private List<OpsRuntimeEvent> priorSessionEvidence(OpsAgentChatRequest request) {
+        if (request == null || request.getMetadata() == null) return List.of();
+        Object value = request.getMetadata().get(
+                OpsChangePackageRuntimeToolContributor.SESSION_EVIDENCE_KEY);
+        if (!(value instanceof Iterable<?> iterable)) return List.of();
+        List<OpsRuntimeEvent> result = new ArrayList<>();
+        for (Object item : iterable) {
+            if (item instanceof OpsRuntimeEvent event) result.add(event);
+        }
+        return List.copyOf(result);
+    }
+
+    private List<OpsRuntimeEvent> loadPriorSessionEvidence(
+            OpsAgentChatRequest request,
+            List<OpsRuntimeEvent> currentEvents) {
+        if (graphEventService == null || request == null
+                || request.getSessionId() == null || request.getSessionId().isBlank()) {
+            return List.of();
+        }
+        String currentRunId = eventJournal.canonicalRunId(request);
+        Set<String> currentEvidenceKeys = new LinkedHashSet<>();
+        if (currentEvents != null) {
+            synchronized (currentEvents) {
+                for (OpsRuntimeEvent event : currentEvents) {
+                    if (event == null) continue;
+                    Map<String, Object> payload = event.getPayload() == null ? Map.of() : event.getPayload();
+                    String resultId = text(payload.get("resultId"));
+                    if (!resultId.isBlank()) currentEvidenceKeys.add(event.getEventType() + "|" + resultId);
+                }
+            }
+        }
+        try {
+            List<GraphEvent> persisted = graphEventService.list(request.getSessionId().trim());
+            List<OpsRuntimeEvent> result = new ArrayList<>();
+            Set<String> seen = new LinkedHashSet<>();
+            for (GraphEvent event : persisted == null ? List.<GraphEvent>of() : persisted) {
+                if (event == null || (!currentRunId.isBlank() && currentRunId.equals(event.runId()))) continue;
+                String eventType = text(event.eventType());
+                if (!"SOURCE_QUERY_FINISHED".equals(eventType)
+                        && !"TOOL_CALL_FINISHED".equals(eventType)
+                        && !"RAG_RETRIEVE".equals(eventType)) continue;
+                Map<String, Object> payload = event.payload() == null ? Map.of() : event.payload();
+                String resultId = text(payload.get("resultId"));
+                String key = eventType + "|" + (resultId.isBlank()
+                        ? event.runId() + "|" + event.sequence()
+                        : resultId);
+                if (!seen.add(key) || (!resultId.isBlank() && currentEvidenceKeys.contains(eventType + "|" + resultId))) {
+                    continue;
+                }
+                String timestamp = firstText(event.finishedAt(), event.startedAt());
+                result.add(OpsRuntimeEvent.builder()
+                        .eventType(eventType)
+                        .nodeId(event.nodeId())
+                        .nodeType(event.nodeType())
+                        .agent(event.agent())
+                        .source(event.source())
+                        .status(event.status())
+                        .summary(event.summary())
+                        .timestamp(timestamp.isBlank() ? null : timestamp)
+                        .payload(payload)
+                        .build());
+            }
+            List<OpsRuntimeEvent> selected = List.copyOf(result);
+            log.debug("ChangePackage prior-session evidence loaded: sessionId={}, currentRunId={}, persisted={}, selected={}, sourceTypes={}",
+                    request.getSessionId(), currentRunId, persisted == null ? 0 : persisted.size(),
+                    selected.size(), authoritativeSourceTypes(selected));
+            return selected;
+        } catch (RuntimeException error) {
+            log.debug("ChangePackage prior-session evidence load failed: sessionId={}, reason={}",
+                    request.getSessionId(), value(error.getMessage()));
+            // Prior evidence is an optimization for same-session continuity. If the
+            // durable journal is unavailable, the normal current-run fail-closed
+            // evidence gates still apply.
+            return List.of();
+        }
+    }
+
+    private String firstText(String... values) {
+        if (values == null) return "";
+        for (String value : values) {
+            if (value != null && !value.isBlank()) return value.trim();
+        }
+        return "";
     }
 
     private OpsRuntimeResourceBundle evidenceCompletionBundle(OpsRuntimeResourceBundle bundle) {
@@ -457,7 +592,7 @@ final class OpsAnalysisChangePackageCoordinator {
                     && Boolean.TRUE.equals(payload.get("remoteCallExecuted"))
                     && !Boolean.FALSE.equals(payload.get("allowed"))
                     && !text(payload.get("resultId")).isBlank()) {
-                String sourceType = datasourceNameSourceType(text(payload.get("remoteToolName")));
+                String sourceType = datasourceNameSourceType(remoteToolName(payload));
                 if (!sourceType.isBlank()) result.add(sourceType);
             }
         }
@@ -476,6 +611,11 @@ final class OpsAnalysisChangePackageCoordinator {
     private String datasourceNameSourceType(String toolName) {
         String name = text(toolName).toLowerCase();
         if (name.startsWith("mcp_tool_catalog_") || name.startsWith("enable_mcp_tool_")) return "";
+        if (name.contains("service-control") || name.contains("service_control")
+                || "get_service_status".equals(name)
+                || "restart_service_dry_run".equals(name)
+                || "restart_service".equals(name)
+                || "get_operation_receipt".equals(name)) return "SERVICE_CONTROL";
         if (OpsDatasourceRuntimeToolProvider.PROMETHEUS_TOOL.equals(name)
                 || name.contains("prometheus")) return "PROMETHEUS";
         if (OpsDatasourceRuntimeToolProvider.ELASTICSEARCH_TOOL.equals(name)
@@ -486,6 +626,26 @@ final class OpsAnalysisChangePackageCoordinator {
             return "MYSQL_SLOW_SQL";
         }
         if (name.contains("mysql")) return "MYSQL";
+        return "";
+    }
+
+    private String remoteToolName(Map<String, Object> payload) {
+        if (payload == null) return "";
+        String name = text(payload.get("remoteToolName"));
+        if (!name.isBlank()) return name;
+        String output = text(payload.get("output"));
+        if (output.isBlank()) return "";
+        try {
+            Object parsed = JSON.parseObject(output);
+            if (parsed instanceof Map<?, ?> map) {
+                name = text(map.get("remoteToolName"));
+                if (!name.isBlank()) return name;
+                return text(map.get("toolName"));
+            }
+        } catch (RuntimeException ignored) {
+            // A provider preview is optional metadata; the event remains valid
+            // for the normal evidence collector even when it is not JSON.
+        }
         return "";
     }
 
@@ -627,7 +787,7 @@ final class OpsAnalysisChangePackageCoordinator {
             OpsAgentChatRequest request,
             List<OpsRuntimeEvent> events,
             Consumer<OpsRuntimeEvent> eventSink) {
-        Set<String> sourceTypes = authoritativeSourceTypes(events);
+        Set<String> sourceTypes = authoritativeSourceTypes(evidenceEvents(request, events));
         String evidenceCompleteness = sourceTypes.size() >= 2
                 ? "COMPLETE"
                 : sourceTypes.size() == 1 ? "PARTIAL" : "INSUFFICIENT";

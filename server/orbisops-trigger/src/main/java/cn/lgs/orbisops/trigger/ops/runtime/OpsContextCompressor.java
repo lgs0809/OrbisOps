@@ -65,6 +65,16 @@ public class OpsContextCompressor {
                 hotBufferMessages));
     }
 
+    public Runnable prepareCompression(cn.lgs.orbisops.domain.memory.model.MemoryProcessingJob job) {
+        if(!settings.enabled())return ()->{};
+        return applicationService.prepareCompression(new MemoryCompressionCommand(job.sessionId(),job.message().userId(),List.of(),
+                settings.thresholdMessages(),settings.keepRecent(),settings.modelEnabled(),settings.modelMaxInputChars(),job.bufferSize()));
+    }
+
+    public Runnable prepareModelRetry(cn.lgs.orbisops.domain.memory.model.MemoryProcessingJob job) {
+        return applicationService.prepareModelRetry(job, settings.enabled() && settings.modelEnabled());
+    }
+
     public String trimContext(String context, int maxChars) {
         return applicationService.trimContext(context, maxChars);
     }

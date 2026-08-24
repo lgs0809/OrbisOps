@@ -3,6 +3,9 @@ package cn.lgs.orbisops.trigger.ops.runtime;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import org.junit.jupiter.api.Test;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -14,6 +17,71 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class OpsRuntimePromptAssemblerTest {
 
     private final OpsRuntimePromptAssembler assembler = new OpsRuntimePromptAssembler();
+
+    @Test
+    void llmAndReactReceiveTheSameInternalContractDespiteNaturalLanguageDisplayInstructions() {
+        Map<String, Object> schema = Map.of("type", "object", "additionalProperties", false,
+                "required", List.of("assessment"), "properties", Map.of("assessment", Map.of("type", "string")));
+        Map<String, Object> contract = Map.of("format", "JSON", "schema", schema);
+        var definition = OpsAgentDefinition.builder().instruction("global rules").build();
+        var node = OpsWorkflowNode.builder().type("LLM").instruction("请直接用中文自然语言展示结论")
+                .config(Map.of("globalPromptMode", "node_only", "outputContract", contract)).build();
+        var agent = OpsAgentScopeConfig.builder().instruction("请直接用中文自然语言展示结论")
+                .outputContract(contract).build();
+        for (String prompt : List.of(assembler.systemPrompt(definition, node, null),
+                assembler.agentInstruction(definition, agent, null))) {
+            assertTrue(prompt.contains(com.alibaba.fastjson.JSON.toJSONString(schema)));
+            assertTrue(prompt.contains("用户无需提供 JSON"));
+            assertTrue(prompt.contains("不能覆盖本节点内部输出协议"));
+            org.junit.jupiter.api.Assertions.assertEquals(1, prompt.split("JSON Schema：", -1).length - 1);
+        }
+        assertFalse(assembler.systemPrompt(definition, node, null).contains("global rules"));
+    }
+
+    @Test
+    void ordinaryNaturalLanguageNodeDoesNotAcquireAnInternalJsonProtocol() {
+        var node = OpsWorkflowNode.builder().type("LLM").instruction("直接回答用户")
+                .config(Map.of("outputContract", Map.of("format", "TEXT"))).build();
+        assertFalse(assembler.systemPrompt(null, node, null).contains("工作流内部输出协议"));
+    }
+
+    @Test
+    void projectIdentityUsesAuthorizedBundleInsteadOfDefinitionOrDisplayNames() {
+        var definition = OpsAgentDefinition.builder().projectId("stale-template-project")
+                .name("Human display name").instruction("local rule").build();
+        var bundle = OpsRuntimeResourceBundle.builder().projectId("authorized-project").build();
+        var node = OpsWorkflowNode.builder().instruction("local rule")
+                .config(Map.of("globalPromptMode", "node_only")).build();
+        for (String prompt : List.of(assembler.systemPrompt(definition, node, bundle),
+                assembler.agentInstruction(definition, null, bundle))) {
+            assertTrue(prompt.contains("currentProjectId: \"authorized-project\""));
+            assertFalse(prompt.contains("stale-template-project"));
+            org.junit.jupiter.api.Assertions.assertEquals(1,
+                    prompt.split("currentProjectId:", -1).length - 1);
+        }
+        assertFalse(assembler.agentInstruction(definition, null, null).contains("currentProjectId:"));
+    }
+
+    @Test
+    void everyModelEntrypointGetsOneAuthoritativeUtcAndEpochAnchorIncludingIsolatedNodes() {
+        Instant now = Instant.parse("2026-09-09T14:45:00Z");
+        OpsRuntimePromptAssembler timed = new OpsRuntimePromptAssembler(
+                Clock.fixed(now, ZoneId.of("Asia/Shanghai")));
+        OpsAgentDefinition definition = OpsAgentDefinition.builder().instruction("private global rule").build();
+        OpsWorkflowNode isolated = OpsWorkflowNode.builder().instruction("local rule")
+                .config(Map.of("globalPromptMode", "node_only")).build();
+
+        String nodePrompt = timed.systemPrompt(definition, isolated, null);
+        String agentPrompt = timed.agentInstruction(definition, null, null);
+
+        for (String prompt : List.of(nodePrompt, agentPrompt)) {
+            assertTrue(prompt.contains("currentTimeUtc: " + now));
+            assertTrue(prompt.contains("currentEpochSeconds: " + now.getEpochSecond()));
+            org.junit.jupiter.api.Assertions.assertEquals(1,
+                    prompt.split("currentEpochSeconds:", -1).length - 1);
+        }
+        assertFalse(nodePrompt.contains("private global rule"));
+    }
     private final OpsRuntimePromptAssembler.ContextPolicy policy = new OpsRuntimePromptAssembler.ContextPolicy() {
         @Override
         public String executionNodeType(OpsWorkflowNode node) {
@@ -190,6 +258,49 @@ class OpsRuntimePromptAssemblerTest {
         assertTrue(prompt.contains("nodeId: diagnose"));
         assertTrue(prompt.contains("routeKey: route-a"));
         assertFalse(prompt.contains("must-not-leak"));
+    }
+
+    @Test
+    void declaredEvidenceKeepsCompleteLateSourcesAndTheirConditions() {
+        var sources = java.util.stream.IntStream.range(0, 21)
+                .mapToObj(index -> Map.of("sourceId", "source-" + index,
+                        "body", "full accepted content ".repeat(35),
+                        "condition", index == 20 ? "coverage-gap-is-a-lower-bound-only" : "complete-boundaries"))
+                .toList();
+        var receipt = Map.of("normalizedContent", Map.of("sources", sources));
+        var node = OpsWorkflowNode.builder().nodeId("review").type("LLM").agent("reviewer")
+                .config(Map.of("contextInputs", List.of("workflowData_receipt"))).build();
+        String prompt = assembler.buildNodePrompt(OpsAgentDefinition.builder().nodes(List.of(node))
+                .edges(List.of()).build(), node, "review every source", "", new OverAllState(
+                Map.of("workflowData_receipt", receipt)), policy);
+        assertTrue(prompt.contains(com.alibaba.fastjson.JSON.toJSONString(receipt)));
+        assertTrue(prompt.contains("source-20"));
+        assertTrue(prompt.contains("coverage-gap-is-a-lower-bound-only"));
+    }
+
+    @Test
+    void overBudgetEvidenceFailsBeforeAClippedPromptCanReachAModel() {
+        var node = OpsWorkflowNode.builder().nodeId("review").type("LLM").agent("reviewer")
+                .config(Map.of("contextInputs", List.of("receipt"))).build();
+        var failure = org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> assembler.buildNodePrompt(OpsAgentDefinition.builder().nodes(List.of(node))
+                        .edges(List.of()).build(), node, "review", "", new OverAllState(
+                        Map.of("receipt", "sensitive-evidence".repeat(2000))), policy));
+        assertTrue(failure.getMessage().startsWith("NODE_CONTEXT_INPUT_BUDGET_EXCEEDED:"));
+        assertFalse(failure.getMessage().contains("sensitive-evidence"));
+    }
+
+    @Test
+    void aggregateEvidenceBudgetFailsEvenWhenEachSelectedInputFits() {
+        var keys = List.of("one", "two", "three", "four", "five");
+        var node = OpsWorkflowNode.builder().nodeId("review").type("LLM").agent("reviewer")
+                .config(Map.of("contextInputs", keys)).build();
+        var state = keys.stream().collect(java.util.stream.Collectors.toMap(key -> key, key -> "x".repeat(30_000)));
+        var failure = org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> assembler.buildNodePrompt(OpsAgentDefinition.builder().nodes(List.of(node))
+                        .edges(List.of()).build(), node, "review", "", new OverAllState(
+                        new java.util.HashMap<String, Object>(state)), policy));
+        assertTrue(failure.getMessage().startsWith("NODE_CONTEXT_TOTAL_BUDGET_EXCEEDED:"));
     }
 
     @Test

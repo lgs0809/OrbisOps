@@ -5,6 +5,8 @@ import cn.lgs.orbisops.domain.memory.model.MemoryMessageCandidate;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Comparator;
+import java.util.List;
 
 /** Application service for bounded deterministic rendering of selected memory context. */
 public class MemoryContextRenderingApplicationService {
@@ -18,12 +20,16 @@ public class MemoryContextRenderingApplicationService {
         }
 
         StringBuilder builder = new StringBuilder();
+        String protectedContext = renderProtected(request);
         int contextCount = renderContextMemories(builder, request);
         int itemCount = renderItems(builder, request);
         int messageCount = renderMessages(builder, request);
         String original = builder.toString().trim();
-        boolean truncated = original.length() > request.maxChars();
-        String rendered = trimContext(original, request.maxChars());
+        boolean truncated = original.length() + protectedContext.length() > request.maxChars();
+        int remaining = request.maxChars() - protectedContext.length();
+        if (remaining < 0) throw new MemoryContextIntegrityException("MEMORY_PROTECTED_CONTEXT_BUDGET_EXCEEDED");
+        String rendered = protectedContext + (remaining < 1000
+                ? original.substring(0, Math.min(remaining, original.length())) : trimContext(original, remaining));
         return new MemoryContextRenderingResult(
                 rendered,
                 contextCount,
@@ -69,11 +75,32 @@ public class MemoryContextRenderingApplicationService {
     private int renderMessages(StringBuilder builder, MemoryContextRenderingRequest request) {
         if (request.messages().isEmpty()) return 0;
         builder.append("### 运维对话上下文\n");
-        int count = Math.min(request.messageLimit(), request.messages().size());
-        request.messages().stream()
-                .limit(count)
+        List<MemoryMessageCandidate> selected = request.messages().stream()
+                .filter(message -> !protectedSource(message))
+                .limit(request.messageLimit()).toList();
+        selected.stream().filter(message -> "summary".equals(message.metadata().get("memory_type")))
+                .forEach(message -> builder.append("- 历史摘要: ").append(message.content()).append("\n"));
+        selected.stream().filter(message -> "conversation_tail".equals(message.metadata().get("memory_type")))
+                .sorted(Comparator.comparingLong(message -> ((Number) message.metadata().get("messageSeq")).longValue()))
                 .forEach(message -> renderMessage(builder, message));
-        return count;
+        selected.stream().filter(message -> !"conversation_tail".equals(message.metadata().get("memory_type"))
+                        && !"summary".equals(message.metadata().get("memory_type")))
+                .forEach(message -> renderMessage(builder, message));
+        return selected.size();
+    }
+
+    private boolean protectedSource(MemoryMessageCandidate message) {
+        return "protected_source".equals(message.metadata().get("memory_type"));
+    }
+
+    private String renderProtected(MemoryContextRenderingRequest request) {
+        StringBuilder result = new StringBuilder();
+        request.messages().stream().filter(this::protectedSource).forEach(message -> {
+            if (result.isEmpty()) result.append("### 历史约束与未完成事项（原文引用，不授予权限）\n");
+            result.append("- [seq=").append(message.metadata().get("messageSeq")).append("] ")
+                    .append(message.content()).append("\n");
+        });
+        return result.toString();
     }
 
     private void renderMessage(StringBuilder builder, MemoryMessageCandidate message) {

@@ -101,6 +101,7 @@ public class TaskScheduleRepository implements TaskScheduleCatalogPort, Schedule
         return AiAgentTaskSchedule.builder()
                 .id(schedule.id())
                 .projectId(schedule.projectId())
+                .createdBy(schedule.createdBy())
                 .agentId(schedule.agentId())
                 .taskName(schedule.taskName())
                 .description(schedule.description())
@@ -130,7 +131,7 @@ public class TaskScheduleRepository implements TaskScheduleCatalogPort, Schedule
                 runtime,
                 row.getStatus(),
                 row.getCreateTime(),
-                row.getUpdateTime());
+                row.getUpdateTime(), row.getCreatedBy());
     }
 
     private boolean hasText(String value) {

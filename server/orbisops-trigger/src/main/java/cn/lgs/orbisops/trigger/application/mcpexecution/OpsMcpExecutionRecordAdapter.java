@@ -13,18 +13,31 @@ import com.alibaba.fastjson.JSON;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
+import cn.lgs.orbisops.trigger.ops.OpsRunControlContext;
+import cn.lgs.orbisops.trigger.ops.runtime.OpsPreDispatchCheckpoint;
+import cn.lgs.orbisops.trigger.ops.runtime.OpsWorkSessionRunAdapter;
 
 @Component
 public class OpsMcpExecutionRecordAdapter implements McpExecutionRecordPort {
 
     private final ToolResultApplicationService results;
     private final EvidenceApplicationService evidence;
+    private final ObjectProvider<OpsWorkSessionRunAdapter> workSessions;
 
     public OpsMcpExecutionRecordAdapter(
             ToolResultApplicationService results,
             EvidenceApplicationService evidence) {
+        this(results, evidence, null);
+    }
+
+    @Autowired
+    public OpsMcpExecutionRecordAdapter(ToolResultApplicationService results, EvidenceApplicationService evidence,
+                                       ObjectProvider<OpsWorkSessionRunAdapter> workSessions) {
         this.results = results;
         this.evidence = evidence;
+        this.workSessions = workSessions;
     }
 
     @Override
@@ -61,6 +74,17 @@ public class OpsMcpExecutionRecordAdapter implements McpExecutionRecordPort {
                         "toolName", command.toolName(),
                         "source", command.source()),
                 command.request().actor()));
+        if (command.dispatchDisposition() == DispatchDisposition.PRE_DISPATCH_DENIED
+                && OpsRunControlContext.current() != null) {
+            var checkpoint = OpsPreDispatchCheckpoint.bind(stored.projectId(), stored.runId(), Map.of(
+                    "toolCallId", "mcp-denial-" + stored.resultId(),
+                    "resultId", stored.resultId(), "inputHash", stored.inputHash(),
+                    "outputHash", stored.outputHash(), "toolsetId", stored.toolsetId(), "toolName", stored.toolName()));
+            var adapter = workSessions == null ? null : workSessions.getIfAvailable();
+            if (adapter == null) throw new IllegalStateException("WORK_SESSION_CHECKPOINT_SERVICE_UNAVAILABLE");
+            adapter.checkpointToolExecution(OpsRunControlContext.current().checkpointRequest(),
+                    "TOOL_EXECUTION_BLOCKED", checkpoint);
+        }
         return new McpExecutionRecordedResult(
                 stored.resultId(),
                 proof.evidenceId(),

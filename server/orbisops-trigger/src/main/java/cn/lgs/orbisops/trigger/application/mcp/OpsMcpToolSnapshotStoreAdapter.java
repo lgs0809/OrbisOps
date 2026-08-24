@@ -62,6 +62,7 @@ public final class OpsMcpToolSnapshotStoreAdapter implements McpToolSnapshotStor
                 .map(schema -> new McpAuthoritativeToolDefinition(
                         text(schema.get("description")),
                         schema.get("schema"),
+                        schema.get("outputSchema"),
                         "PERSISTED_REMOTE_MCP_TOOL_DEFINITION"));
     }
 

@@ -6,11 +6,14 @@ import java.util.Set;
 
 /** Authoritative lifecycle state for a governed Skill release. */
 public enum SkillReleaseStatus {
+    READY,
+    PENDING_INDEX,
     CANARY,
     PROMOTING,
     ACTIVE,
     ROLLING_BACK,
     ROLLED_BACK,
+    DISABLED,
     PROMOTION_UNKNOWN,
     ROLLBACK_UNKNOWN;
 
@@ -45,16 +48,18 @@ public enum SkillReleaseStatus {
     }
 
     public boolean evaluable() {
-        return this == CANARY || this == ACTIVE;
+        return this == READY || this == PENDING_INDEX || this == CANARY || this == ACTIVE;
     }
 
     private Set<SkillReleaseStatus> allowedTargets() {
         return switch (this) {
+            case READY -> EnumSet.of(PROMOTING, ROLLED_BACK);
+            case PENDING_INDEX -> EnumSet.of(ACTIVE, ROLLED_BACK);
             case CANARY -> EnumSet.of(PROMOTING, ROLLED_BACK);
-            case PROMOTING -> EnumSet.of(ACTIVE, ROLLED_BACK, PROMOTION_UNKNOWN);
+            case PROMOTING -> EnumSet.of(PENDING_INDEX, ACTIVE, ROLLED_BACK, PROMOTION_UNKNOWN);
             case ACTIVE -> EnumSet.of(ROLLING_BACK);
-            case ROLLING_BACK -> EnumSet.of(ROLLED_BACK, ROLLBACK_UNKNOWN);
-            case ROLLED_BACK, PROMOTION_UNKNOWN, ROLLBACK_UNKNOWN -> EnumSet.noneOf(SkillReleaseStatus.class);
+            case ROLLING_BACK -> EnumSet.of(ROLLED_BACK, DISABLED, ROLLBACK_UNKNOWN);
+            case ROLLED_BACK, DISABLED, PROMOTION_UNKNOWN, ROLLBACK_UNKNOWN -> EnumSet.noneOf(SkillReleaseStatus.class);
         };
     }
 }

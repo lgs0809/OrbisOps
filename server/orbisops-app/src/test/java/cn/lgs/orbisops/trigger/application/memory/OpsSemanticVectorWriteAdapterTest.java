@@ -26,7 +26,7 @@ class OpsSemanticVectorWriteAdapterTest {
         when(provider.getIfAvailable()).thenReturn(vectorStore);
         OpsSemanticVectorWriteAdapter adapter = new OpsSemanticVectorWriteAdapter(provider);
         SemanticMemoryDocumentSnapshot snapshot = new SemanticMemoryDocumentSnapshot(
-                "",
+                "ops-message-stable-id",
                 "semantic memory",
                 Map.of("memory_type", "ops_chat", "session_id", "session-1"));
 
@@ -35,6 +35,7 @@ class OpsSemanticVectorWriteAdapterTest {
         ArgumentCaptor<List<Document>> captor = ArgumentCaptor.forClass(List.class);
         verify(vectorStore).add(captor.capture());
         Document document = captor.getValue().get(0);
+        assertEquals("ops-message-stable-id", document.getId());
         assertEquals("semantic memory", document.getText());
         assertEquals("ops_chat", document.getMetadata().get("memory_type"));
         assertEquals("session-1", document.getMetadata().get("session_id"));

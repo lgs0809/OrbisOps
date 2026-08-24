@@ -1,6 +1,7 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
 import cn.lgs.orbisops.application.project.ProjectMcpAuthorizationApplicationService;
+import cn.lgs.orbisops.application.changepackage.LandingOperationJournalApplicationService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -27,11 +28,13 @@ public class OpsRuntimeMcpResolverConfiguration {
             OpsMcpToolProvider toolProvider,
             OpsMcpRuntimeConfigSourceChain configSources,
             ObjectProvider<ProjectMcpAuthorizationApplicationService> authorizationProvider,
-            OpsMcpRuntimeCatalogReconciler catalogReconciler) {
+            OpsMcpRuntimeCatalogReconciler catalogReconciler,
+            ObjectProvider<LandingOperationJournalApplicationService> landingJournalProvider) {
         return new OpsRuntimeMcpResolver(
                 toolProvider,
                 configSources,
                 authorizationProvider::getIfAvailable,
-                catalogReconciler);
+                catalogReconciler,
+                landingJournalProvider::getIfAvailable);
     }
 }

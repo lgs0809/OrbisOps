@@ -22,7 +22,8 @@ final class OpsChangePackageRunEvidenceCollector {
     private static final String PREPARE_TOOL_NAME = "PrepareChangePackage";
     private static final String SOURCE_QUERY_FINISHED = "SOURCE_QUERY_FINISHED";
     private static final Set<String> AUTHORITATIVE_DATASOURCE_TYPES = Set.of(
-            "PROMETHEUS", "ELASTICSEARCH", "MYSQL_SLOW_SQL", "MYSQL", "RABBITMQ", "REDIS");
+            "PROMETHEUS", "ELASTICSEARCH", "MYSQL_SLOW_SQL", "MYSQL", "RABBITMQ", "REDIS",
+            "SERVICE_CONTROL");
     private static final int MAX_EVIDENCE = 20;
     private static final int MAX_SUMMARY_CHARS = 1800;
 
@@ -105,6 +106,7 @@ final class OpsChangePackageRunEvidenceCollector {
             if (output.isBlank()) return null;
             String toolKind = text(payload.get("toolKind"));
             String authoritativeMcpType = authoritativeMcpSourceType(payload);
+            String remoteToolName = remoteToolName(payload);
             sourceType = !authoritativeMcpType.isBlank()
                     ? authoritativeMcpType
                     : "mcp".equalsIgnoreCase(toolKind) ? "MCP" : "TOOL";
@@ -119,7 +121,7 @@ final class OpsChangePackageRunEvidenceCollector {
                 metadata.put("verified", true);
                 metadata.put("resultId", resultId);
                 metadata.put("mcpId", text(payload.get("mcpId")));
-                metadata.put("remoteToolName", text(payload.get("remoteToolName")));
+                metadata.put("remoteToolName", remoteToolName);
             }
         } else if ("RAG_RETRIEVE".equals(event.getEventType())) {
             sourceType = "RAG";
@@ -149,16 +151,56 @@ final class OpsChangePackageRunEvidenceCollector {
                 || text(payload.get("resultId")).isBlank()) {
             return "";
         }
-        String name = text(payload.get("remoteToolName")).toLowerCase();
-        if (name.startsWith("rabbitmq_")) return "RABBITMQ";
-        if (name.startsWith("redis_")) return "REDIS";
-        if (name.startsWith("prometheus_")) return "PROMETHEUS";
-        if (name.startsWith("elasticsearch_") || name.startsWith("es_")) return "ELASTICSEARCH";
-        if (name.contains("mysql") && (name.contains("slow") || name.contains("digest"))) {
+        String name = remoteToolName(payload).toLowerCase();
+        if (name.isBlank()) return "";
+        String mcpId = text(payload.get("mcpId")).toLowerCase();
+        if (mcpId.contains("service-control") || mcpId.contains("service_control")
+                || "get_service_status".equals(name)
+                || "restart_service_dry_run".equals(name)
+                || "restart_service".equals(name)
+                || "get_operation_receipt".equals(name)) {
+            return "SERVICE_CONTROL";
+        }
+        if (name.startsWith("rabbitmq_") || mcpId.contains("rabbitmq")) return "RABBITMQ";
+        if (name.startsWith("redis_") || mcpId.contains("redis")) return "REDIS";
+        if (name.startsWith("prometheus_") || mcpId.contains("prometheus")) return "PROMETHEUS";
+        if (name.startsWith("elasticsearch_") || name.startsWith("es_")
+                || mcpId.contains("elasticsearch") || mcpId.contains("-es-")) return "ELASTICSEARCH";
+        if ((name.contains("mysql") || mcpId.contains("mysql"))
+                && (name.contains("slow") || name.contains("digest")
+                || mcpId.contains("slow") || mcpId.contains("digest"))) {
             return "MYSQL_SLOW_SQL";
         }
-        if (name.startsWith("mysql_")) return "MYSQL";
+        if (name.startsWith("mysql_") || mcpId.contains("mysql")) return "MYSQL";
         return "";
+    }
+
+    /**
+     * Some MCP adapters put the authoritative remote name on the event, while
+     * others only include it in the provider JSON returned by the callback.
+     * Normalize both shapes before applying evidence policy.
+     */
+    @SuppressWarnings("unchecked")
+    private String remoteToolName(Map<String, Object> payload) {
+        if (payload == null) return "";
+        String name = text(payload.get("remoteToolName"));
+        if (!name.isBlank()) return name;
+        Object parsed = null;
+        String output = text(payload.get("output"));
+        if (!output.isBlank()) {
+            try {
+                parsed = JSON.parseObject(output, Map.class);
+            } catch (RuntimeException ignored) {
+                // The output is still useful evidence; an unparsable preview
+                // simply means the event has no normalized remote name.
+            }
+        }
+        if (parsed instanceof Map<?, ?> map) {
+            name = text(map.get("remoteToolName"));
+            if (!name.isBlank()) return name;
+            name = text(map.get("toolName"));
+        }
+        return name;
     }
 
     private String abbreviate(String value) {

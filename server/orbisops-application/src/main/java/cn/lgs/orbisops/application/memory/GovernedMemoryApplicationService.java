@@ -60,6 +60,11 @@ public class GovernedMemoryApplicationService {
                 command.verified(),
                 command.confidence(),
                 command.riskLevel());
+        String lockKey = hashPolicy.sha256(draft.scope() + ":" + draft.scopeId() + ":" + draft.type() + ":" + draft.logicalKey());
+        return repository.withLogicalLock(lockKey, () -> createLocked(command, draft));
+    }
+
+    private GovernedMemoryCreationResult createLocked(GovernedMemoryCreateCommand command, GovernedMemoryDraft draft) {
         String idempotencyKey = hashPolicy.idempotencyKey(draft, command.sourceRunId());
         Optional<GovernedMemorySnapshot> duplicate = repository.findByIdempotencyKey(idempotencyKey);
         if (duplicate.isPresent()) {
@@ -71,11 +76,17 @@ public class GovernedMemoryApplicationService {
                 draft.scopeId(),
                 draft.type(),
                 draft.logicalKey());
+        Optional<GovernedMemorySnapshot> previous = existing.flatMap(head -> repository.findByMemoryId(head.memoryId()));
+        if (previous.isPresent() && !hashPolicy.conflicts(hashPolicy.contentFingerprint(previous.get()), hashPolicy.contentFingerprint(draft))) {
+            GovernedMemorySnapshot same = previous.get();
+            repository.appendSource(same.memoryId(), idempotencyKey, command.sourceRunId(), command.proofRefs(), command.actor());
+            repository.recordAudit(same.memoryId(), "SOURCE_ADDED", command.actor(), same, "");
+            return GovernedMemoryCreationResult.duplicate(same);
+        }
         int version = memoryPolicy.nextVersion(existing.map(GovernedMemoryHead::version).orElse(null));
         String memoryId = requireMemoryId(memoryIdSupplier.get());
         String memoryHash = hashPolicy.memoryHash(draft, version);
-        boolean conflict = existing.isPresent()
-                && hashPolicy.conflicts(existing.get().memoryHash(), memoryHash);
+        boolean conflict = existing.isPresent();
         String status = memoryPolicy.status(conflict);
         Instant now = clock.instant();
         Instant expiresAt = memoryPolicy.expiresAt(draft.type(), now, defaultTtl);
@@ -107,6 +118,7 @@ public class GovernedMemoryApplicationService {
                 null,
                 null);
         repository.insert(pending);
+        repository.appendSource(memoryId, idempotencyKey, command.sourceRunId(), command.proofRefs(), command.actor());
         repository.appendVersion(new GovernedMemoryVersionSnapshot(
                 memoryId,
                 version,

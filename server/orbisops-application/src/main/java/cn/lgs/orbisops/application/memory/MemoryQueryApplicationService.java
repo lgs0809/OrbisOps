@@ -63,6 +63,7 @@ public class MemoryQueryApplicationService {
             return new MemoryQueryResult(rendered.context(), references);
         } catch (RuntimeException error) {
             observe("query", error);
+            if (error instanceof MemoryContextIntegrityException) throw error;
             return MemoryQueryResult.empty();
         }
     }

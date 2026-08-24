@@ -1,87 +1,79 @@
 package cn.lgs.orbisops.trigger.application.skill;
 
-import cn.lgs.orbisops.domain.skill.model.SkillRoutingProfile;
-import cn.lgs.orbisops.domain.skill.model.SkillRuntimeCandidate;
-import cn.lgs.orbisops.trigger.ops.OpsAgentLlmClient;
+import cn.lgs.orbisops.domain.skill.model.*;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.ObjectProvider;
+import com.sun.net.httpserver.HttpServer;
+import org.junit.jupiter.api.*;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.*;
+import static org.junit.jupiter.api.Assertions.*;
 
-import java.util.List;
-import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.contains;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
+/** Synthetic wire protocol, never a Qwen model-quality claim. */
 class OpsSkillLlmRerankAdapterTest {
-
-    @Test
-    void reranksOnlyAllowedCandidatesAndIgnoresUnknownIds() {
-        OpsAgentLlmClient client = mock(OpsAgentLlmClient.class);
-        @SuppressWarnings("unchecked")
-        ObjectProvider<OpsAgentLlmClient> provider = mock(ObjectProvider.class);
-        when(provider.getIfAvailable()).thenReturn(client);
-        when(client.available()).thenReturn(true);
-        JSONObject response = JSON.parseObject("""
-                {
-                  "ranking": [
-                    {"skillId": "quarterly-ppt", "score": 0.98},
-                    {"skillId": "invented-skill", "score": 1.0},
-                    {"skillId": "code-generator", "score": 0.05}
-                  ]
-                }
-                """);
-        when(client.chatJsonObject(
-                eq("skill-routing-reranker"),
-                contains("whenNotToUse"),
-                contains("quarterly-ppt"))).thenReturn(response);
-        OpsSkillLlmRerankAdapter adapter = new OpsSkillLlmRerankAdapter(provider);
-
-        Map<String, Double> scores = adapter.scores(
-                "生成季度汇报 PPT",
-                List.of(
-                        skill("quarterly-ppt", "DOCUMENT", List.of("后端开发")),
-                        skill("code-generator", "DEVELOPMENT", List.of("制作 PPT"))));
-
-        assertEquals(0.98D, scores.get("quarterly-ppt"));
-        assertEquals(0.05D, scores.get("code-generator"));
-        assertTrue(!scores.containsKey("invented-skill"));
-        verify(client).chatJsonObject(
-                eq("skill-routing-reranker"),
-                contains("whenNotToUse"),
-                contains("quarterly-ppt"));
+    private HttpServer server;private ExecutorService executor;
+    private final AtomicInteger calls=new AtomicInteger();
+    private final AtomicReference<String> upgrade=new AtomicReference<>();
+    private final AtomicReference<JSONObject> received=new AtomicReference<>();
+    private final AtomicReference<String> reply=new AtomicReference<>();
+    private OpsSkillRetrievalHttpClient client;
+    private static final String REV="a".repeat(40);
+    @BeforeEach void open() throws Exception {
+        server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);executor=Executors.newCachedThreadPool();server.setExecutor(executor);
+        server.createContext("/",x->{
+            upgrade.set(x.getRequestHeaders().getFirst("Upgrade"));calls.incrementAndGet();received.set(JSON.parseObject(new String(x.getRequestBody().readAllBytes(),StandardCharsets.UTF_8)));
+            byte[] body=reply.get().getBytes(StandardCharsets.UTF_8);x.sendResponseHeaders(200,body.length);x.getResponseBody().write(body);x.close();
+        });server.start();
+        client=new OpsSkillRetrievalHttpClient("http://127.0.0.1:"+server.getAddress().getPort(),"",REV,REV);
     }
-
-    @Test
-    void degradesToEmptyScoresWhenModelUnavailable() {
-        @SuppressWarnings("unchecked")
-        ObjectProvider<OpsAgentLlmClient> provider = mock(ObjectProvider.class);
-        when(provider.getIfAvailable()).thenReturn(null);
-
-        Map<String, Double> scores = new OpsSkillLlmRerankAdapter(provider).scores(
-                "query",
-                List.of(
-                        skill("one", "GENERAL", List.of()),
-                        skill("two", "GENERAL", List.of())));
-
-        assertTrue(scores.isEmpty());
+    @AfterEach void close() { server.stop(0);executor.shutdownNow(); }
+    private void response(Object ranking) { reply.set(JSON.toJSONString(Map.of("model",OpsSkillRetrievalHttpClient.RERANKER,"revision",REV,"preprocessing",OpsSkillRetrievalHttpClient.PREPROCESS,"ranking",ranking))); }
+    @Test void keepsRawScorerValuesAndUsesOneDedicatedRequest() {
+        response(List.of(Map.of("id","one","score",4.5),Map.of("id","two","score",-2.5)));
+        var scores=new OpsSkillLlmRerankAdapter(client).scores("query",List.of(skill("one"),skill("two")));
+        assertNull(upgrade.get(), "HTTP/1.1 inference servers must not receive an h2c upgrade");
+        assertEquals(Map.of("one",4.5,"two",-2.5),scores);assertEquals(1,calls.get());
+        assertEquals(OpsSkillRetrievalHttpClient.RERANKER,received.get().getString("model"));
+        assertFalse(received.get().containsKey("messages"));assertFalse(received.get().containsKey("embedding"));
     }
-
-    private SkillRuntimeCandidate skill(String id,
-                                        String category,
-                                        List<String> exclusions) {
-        SkillRoutingProfile profile = new SkillRoutingProfile(
-                category, "", id, List.of(id), exclusions, List.of(id));
-        return new SkillRuntimeCandidate(
-                id, "demo-project", "PROJECT", id, id, 1,
-                "hash-" + id, "package-" + id, "manifest-" + id,
-                Map.of("SKILL.md", "artifact-" + id), "SKILL.md",
-                "ACTIVE", "AUTO", 10, profile);
+    @Test void rejectsUnknownDuplicateMissingAndNonFiniteScoresWithoutRetry() {
+        for(Object invalid:List.of(
+                List.of(Map.of("id","invented","score",1),Map.of("id","two","score",2)),
+                List.of(Map.of("id","one","score",1),Map.of("id","one","score",2)),
+                List.of(Map.of("id","one","score",1)),
+                List.of(Map.of("id","one","score","NaN"),Map.of("id","two","score",2)))) {
+            int before=calls.get();response(invalid);
+            assertThrows(IllegalStateException.class,()->new OpsSkillLlmRerankAdapter(client).scores("query",List.of(skill("one"),skill("two"))));assertEquals(before+1,calls.get());
+        }
+    }
+    @Test void validatesExactEmbeddingDimensionNormalizationAndModelIdentity() {
+        var vector=new ArrayList<Double>(Collections.nCopies(1024,0D));vector.set(0,1D);
+        var result=new LinkedHashMap<String,Object>(Map.of("model",OpsSkillRetrievalHttpClient.EMBEDDING,"revision",REV,"preprocessing",OpsSkillRetrievalHttpClient.PREPROCESS,"embedding",vector));
+        reply.set(JSON.toJSONString(result));assertEquals(1024,client.embed("检索问题",true).length);
+        assertEquals(1024,received.get().getIntValue("dimensions"));assertEquals("query",received.get().getString("kind"));
+        vector.remove(0);reply.set(JSON.toJSONString(result));assertThrows(IllegalStateException.class,()->client.embed("x",true));
+        vector.add(0D);reply.set(JSON.toJSONString(result));assertThrows(IllegalStateException.class,()->client.embed("x",true));
+        vector.set(0,1D);result.put("model","another-model");reply.set(JSON.toJSONString(result));assertThrows(IllegalStateException.class,()->client.embed("x",true));
+    }
+    @Test void boundedResponseAndMissingConfigurationNeverInvokeAnotherProvider() {
+        reply.set(" ".repeat(1_000_001));assertThrows(IllegalStateException.class,()->client.embed("x",true));assertEquals(1,calls.get());
+        var unavailable=new OpsSkillRetrievalHttpClient("","","","");
+        assertTrue(new OpsSkillLlmRerankAdapter(unavailable).scores("x",List.of(skill("one"))).isEmpty());assertEquals(1,calls.get());
+    }
+    @Test void enforcesBudgetThroughSlowResponseBody() {
+        server.removeContext("/");server.createContext("/",x->{
+            calls.incrementAndGet();x.getRequestBody().readAllBytes();x.sendResponseHeaders(200,100);
+            try { Thread.sleep(6500);x.getResponseBody().write(" ".repeat(100).getBytes(StandardCharsets.UTF_8)); }
+            catch(InterruptedException ignored) { Thread.currentThread().interrupt(); } finally { x.close(); }
+        });
+        long start=System.nanoTime();assertThrows(IllegalStateException.class,()->client.embed("x",true));
+        assertTrue(TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-start)<5900);assertEquals(1,calls.get());
+    }
+    private SkillRuntimeCandidate skill(String id) {
+        return new SkillRuntimeCandidate(id,"p","PROJECT",id,id,1,"hash-"+id,"package-"+id,"manifest-"+id,Map.of(),"SKILL.md","ACTIVE","AUTO",10,
+                new SkillRoutingProfile("GENERAL","",id,List.of("query"),List.of("unrelated"),List.of(id)));
     }
 }

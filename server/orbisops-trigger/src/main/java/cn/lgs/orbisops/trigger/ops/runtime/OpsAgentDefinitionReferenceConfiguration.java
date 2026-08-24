@@ -8,7 +8,7 @@ import cn.lgs.orbisops.application.project.ProjectKnowledgeAuthorizationApplicat
 import cn.lgs.orbisops.application.project.ProjectMcpAuthorizationApplicationService;
 import cn.lgs.orbisops.application.project.ProjectMcpRuntimeDescriptorApplicationService;
 import cn.lgs.orbisops.application.project.ProjectSkillAuthorizationApplicationService;
-import cn.lgs.orbisops.trigger.ops.skill.SkillRuntimeToolProvider;
+import cn.lgs.orbisops.application.skill.SkillCatalogPort;
 import cn.lgs.orbisops.trigger.ops.source.OpsSourceRepositoryService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
@@ -21,7 +21,7 @@ public class OpsAgentDefinitionReferenceConfiguration {
     public OpsAgentProjectCapabilityReferenceValidator
     opsAgentProjectCapabilityReferenceValidator(
             ObjectProvider<McpClientCatalogPort> mcpRepositoryProvider,
-            ObjectProvider<SkillRuntimeToolProvider> skillToolProvider,
+            SkillCatalogPort skillCatalog,
             ObjectProvider<ProjectDefinitionApplicationService> projectDefinitionProvider,
             ObjectProvider<ProjectMcpAuthorizationApplicationService> mcpAuthorizationProvider,
             ObjectProvider<ProjectSkillAuthorizationApplicationService> skillAuthorizationProvider,
@@ -29,7 +29,7 @@ public class OpsAgentDefinitionReferenceConfiguration {
             ObjectProvider<OpsSourceRepositoryService> sourceRepositoryProvider) {
         return new OpsAgentProjectCapabilityReferenceValidator(
                 mcpRepositoryProvider::getIfAvailable,
-                skillToolProvider::getIfAvailable,
+                () -> skillCatalog,
                 projectDefinitionProvider::getIfAvailable,
                 mcpAuthorizationProvider::getIfAvailable,
                 skillAuthorizationProvider::getIfAvailable,

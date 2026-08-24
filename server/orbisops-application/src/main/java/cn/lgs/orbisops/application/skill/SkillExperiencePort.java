@@ -14,6 +14,13 @@ public interface SkillExperiencePort {
 
     boolean insertObservation(SkillExperienceObservation observation);
 
+    /** Preserve an admitted observation's identity across retries, rule upgrades and semantic reassignment. */
+    default java.util.Optional<String> recordedClusterKey(String projectId,String agentId,String observationId) {
+        return java.util.Optional.empty();
+    }
+
+    default boolean recordVerifiedContribution(SkillExperienceObservation observation) { return false; }
+
     void upsertCluster(SkillExperienceObservation observation);
 
     SkillExperienceClusterSnapshot cluster(
@@ -31,6 +38,10 @@ public interface SkillExperiencePort {
             String agentId,
             String clusterKey,
             int limit);
+
+    default List<SkillExperienceConsolidationSample> consolidationSamples(String projectId,String agentId,String clusterKey,int limit,String requiredRun) {
+        return consolidationSamples(projectId,agentId,clusterKey,limit);
+    }
 
     boolean markClusterPromoted(
             String projectId,

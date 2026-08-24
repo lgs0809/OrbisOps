@@ -6,6 +6,7 @@ import cn.lgs.orbisops.application.skill.QuarantineSkillUseCase;
 import cn.lgs.orbisops.application.skill.RestoreSkillUseCase;
 import cn.lgs.orbisops.application.skill.SealSkillUseCase;
 import cn.lgs.orbisops.application.skill.SelectRuntimeSkillsQuery;
+import cn.lgs.orbisops.application.skill.SkillRuntimePublishedVersionPort;
 import cn.lgs.orbisops.application.skill.SkillGovernanceAuditPort;
 import cn.lgs.orbisops.application.skill.SkillGovernanceAuthorizationPort;
 import cn.lgs.orbisops.application.skill.SkillGovernanceTransitionUseCase;
@@ -19,7 +20,7 @@ import cn.lgs.orbisops.application.skill.SkillCanarySettings;
 import cn.lgs.orbisops.application.skill.SkillEvolutionApplicationService;
 import cn.lgs.orbisops.application.skill.SkillEvolutionAuditPort;
 import cn.lgs.orbisops.application.skill.SkillEvolutionAuthoringPort;
-import cn.lgs.orbisops.application.skill.SkillEvolutionChatInputPort;
+import cn.lgs.orbisops.application.skill.SkillEvolutionSourcePort;
 import cn.lgs.orbisops.application.skill.SkillEvolutionJobApplicationService;
 import cn.lgs.orbisops.application.skill.SkillEvolutionPatchJsonEncoder;
 import cn.lgs.orbisops.application.skill.SkillEvolutionPayloadCodec;
@@ -138,9 +139,10 @@ public class OpsSkillCatalogApplicationConfiguration {
             ISkillCatalogRepository catalogRepository,
             ISkillPackageRepository packageRepository,
             SkillTransactionPort transactionPort,
-            SkillPackageManifest.Limits packageLimits) {
+            SkillPackageManifest.Limits packageLimits,
+            cn.lgs.orbisops.application.skill.SkillRecoverySafetyPort recoverySafety) {
         return new SkillRollbackUseCase(
-                catalogRepository, packageRepository, transactionPort, packageLimits);
+                catalogRepository, packageRepository, transactionPort, packageLimits, recoverySafety);
     }
 
     @Bean
@@ -212,9 +214,9 @@ public class OpsSkillCatalogApplicationConfiguration {
             ISkillCatalogRepository catalogRepository,
             ISkillPackageRepository packageRepository,
             SkillFileSourcePort fileSourcePort,
-            SkillProjectValidationPort projectValidationPort) {
+            SkillProjectValidationPort projectValidationPort, cn.lgs.orbisops.application.skill.SkillFileProjectionPort fileProjection) {
         return new SkillCatalogReadService(catalogRepository, packageRepository,
-                fileSourcePort, projectValidationPort);
+                fileSourcePort, projectValidationPort, fileProjection);
     }
 
     @Bean
@@ -239,8 +241,8 @@ public class OpsSkillCatalogApplicationConfiguration {
     @Bean
     public SkillCatalogQueryService skillCatalogQueryService(
             SkillCatalogPort port,
-            SkillPackageQueryService packageQueryService) {
-        return new SkillCatalogQueryService(port, packageQueryService);
+            SkillPackageQueryService packageQueryService,SkillRuntimePublishedVersionPort runtimePublication) {
+        return new SkillCatalogQueryService(port, packageQueryService,runtimePublication);
     }
 
     @Bean
@@ -306,6 +308,8 @@ public class OpsSkillCatalogApplicationConfiguration {
             SkillEvolutionPipelineAuditPort pipelineAuditPort,
             SkillEvolutionCandidateSetSelector candidateSetSelector,
             SkillCandidateTournamentSettings tournamentSettings,
+            cn.lgs.orbisops.application.skill.SkillEvolutionProposalPort proposalPort,
+            cn.lgs.orbisops.application.skill.SkillExperienceGroupingService grouping,
             @Value("${orbisops.skill-evolution.promotion.min-observations:3}") int minimumObservations,
             @Value("${orbisops.skill-evolution.promotion.explicit-procedure-min-observations:2}") int explicitProcedureMinimumObservations,
             @Value("${orbisops.skill-evolution.promotion.min-distinct-runs:2}") int minimumDistinctRuns,
@@ -328,27 +332,34 @@ public class OpsSkillCatalogApplicationConfiguration {
                         minimumDistinctSessions,
                         consolidationSampleLimit),
                 candidateSetSelector,
-                tournamentSettings);
+                tournamentSettings,proposalPort).withGrouping(grouping);
+    }
+
+    @Bean
+    public cn.lgs.orbisops.application.skill.SkillEvolutionRelatedSkillService skillEvolutionRelatedSkillService(
+            cn.lgs.orbisops.domain.skill.adapter.repository.ISkillCatalogRepository repository,
+            cn.lgs.orbisops.application.skill.SkillFileSourcePort files,
+            cn.lgs.orbisops.application.skill.SkillCatalogQueryService catalog) {
+        return new cn.lgs.orbisops.application.skill.SkillEvolutionRelatedSkillService(repository,files,catalog);
     }
 
     @Bean
     public SkillEvolutionJobApplicationService skillEvolutionJobApplicationService(
             ISkillEvolutionJobRepository repository,
-            SkillEvolutionTraceInputPort traceInputPort,
-            SkillEvolutionChatInputPort chatInputPort,
+            SkillEvolutionSourcePort sourcePort,
             SkillEvolutionPipelinePort pipelinePort,
-            SkillEvolutionAuditPort auditPort) {
+            SkillEvolutionAuditPort auditPort,
+            cn.lgs.orbisops.application.skill.SkillEvolutionLeasePort leases) {
         return new SkillEvolutionJobApplicationService(
                 repository,
                 new SkillEvolutionJobPolicy(),
                 new SkillEvolutionInputPolicy(),
-                traceInputPort,
-                chatInputPort,
+                sourcePort,
                 pipelinePort,
                 new SkillEvolutionPatchJsonEncoder(),
                 () -> "skill-patch-" + UUID.randomUUID(),
                 auditPort,
-                Clock.systemDefaultZone());
+                Clock.systemDefaultZone(), leases);
     }
 
     @Bean
@@ -453,15 +464,26 @@ public class OpsSkillCatalogApplicationConfiguration {
     }
 
     @Bean
+    public cn.lgs.orbisops.application.skill.SkillExperienceGroupingService skillExperienceGroupingService(
+            cn.lgs.orbisops.application.skill.SkillExperienceGroupingStore store,
+            cn.lgs.orbisops.application.skill.SkillExperienceGroupingModelPort model,
+            cn.lgs.orbisops.application.skill.SkillExperienceGroupingIndexPort index,
+            cn.lgs.orbisops.application.skill.SkillExperienceEmbeddingPort embeddings,
+            SkillExperiencePort experience) {
+        return new cn.lgs.orbisops.application.skill.SkillExperienceGroupingService(store,model,index,embeddings,experience);
+    }
+
+    @Bean
     public SkillExperienceApplicationService skillExperienceApplicationService(
             SkillExperiencePort experiencePort,
             SkillExperienceAuditPort auditPort,
-            SkillTransactionPort transactionPort) {
+            SkillTransactionPort transactionPort,
+            cn.lgs.orbisops.application.skill.SkillTaskOutcomePort outcomes) {
         return new SkillExperienceApplicationService(
                 experiencePort,
                 auditPort,
                 transactionPort,
-                new SkillExperienceObservationPolicy());
+                new SkillExperienceObservationPolicy(), outcomes);
     }
 
     @Bean
@@ -500,7 +522,12 @@ public class OpsSkillCatalogApplicationConfiguration {
             SkillReleaseAuditPort auditPort,
             @Value("${orbisops.skill-evolution.enabled:true}") boolean enabled,
             @Value("${orbisops.skill-evolution.min-sample-size:10}") int minimumSampleSize,
-            @Value("${orbisops.skill-evolution.release.batch-size:20}") int evaluationBatchSize) {
+            @Value("${orbisops.skill-evolution.release.batch-size:20}") int evaluationBatchSize,
+            cn.lgs.orbisops.application.skill.SkillAutomaticPublicationCheckPort publicationChecks,
+            cn.lgs.orbisops.application.skill.SkillContentReviewPort contentReview,
+            cn.lgs.orbisops.application.skill.SkillContentRevisionPort contentRevisions,
+            cn.lgs.orbisops.application.skill.SkillAtomicPublicationPort atomicPublication,
+            SkillTransactionPort transactionPort) {
         return new SkillReleaseApplicationService(
                 releasePort,
                 candidateService,
@@ -514,7 +541,12 @@ public class OpsSkillCatalogApplicationConfiguration {
                 new SkillReleaseSettings(
                         enabled,
                         minimumSampleSize,
-                        evaluationBatchSize));
+                        evaluationBatchSize)).withAutomaticPublication(
+                new cn.lgs.orbisops.application.skill.SkillAutomaticPublicationService(
+                        releasePort, candidateService, validationService, publicationChecks, contentReview,
+                        packageAssembler, managementUseCase, transactionPort, auditPort,
+                        new SkillReleaseSettings(enabled, minimumSampleSize, evaluationBatchSize)).withAtomicPublication(atomicPublication)
+                        .withContentRevisions(contentRevisions));
     }
 
     @Bean
@@ -554,7 +586,9 @@ public class OpsSkillCatalogApplicationConfiguration {
             SkillCatalogPort port,
             SkillSemanticScorePort semanticScorePort,
             SkillRerankPort rerankPort,
-            SkillRuntimeSelectionSettings settings) {
-        return new SelectRuntimeSkillsQuery(port, semanticScorePort, rerankPort, settings);
+            SkillRuntimeSelectionSettings settings,
+            cn.lgs.orbisops.application.skill.SkillRuntimePublishedVersionPort publishedVersions,
+            cn.lgs.orbisops.application.skill.SkillApplicabilityPort applicability) {
+        return new SelectRuntimeSkillsQuery(port, semanticScorePort, rerankPort, settings, publishedVersions, applicability);
     }
 }

@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.sql.ResultSet;
@@ -25,7 +26,9 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 @Repository
 public class JdbcSkillCatalogRepository implements ISkillCatalogRepository {
@@ -40,10 +43,20 @@ public class JdbcSkillCatalogRepository implements ISkillCatalogRepository {
             frozen_reason, frozen_by, frozen_at, skill_hash, current_version, current_skill_hash, version_seq,
             current_package_hash, package_manifest_json, artifact_hashes_json
             """;
+    private static final String METADATA_COLUMNS = SELECT_COLUMNS.replace("description, content,", "description, '' AS content,");
 
     @Qualifier("mysqlJdbcTemplate")
     @Autowired(required = false)
     private JdbcTemplate jdbcTemplate;
+
+    public JdbcSkillCatalogRepository() { }
+    public JdbcSkillCatalogRepository(JdbcTemplate jdbcTemplate) { this.jdbcTemplate=jdbcTemplate; }
+
+    Optional<SkillCatalogEntry> lockEvolutionEntry(String scope,String projectId,String skillId) {
+        requireAvailable();
+        return jdbcTemplate.query("SELECT "+SELECT_COLUMNS+" FROM ai_ops_skill WHERE scope=? AND project_id=? AND skill_id=? FOR UPDATE",
+                mapper(),scope,projectId,skillId).stream().findFirst();
+    }
 
     @Override
     public boolean available() {
@@ -56,6 +69,35 @@ public class JdbcSkillCatalogRepository implements ISkillCatalogRepository {
         return jdbcTemplate.query("SELECT " + SELECT_COLUMNS + " FROM ai_ops_skill "
                         + "WHERE scope=? AND project_id=? ORDER BY update_time DESC, id DESC",
                 mapper(), scope, projectId);
+    }
+
+    @Override
+    public List<SkillCatalogEntry> findEvolutionMetadata(String scope, String projectId) {
+        requireAvailable();
+        return jdbcTemplate.query("SELECT " + METADATA_COLUMNS
+                        + " FROM ai_ops_skill WHERE scope=? AND project_id=? ORDER BY skill_id",
+                mapper(), scope, projectId);
+    }
+
+    @Override
+    public List<SkillCatalogEntry> findEvolutionMetadata(String scope, String projectId, Set<String> skillIds) {
+        requireAvailable();
+        if (skillIds.isEmpty()) return List.of();
+        return new NamedParameterJdbcTemplate(jdbcTemplate).query("SELECT " + METADATA_COLUMNS
+                        + " FROM ai_ops_skill WHERE scope=:scope AND project_id=:project AND skill_id IN (:ids) ORDER BY skill_id",
+                Map.of("scope", scope, "project", projectId, "ids", skillIds), mapper()).stream()
+                .filter(entry -> skillIds.contains(entry.skillId())).toList();
+    }
+
+    @Override public List<SkillCatalogEntry> findAuthoringMetadata(String scope,String projectId) {
+        return new JdbcSkillLifecycleVisibility(jdbcTemplate).filter(projectId,findEvolutionMetadata(scope,projectId),
+                SkillCatalogEntry::scope,SkillCatalogEntry::skillId,java.util.Set.of());
+    }
+
+    List<SkillCatalogEntry> routingMetadataPage(long afterId,int limit) {
+        requireAvailable();
+        return jdbcTemplate.query("SELECT "+METADATA_COLUMNS
+                +" FROM ai_ops_skill WHERE id>? ORDER BY id LIMIT ?",mapper(),afterId,limit);
     }
 
     @Override

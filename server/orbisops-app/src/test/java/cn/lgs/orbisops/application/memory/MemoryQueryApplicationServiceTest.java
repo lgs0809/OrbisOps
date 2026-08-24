@@ -22,6 +22,15 @@ import static org.mockito.Mockito.when;
 class MemoryQueryApplicationServiceTest {
 
     @Test
+    void protectedSourceOverflowIsNotSilentlyDowngradedToEmptyContext() {
+        MemoryRetrievalApplicationService retrieval = mock(MemoryRetrievalApplicationService.class);
+        when(retrieval.retrieve(any())).thenThrow(new MemoryContextIntegrityException("MEMORY_PROTECTED_CONTEXT_BUDGET_EXCEEDED"));
+        var service = service(retrieval, null, null, new ArrayList<>());
+        org.junit.jupiter.api.Assertions.assertThrows(MemoryContextIntegrityException.class,
+                () -> service.query(command("", "", "继续处理")));
+    }
+
+    @Test
     void assemblesRetrievalSelectionRenderingAndReferences() {
         MemoryRetrievalApplicationService retrievalService = mock(MemoryRetrievalApplicationService.class);
         MemoryContextRenderingApplicationService renderingService =

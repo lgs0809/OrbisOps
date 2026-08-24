@@ -6,6 +6,7 @@ import cn.lgs.orbisops.application.changepackage.ChangePackageRevisionPlan;
 import cn.lgs.orbisops.application.project.ProjectDefinitionApplicationService;
 import cn.lgs.orbisops.domain.changepackage.model.ChangePackagePreparationDecision;
 import cn.lgs.orbisops.domain.changepackage.service.ChangePackagePreparationPolicy;
+import cn.lgs.orbisops.domain.runtime.workflow.service.WorkflowChangeVerificationPolicy;
 import cn.lgs.orbisops.trigger.application.agentdefinition.OpsAgentDefinitionQueryGateway;
 import cn.lgs.orbisops.trigger.application.runtime.OpsRuntimeContextBundleAdapter;
 import cn.lgs.orbisops.trigger.ops.OpsConfigAuditService;
@@ -120,8 +121,9 @@ public class OpsChangePackagePreparationService implements ChangePackagePreparat
             String packageId,
             Map<String, Object> request,
             String actor) {
-        return ChangePackageRevisionPlan.from(
-                contextBundleService.validateRevision(request));
+        Map<String, Object> safe = contextBundleService.validateRevision(request);
+        new WorkflowChangeVerificationPolicy().validateDeclaredCriteria(safe.get("verificationCriteria"));
+        return ChangePackageRevisionPlan.from(safe);
     }
 
     @Override
@@ -132,6 +134,7 @@ public class OpsChangePackagePreparationService implements ChangePackagePreparat
                 request == null ? Map.of() : request);
         Map<String, Object> contextBundle = contextBundleService.requireForRequest(safe);
         contextBundleService.applyAuthoritative(safe, contextBundle);
+        new WorkflowChangeVerificationPolicy().validateDeclaredCriteria(safe.get("verificationCriteria"));
         String projectId = requireText(
                 safe.get("projectId"),
                 "PREPARE 必须提供 projectId");

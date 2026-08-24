@@ -111,7 +111,15 @@ public final class ScheduledTaskExecutionUseCase<Q, R> {
             if (incidentId != null && !incidentId.isBlank()) {
                 incidentPort.linkInvestigation(incidentId, command, executionId);
             }
-            catalogPort.markSucceeded(executionId, analysisPort.renderOutput(response));
+            String status = analysisPort.runtimeStatus(response);
+            String output = analysisPort.renderOutput(response);
+            if ("SUCCEEDED".equals(status)) {
+                catalogPort.markSucceeded(executionId, output);
+            } else if ("WAITING_APPROVAL".equals(status) || "CANCELED".equals(status)) {
+                catalogPort.markIncomplete(executionId, status, output);
+            } else {
+                catalogPort.markFailed(executionId, "SCHEDULED_ANALYSIS_NOT_SUCCEEDED", output);
+            }
         } catch (Exception error) {
             catalogPort.markFailed(executionId, error.getMessage(), null);
         }

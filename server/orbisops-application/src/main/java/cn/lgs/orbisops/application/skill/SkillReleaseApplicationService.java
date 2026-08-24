@@ -14,6 +14,12 @@ public class SkillReleaseApplicationService {
     private final SkillReleaseStarter starter;
     private final SkillReleasePromotionCoordinator promotionCoordinator;
     private final SkillReleaseRollbackCoordinator rollbackCoordinator;
+    private SkillAutomaticPublicationService automaticPublication;
+
+    public SkillReleaseApplicationService withAutomaticPublication(SkillAutomaticPublicationService service) {
+        this.automaticPublication = java.util.Objects.requireNonNull(service);
+        return this;
+    }
 
     public SkillReleaseApplicationService(
             SkillReleasePort releasePort,
@@ -63,8 +69,20 @@ public class SkillReleaseApplicationService {
         return startOutcome(candidateId).view();
     }
 
+    public Map<String,Object> rollbackAtomic(String projectId,String candidateId,String actor,String reason) {
+        if(automaticPublication==null) throw new IllegalStateException("SKILL_ATOMIC_PUBLICATION_UNAVAILABLE");
+        automaticPublication.rollbackAtomic(projectId,candidateId,actor,reason);
+        return SkillReleaseStartOutcome.released(releasePort.findByCandidate(candidateId).orElseThrow()).view();
+    }
+
     public SkillReleaseStartOutcome startOutcome(String candidateId) {
+        if (automaticPublication != null) return automaticPublication.start(candidateId);
         return starter.startOutcome(candidateId);
+    }
+
+    public SkillReleaseStartOutcome resumeRetained(String candidateId, Runnable leaseGuard) {
+        if(automaticPublication==null) throw new IllegalStateException("SKILL_AUTOMATIC_PUBLICATION_REQUIRED");
+        return automaticPublication.start(candidateId,leaseGuard);
     }
 
     public void evaluateReleases() {
@@ -72,7 +90,11 @@ public class SkillReleaseApplicationService {
         for (SkillReleaseSnapshot release : releasePort.listEvaluable(
                 settings.evaluationBatchSize())) {
             try {
-                if (release.status() == SkillReleaseStatus.CANARY) {
+                if (automaticPublication != null) {
+                    if(SkillAutomaticPublicationService.POLICY.equals(release.metadata().get("publicationPolicy")))
+                        automaticPublication.advance(release);
+                    // Historical canary releases remain archival under the new publication policy.
+                } else if (release.status() == SkillReleaseStatus.CANARY) {
                     promoteIfReady(release);
                 } else if (release.status() == SkillReleaseStatus.ACTIVE) {
                     rollbackIfDegraded(release);

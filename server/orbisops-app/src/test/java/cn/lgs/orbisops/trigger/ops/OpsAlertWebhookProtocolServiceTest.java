@@ -52,6 +52,8 @@ class OpsAlertWebhookProtocolServiceTest {
         assertEquals("warning", first.severity());
         assertEquals("payment", first.service());
         assertEquals("firing", first.status());
+        assertEquals("2026-07-15T10:00:00Z", first.startsAt());
+        assertEquals("2026-07-15T10:05:00Z", second.startsAt());
         assertEquals("first message", first.annotation("summary"));
         assertEquals(first.fingerprint(), second.fingerprint());
         assertFalse(first.fingerprint().isBlank());

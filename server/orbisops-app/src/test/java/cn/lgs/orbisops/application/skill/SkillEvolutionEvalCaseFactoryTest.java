@@ -54,6 +54,7 @@ class SkillEvolutionEvalCaseFactoryTest {
         List<?> artifacts = (List<?>) result.get("artifacts");
 
         assertEquals(3, cases.size());
+        cases.forEach(c -> assertEquals("DEVELOPMENT_ONLY",((Map<?,?>)c).get("usage")));
         assertTrue(String.valueOf(cases).contains("ROUTING_POSITIVE"));
         assertTrue(String.valueOf(cases).contains("ROUTING_NEGATIVE"));
         assertTrue(String.valueOf(cases).contains("HARD_CASE"));

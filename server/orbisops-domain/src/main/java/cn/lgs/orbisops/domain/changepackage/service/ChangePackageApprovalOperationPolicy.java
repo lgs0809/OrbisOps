@@ -51,6 +51,9 @@ public final class ChangePackageApprovalOperationPolicy {
         }
         verifyHashes(operation, operationId);
         if (!operation.writesTargetResource()) return;
+        if (operation.raw().containsKey("additionalChecks")) {
+            throw new IllegalStateException("生产写 operation 的附加检查未纳入 postCheck，必须重新准备：" + operationId);
+        }
         if (!operation.requiresChangePackage() || !operation.requiresApproval()) {
             throw new IllegalStateException(
                     "生产写 operation 必须显式要求 ChangePackage 和审批：" + operationId);

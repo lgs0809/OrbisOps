@@ -3,6 +3,7 @@ package cn.lgs.orbisops.trigger.ops.runtime;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -54,9 +55,8 @@ final class OpsRuntimeConversationContextCoordinator {
     }
 
     String originalUserQuery(OpsAgentChatRequest request) {
-        if (request == null || request.getMetadata() == null) {
-            return "";
-        }
+        if (request == null) return "";
+        if (request.getMetadata() == null) return value(request.getQuery());
         Object original = request.getMetadata().get(
                 OpsWorkSessionContextMetadataKeys.ORIGINAL_USER_QUERY);
         String originalText = original == null ? "" : String.valueOf(original);
@@ -66,14 +66,8 @@ final class OpsRuntimeConversationContextCoordinator {
     }
 
     String userMemoryContent(OpsAgentChatRequest request) {
-        String original = originalUserQuery(request);
-        String rewritten = request == null ? "" : value(request.getQuery());
-        if (StringUtils.hasText(original)
-                && StringUtils.hasText(rewritten)
-                && !original.equals(rewritten)) {
-            return "原始问题：" + original + "\n主 Agent 重写问题：" + rewritten;
-        }
-        return StringUtils.hasText(original) ? original : rewritten;
+        // A model's internal query resolution is not a statement authored by the user.
+        return originalUserQuery(request);
     }
 
     void appendMessage(OpsAgentChatRequest request,
@@ -85,12 +79,24 @@ final class OpsRuntimeConversationContextCoordinator {
                        String content,
                        Map<String, Object> metadata) {
         try {
+            Map<String, Object> captureMetadata = new LinkedHashMap<>(metadata == null ? Map.of() : metadata);
+            // Resolve scope from the authenticated request, never from model/tool output metadata.
+            captureMetadata.put("projectId", value(request.getProjectId()));
+            captureMetadata.put("runId", value(request.getRunId()));
+            captureMetadata.put("turnId", value(request.getRunId()));
+            if ("user".equalsIgnoreCase(role)) {
+                String original = originalUserQuery(request);
+                captureMetadata.put("originalUserQuery", original);
+                if (!original.equals(value(request.getQuery()))) {
+                    captureMetadata.put("resolvedQuery", value(request.getQuery()));
+                }
+            }
             memoryService.appendMessage(
                     request.getSessionId(),
                     request.getUserId(),
                     role,
                     value(content),
-                    metadata == null ? Map.of() : metadata);
+                    captureMetadata);
         } catch (RuntimeException error) {
             eventJournal.record(events, eventSink, OpsRuntimeEvent.builder()
                     .eventType("MEMORY_APPEND_DEGRADED")

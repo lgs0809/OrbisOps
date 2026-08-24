@@ -29,7 +29,7 @@ final class OpsAlertAnalysisRequestFactory {
                 .rangeMinutes(rule.getRangeMinutes())
                 .promWindow(rule.getPromWindow())
                 .includeRecentLogs(rule.getIncludeRecentLogs())
-                .question(renderQuestion(rule, alert, eventType, occurrenceCount))
+                .question(renderQuestion(agent, rule, alert, eventType, occurrenceCount))
                 .agentDefinitionId(agent.getAgentId())
                 .agentVersion(agent.getVersion())
                 .agentDefinitionSnapshotJson(JSON.toJSONString(agent))
@@ -98,6 +98,7 @@ final class OpsAlertAnalysisRequestFactory {
     }
 
     private String renderQuestion(
+            OpsAgentDefinition agent,
             OpsAlertTriggerRule rule,
             AlertView alert,
             String eventType,
@@ -116,6 +117,9 @@ final class OpsAlertAnalysisRequestFactory {
                 标签：${labels}
                 注解：${annotations}
                 """;
+        if ("WORKFLOW".equals(executionStyle(agent)) && template.stripLeading().startsWith("{")) {
+            return new OpsAlertWorkflowInputRenderer().render(template, rule, alert, eventType, occurrenceCount);
+        }
         return template
                 .replace("${alertName}", value(alert.alertName()))
                 .replace("${severity}", value(alert.severity()))

@@ -3,9 +3,11 @@ package cn.lgs.orbisops.trigger.ops.runtime;
 import cn.lgs.orbisops.trigger.application.agentdefinition.OpsAgentDefinitionQueryGateway;
 import cn.lgs.orbisops.trigger.ops.OpsRunCanceledException;
 import cn.lgs.orbisops.trigger.ops.OpsRunCancellationRegistry;
+import cn.lgs.orbisops.trigger.ops.OpsRunControlContext;
 import org.springframework.util.StringUtils;
 
 import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 
 /** Owns request normalization, definition scope resolution and durable cancellation/finish control. */
@@ -79,6 +81,29 @@ final class OpsWorkSessionRequestControl {
                 request.getRunId(), request.getProjectId())) {
             throw new OpsRunCanceledException("Work Session 已收到持久化取消请求");
         }
+    }
+
+    OpsRunControlContext.Scope runControl(OpsAgentChatRequest request) {
+        if (cancellationRegistry == null) return OpsRunControlContext.open(null);
+        Map<String, Object> metadata = request.getMetadata() == null ? Map.of() : request.getMetadata();
+        // Bind only after begin() has supplied the server-owned attempt/lease, never from a model payload.
+        if (!metadata.containsKey(OpsWorkSessionClaimMetadata.ATTEMPT_ID)
+                || !metadata.containsKey(OpsWorkSessionClaimMetadata.LEASE_TOKEN)) return OpsRunControlContext.open(null);
+        var claim = new LinkedHashMap<String, Object>();
+        for (String key : java.util.List.of(OpsWorkSessionClaimMetadata.ATTEMPT_ID,
+                OpsWorkSessionClaimMetadata.LEASE_TOKEN, OpsWorkSessionClaimMetadata.FENCING_TOKEN,
+                OpsWorkSessionClaimMetadata.STATE_VERSION, OpsWorkSessionClaimMetadata.RUN_MANIFEST_HASH)) {
+            if (metadata.get(key) != null) claim.put(key, metadata.get(key));
+        }
+        var envelope = new LinkedHashMap<String, Object>();
+        envelope.put("runId", request.getRunId());
+        envelope.put("projectId", request.getProjectId());
+        envelope.put("sessionId", java.util.Objects.requireNonNullElse(request.getSessionId(), ""));
+        envelope.put("userId", java.util.Objects.requireNonNullElse(request.getUserId(), ""));
+        envelope.put("metadata", Map.copyOf(claim));
+        var binding = new OpsRunControlContext.Binding(request.getRunId(), request.getProjectId(), envelope,
+                cancellationRegistry);
+        return OpsRunControlContext.open(binding);
     }
 
     void finish(OpsAgentChatRequest request,

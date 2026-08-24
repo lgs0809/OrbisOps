@@ -124,6 +124,21 @@ public final class OpsMcpProgressiveRuntimeAdapter {
                 McpAuthoritativeToolDefinition.empty())).view();
     }
 
+    /** Recheck current local authorization without rebuilding/persisting the summary. */
+    public boolean authorizedForCurrentStage(OpsMcpServerConfig config,String name) {
+        return currentlyAuthorizedNames(config).contains(name);
+    }
+
+    public java.util.Set<String> currentlyAuthorizedNames(OpsMcpServerConfig config) {
+        var manager = processManagerSupplier.get();
+        if (!progressiveCandidate(config,manager)) return java.util.Set.of();
+        var tools = manager.runtimeExecutableTools(value(config.getProjectId()),
+                value(config.getToolId(),value(config.getMcpId(),config.getName())),
+                config.getAllowedTools(),config.getBlockedTools(),catalogStage(config));
+        return tools == null ? java.util.Set.of() : tools.stream().map(tool -> value(tool.get("toolName")))
+                .filter(name -> !name.isBlank()).collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
     public void recordPreRemoteFailure(
             OpsMcpServerConfig config,
             String remoteToolName,

@@ -30,6 +30,33 @@ import java.util.Map;
 @Repository
 public class JdbcChangePackageQueryAdapter implements ChangePackageQueryPort {
 
+    // The ReAct Landing path records operation start in the execution ledger.
+    // Join only the same successful side effect and immutable receipt; never infer
+    // a timestamp from package creation, approval, or the time of this query.
+    static final String LANDING_OPERATION_QUERY = """
+            SELECT o.operation_run_id, o.landing_run_id, o.package_id, o.project_id, o.approved_version,
+                   o.approved_package_hash, o.operation_id, o.operation_hash, o.adapter_type, o.toolset_id,
+                   o.tool_name, o.resource_key, o.effect_type, o.stage, o.status, o.fact_status, o.reason_code,
+                   o.result_id, o.output_hash, o.precondition_result_json, o.execution_result_json,
+                   o.post_check_result_json, o.rollback_status, o.rollback_result_json, o.rollback_at,
+                   o.result_json, o.started_at, o.finished_at,
+                   UNIX_TIMESTAMP(COALESCE(e.created_at, o.started_at)) AS startedEpoch,
+                   UNIX_TIMESTAMP(COALESCE(e.updated_at, o.finished_at)) AS finishedEpoch,
+                   CASE WHEN e.updated_at IS NOT NULL THEN 'TOOL_EXECUTION_LEDGER_COMPLETED_AT'
+                        WHEN o.finished_at IS NOT NULL THEN 'LANDING_OPERATION_FINISHED_AT'
+                        ELSE 'MISSING' END AS finishedEpochSource,
+                   CASE WHEN e.created_at IS NOT NULL THEN 'TOOL_EXECUTION_LEDGER_CREATED_AT'
+                        WHEN o.started_at IS NOT NULL THEN 'LANDING_OPERATION_STARTED_AT'
+                        ELSE 'MISSING' END AS startedEpochSource
+            FROM ai_ops_change_package_landing_operation_run o
+            LEFT JOIN ai_ops_tool_execution_ledger e
+              ON e.idempotency_key=o.execution_key AND e.project_id=o.project_id
+             AND e.run_id=o.landing_run_id AND e.status='SUCCEEDED' AND e.side_effecting=1
+             AND e.result_id=o.result_id AND e.output_hash=o.output_hash
+             AND o.result_id<>'' AND o.output_hash<>''
+            WHERE o.package_id=? ORDER BY o.id DESC LIMIT ?
+            """;
+
     private static final List<String> SNAPSHOT_PROJECTION_FIELDS = List.of(
             "contextBundleId", "contextBundleHash", "memoryContextRefs", "memoryContextHash",
             "compressedMemorySummary", "memoryInjectionVersion", "usedSkillVersionRefs",
@@ -121,18 +148,7 @@ public class JdbcChangePackageQueryAdapter implements ChangePackageQueryPort {
     public List<Map<String, Object>> landingOperationRuns(String packageId, int limit) {
         String id = required(packageId, "CHANGE_PACKAGE_ID_REQUIRED");
         detail(id);
-        return template().queryForList("""
-                SELECT operation_run_id, landing_run_id, package_id, project_id, approved_version,
-                       approved_package_hash, operation_id, operation_hash, adapter_type, toolset_id,
-                       tool_name, resource_key, effect_type, stage, status, fact_status, reason_code,
-                       result_id, output_hash, precondition_result_json, execution_result_json,
-                       post_check_result_json, rollback_status, rollback_result_json, rollback_at,
-                       result_json, started_at, finished_at
-                FROM ai_ops_change_package_landing_operation_run
-                WHERE package_id=?
-                ORDER BY id DESC
-                LIMIT ?
-                """, id, Math.max(1, Math.min(limit, 500))).stream()
+        return template().queryForList(LANDING_OPERATION_QUERY, id, Math.max(1, Math.min(limit, 500))).stream()
                 .map(this::landingRunView)
                 .toList();
     }
@@ -210,6 +226,7 @@ public class JdbcChangePackageQueryAdapter implements ChangePackageQueryPort {
         row.put("create_time", current.createTime());
         row.put("update_time", current.updateTime());
         row.put("approved_at", current.approvedAt());
+        row.put("approvedEpoch", current.approvedAt()==null ? null : current.approvedAt().getEpochSecond());
         current.state().values().forEach((field, value) -> row.put(columnName(field.snapshotKey()), value));
         return view(row);
     }
@@ -373,11 +390,31 @@ public class JdbcChangePackageQueryAdapter implements ChangePackageQueryPort {
                 {"preparation_agent_id", "preparationAgentId"},
                 {"preparation_agent_version", "preparationAgentVersion"},
                 {"package_type", "packageType"}, {"approved_version", "approvedVersion"},
+                {"objective", "objective"}, {"summary", "summary"},
                 {"package_hash", "packageHash"}, {"approved_package_hash", "approvedPackageHash"},
                 {"approved_snapshot_json", "approvedSnapshotJson"}, {"risk_level", "riskLevel"},
+                {"evidence_json", "evidenceJson"}, {"tool_bindings_json", "toolBindingsJson"},
+                {"preflight_result_json", "preflightResultJson"}, {"dry_run_result_json", "dryRunResultJson"},
                 {"validation_assessment", "validationAssessment"}, {"reason_code", "reasonCode"},
+                {"approval_boundary_json", "approvalBoundaryJson"},
+                {"preferred_plan_json", "preferredPlanJson"}, {"adjustment_policy_json", "adjustmentPolicyJson"},
                 {"target_environment", "targetEnvironment"}, {"target_scope_json", "targetScopeJson"},
                 {"allowed_tools_json", "allowedToolsJson"}, {"forbidden_tools_json", "forbiddenToolsJson"},
+                {"branch_name", "branchName"}, {"base_branch", "baseBranch"},
+                {"target_branch", "targetBranch"}, {"base_commit", "baseCommit"},
+                {"repair_workspace_id", "repairWorkspaceId"}, {"repository_id", "repositoryId"},
+                {"service_id", "serviceId"}, {"repair_commit", "repairCommit"},
+                {"diff_summary", "diffSummary"}, {"diff_hash", "diffHash"},
+                {"test_command", "testCommand"}, {"test_proof_hash", "testProofHash"},
+                {"artifact_digest", "artifactDigest"}, {"changed_files_json", "changedFilesJson"},
+                {"code_evidence_json", "codeEvidenceJson"}, {"bash_evidence_json", "bashEvidenceJson"},
+                {"lsp_evidence_json", "lspEvidenceJson"}, {"mcp_steps_json", "mcpStepsJson"},
+                {"rollback_steps_json", "rollbackStepsJson"},
+                {"verification_criteria_json", "verificationCriteriaJson"},
+                {"ci_result_json", "ciResultJson"}, {"landing_plan_json", "landingPlanJson"},
+                {"allowed_landing_adjustments_json", "allowedLandingAdjustmentsJson"},
+                {"landing_result_json", "landingResultJson"}, {"failure_summary_json", "failureSummaryJson"},
+                {"cleanup_plan_json", "cleanupPlanJson"},
                 {"create_by", "createBy"}, {"approve_by", "approveBy"},
                 {"create_time", "createTime"}, {"update_time", "updateTime"},
                 {"approved_at", "approvedAt"}, {"event_id", "eventId"},
@@ -397,7 +434,22 @@ public class JdbcChangePackageQueryAdapter implements ChangePackageQueryPort {
         putParsedAndRemove(data, "failureSummary", "failure_summary_json", "failureSummaryJson");
         putParsedAndRemove(data, "landingPlan", "landing_plan_json", "landingPlanJson");
         putParsedAndRemove(data, "mcpSteps", "mcp_steps_json", "mcpStepsJson");
+        // Preserve the parsed aliases used by legacy/history views and also
+        // expose the canonical camelCase fields consumed by the approval UI.
+        // Without these mirrors a package with real steps and evidence appears
+        // empty in the approval cockpit after JSON parsing.
+        mirror(data, "evidence", "evidenceJson");
+        mirror(data, "approvedSnapshot", "approvedSnapshotJson");
+        mirror(data, "snapshot", "snapshotJson");
+        mirror(data, "landingResult", "landingResultJson");
+        mirror(data, "failureSummary", "failureSummaryJson");
+        mirror(data, "landingPlan", "landingPlanJson");
+        mirror(data, "mcpSteps", "mcpStepsJson");
         return data;
+    }
+
+    private void mirror(Map<String, Object> data, String parsedKey, String canonicalKey) {
+        if (data.containsKey(parsedKey)) data.put(canonicalKey, data.get(parsedKey));
     }
 
     private void putParsedAndRemove(Map<String, Object> data, String target, String... sources) {

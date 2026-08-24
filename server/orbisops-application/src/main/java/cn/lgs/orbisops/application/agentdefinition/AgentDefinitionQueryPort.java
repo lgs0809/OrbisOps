@@ -9,6 +9,7 @@ public interface AgentDefinitionQueryPort<D, B> {
 
     List<D> listForProject(String projectId);
 
+    /** Immutable versions in descending version order, including drafts for administration. */
     List<D> listVersions(String agentId);
 
     D resolveDraft(String agentId);

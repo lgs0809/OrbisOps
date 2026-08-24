@@ -122,6 +122,7 @@ public class OpsMcpExecutionRuntimeAdapter implements McpExecutionRuntimePort {
         return new McpAuthoritativeToolDefinition(
                 text(safe.get("description")),
                 schema,
+                safe.get("outputSchema"),
                 "REMOTE_MCP_TOOL_DEFINITION");
     }
 

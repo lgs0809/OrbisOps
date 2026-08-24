@@ -45,10 +45,11 @@ public class OpsMainQuestionRewriteService {
     public RewriteResult rewrite(String query, String memoryContext) {
         String original = protocol.normalize(query);
         if (!settings.enabled()
-                || !StringUtils.hasText(original)) {
+                || !StringUtils.hasText(original)
+                || !StringUtils.hasText(memoryContext)) {
             return RewriteResult.unchanged(
                     original,
-                    "query rewrite skipped: disabled or blank query");
+                    "query rewrite skipped: disabled, blank query, or no conversation context");
         }
         JSONObject json = llmClient.chatJsonObject(
                 "ops-main-query-rewriter",

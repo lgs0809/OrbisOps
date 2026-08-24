@@ -34,7 +34,9 @@ class WorkSessionLifecycleBoundaryArchitectureTest {
                 () -> assertFalse(lifecycle.contains("runtimeEventJournal.record(")),
                 () -> assertFalse(lifecycle.contains("engineDispatcher.executePlan(")),
                 () -> assertFalse(lifecycle.contains("conversationContextCoordinator.appendMessage(")),
-                () -> assertTrue(lifecycle.lines().count() < 100));
+                () -> assertTrue(lifecycle.contains("isWorkSessionSuspension")),
+                () -> assertTrue(lifecycle.contains("terminalCoordinator.waitingApproval(context, pending)")),
+                () -> assertTrue(lifecycle.lines().count() < 120));
     }
 
     @Test

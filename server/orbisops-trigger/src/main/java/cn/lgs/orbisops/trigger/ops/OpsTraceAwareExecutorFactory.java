@@ -14,7 +14,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-/** Plain infrastructure factory for bounded executors with trace propagation. */
+/** Bounded executors propagate tracing, but never implicitly inherit a foreground Run claim.
+ * Model-call boundaries explicitly capture their current claim; background jobs keep independent control. */
 public final class OpsTraceAwareExecutorFactory {
 
     public ThreadPoolExecutor create(OpsExecutorPoolSettings settings) {
@@ -81,22 +82,32 @@ public final class OpsTraceAwareExecutorFactory {
 
         @Override
         public void execute(Runnable command) {
-            super.execute(TraceContext.wrap(command));
+            Runnable isolated = () -> OpsRunControlContext.withBinding(null, () -> {
+                command.run(); return null;
+            });
+            super.execute(TraceContext.wrap(isolated));
         }
 
         @Override
         public Future<?> submit(Runnable task) {
-            return super.submit(TraceContext.wrap(task));
+            Callable<Void> wrapped = () -> OpsRunControlContext.withBinding(null, () -> {
+                task.run(); return null;
+            });
+            return super.submit(TraceContext.wrap(wrapped));
         }
 
         @Override
         public <T> Future<T> submit(Runnable task, T result) {
-            return super.submit(TraceContext.wrap(task), result);
+            Callable<T> wrapped = () -> OpsRunControlContext.withBinding(null, () -> {
+                task.run(); return result;
+            });
+            return super.submit(TraceContext.wrap(wrapped));
         }
 
         @Override
         public <T> Future<T> submit(Callable<T> task) {
-            return super.submit(TraceContext.wrap(task));
+            Callable<T> wrapped = () -> OpsRunControlContext.callWithBinding(null, task);
+            return super.submit(TraceContext.wrap(wrapped));
         }
     }
 

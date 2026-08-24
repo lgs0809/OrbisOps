@@ -178,6 +178,7 @@ public class OpsWorkSessionRunMapper {
         request.setRagEnabled(bool(payload.get("ragEnabled")));
         request.setKnowledgeBaseId(text(payload.get("knowledgeBaseId")));
         request.setEnableThinking(bool(payload.get("enableThinking")));
+        request.setTrustedObserveOnly(bool(payload.get("trustedObserveOnly")));
         Map<String, Object> metadata = objectMap(payload.get("metadata"));
         metadata.keySet().removeIf(key -> key.startsWith("_workSession"));
         executionContextFactory.restorePersistedAuthority(metadata);
@@ -217,6 +218,7 @@ public class OpsWorkSessionRunMapper {
         result.put("ragEnabled", request.getRagEnabled());
         result.put("knowledgeBaseId", request.getKnowledgeBaseId());
         result.put("enableThinking", request.getEnableThinking());
+        result.put("trustedObserveOnly", Boolean.TRUE.equals(request.getTrustedObserveOnly()));
         result.put("metadata", executionContextFactory.persistableMetadata(request.getMetadata()));
         return result;
     }

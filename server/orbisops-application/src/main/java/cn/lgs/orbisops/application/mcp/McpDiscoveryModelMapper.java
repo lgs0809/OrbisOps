@@ -97,6 +97,7 @@ final class McpDiscoveryModelMapper {
         input.put("toolName", text(effectiveToolName));
         input.put("resourceType", text(schema == null ? null : schema.get("resourceType")));
         input.put("transportType", text(schema == null ? null : schema.get("transportType")));
+        if (schema != null && schema.get("outputSchema") != null) input.put("outputSchema", schema.get("outputSchema"));
         Map<String, Object> remote = remoteMetadata == null ? Map.of() : remoteMetadata;
         input.put("description", !text(schema == null ? null : schema.get("description")).isBlank()
                 ? text(schema.get("description"))

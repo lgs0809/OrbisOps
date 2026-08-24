@@ -33,6 +33,7 @@ public final class OpsMcpRemoteInvocationAdapter {
     private final OpsMcpRemoteClientAdapter remoteClientAdapter;
     private final Supplier<ProgressiveMcpProcessManager> progressiveMcpProcessManagerSupplier;
     private final OpsMcpInvocationResiliencePolicy resilience;
+    private final OpsMcpLogicalCall logicalCall;
 
     public OpsMcpRemoteInvocationAdapter(
             OpsMcpRemoteClientAdapter remoteClientAdapter,
@@ -64,6 +65,7 @@ public final class OpsMcpRemoteInvocationAdapter {
         this.remoteClientAdapter = remoteClientAdapter;
         this.progressiveMcpProcessManagerSupplier = progressiveMcpProcessManagerSupplier;
         this.resilience = resilience;
+        this.logicalCall = new OpsMcpLogicalCall(remoteClientAdapter, this::attempt);
     }
 
     public ToolCallback serialized(
@@ -89,20 +91,12 @@ public final class OpsMcpRemoteInvocationAdapter {
 
             @Override
             public String call(String toolInput) {
-                return callSerialized(
-                        session.handle(),
-                        toolName,
-                        toolInput,
-                        () -> delegate.call(toolInput));
+                return logicalCall.invoke(session.config(), toolName, toolInput, session, delegate);
             }
 
             @Override
             public String call(String toolInput, ToolContext toolContext) {
-                return callSerialized(
-                        session.handle(),
-                        toolName,
-                        toolInput,
-                        () -> delegate.call(toolInput));
+                return logicalCall.invoke(session.config(), toolName, toolInput, session, delegate);
             }
         };
     }
@@ -111,13 +105,11 @@ public final class OpsMcpRemoteInvocationAdapter {
             OpsMcpServerConfig config,
             String remoteToolName,
             String remoteArgs) {
-        OpsMcpRemoteClientAdapter.Session session = remoteClientAdapter.open(config);
-        ToolCallback callback = remoteClientAdapter.find(session, remoteToolName);
-        return callSerialized(
-                session.handle(),
-                remoteToolName,
-                remoteArgs,
-                () -> callback.call(remoteArgs));
+        return logicalCall.invoke(config, remoteToolName, remoteArgs, null, null);
+    }
+
+    private String attempt(OpsMcpRemoteClientAdapter.Session session, ToolCallback callback, String input) {
+        return callSerialized(session.handle(), session.config(), toolName(callback), input, () -> callback.call(input));
     }
 
     public String summarizeInput(String toolInput) {
@@ -149,15 +141,17 @@ public final class OpsMcpRemoteInvocationAdapter {
 
     private String callSerialized(
             OpsMcpClientRegistry.ClientHandle handle,
+            OpsMcpServerConfig config,
             String toolName,
             String toolInput,
             Callable<String> call) {
         OpsMcpInvocationResiliencePolicy.Permit permit;
         try {
-            permit = resilience.acquire(handle.config(), toolName);
+            permit = resilience.acquire(config, toolName);
         } catch (RuntimeException rejected) {
             recordMcpCall(
                     handle,
+                    config,
                     toolName,
                     "REJECTED",
                     toolInput,
@@ -166,15 +160,20 @@ public final class OpsMcpRemoteInvocationAdapter {
             throw rejected;
         }
         long startedNanos = System.nanoTime();
-        handle.lock().lock();
+        OpsMcpRequestScope scope = new OpsMcpRequestScope(config);
+        boolean locked = false;
         try {
-            assertAuthorityFresh(handle.config());
+            OpsMcpRequestScope.acquire(handle.lock());
+            locked = true;
+            handle.assertValid();
+            assertAuthorityFresh(config);
             handle.touch();
             String result = call.call();
             long durationMs = elapsedMs(startedNanos);
             resilience.succeeded(permit, durationMs);
             recordMcpCall(
                     handle,
+                    config,
                     toolName,
                     "SUCCEEDED",
                     toolInput,
@@ -188,21 +187,23 @@ public final class OpsMcpRemoteInvocationAdapter {
                     !StringUtils.hasText(result) || "null".equalsIgnoreCase(result.trim()));
             return result;
         } catch (RuntimeException error) {
-            recordFailure(handle, toolName, toolInput, startedNanos, permit, error);
+            recordFailure(handle, config, toolName, toolInput, startedNanos, permit, error);
             throw error;
         } catch (Exception error) {
-            recordFailure(handle, toolName, toolInput, startedNanos, permit, error);
+            recordFailure(handle, config, toolName, toolInput, startedNanos, permit, error);
             throw new IllegalStateException(
                     "MCP 工具调用失败：" + REDACTION.redactText(value(error.getMessage())),
                     error);
         } finally {
+            scope.close();
             handle.touch();
-            handle.lock().unlock();
+            if (locked) handle.lock().unlock();
         }
     }
 
     private void recordFailure(
             OpsMcpClientRegistry.ClientHandle handle,
+            OpsMcpServerConfig config,
             String toolName,
             String toolInput,
             long startedNanos,
@@ -210,18 +211,23 @@ public final class OpsMcpRemoteInvocationAdapter {
             Exception error) {
         long durationMs = elapsedMs(startedNanos);
         try {
-            resilience.failed(permit, durationMs);
+            if (OpsMcpFailureClassifier.dependencyFailure(error)) resilience.failed(permit, durationMs);
+            else resilience.neutral(permit);
         } catch (RuntimeException resilienceFailure) {
             error.addSuppressed(resilienceFailure);
         }
         String redactedError = REDACTION.redactText(value(error.getMessage()));
-        recordMcpCall(handle, toolName, "FAILED", toolInput, redactedError, durationMs);
+        Object output = error instanceof OpsMcpCallFailure typed
+                ? Map.of("errorClass", typed.kind().name(), "dispatched", typed.dispatched(), "message", redactedError,
+                        "rawEnvelope", typed.rawEnvelope() == null ? "" : REDACTION.redact(typed.rawEnvelope())) : redactedError;
+        recordMcpCall(handle, config, toolName, "FAILED", toolInput, output, durationMs);
         log.warn("MCP 工具调用失败，tool={}，durationMs={}，error={}",
                 value(toolName), durationMs, redactedError);
     }
 
     private void recordMcpCall(
             OpsMcpClientRegistry.ClientHandle handle,
+            OpsMcpServerConfig config,
             String toolName,
             String status,
             String toolInput,
@@ -229,8 +235,7 @@ public final class OpsMcpRemoteInvocationAdapter {
             long durationMs) {
         try {
             ProgressiveMcpProcessManager processManager = progressiveMcpProcessManagerSupplier.get();
-            if (processManager == null || handle == null || handle.config() == null) return;
-            OpsMcpServerConfig config = handle.config();
+            if (processManager == null || handle == null || config == null) return;
             processManager.recordMcpCall(new McpCommands.RuntimeCall(
                     value(config.getProjectId()),
                     value(config.getAgentId()),
@@ -247,7 +252,7 @@ public final class OpsMcpRemoteInvocationAdapter {
                     summarizeInput(toolInput),
                     REDACTION.redact(output),
                     durationMs,
-                    Map.of()));
+                    OpsMcpRequestScope.audit()));
         } catch (Exception error) {
             log.debug("MCP 调用审计写入失败，已忽略：{}",
                     REDACTION.redactText(value(error.getMessage())));

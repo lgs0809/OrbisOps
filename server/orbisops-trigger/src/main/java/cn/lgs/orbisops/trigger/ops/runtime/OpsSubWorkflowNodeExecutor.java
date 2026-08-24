@@ -1,6 +1,8 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
 import cn.lgs.orbisops.domain.agentdefinition.model.AgentDefinitionKind;
+import cn.lgs.orbisops.domain.agentdefinition.service.DirectActionDataPolicy;
+import cn.lgs.orbisops.domain.shared.json.CanonicalJson;
 import cn.lgs.orbisops.domain.shared.service.CanonicalObjectHasher;
 import cn.lgs.orbisops.trigger.application.agentdefinition.OpsAgentDefinitionQueryGateway;
 import cn.lgs.orbisops.trigger.application.ops.OpsChatApplicationService;
@@ -64,10 +66,10 @@ final class OpsSubWorkflowNodeExecutor {
                 "nodeId", nodeId,
                 "workflowId", workflowId));
         String suffix = childKey.substring(0, 16);
-        String childRunId = bounded(parentRunId + "-sub-" + suffix, 120);
+        String childRunId = childIdentity(parentRunId, suffix);
         String parentSessionId = text(parentRequest.getSessionId());
         String childSessionBase = parentSessionId.isBlank() ? parentRunId : parentSessionId;
-        String childSessionId = bounded(childSessionBase + "-sub-" + suffix, 120);
+        String childSessionId = childIdentity(childSessionBase, suffix);
         OpsChatApplicationService chat = chatProvider.getObject();
 
         Map<String, Object> existing = existingRun(chat, childRunId, projectId);
@@ -76,7 +78,7 @@ final class OpsSubWorkflowNodeExecutor {
                 throw new IllegalStateException("SUB_WORKFLOW_CHILD_RUN_IDENTITY_CONFLICT");
             }
             if ("SUCCEEDED".equals(text(existing.get("status")))) {
-                return reusedOutput(existing, workflowId, childRunId);
+                return output(node, existing, workflowId, childRunId, true);
             }
             throw new IllegalStateException(
                     "SUB_WORKFLOW_CHILD_RUN_NOT_REUSABLE:" + text(existing.get("status")));
@@ -138,15 +140,19 @@ final class OpsSubWorkflowNodeExecutor {
                 .mode("WORKFLOW")
                 .metadata(metadata)
                 .build();
-        OpsAgentChatResponse response = chat.chat(child, text(parentRequest.getUserId()));
-        Map<String, Object> output = new LinkedHashMap<>();
-        output.put("output", response == null ? "" : text(response.getContent()));
-        output.put("childRunId", childRunId);
-        output.put("workflowId", workflowId);
-        output.put("workflowVersion", childDefinition.getVersion());
-        output.put("workflowDefinitionHash", childDefinition.getDefinitionHash());
-        output.put("reused", false);
-        return Map.copyOf(output);
+        chat.chat(child, text(parentRequest.getUserId()));
+        // A returned answer can describe a failed execution. Only its committed Run
+        // status and frozen identity authorize completing this parent node.
+        Map<String, Object> completed = existingRun(chat, childRunId, projectId);
+        if (!"SUCCEEDED".equals(text(completed.get("status")))) {
+            throw new IllegalStateException("SUB_WORKFLOW_CHILD_RUN_NOT_SUCCEEDED:" + text(completed.get("status")));
+        }
+        if (!workflowId.equals(text(completed.get("agent_id")))
+                || !String.valueOf(childDefinition.getVersion()).equals(text(completed.get("agent_version")))
+                || !childDefinition.getDefinitionHash().equals(text(completed.get("agent_definition_hash")))) {
+            throw new IllegalStateException("SUB_WORKFLOW_CHILD_RUN_IDENTITY_CONFLICT");
+        }
+        return output(node, completed, workflowId, childRunId, false);
     }
 
     private Map<String, Object> existingRun(
@@ -165,10 +171,14 @@ final class OpsSubWorkflowNodeExecutor {
         }
     }
 
-    private Map<String, Object> reusedOutput(
+    private Map<String, Object> output(
+            OpsWorkflowNode node,
             Map<String, Object> existing,
             String workflowId,
-            String childRunId) {
+            String childRunId,
+            boolean reused) {
+        positiveInteger(existing.get("agent_version"), "SUB_WORKFLOW_DEFINITION_IDENTITY_REQUIRED");
+        required(existing.get("agent_definition_hash"), "SUB_WORKFLOW_DEFINITION_IDENTITY_REQUIRED");
         Object rawResponse = existing.get("response");
         String content = "";
         if (rawResponse instanceof Map<?, ?> response) {
@@ -180,7 +190,13 @@ final class OpsSubWorkflowNodeExecutor {
         output.put("workflowId", workflowId);
         output.put("workflowVersion", existing.get("agent_version"));
         output.put("workflowDefinitionHash", text(existing.get("agent_definition_hash")));
-        output.put("reused", true);
+        output.put("reused", reused);
+        if (configObject(node, "structuredOutputKey") != null) {
+            new DirectActionDataPolicy().validate(Map.of("structuredOutputKey", configObject(node, "structuredOutputKey")));
+            var reference = new LinkedHashMap<>(output);
+            reference.put("executionStatus", "SUCCEEDED");
+            output.put("workflowData_" + config(node, "structuredOutputKey"), Map.copyOf(reference));
+        }
         return Map.copyOf(output);
     }
 
@@ -189,8 +205,13 @@ final class OpsSubWorkflowNodeExecutor {
             OpsAgentChatRequest parentRequest,
             Map<String, Object> state) {
         String key = config(node, "inputKey");
-        if (!key.isBlank() && state != null && state.get(key) != null) {
-            return text(state.get(key));
+        if (!key.isBlank()) {
+            Object value = state == null ? null : state.get(key);
+            if (value == null) throw new IllegalArgumentException("SUB_WORKFLOW_INPUT_MISSING:" + key);
+            if (value instanceof String string) return string;
+            String json = CanonicalJson.stringifyPreservingOrder(value);
+            new DirectActionDataPolicy().parseObject("{\"value\":" + json + "}");
+            return json;
         }
         return text(parentRequest.getQuery());
     }
@@ -220,9 +241,11 @@ final class OpsSubWorkflowNodeExecutor {
         }
     }
 
-    private String bounded(String value, int max) {
-        String normalized = text(value);
-        return normalized.length() <= max ? normalized : normalized.substring(0, max);
+    private String childIdentity(String base, String suffix) {
+        // Run/session journals use VARCHAR(80). Keep working legacy identities and
+        // retain the hash suffix when truncating, including at deeper nesting levels.
+        int prefixLimit = 80 - "-sub-".length() - suffix.length();
+        return base.substring(0, Math.min(base.length(), prefixLimit)) + "-sub-" + suffix;
     }
 
     private String required(Object value, String reason) {

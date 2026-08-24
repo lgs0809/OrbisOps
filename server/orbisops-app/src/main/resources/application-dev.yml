@@ -74,6 +74,7 @@ orbisops:
       enabled: ${ORBISOPS_SKILL_EVOLVER_WORKER_ENABLED:true}
       fixed-delay-ms: ${ORBISOPS_SKILL_EVOLVER_WORKER_FIXED_DELAY_MS:60000}
       batch-size: ${ORBISOPS_SKILL_EVOLVER_WORKER_BATCH_SIZE:5}
+      # Legacy binding only; background model failures now persist exponential backoff without a lifetime quota.
       max-attempts: ${ORBISOPS_SKILL_EVOLVER_WORKER_MAX_ATTEMPTS:3}
   skill-evolution:
     enabled: ${ORBISOPS_SKILL_EVOLUTION_ENABLED:true}
@@ -99,19 +100,24 @@ orbisops:
       evidence-rate-drop: ${ORBISOPS_SKILL_EVOLUTION_MAX_EVIDENCE_RATE_DROP:0.15}
       tool-call-increase-rate: ${ORBISOPS_SKILL_EVOLUTION_MAX_TOOL_CALL_INCREASE_RATE:0.50}
   skill-runtime:
-    catalog-candidate-limit: ${ORBISOPS_SKILL_RUNTIME_CATALOG_LIMIT:24}
-    selected-limit: ${ORBISOPS_SKILL_RUNTIME_SELECTED_LIMIT:6}
-    max-explicit-skills: ${ORBISOPS_SKILL_RUNTIME_MAX_EXPLICIT:12}
+    retrieval:
+      endpoint: ${ORBISOPS_SKILL_RETRIEVAL_ENDPOINT:}
+      api-key: ${ORBISOPS_SKILL_RETRIEVAL_API_KEY:}
+      embedding-revision: ${ORBISOPS_SKILL_EMBEDDING_REVISION:}
+      reranker-revision: ${ORBISOPS_SKILL_RERANKER_REVISION:}
+    catalog-candidate-limit: ${ORBISOPS_SKILL_RUNTIME_CATALOG_LIMIT:20}
+    selected-limit: ${ORBISOPS_SKILL_RUNTIME_SELECTED_LIMIT:3}
+    max-explicit-skills: ${ORBISOPS_SKILL_RUNTIME_MAX_EXPLICIT:3}
     min-relevance-score: ${ORBISOPS_SKILL_RUNTIME_MIN_RELEVANCE:0.12}
     similar-suppression-threshold: ${ORBISOPS_SKILL_RUNTIME_SIMILAR_THRESHOLD:0.88}
     semantic-enabled: ${ORBISOPS_SKILL_RUNTIME_SEMANTIC_ENABLED:true}
     semantic-candidate-limit: ${ORBISOPS_SKILL_RUNTIME_SEMANTIC_CANDIDATE_LIMIT:64}
-    semantic-recall-limit: ${ORBISOPS_SKILL_RUNTIME_SEMANTIC_RECALL_LIMIT:64}
+    semantic-recall-limit: ${ORBISOPS_SKILL_RUNTIME_SEMANTIC_RECALL_LIMIT:20}
     semantic-weight: ${ORBISOPS_SKILL_RUNTIME_SEMANTIC_WEIGHT:0.42}
     category-boost: ${ORBISOPS_SKILL_RUNTIME_CATEGORY_BOOST:0.12}
     negative-penalty-weight: ${ORBISOPS_SKILL_RUNTIME_NEGATIVE_PENALTY_WEIGHT:0.65}
     llm-rerank-enabled: ${ORBISOPS_SKILL_RUNTIME_LLM_RERANK_ENABLED:true}
-    llm-rerank-candidate-limit: ${ORBISOPS_SKILL_RUNTIME_LLM_RERANK_CANDIDATE_LIMIT:10}
+    llm-rerank-candidate-limit: ${ORBISOPS_SKILL_RUNTIME_LLM_RERANK_CANDIDATE_LIMIT:20}
     llm-rerank-weight: ${ORBISOPS_SKILL_RUNTIME_LLM_RERANK_WEIGHT:0.35}
     embedding-cache-size: ${ORBISOPS_SKILL_RUNTIME_EMBEDDING_CACHE_SIZE:2048}
     catalog-summary-max-chars: ${ORBISOPS_SKILL_RUNTIME_CATALOG_SUMMARY_MAX_CHARS:2500}
@@ -222,7 +228,7 @@ orbisops:
       allowed-stdio-commands: ${ORBISOPS_MCP_ALLOWED_STDIO_COMMANDS:npx,node,python,python3,uvx,java}
       allowed-sse-hosts: ${ORBISOPS_MCP_ALLOWED_SSE_HOSTS:127.0.0.1,localhost}
       allowed-env-keys: ${ORBISOPS_MCP_ALLOWED_ENV_KEYS:ES_API_KEY,MYSQL_PASSWORD,POSTGRES_PASSWORD,REDIS_PASSWORD,PROMETHEUS_PASSWORD,RABBITMQ_PASSWORD}
-      allowed-header-keys: ${ORBISOPS_MCP_ALLOWED_HEADER_KEYS:Authorization,X-API-Key}
+      allowed-header-keys: ${ORBISOPS_MCP_ALLOWED_HEADER_KEYS:Authorization,X-API-Key,X-Ops-Execution-Key,X-Ops-Fencing-Token,X-Ops-Deadline}
       max-timeout-seconds: ${ORBISOPS_MCP_MAX_TIMEOUT_SECONDS:60}
   elasticsearch-url: http://127.0.0.1:9200
   elasticsearch-index: ${ORBISOPS_ES_INDEX:}

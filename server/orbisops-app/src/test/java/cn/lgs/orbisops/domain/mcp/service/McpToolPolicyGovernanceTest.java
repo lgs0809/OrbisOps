@@ -20,6 +20,22 @@ class McpToolPolicyGovernanceTest {
     private final McpToolPolicyGovernance governance = new McpToolPolicyGovernance();
 
     @Test
+    void explicitlyReadOnlyValidationCanBePublishedWithoutAllowingDisguisedWrites() {
+        for (String effect : List.of("VALIDATE_ONLY", "DRY_RUN")) {
+            governance.validateForHumanPublish(review(effect, "SANDBOX", "READ_ONLY",
+                    true, false, false, false, McpRiskLevel.LOW, McpSchemaExposureTier.EXTENSION));
+            for (String mutability : List.of("TEST_MUTATING", "EPHEMERAL", "PROD_MUTATING")) {
+                assertThrows(IllegalArgumentException.class, () -> governance.validateForHumanPublish(
+                        review(effect, "SANDBOX", mutability, true, false, false, false,
+                                McpRiskLevel.LOW, McpSchemaExposureTier.EXTENSION)));
+            }
+            assertThrows(IllegalArgumentException.class, () -> governance.validateForHumanPublish(
+                    review(effect, "TARGET_RESOURCE_WRITE", "READ_ONLY", true, false, true, true,
+                            McpRiskLevel.HIGH, McpSchemaExposureTier.EXTENSION)));
+        }
+    }
+
+    @Test
     void unknownClassificationCannotBePublished() {
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
                 () -> governance.validateForHumanPublish(review("UNKNOWN", "UNKNOWN", "UNKNOWN",

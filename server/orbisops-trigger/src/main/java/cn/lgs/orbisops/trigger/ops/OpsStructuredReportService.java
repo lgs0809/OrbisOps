@@ -19,9 +19,16 @@ import java.util.Optional;
 public class OpsStructuredReportService {
 
     private final OpsToolExecutionPolicy toolExecutionPolicy;
+    private final OpsMcpReportEvidenceReader mcpEvidence;
 
     public OpsStructuredReportService(OpsToolExecutionPolicy toolExecutionPolicy) {
+        this(toolExecutionPolicy, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public OpsStructuredReportService(OpsToolExecutionPolicy toolExecutionPolicy, OpsMcpReportEvidenceReader mcpEvidence) {
         this.toolExecutionPolicy = toolExecutionPolicy;
+        this.mcpEvidence = mcpEvidence;
     }
 
     public Map<String, Object> compose(OpsAnalysisResponseDTO response) {
@@ -41,7 +48,8 @@ public class OpsStructuredReportService {
         report.put("logs", response.getLogSummary());
         report.put("slowSql", response.getSlowSqlSummary());
         report.put("insights", Optional.ofNullable(response.getInsights()).orElse(List.of()));
-        report.put("recommendedActions", recommendedActions(response));
+        List<Map<String, Object>> evidenceTrace = evidenceTrace(response);
+        report.put("recommendedActions", recommendedActions(response, evidenceTrace));
         report.put("operationBoundary", toolExecutionPolicy.operationBoundary());
         report.put("humanApproval", humanApproval());
         report.put("executionSteps", Optional.ofNullable(response.getAgentExecutionSteps()).orElse(List.of()));
@@ -55,7 +63,6 @@ public class OpsStructuredReportService {
         if (StringUtils.hasText(changePackageBehavior)) {
             report.put("changePackageBehavior", changePackageBehavior);
         }
-        List<Map<String, Object>> evidenceTrace = evidenceTrace(response);
         report.put("evidenceTrace", evidenceTrace);
         report.put("diagnosis", diagnosis(response, evidenceTrace));
         report.put("ragSources", evidenceTrace.stream()
@@ -65,8 +72,8 @@ public class OpsStructuredReportService {
         return report;
     }
 
-    private List<Map<String, Object>> recommendedActions(OpsAnalysisResponseDTO response) {
-        List<String> evidenceIds = evidenceTrace(response).stream()
+    private List<Map<String, Object>> recommendedActions(OpsAnalysisResponseDTO response, List<Map<String, Object>> evidenceTrace) {
+        List<String> evidenceIds = evidenceTrace.stream()
                 .map(item -> String.valueOf(item.get("id")))
                 .limit(8)
                 .toList();
@@ -103,6 +110,12 @@ public class OpsStructuredReportService {
 
     private List<Map<String, Object>> evidenceTrace(OpsAnalysisResponseDTO response) {
         List<Map<String, Object>> authoritative = authoritativeEvidenceTrace(response);
+        if (mcpEvidence != null) {
+            var combined = new LinkedHashMap<Object, Map<String, Object>>();
+            authoritative.forEach(item -> combined.put(item.get("resultId"), item));
+            mcpEvidence.read(response).forEach(item -> combined.putIfAbsent(item.get("resultId"), item));
+            authoritative = new ArrayList<>(combined.values());
+        }
         if (!authoritative.isEmpty()) return authoritative;
         List<Map<String, Object>> evidenceTrace = new ArrayList<>();
         List<OpsAnalysisResponseDTO.InvestigationResultDTO> results = Optional.ofNullable(response.getInvestigationResults()).orElse(List.of());
@@ -187,7 +200,9 @@ public class OpsStructuredReportService {
                 unknowns.add(detail);
             }
         }
-        if (results.isEmpty()) unknowns.add("尚未形成数据源查询结果，不能判断系统正常。");
+        boolean receiptOnly = evidenceTrace.stream().anyMatch(item -> Boolean.TRUE.equals(item.get("receiptOnly")));
+        if (results.isEmpty() && facts.isEmpty()) unknowns.add("尚未形成数据源查询结果，不能判断系统正常。");
+        if (receiptOnly) unknowns.add("已保留 MCP 查询回执；业务覆盖范围和恢复状态仍以运行报告为准。");
 
         List<String> recommendations = Optional.ofNullable(response.getInsights()).orElse(List.of()).stream()
                 .map(OpsAnalysisResponseDTO.InsightDTO::getSuggestion)
@@ -204,8 +219,8 @@ public class OpsStructuredReportService {
         diagnosis.put("excludedHypotheses", List.of());
         diagnosis.put("unknowns", unknowns.stream().distinct().toList());
         diagnosis.put("recommendations", recommendations);
-        diagnosis.put("sourceStatus", sourceStatus(response, results));
-        diagnosis.put("evidenceCompleteness", evidenceCompleteness(results, facts));
+        diagnosis.put("sourceStatus", sourceStatus(response, results, evidenceTrace));
+        diagnosis.put("evidenceCompleteness", receiptOnly && results.isEmpty() ? "PARTIAL" : evidenceCompleteness(results, facts));
         diagnosis.put("confidence", confidence(results));
         Map<String, Object> runtimeOutcome = runtimeOutcome(response);
         Object runtimeRequiresAction = runtimeOutcome.get("requiresAction");
@@ -222,7 +237,8 @@ public class OpsStructuredReportService {
 
     private List<Map<String, Object>> sourceStatus(
             OpsAnalysisResponseDTO response,
-            List<OpsAnalysisResponseDTO.InvestigationResultDTO> results) {
+            List<OpsAnalysisResponseDTO.InvestigationResultDTO> results,
+            List<Map<String, Object>> evidenceTrace) {
         Map<String, OpsAnalysisResponseDTO.DataSourceStatusDTO> configured = new LinkedHashMap<>();
         configured.put("elasticsearch", response.getElasticsearchStatus());
         configured.put("prometheus", response.getPrometheusStatus());
@@ -241,6 +257,10 @@ public class OpsStructuredReportService {
         java.util.LinkedHashSet<String> sourceIds = new java.util.LinkedHashSet<>(configured.keySet());
         sourceIds.addAll(queried.keySet());
         sourceIds.addAll(authoritative);
+        Map<String, Map<String, Object>> receipts = new LinkedHashMap<>();
+        evidenceTrace.stream().filter(item -> Boolean.TRUE.equals(item.get("receiptOnly")))
+                .forEach(item -> receipts.put(String.valueOf(item.get("source")), item));
+        sourceIds.addAll(receipts.keySet());
         List<Map<String, Object>> statuses = new ArrayList<>();
         for (String sourceId : sourceIds) {
             OpsAnalysisResponseDTO.DataSourceStatusDTO health = configured.get(sourceId);
@@ -248,7 +268,13 @@ public class OpsStructuredReportService {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("sourceId", sourceId);
             item.put("sourceName", health != null && StringUtils.hasText(health.getName()) ? health.getName() : sourceId);
-            if (health != null && Boolean.FALSE.equals(health.getAvailable())) {
+            if (receipts.containsKey(sourceId)) {
+                item.put("sourceName", receipts.get(sourceId).get("sourceName"));
+                item.put("queryStatus", "SUCCEEDED");
+                item.put("assessment", "UNKNOWN");
+                item.put("state", "UNKNOWN");
+                item.put("detail", receipts.get(sourceId).get("text"));
+            } else if (health != null && Boolean.FALSE.equals(health.getAvailable())) {
                 item.put("queryStatus", "FAILED");
                 item.put("assessment", "UNKNOWN");
                 item.put("state", "UNAVAILABLE");
@@ -259,7 +285,7 @@ public class OpsStructuredReportService {
                 item.put("state", "UNKNOWN");
                 item.put("detail", "已获得 authoritative datasource evidence");
             } else if (result == null) {
-                boolean notConfigured = health == null;
+                boolean notConfigured = health == null || health.getAvailable() == null;
                 item.put("queryStatus", notConfigured ? "NOT_CONFIGURED" : "NOT_QUERIED");
                 item.put("assessment", "UNKNOWN");
                 item.put("state", notConfigured ? "NOT_CONFIGURED" : "NOT_QUERIED");

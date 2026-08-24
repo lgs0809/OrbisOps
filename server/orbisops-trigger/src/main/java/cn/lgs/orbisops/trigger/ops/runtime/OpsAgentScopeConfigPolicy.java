@@ -3,6 +3,7 @@ package cn.lgs.orbisops.trigger.ops.runtime;
 import cn.lgs.orbisops.api.dto.OpsAgentRunRequestDTO;
 import cn.lgs.orbisops.domain.agentdefinition.model.OpsBuiltinSubAgentRole;
 import org.springframework.util.StringUtils;
+import org.springframework.ai.openai.OpenAiChatOptions;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -11,6 +12,12 @@ import java.util.Optional;
 
 /** Selects and projects AgentScope configuration without building runtime agents. */
 final class OpsAgentScopeConfigPolicy {
+
+    /** Spring AI 1.1.x cannot merge interleaved arguments. Keep discovery and execution
+     * in the native loop and ask the provider for one complete tool call at a time. */
+    static OpenAiChatOptions.Builder toolCallingOptions() {
+        return OpenAiChatOptions.builder().parallelToolCalls(false);
+    }
 
     List<OpsAgentScopeConfig> configs(OpsAgentDefinition definition,
                                       OpsAgentChatRequest request) {
@@ -77,6 +84,7 @@ final class OpsAgentScopeConfigPolicy {
                 .outputKey(StringUtils.hasText(node.getOutputKey())
                         ? node.getOutputKey()
                         : node.getNodeId())
+                .outputContract(OpsRuntimePromptAssembler.nodeOutputContract(node))
                 .ragEnabled(firstNonNull(
                         node.getRagEnabled(), definition.getRagEnabled()))
                 .knowledgeBaseId(firstText(
@@ -86,6 +94,7 @@ final class OpsAgentScopeConfigPolicy {
                 .allowedToolNames(stringConfigList(node, "allowedToolNames"))
                 .inheritProjectCapabilities(Boolean.parseBoolean(firstText(
                         configText(node, "inheritProjectCapabilities"), "false")))
+                .changePackageStatusEnabled(node.getConfig() != null && Boolean.TRUE.equals(node.getConfig().get("changePackageStatusEnabled")))
                 .repairEnabled(Boolean.TRUE.equals(node.getRepairEnabled()))
                 .changePackageEnabled(firstNonNull(
                         node.getChangePackageEnabled(),

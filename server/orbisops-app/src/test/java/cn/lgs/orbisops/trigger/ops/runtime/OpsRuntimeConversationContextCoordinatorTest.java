@@ -58,9 +58,21 @@ class OpsRuntimeConversationContextCoordinatorTest {
         assertTrue(coordinator.hasMemoryContext(request));
         assertEquals("历史上下文", coordinator.memoryContext(request));
         assertEquals("原始问题", coordinator.originalUserQuery(request));
-        assertEquals(
-                "原始问题：原始问题\n主 Agent 重写问题：重写后的问题",
-                coordinator.userMemoryContent(request));
+        assertEquals("原始问题", coordinator.userMemoryContent(request));
+    }
+
+    @Test
+    void modelResolutionIsAuditedSeparatelyFromTheUserAuthoredMessage() {
+        OpsConversationMemoryService memory = mock(OpsConversationMemoryService.class);
+        OpsRuntimeConversationContextCoordinator coordinator = coordinator(
+                mock(OpsWorkSessionContextPreparationService.class), memory);
+        OpsAgentChatRequest request = request("模型补全后的查询");
+        request.getMetadata().put(OpsWorkSessionContextPreparationService.ORIGINAL_USER_QUERY_KEY, "再查一下它");
+        coordinator.appendMessage(request, null, new ArrayList<>(), null, 0L,
+                "user", coordinator.userMemoryContent(request), Map.of());
+        verify(memory).appendMessage("session-1", "user-1", "user", "再查一下它",
+                Map.of("projectId", "", "runId", "", "turnId", "",
+                        "originalUserQuery", "再查一下它", "resolvedQuery", "模型补全后的查询"));
     }
 
     @Test
@@ -98,7 +110,7 @@ class OpsRuntimeConversationContextCoordinatorTest {
                 metadata);
 
         verify(memoryService).appendMessage(
-                "session-1", "user-1", "assistant", "回答", metadata);
+                "session-1", "user-1", "assistant", "回答", Map.of("agentId", "agent-1", "projectId", "", "runId", "", "turnId", ""));
     }
 
     @Test

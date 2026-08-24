@@ -108,12 +108,18 @@ public final class OpsChatSessionService {
             String keyword,
             Boolean favorite,
             int limit) {
+        return list(userId, agentId, keyword, favorite, limit, null);
+    }
+
+    public List<OpsChatSession> list(String userId, String agentId, String keyword,
+                                    Boolean favorite, int limit, String projectId) {
         ChatSessionSearchCriteria criteria = new ChatSessionSearchCriteria(
                 userId,
                 agentId,
                 value(keyword).trim().toLowerCase(),
                 favorite,
-                limit);
+                limit,
+                projectId);
         return sessionStore.search(criteria).stream()
                 .map(sessionMapper::view)
                 .toList();

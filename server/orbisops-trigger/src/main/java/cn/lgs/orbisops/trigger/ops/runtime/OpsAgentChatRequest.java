@@ -51,6 +51,12 @@ public class OpsAgentChatRequest {
     @JsonIgnore
     private Boolean trustedObserveOnly;
 
+    /** Captured only after resolving the executable definition / persisted context bundle. */
+    @JsonIgnore
+    private OpsExplicitSkillBindings trustedSkillBindings;
+    @JsonIgnore
+    private OpsRuntimeSkillFrame trustedSkillFrame;
+
     @Builder.Default
     private Map<String, Object> metadata = new LinkedHashMap<>();
 

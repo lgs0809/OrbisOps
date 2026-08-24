@@ -1,6 +1,8 @@
 ---
 name: rag-knowledge-agent
 description: Generic RAG knowledge evidence policy for project operations investigations.
+whenToUse: ["Retrieve stable SOP, architecture, dependency or historical incident knowledge", "需要既有知识库中的规程和历史参考"]
+whenNotToUse: ["Realtime metrics, logs or current production state verification", "用历史知识代替当前系统观测证据"]
 ---
 
 # rag-knowledge-agent Skill

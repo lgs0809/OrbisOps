@@ -138,6 +138,11 @@ public class OpsPreApprovalValidationService implements ChangePackageValidationP
             return REPORT_FACTORY.fail(errors, proofs);
         }
         if (type.humanOnly()) {
+            // Failed executable proposals retain their steps for revision; their downgraded type
+            // must never turn a missing validation proof into a no-op validation success.
+            if (hasRetainedOperations(snapshot)) {
+                return REPORT_FACTORY.fail(List.of("HUMAN_ONLY_PACKAGE_HAS_EXECUTABLE_OPERATIONS"), proofs);
+            }
             return REPORT_FACTORY.pass("NO_EXECUTABLE_OPERATION", List.of(), List.of());
         }
         if (type == ChangePackageType.GIT_BRANCH_REPAIR) {
@@ -150,6 +155,19 @@ public class OpsPreApprovalValidationService implements ChangePackageValidationP
         return errors.isEmpty()
                 ? REPORT_FACTORY.pass("READY_FOR_REVIEW", proofs, List.of())
                 : REPORT_FACTORY.fail(errors, proofs);
+    }
+
+    private boolean hasRetainedOperations(Map<String, Object> snapshot) {
+        for (String key : List.of("mcpSteps", "mcpStepsJson", "operations")) {
+            if (!STRUCTURED_VALUE_READER.operations(snapshot.get(key)).isEmpty()) return true;
+        }
+        for (String key : List.of("landingPlan", "landingPlanJson")) {
+            Map<String, Object> plan = STRUCTURED_VALUE_READER.object(snapshot.get(key));
+            for (String steps : List.of("steps", "operations", "mcpSteps")) {
+                if (!STRUCTURED_VALUE_READER.operations(plan.get(steps)).isEmpty()) return true;
+            }
+        }
+        return false;
     }
 
     private void validateMcpPackage(Map<String, Object> snapshot,

@@ -13,12 +13,10 @@ import static cn.lgs.orbisops.trigger.ops.runtime.OpsProjectMcpConfigValues.text
 
 /** Projects typed project resources into MCP process environment variables. */
 final class OpsProjectMcpEnvironmentProjector {
-
     private final OpsProjectMcpTypePolicy typePolicy;
     private final OpsProjectMcpEndpointParser endpointParser;
     private final OpsServiceControlEnvironmentProjector serviceControl =
             new OpsServiceControlEnvironmentProjector();
-
     OpsProjectMcpEnvironmentProjector(
             OpsProjectMcpTypePolicy typePolicy,
             OpsProjectMcpEndpointParser endpointParser) {
@@ -29,7 +27,6 @@ final class OpsProjectMcpEnvironmentProjector {
         this.typePolicy = typePolicy;
         this.endpointParser = endpointParser;
     }
-
     Map<String, String> project(
             String type,
             String endpoint,
@@ -93,6 +90,10 @@ final class OpsProjectMcpEnvironmentProjector {
                                 .toList()));
             }
         }
+        if (stringList(permission.get("actions"), List.of()).stream()
+                .anyMatch(action -> "EXPLAIN".equalsIgnoreCase(action))) {
+            env.put("MYSQL_MCP_ALLOW_EXPLAIN_SELECT", "true");
+        }
         env.put(
                 "MYSQL_MCP_MAX_LIMIT",
                 String.valueOf(intValue(permission.get("maxRows"), 100)));
@@ -147,6 +148,10 @@ final class OpsProjectMcpEnvironmentProjector {
         env.put(
                 "REDIS_MCP_MAX_KEYS",
                 String.valueOf(intValue(permission.get("maxRows"), 100)));
+        List<String> objects = stringList(permission.get("objects"), List.of());
+        if (!objects.isEmpty()) {
+            env.put("REDIS_MCP_ALLOWED_KEY_PREFIXES", String.join(",", objects));
+        }
         env.put(
                 "REDIS_TIMEOUT_MS",
                 String.valueOf(typePolicy.timeoutSeconds("redis") * 1000));

@@ -5,6 +5,7 @@
     <resultMap id="AiAgentTaskScheduleMap" type="cn.lgs.orbisops.infrastructure.dao.po.AiAgentTaskSchedule">
         <id column="id" property="id"/>
         <result column="project_id" property="projectId"/>
+        <result column="created_by" property="createdBy"/>
         <result column="agent_id" property="agentId"/>
         <result column="task_name" property="taskName"/>
         <result column="description" property="description"/>
@@ -17,9 +18,9 @@
 
     <insert id="insert" parameterType="cn.lgs.orbisops.infrastructure.dao.po.AiAgentTaskSchedule" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO ai_agent_task_schedule (
-            project_id, agent_id, task_name, description, cron_expression, task_param, status, create_time, update_time
+            project_id, created_by, agent_id, task_name, description, cron_expression, task_param, status, create_time, update_time
         ) VALUES (
-            #{projectId}, #{agentId}, #{taskName}, #{description}, #{cronExpression}, #{taskParam}, #{status}, #{createTime}, #{updateTime}
+            #{projectId}, #{createdBy}, #{agentId}, #{taskName}, #{description}, #{cronExpression}, #{taskParam}, #{status}, #{createTime}, #{updateTime}
         )
     </insert>
 
@@ -45,46 +46,46 @@
     </delete>
 
     <select id="queryById" parameterType="java.lang.Long" resultMap="AiAgentTaskScheduleMap">
-        SELECT id, project_id, agent_id, task_name, description, cron_expression, task_param, status, create_time, update_time
+        SELECT id, project_id, created_by, agent_id, task_name, description, cron_expression, task_param, status, create_time, update_time
         FROM ai_agent_task_schedule
         WHERE id = #{id}
     </select>
 
     <select id="queryByAgentId" parameterType="java.lang.String" resultMap="AiAgentTaskScheduleMap">
-        SELECT id, project_id, agent_id, task_name, description, cron_expression, task_param, status, create_time, update_time
+        SELECT id, project_id, created_by, agent_id, task_name, description, cron_expression, task_param, status, create_time, update_time
         FROM ai_agent_task_schedule
         WHERE agent_id = #{agentId}
         ORDER BY create_time DESC
     </select>
 
     <select id="queryEnabledTasks" resultMap="AiAgentTaskScheduleMap">
-        SELECT id, project_id, agent_id, task_name, description, cron_expression, task_param, status, create_time, update_time
+        SELECT id, project_id, created_by, agent_id, task_name, description, cron_expression, task_param, status, create_time, update_time
         FROM ai_agent_task_schedule
         WHERE status = 1
         ORDER BY create_time DESC
     </select>
 
     <select id="queryByTaskName" parameterType="java.lang.String" resultMap="AiAgentTaskScheduleMap">
-        SELECT id, project_id, agent_id, task_name, description, cron_expression, task_param, status, create_time, update_time
+        SELECT id, project_id, created_by, agent_id, task_name, description, cron_expression, task_param, status, create_time, update_time
         FROM ai_agent_task_schedule
         WHERE task_name = #{taskName}
     </select>
 
     <select id="queryAll" resultMap="AiAgentTaskScheduleMap">
-        SELECT id, project_id, agent_id, task_name, description, cron_expression, task_param, status, create_time, update_time
+        SELECT id, project_id, created_by, agent_id, task_name, description, cron_expression, task_param, status, create_time, update_time
         FROM ai_agent_task_schedule
         ORDER BY create_time DESC
     </select>
 
     <select id="queryByProjectId" parameterType="java.lang.String" resultMap="AiAgentTaskScheduleMap">
-        SELECT id, project_id, agent_id, task_name, description, cron_expression, task_param, status, create_time, update_time
+        SELECT id, project_id, created_by, agent_id, task_name, description, cron_expression, task_param, status, create_time, update_time
         FROM ai_agent_task_schedule
         WHERE project_id = #{projectId}
         ORDER BY create_time DESC
     </select>
 
     <select id="queryAllValidTaskSchedule" resultMap="AiAgentTaskScheduleMap">
-        SELECT id, project_id, agent_id, task_name, description, cron_expression, task_param, status, create_time, update_time
+        SELECT id, project_id, created_by, agent_id, task_name, description, cron_expression, task_param, status, create_time, update_time
         FROM ai_agent_task_schedule
         WHERE status = 1
         ORDER BY create_time DESC

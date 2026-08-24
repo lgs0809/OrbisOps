@@ -2,6 +2,7 @@ package cn.lgs.orbisops.trigger.ops.runtime;
 
 import cn.lgs.orbisops.application.project.ProjectSkillAuthorizationApplicationService;
 import cn.lgs.orbisops.application.skill.SkillCatalogQueryService;
+import cn.lgs.orbisops.application.skill.SkillRuntimeBudgetPort;
 import cn.lgs.orbisops.trigger.ops.skill.OpsSkillReleaseService;
 import cn.lgs.orbisops.trigger.ops.skill.SkillRuntimeToolProvider;
 import org.springframework.beans.factory.ObjectProvider;
@@ -15,11 +16,11 @@ public class OpsRuntimeSkillResolverConfiguration {
     public OpsRuntimeFrozenSkillContextResolver opsRuntimeFrozenSkillContextResolver(
             ObjectProvider<SkillCatalogQueryService> catalogQueryProvider,
             ObjectProvider<OpsSkillReleaseService> releaseServiceProvider,
-            OpsRuntimeSkillSettings settings) {
+            OpsRuntimeSkillSettings settings, SkillRuntimeBudgetPort budget) {
         return new OpsRuntimeFrozenSkillContextResolver(
                 catalogQueryProvider::getIfAvailable,
                 releaseServiceProvider::getIfAvailable,
-                settings);
+                settings, budget);
     }
 
     @Bean

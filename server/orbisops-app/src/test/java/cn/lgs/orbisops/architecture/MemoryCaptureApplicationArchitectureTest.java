@@ -42,14 +42,14 @@ class MemoryCaptureApplicationArchitectureTest {
         String service = read(APPLICATION_SERVICE);
 
         assertAll(
-                () -> assertTrue(service.contains("ConcurrentMap<String, AtomicLong> sessionTurnCounters")),
+                () -> assertFalse(service.contains("AtomicLong")),
                 () -> assertTrue(service.contains("Clock clock")),
                 () -> assertTrue(service.contains("MemoryCapturePolicy")),
                 () -> assertTrue(service.contains("HotMemoryWritePort")),
                 () -> assertTrue(service.contains("ColdMemoryStoreApplicationService")),
                 () -> assertTrue(service.contains("MemoryPostProcessingApplicationService")),
                 () -> assertTrue(service.contains("hotMemoryWritePort.append")),
-                () -> assertTrue(service.contains("coldMemoryStore.appendMessage")),
+                () -> assertTrue(service.contains("conversationRepository.capture")),
                 () -> assertTrue(service.contains("postProcessingService.submit")),
                 () -> assertTrue(service.contains("clearSessionState(")),
                 () -> assertFalse(service.contains("org.springframework")),

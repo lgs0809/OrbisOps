@@ -91,10 +91,11 @@ final class OpsLlmObservabilityService {
         payload.put("error", error == null ? null : error.getMessage());
         recordModelEvent(
                 trace,
-                "MODEL_CALL_FAILED",
-                "FAILED",
+                error instanceof OpsRunCanceledException ? "MODEL_CALL_CANCELLED" : "MODEL_CALL_FAILED",
+                error instanceof OpsRunCanceledException ? "CANCELED" : "FAILED",
                 agentName,
-                "自定义运维 LLM 调用失败：" + (error == null ? null : error.getMessage()),
+                error instanceof OpsRunCanceledException ? "用户取消了模型调用。"
+                        : "自定义运维 LLM 调用失败：" + (error == null ? null : error.getMessage()),
                 payload);
     }
 

@@ -30,7 +30,8 @@ public final class ChangePackagePreparationPolicy {
                 new PreflightSpecification(),
                 new ValidationProofSpecification(),
                 new OperationShapeSpecification(),
-                new TrustedEvidenceSpecification()));
+                new TrustedEvidenceSpecification(),
+                new RequestedTypeSpecification()));
     }
 
     ChangePackagePreparationPolicy(ChangePackageRiskPolicy riskPolicy,
@@ -175,6 +176,20 @@ public final class ChangePackagePreparationPolicy {
 
     interface PreparationSpecification {
         List<String> violations(ChangePackagePreparationContext context);
+    }
+
+    private static final class RequestedTypeSpecification implements PreparationSpecification {
+        @Override
+        public List<String> violations(ChangePackagePreparationContext context) {
+            if (context.operations().isEmpty() || context.requestedPackageType().isBlank()) return List.of();
+            try {
+                return ChangePackageType.require(context.requestedPackageType()).humanOnly()
+                        ? List.of("HUMAN_ONLY_PACKAGE_HAS_EXECUTABLE_OPERATIONS：人工处理类型不能包含可执行操作。")
+                        : List.of();
+            } catch (IllegalArgumentException invalidType) {
+                return List.of(); // Existing classification fallback handles unknown type hints.
+            }
+        }
     }
 
     private static final class OperationPresenceSpecification implements PreparationSpecification {

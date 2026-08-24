@@ -21,6 +21,7 @@ class OpsRunCancellationBoundaryArchitectureTest {
     void registryDelegatesRetentionAndConcurrentState() throws IOException {
         String registry = read(OPS + "OpsRunCancellationRegistry.java");
         String state = read(OPS + "OpsRunCancellationState.java");
+        String listeners = read(OPS + "OpsRunCancellationListeners.java");
         String settings = read(OPS + "OpsRunCancellationSettings.java");
         String configuration = read(APPLICATION + "OpsRunCancellationConfiguration.java");
 
@@ -34,10 +35,32 @@ class OpsRunCancellationBoundaryArchitectureTest {
                 () -> assertFalse(registry.contains("canceledFinishedAt")),
                 () -> assertFalse(registry.contains("cleanupExpired(")),
                 () -> assertTrue(registry.lines().count() <= 70),
-                () -> assertTrue(state.contains("ConcurrentHashMap.newKeySet()")),
+                () -> assertTrue(registry.contains("OpsRunCancellationListeners listeners")),
+                () -> assertTrue(registry.contains("listeners.register(key, action)")),
+                () -> assertTrue(registry.contains("if (state.isCanceled(key)) registration.cancel()")),
+                () -> assertTrue(registry.contains("listeners.cancel(key)")),
+                () -> assertTrue(registry.contains("state.requireRunId(runId)")),
+                () -> assertTrue(state.contains("ConcurrentMap<String, CancellationSignal>")),
+                () -> assertTrue(state.lines().filter(line -> line.contains("ConcurrentMap<")).count() == 1),
+                () -> assertTrue(state.contains("new ConcurrentHashMap<>()")),
+                () -> assertTrue(state.contains("canceledRuns.computeIfPresent(key,")),
+                () -> assertTrue(state.contains("canceledRuns.computeIfPresent(runId,")),
+                () -> assertTrue(state.contains("record CancellationSignal(Long finishedAt)")),
+                () -> assertFalse(state.contains("canceledRunIds")),
+                () -> assertFalse(state.contains("canceledFinishedAt")),
+                () -> assertFalse(state.contains("clear(key)")),
                 () -> assertTrue(state.contains("settings.retentionMillis()")),
                 () -> assertTrue(state.contains("cleanupExpired()")),
                 () -> assertFalse(state.contains("@Service")),
+                () -> assertFalse(state.contains("Runnable")),
+                () -> assertTrue(listeners.contains("ConcurrentHashMap.newKeySet()")),
+                () -> assertTrue(listeners.contains("synchronized void cancel()")),
+                () -> assertTrue(listeners.contains("if (closed || canceled) return")),
+                () -> assertTrue(listeners.contains("registrations.computeIfPresent(")),
+                () -> assertTrue(listeners.contains("extends OpsRunCancellationRegistry.CancellationRegistration")),
+                () -> assertFalse(listeners.contains("OpsRunCancellationState")),
+                () -> assertFalse(listeners.contains("retentionMillis")),
+                () -> assertFalse(listeners.contains("@Service")),
                 () -> assertTrue(settings.contains("public record OpsRunCancellationSettings(")),
                 () -> assertTrue(configuration.contains("orbisops.runs.cancellation-retention-seconds")));
     }

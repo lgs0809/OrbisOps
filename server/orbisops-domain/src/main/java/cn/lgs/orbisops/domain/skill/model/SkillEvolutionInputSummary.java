@@ -12,7 +12,16 @@ public record SkillEvolutionInputSummary(
         boolean hasToolEvidence,
         boolean hasMessages,
         List<SkillEvolutionEvidenceReference> evidenceReferences,
-        String contextBundleHash) {
+        String contextBundleHash,
+        String episodeJson,
+        String sourceHash) {
+
+    public SkillEvolutionInputSummary(List<String> eventSummaries, List<String> toolEvents, String normalizedUserGoal,
+            String finalReport, boolean hasCompleted, boolean hasToolEvidence, boolean hasMessages,
+            List<SkillEvolutionEvidenceReference> evidenceReferences, String contextBundleHash) {
+        this(eventSummaries, toolEvents, normalizedUserGoal, finalReport, hasCompleted, hasToolEvidence,
+                hasMessages, evidenceReferences, contextBundleHash, "", "");
+    }
 
     public SkillEvolutionInputSummary {
         eventSummaries = eventSummaries == null ? List.of() : List.copyOf(eventSummaries);
@@ -21,6 +30,8 @@ public record SkillEvolutionInputSummary(
         finalReport = text(finalReport);
         evidenceReferences = evidenceReferences == null ? List.of() : List.copyOf(evidenceReferences);
         contextBundleHash = text(contextBundleHash);
+        episodeJson = text(episodeJson);
+        sourceHash = text(sourceHash);
     }
 
     private static String text(String value) {

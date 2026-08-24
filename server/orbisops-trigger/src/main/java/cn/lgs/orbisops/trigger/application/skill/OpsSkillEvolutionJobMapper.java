@@ -2,6 +2,7 @@ package cn.lgs.orbisops.trigger.application.skill;
 
 import cn.lgs.orbisops.application.skill.SkillEvolutionEnqueueResult;
 import cn.lgs.orbisops.application.skill.SkillEvolutionJobRunResult;
+import cn.lgs.orbisops.application.skill.SkillEvolutionDiagnosticPort;
 import cn.lgs.orbisops.domain.skill.model.SkillEvolutionJobSnapshot;
 import cn.lgs.orbisops.domain.skill.model.SkillEvolutionPatchSnapshot;
 import com.alibaba.fastjson.JSON;
@@ -51,6 +52,10 @@ public class OpsSkillEvolutionJobMapper {
         data.put("triggerReason", job.triggerReason());
         data.put("status", job.status().name());
         data.put("attempts", job.attempts());
+        data.put("ordinaryFailureCount", job.ordinaryFailures());
+        data.put("acceptedSourceId", job.sourceId());
+        data.put("executionEpoch", job.epoch());
+        data.put("leaseUntilMillis", job.leaseUntilMillis());
         data.put("nextRunAt", time(job.nextRunAt()));
         data.put("lastError", job.lastError());
         data.put("createTime", time(job.createdAt()));
@@ -89,6 +94,17 @@ public class OpsSkillEvolutionJobMapper {
         data.put("createTime", time(snapshot.createdAt()));
         data.put("updateTime", time(snapshot.updatedAt()));
         return data;
+    }
+
+    /** Add a current read projection without rewriting the immutable generated patch status. */
+    public List<Map<String,Object>> withPublications(List<Map<String,Object>> patches,
+            Map<SkillEvolutionDiagnosticPort.PublicationRef,SkillEvolutionDiagnosticPort.PublicationState> publications) {
+        for(var patch:patches) {
+            var current=publications.get(new SkillEvolutionDiagnosticPort.PublicationRef(
+                    (String)patch.get("projectId"),(String)patch.get("candidateId")));
+            if(current!=null) patch.put("publication",current);
+        }
+        return patches;
     }
 
     private Map<String, Object> patchResult(SkillEvolutionPatchSnapshot patch) {

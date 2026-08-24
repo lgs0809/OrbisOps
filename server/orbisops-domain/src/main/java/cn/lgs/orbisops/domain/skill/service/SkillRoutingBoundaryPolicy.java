@@ -23,13 +23,22 @@ public final class SkillRoutingBoundaryPolicy {
     public MatchDecision match(
             String query,
             SkillRoutingProfile profile) {
+        return match(query, profile, true);
+    }
+
+    /** Keywords retrieve a topic; they do not establish that the task meets a method's use cases. */
+    public MatchDecision matchApplicability(String query, SkillRoutingProfile profile) {
+        return match(query, profile, false);
+    }
+
+    private MatchDecision match(String query, SkillRoutingProfile profile, boolean includeKeywords) {
         String normalizedQuery = normalize(query);
         if (normalizedQuery.isBlank() || profile == null) {
             return new MatchDecision(false, 0D, 0D, "EMPTY_QUERY_OR_PROFILE");
         }
         double positive = maximumSimilarity(
                 normalizedQuery,
-                merge(profile.useCases(), profile.keywords()));
+                includeKeywords ? merge(profile.useCases(), profile.keywords()) : profile.useCases());
         double negative = maximumSimilarity(
                 normalizedQuery,
                 profile.exclusions());

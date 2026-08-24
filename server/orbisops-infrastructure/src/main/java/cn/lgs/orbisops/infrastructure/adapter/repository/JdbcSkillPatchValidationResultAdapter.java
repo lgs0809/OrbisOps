@@ -7,6 +7,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /** JDBC implementation for named Skill patch validation results. */
@@ -19,6 +20,15 @@ public class JdbcSkillPatchValidationResultAdapter
     public JdbcSkillPatchValidationResultAdapter(
             @Qualifier("mysqlJdbcTemplate") JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+    }
+
+    @Override
+    public Optional<Checkpoint> find(String candidateId, String validationType) {
+        var rows = jdbcTemplate.query("""
+                SELECT status,result_json FROM ai_ops_skill_patch_validation
+                WHERE candidate_id=? AND validation_type=?
+                """, (rs, row) -> new Checkpoint(rs.getString(1), JSON.parseObject(rs.getString(2))), candidateId, validationType);
+        return rows.stream().findFirst();
     }
 
     @Override

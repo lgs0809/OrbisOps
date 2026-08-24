@@ -15,11 +15,11 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
 /** Executes one Spring AI model call with trace propagation, total deadline and cancellation. */
-final class OpsLlmModelCallExecutor {
+public final class OpsLlmModelCallExecutor {
 
     private final ExecutorService executorService;
 
-    OpsLlmModelCallExecutor(ExecutorService executorService) {
+    public OpsLlmModelCallExecutor(ExecutorService executorService) {
         this.executorService = executorService;
     }
 
@@ -31,7 +31,7 @@ final class OpsLlmModelCallExecutor {
         return await(submitted, timeoutMillis);
     }
 
-    <T> T executeCall(
+    public <T> T executeCall(
             Callable<T> callable,
             OpsLlmTraceContext.Trace trace,
             long timeoutMillis) {
@@ -44,10 +44,16 @@ final class OpsLlmModelCallExecutor {
         CountDownLatch started = new CountDownLatch(1);
         AtomicLong startedNanos = new AtomicLong();
         long queuedNanos = System.nanoTime();
+        Long nodeDeadline = OpsNodeDeadlineContext.captureDeadline();
+        var control = OpsRunControlContext.current();
         Future<T> future = executorService.submit(() -> {
             startedNanos.set(System.nanoTime());
             started.countDown();
-            return OpsLlmTraceContext.withTrace(trace, () -> call(callable));
+            return OpsRunControlContext.withBinding(control, () -> {
+                if (control != null) control.assertNotCanceled();
+                return OpsNodeDeadlineContext.withDeadline(nodeDeadline,
+                        () -> OpsLlmTraceContext.withTrace(trace, () -> call(callable)));
+            });
         });
         return new SubmittedCall<>(future, started, queuedNanos, startedNanos);
     }
@@ -60,7 +66,7 @@ final class OpsLlmModelCallExecutor {
         long queueWaitBudgetMillis = OpsNodeDeadlineContext.remainingMillis(doubled(timeoutMillis));
         long executionTimeoutMillis = timeoutMillis;
         try {
-            if (!submitted.started().await(queueWaitBudgetMillis, TimeUnit.MILLISECONDS)) {
+            if (!OpsModelCallAwaiter.started(submitted.started(), submitted.future(), queueWaitBudgetMillis)) {
                 submitted.future().cancel(true);
                 throw new IllegalStateException(
                         "模型调用等待执行槽超过当前总时限 " + queueWaitBudgetMillis + "ms");
@@ -72,7 +78,7 @@ final class OpsLlmModelCallExecutor {
                 submitted.future().cancel(true);
                 throw new IllegalStateException("模型调用开始前节点总时限已耗尽");
             }
-            T value = submitted.future().get(executionTimeoutMillis, TimeUnit.MILLISECONDS);
+            T value = OpsModelCallAwaiter.get(submitted.future(), executionTimeoutMillis);
             long executionMillis = nanosToMillis(
                     System.nanoTime() - submitted.startedNanos().get());
             return new ExecutionResult<>(value, queueWaitMillis, executionMillis);

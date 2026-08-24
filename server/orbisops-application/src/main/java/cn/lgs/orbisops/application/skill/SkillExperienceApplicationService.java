@@ -23,6 +23,7 @@ public class SkillExperienceApplicationService {
     private final SkillExperienceAuditPort auditPort;
     private final SkillTransactionPort transactionPort;
     private final SkillExperienceObservationPolicy observationPolicy;
+    private final SkillTaskOutcomePort outcomes;
     private final SkillExperienceClusteringPolicy clusteringPolicy =
             new SkillExperienceClusteringPolicy();
 
@@ -31,6 +32,12 @@ public class SkillExperienceApplicationService {
             SkillExperienceAuditPort auditPort,
             SkillTransactionPort transactionPort,
             SkillExperienceObservationPolicy observationPolicy) {
+        this(experiencePort, auditPort, transactionPort, observationPolicy,
+                (project, run) -> cn.lgs.orbisops.domain.skill.model.VerifiedTaskOutcome.unknown());
+    }
+
+    public SkillExperienceApplicationService(SkillExperiencePort experiencePort, SkillExperienceAuditPort auditPort,
+            SkillTransactionPort transactionPort, SkillExperienceObservationPolicy observationPolicy, SkillTaskOutcomePort outcomes) {
         if (experiencePort == null) {
             throw new IllegalArgumentException("SKILL_EXPERIENCE_PORT_REQUIRED");
         }
@@ -40,6 +47,7 @@ public class SkillExperienceApplicationService {
         this.experiencePort = experiencePort;
         this.auditPort = auditPort;
         this.transactionPort = transactionPort;
+        this.outcomes = java.util.Objects.requireNonNull(outcomes, "SKILL_TASK_OUTCOME_PORT_REQUIRED");
         this.observationPolicy = observationPolicy == null
                 ? new SkillExperienceObservationPolicy()
                 : observationPolicy;
@@ -49,7 +57,12 @@ public class SkillExperienceApplicationService {
             SkillExperienceInput input) {
         require(input == null ? null : input.projectId(), "projectId");
         require(input == null ? null : input.runId(), "runId");
-        SkillExperiencePolicyResult policy = observationPolicy.sanitize(input);
+        return transactionPort.required(() -> recordRequired(input));
+    }
+
+    private SkillExperienceRecordResult recordRequired(SkillExperienceInput input) {
+        var verified = outcomes.verifiedSuccess(input.projectId(), input.runId());
+        SkillExperiencePolicyResult policy = observationPolicy.sanitize(input, verified);
         String taskTemplateHash = CanonicalObjectHasher.sha256(
                 taskTemplateView(policy.taskTemplate()));
         String trajectoryHash = CanonicalObjectHasher.sha256(
@@ -71,6 +84,8 @@ public class SkillExperienceApplicationService {
                         + value(input.runId())
                         + ":"
                         + value(input.observationType()));
+        clusterKey = experiencePort.recordedClusterKey(value(input.projectId()),value(input.agentId()),observationId)
+                .orElse(clusterKey);
         SkillExperienceObservation observation = new SkillExperienceObservation(
                 episodeId,
                 observationId,
@@ -88,23 +103,22 @@ public class SkillExperienceApplicationService {
                 policy.evidenceReferences(),
                 policy.finalSummary(),
                 input.eventCount(),
-                policy.qualityScore());
-        return transactionPort.required(() -> {
-            experiencePort.upsertEpisode(observation);
-            boolean inserted = experiencePort.insertObservation(observation);
-            if (inserted) {
-                experiencePort.upsertCluster(observation);
-                if (auditPort != null) auditPort.recordObservation(observation);
-            }
-            SkillExperienceClusterSnapshot cluster = experiencePort.cluster(
-                    observation.projectId(),
-                    observation.agentId(),
-                    observation.clusterKey());
-            return new SkillExperienceRecordResult(
-                    observation,
-                    cluster,
-                    inserted);
-        });
+                policy.qualityScore(), verified);
+        experiencePort.upsertEpisode(observation);
+        boolean inserted = experiencePort.insertObservation(observation);
+        boolean contributed = experiencePort.recordVerifiedContribution(observation);
+        if (inserted || contributed) {
+            experiencePort.upsertCluster(observation);
+            if (auditPort != null) auditPort.recordObservation(observation);
+        }
+        SkillExperienceClusterSnapshot cluster = experiencePort.cluster(
+                observation.projectId(),
+                observation.agentId(),
+                observation.clusterKey());
+        return new SkillExperienceRecordResult(
+                observation,
+                cluster,
+                inserted);
     }
 
     public void markPromoted(
@@ -152,6 +166,11 @@ public class SkillExperienceApplicationService {
                         value(clusterKey),
                         Math.max(1, Math.min(limit, 32)));
         return samples == null ? List.of() : List.copyOf(samples);
+    }
+
+    public List<SkillExperienceConsolidationSample> consolidationSamples(String projectId,String agentId,String clusterKey,int limit,String requiredRun) {
+        var sources=experiencePort.consolidationSamples(value(projectId),value(agentId),value(clusterKey),Math.max(3,Math.min(limit,20)),value(requiredRun));
+        return sources==null?List.of():List.copyOf(sources);
     }
 
     private Map<String, Object> taskTemplateView(

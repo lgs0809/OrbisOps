@@ -67,6 +67,18 @@ public final class ChangePackageCanonicalHasher {
         }
     }
 
+    /** Stable identity used by the native operation journal and read-only recovery. */
+    public static String landingExecutionKey(String projectId, String packageId, String version,
+                                              String packageHash, String operationId, String operationHash) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(
+                    (projectId + "\n" + packageId + "\n" + version + "\n" + packageHash + "\n"
+                            + operationId + "\n" + operationHash).getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception error) {
+            throw new IllegalStateException("CHANGE_PACKAGE_LANDING_IDENTITY_HASH_FAILED", error);
+        }
+    }
+
     private static Map<String, Object> canonicalOperation(Map<String, Object> operation, OperationHashes hashes) {
         Map<String, Object> canonical = new LinkedHashMap<>(operation);
         canonical.put("argumentsHash", hashes.argumentsHash());

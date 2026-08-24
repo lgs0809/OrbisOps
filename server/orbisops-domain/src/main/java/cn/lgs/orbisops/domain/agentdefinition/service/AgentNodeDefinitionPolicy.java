@@ -15,7 +15,7 @@ public final class AgentNodeDefinitionPolicy {
             "CHAT", "LLM", "PLAN", "AGENT", "SUB_AGENT", "ROUTER", "REVIEW",
             "REFLECT", "REPORT", "NOTIFY", "EXECUTE", "AGENTSCOPE", "RAG", "MCP",
             "CUSTOM", "KNOWLEDGE_RETRIEVAL", "TOOL_CALL", "HTTP", "CODE", "TEMPLATE",
-            "VARIABLE_MERGE", "SUB_WORKFLOW", "HUMAN_APPROVAL");
+            "VARIABLE_MERGE", "SUB_WORKFLOW");
 
     private final AgentWorkflowNodeTypePolicy workflowTypePolicy;
 
@@ -37,6 +37,22 @@ public final class AgentNodeDefinitionPolicy {
         workflowTypePolicy.validateEnabled(node.workflowDefinition());
         String type = AgentWorkflowNodeType.normalizePublishedName(node.type());
         String mode = normalize(node.mode(), "");
+        if (node.config()!=null && node.config().containsKey("changeVerification")) {
+            if (!"ROUTER".equals(type) || !(node.config().get("changeVerification") instanceof java.util.Map<?,?>)) {
+                throw new IllegalArgumentException("CHANGE_VERIFICATION_ROUTER_REQUIRED");
+            }
+            new cn.lgs.orbisops.domain.runtime.workflow.service.WorkflowChangeVerificationPolicy().validate((java.util.Map<?,?>)node.config().get("changeVerification"));
+        }
+        if ("SUB_WORKFLOW".equals(type) && node.config() != null && node.config().containsKey("structuredOutputKey")) {
+            new DirectActionDataPolicy().validate(java.util.Map.of("structuredOutputKey", node.config().get("structuredOutputKey")));
+        }
+        if (node.config() != null && node.config().containsKey("observability")) {
+            if (!"ROUTER".equals(type) || !(node.config().get("observability") instanceof java.util.Map<?, ?>)) {
+                throw new IllegalArgumentException("OBSERVABILITY_ROUTER_CONFIG_REQUIRED");
+            }
+            new cn.lgs.orbisops.domain.runtime.workflow.service.WorkflowObservabilityPolicy()
+                    .validate((java.util.Map<?, ?>) node.config().get("observability"));
+        }
         if (hasText(mode) && !NODE_MODES.contains(mode)) {
             throw new IllegalArgumentException(
                     "节点 " + node.nodeId() + " mode 不支持：" + node.mode());
@@ -54,11 +70,18 @@ public final class AgentNodeDefinitionPolicy {
                     "节点 " + node.nodeId()
                             + " 是结构节点，不能启用 ChangePackage 工具");
         }
+        if (node.config().containsKey("changePackageStatusEnabled")) {
+            Object enabled = node.config().get("changePackageStatusEnabled");
+            if (!(enabled instanceof Boolean) || (Boolean.TRUE.equals(enabled)
+                    && !("AGENT".equals(type) && "REACT".equals(normalizeAgentMode(node, type))))) {
+                throw new IllegalArgumentException("CHANGE_PACKAGE_STATUS_REACT_NODE_REQUIRED");
+            }
+        }
         if (requiresExplicitRuntimeCapability(node, type)
                 && lacksExplicitRuntimeCapability(node)) {
             throw new IllegalArgumentException(
                     "节点 " + node.nodeId()
-                            + " 是 ReAct/工具执行节点，必须显式选择 MCP，或显式启用 RAG。"
+                            + " 是 ReAct/工具执行节点，必须显式选择 MCP、启用 RAG 或配置受支持的只读变更查询能力。"
                             + "不能通过节点名称或路由条件推断工具能力");
         }
     }
@@ -91,6 +114,9 @@ public final class AgentNodeDefinitionPolicy {
         if (Boolean.TRUE.equals(booleanConfig(node, "inheritProjectCapabilities"))) {
             return false;
         }
+        if (Boolean.TRUE.equals(node.config().get("changePackageStatusEnabled"))) {
+            return false;
+        }
         return !node.hasExplicitMcp() && !Boolean.TRUE.equals(node.ragEnabled());
     }
 
@@ -107,6 +133,7 @@ public final class AgentNodeDefinitionPolicy {
                 throw new IllegalArgumentException(
                         "节点 " + node.nodeId() + " DIRECT Action " + index + " 格式无效");
             }
+            new DirectActionDataPolicy().validate(map);
             String toolName = mapText(map, "toolName");
             String mcpId = mapText(map, "mcpId");
             String remoteToolName = mapText(map, "remoteToolName");

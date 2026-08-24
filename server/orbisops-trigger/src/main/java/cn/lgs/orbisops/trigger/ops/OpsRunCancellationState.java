@@ -1,60 +1,68 @@
 package cn.lgs.orbisops.trigger.ops;
 
-import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.function.LongSupplier;
+import org.springframework.util.StringUtils;
 
-/** Thread-safe cancellation signal state with bounded post-finish retention. */
+/** One atomic retained signal per Run; live transport subscriptions belong to Listeners. */
 final class OpsRunCancellationState {
-
-    private final Set<String> canceledRunIds = ConcurrentHashMap.newKeySet();
-    private final Map<String, Long> canceledFinishedAt = new ConcurrentHashMap<>();
+    private static final CancellationSignal ACTIVE = new CancellationSignal(null);
+    private final ConcurrentMap<String, CancellationSignal> canceledRuns = new ConcurrentHashMap<>();
     private final OpsRunCancellationSettings settings;
     private final LongSupplier clock;
 
-    OpsRunCancellationState(
-            OpsRunCancellationSettings settings,
-            LongSupplier clock) {
-        this.settings = settings == null
-                ? OpsRunCancellationSettings.defaults()
-                : settings;
+    OpsRunCancellationState(OpsRunCancellationSettings settings, LongSupplier clock) {
+        this.settings = settings == null ? OpsRunCancellationSettings.defaults() : settings;
         this.clock = clock == null ? System::currentTimeMillis : clock;
     }
 
     void markCanceled(String runId) {
+        String key = requireRunId(runId);
         cleanupExpired();
-        canceledRunIds.add(runId);
-        canceledFinishedAt.remove(runId);
+        canceledRuns.put(key, ACTIVE);
     }
 
     boolean isCanceled(String runId) {
+        String key = normalize(runId);
+        if (key == null) return false;
         cleanupExpired();
-        return canceledRunIds.contains(runId);
+        return canceledRuns.containsKey(key);
     }
 
     void markFinished(String runId) {
-        if (canceledRunIds.contains(runId)) {
-            canceledFinishedAt.put(runId, clock.getAsLong());
-        } else {
-            clear(runId);
-        }
+        String key = normalize(runId);
+        if (key == null) return;
+        long finishedAt = clock.getAsLong();
+        canceledRuns.computeIfPresent(key, (ignored, current) -> new CancellationSignal(finishedAt));
         cleanupExpired();
     }
 
     void clear(String runId) {
-        canceledRunIds.remove(runId);
-        canceledFinishedAt.remove(runId);
+        String key = normalize(runId);
+        if (key != null) canceledRuns.remove(key);
+    }
+
+    String requireRunId(String runId) {
+        String key = normalize(runId);
+        if (key == null) {
+            throw new IllegalArgumentException("RUN_ID_REQUIRED：取消运行时 runId 不能为空");
+        }
+        return key;
+    }
+
+    private String normalize(String runId) {
+        return StringUtils.hasText(runId) ? runId.trim() : null;
     }
 
     private void cleanupExpired() {
         long now = clock.getAsLong();
-        canceledFinishedAt.entrySet().removeIf(entry -> {
-            boolean expired = now - entry.getValue() > settings.retentionMillis();
-            if (expired) {
-                canceledRunIds.remove(entry.getKey());
-            }
-            return expired;
-        });
+        for (String runId : canceledRuns.keySet()) {
+            canceledRuns.computeIfPresent(runId, (ignored, signal) ->
+                    signal.finishedAt() != null && now - signal.finishedAt() > settings.retentionMillis()
+                            ? null : signal);
+        }
     }
+
+    private record CancellationSignal(Long finishedAt) { }
 }

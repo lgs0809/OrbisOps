@@ -95,6 +95,8 @@ final class OpsGraphRouterPromptContract {
 
         JSONObject root = OpsGraphEdgeChoiceRenderer.orderedJson();
         root.put("upstreamNodeId", upstream.getNodeId());
+        Map<?, ?> outputContract = OpsRuntimePromptAssembler.nodeOutputContract(upstream);
+        boolean typedOutput = OpsRuntimePromptAssembler.hasJsonOutputContract(outputContract);
         JSONArray routers = new JSONArray();
         for (OpsGraphEdge routerEdge : routerEdges) {
             OpsWorkflowNode router = nodeById.get(routerEdge.getTo());
@@ -113,8 +115,8 @@ final class OpsGraphRouterPromptContract {
             item.put("description", value(router.getDescription(), ""));
             item.put(
                     "requiredOutput",
-                    OpsGraphEdgeChoiceRenderer.routerRequiredOutput(
-                            inputKey, routeMode));
+                    typedOutput ? outputContract.get("schema")
+                        : OpsGraphEdgeChoiceRenderer.routerRequiredOutput(inputKey, routeMode));
             item.put(
                     "choices",
                     OpsGraphEdgeChoiceRenderer.edgeChoices(
@@ -128,7 +130,9 @@ final class OpsGraphRouterPromptContract {
         root.put("routers", routers);
         root.put(
                 "rule",
-                "当前节点后接 Router 时，当前节点输出必须包含 Router 可解析的路由字段；使用 choices[].routeKey 或 choices[].condition 作为 route key，不要发明新 key；选择前阅读 choices[].description。feedback=true 的 choice 是回边分支，必须同时遵守 runtime.loop 状态。");
+                typedOutput
+                    ? "当前节点只输出符合 requiredOutput JSON Schema 的字段。inputKey 是保存整个节点结果的位置，不是应追加的字段。Router 按已有字段及边条件判定分支，不需要模型另选 route key。"
+                    : "当前节点后接 Router 时，当前节点输出必须包含 Router 可解析的路由字段；使用 choices[].routeKey 或 choices[].condition 作为 route key，不要发明新 key；选择前阅读 choices[].description。feedback=true 的 choice 是回边分支，必须同时遵守 runtime.loop 状态。");
         return limit(JSON.toJSONString(root));
     }
 

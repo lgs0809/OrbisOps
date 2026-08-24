@@ -33,6 +33,31 @@ import static org.mockito.Mockito.when;
 class GovernedMemoryApplicationServiceTest {
 
     @Test
+    void sameNormalizedFactFromAnotherRunAddsSourceWithoutConflictOrNewVersion() {
+        IGovernedMemoryRepository repository = mock(IGovernedMemoryRepository.class);
+        when(repository.available()).thenReturn(true);
+        GovernedMemorySnapshot old = snapshot("memory-old", MemoryType.PROJECT_FACT, "ACTIVE", 1, "legacy-audit-hash");
+        var existing = new GovernedMemorySnapshot(old.databaseId(), old.memoryId(), old.scope(), old.scopeId(),
+                old.userId(), old.projectId(), old.agentId(), old.sessionId(), old.type(), "mysql-primary",
+                "MySQL 主库", "MySQL 主库", old.sourceType(), "previous-run", old.verified(), old.confidence(),
+                old.riskLevel(), old.status(), old.version(), old.memoryHash(), old.proofRefs(), old.expiresAt(),
+                old.createdBy(), old.idempotencyKey(), old.createdAt(), old.updatedAt());
+        when(repository.findLatestHead(any(), anyString(), any(), anyString()))
+                .thenReturn(Optional.of(new GovernedMemoryHead("memory-old", 1, "legacy-audit-hash")));
+        when(repository.findByMemoryId("memory-old")).thenReturn(Optional.of(existing));
+        when(repository.findByMemoryId("memory-1")).thenReturn(Optional.of(existing));
+
+        GovernedMemoryCreationResult result = service(repository, null).create(command("PROJECT_FACT"));
+
+        assertTrue(result.duplicate());
+        assertEquals("", result.conflictId());
+        assertEquals("ACTIVE", result.snapshot().status());
+        assertEquals(1, result.snapshot().version());
+        verify(repository, never()).markConflict(anyString());
+        verify(repository, never()).insert(any());
+    }
+
+    @Test
     void createsTypedMemoryAndPublishesInternalAndExternalAudit() {
         IGovernedMemoryRepository repository = mock(IGovernedMemoryRepository.class);
         GovernedMemoryExternalAuditPort externalAudit = mock(GovernedMemoryExternalAuditPort.class);
@@ -171,6 +196,8 @@ class GovernedMemoryApplicationServiceTest {
     private GovernedMemoryApplicationService service(
             IGovernedMemoryRepository repository,
             GovernedMemoryExternalAuditPort externalAudit) {
+        when(repository.withLogicalLock(anyString(), any())).thenAnswer(invocation ->
+                ((java.util.function.Supplier<?>) invocation.getArgument(1)).get());
         return new GovernedMemoryApplicationService(
                 repository,
                 new GovernedMemoryPolicy(),

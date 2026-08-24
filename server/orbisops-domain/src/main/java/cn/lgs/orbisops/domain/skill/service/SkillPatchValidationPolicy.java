@@ -103,7 +103,8 @@ public class SkillPatchValidationPolicy {
         String lower = (String.valueOf(changes) + String.valueOf(artifacts))
                 .toLowerCase(Locale.ROOT);
         DANGEROUS_CONTENT.stream()
-                .filter(lower::contains)
+                .filter(item -> SkillForbiddenDirectivePolicy.present(changes, item)
+                        || SkillForbiddenDirectivePolicy.present(artifacts, item))
                 .forEach(item -> failures.add("POLICY_DANGEROUS_CONTENT"));
         DANGEROUS_SCRIPT.stream()
                 .filter(lower::contains)

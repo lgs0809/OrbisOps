@@ -23,6 +23,7 @@ public class OpsAnalysisResponseDTO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private String analysisId;
+    private String runtimeStatus;
     private String agentDefinitionId;
     private Integer agentVersion;
     private String agentRuntime;

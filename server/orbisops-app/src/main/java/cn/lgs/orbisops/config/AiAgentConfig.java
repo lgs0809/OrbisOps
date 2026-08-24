@@ -1,6 +1,8 @@
 package cn.lgs.orbisops.config;
 
 import cn.lgs.orbisops.trigger.ops.runtime.OpsModelHttpClientFactory;
+import cn.lgs.orbisops.trigger.ops.runtime.OpsResilientOpenAiApi;
+import org.springframework.retry.support.RetryTemplate;
 import org.springframework.ai.document.MetadataMode;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
@@ -29,15 +31,11 @@ public class AiAgentConfig {
                                            @Value("${spring.ai.openai.chat.connect-timeout-seconds:5}") int connectTimeoutSeconds,
                                            @Value("${spring.ai.openai.chat.read-timeout-seconds:45}") int readTimeoutSeconds) {
         String resolvedApiKey = StringUtils.hasText(apiKey) ? apiKey : "dev-placeholder-key";
-        OpenAiApi openAiApi = OpenAiApi.builder()
-                .baseUrl(baseUrl)
-                .apiKey(resolvedApiKey)
-                .completionsPath("v1/chat/completions")
-                .embeddingsPath("v1/embeddings")
-                .restClientBuilder(OpsModelHttpClientFactory.restClientBuilder(connectTimeoutSeconds, readTimeoutSeconds))
-                .build();
+        OpenAiApi openAiApi = new OpsResilientOpenAiApi(baseUrl, resolvedApiKey,
+                "/v1/chat/completions", "/v1/embeddings", connectTimeoutSeconds, readTimeoutSeconds, 240_000L, null);
         return OpenAiChatModel.builder()
                 .openAiApi(openAiApi)
+                .retryTemplate(RetryTemplate.builder().maxAttempts(1).noBackoff().build())
                 .defaultOptions(OpenAiChatOptions.builder()
                         .model(chatModelName)
                         .build())

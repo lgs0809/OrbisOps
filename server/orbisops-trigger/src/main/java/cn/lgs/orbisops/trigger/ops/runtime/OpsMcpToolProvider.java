@@ -65,6 +65,14 @@ public class OpsMcpToolProvider {
         return callbackAssembler.assemble(configs);
     }
 
+    public java.util.List<Map<String,Object>> currentAuthorizedDefinitions(OpsMcpServerConfig config) {
+        return callbackAssembler.currentAuthorizedDefinitions(config);
+    }
+
+    public Map<String,Object> currentAuthorizedDefinition(OpsMcpServerConfig config,String name) {
+        return callbackAssembler.currentAuthorizedDefinition(config,name);
+    }
+
     public String callProgressiveDirect(OpsMcpServerConfig config, String toolInput) {
         return progressiveInvocations.invoke(config, toolInput, this::invokeRemoteMcpTool);
     }

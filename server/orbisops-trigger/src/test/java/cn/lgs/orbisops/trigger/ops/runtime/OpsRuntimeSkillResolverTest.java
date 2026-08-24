@@ -44,44 +44,25 @@ class OpsRuntimeSkillResolverTest {
     }
 
     @Test
-    void boundSkillsMustExposeToolAndLazyGuidance() {
+    void liveFileNamesWithoutFrozenGovernedVersionsMustNotExposeToolOrBody() {
         OpsSkillToolProvider toolProvider = mock(OpsSkillToolProvider.class);
-        ToolCallback callback = mock(ToolCallback.class);
-        when(toolProvider.buildSkillToolCallback(anyCollection()))
-                .thenReturn(Optional.of(callback));
-        when(toolProvider.renderSkillSummaryContext(anyCollection(), anyInt()))
-                .thenReturn("- logs: 日志查询规程");
-        OpsRuntimeSkillResolver resolver = resolver(
-                toolProvider, null, null, null, null, settings(true, "lazy"));
-        OpsRuntimeResourceContext context = context(List.of("logs"), Map.of());
-
+        OpsRuntimeSkillResolver resolver = resolver(toolProvider, null, null, null, null, settings(true, "full"));
+        OpsRuntimeResourceContext context = context(List.of("repair"), Map.of());
         resolver.resolve(context);
-
-        assertEquals(1, context.getTools().size());
-        assertTrue(((OpsRuntimeGovernedToolCallback) context.getTools().get(0)).delegate()
-                instanceof OpsRuntimeSkillActivationToolCallback);
-        assertEquals("lazy", context.getMetadata().get("skillContextMode"));
-        assertTrue(context.getSkillContext().contains("必须先调用 Skill 工具"));
-        assertTrue(context.getSkillContext().contains("日志查询规程"));
+        assertTrue(context.getTools().isEmpty());
+        assertNull(context.getSkillContext());
+        verify(toolProvider, never()).buildSkillToolCallback(anyCollection());
+        verify(toolProvider, never()).renderSkillContext(anyCollection(), anyInt());
     }
 
     @Test
-    void disabledContextMustStillExposeBoundTool() {
+    void disabledContextMustNotReadOrExposeUnfrozenFiles() {
         OpsSkillToolProvider toolProvider = mock(OpsSkillToolProvider.class);
-        ToolCallback callback = mock(ToolCallback.class);
-        when(toolProvider.buildSkillToolCallback(anyCollection()))
-                .thenReturn(Optional.of(callback));
-        OpsRuntimeSkillResolver resolver = resolver(
-                toolProvider, null, null, null, null, settings(false, "full"));
+        OpsRuntimeSkillResolver resolver = resolver(toolProvider, null, null, null, null, settings(false, "full"));
         OpsRuntimeResourceContext context = context(List.of("repair"), Map.of());
-
         resolver.resolve(context);
-
-        assertEquals(1, context.getTools().size());
-        assertTrue(((OpsRuntimeGovernedToolCallback) context.getTools().get(0)).delegate()
-                instanceof OpsRuntimeSkillActivationToolCallback);
+        assertTrue(context.getTools().isEmpty());
         assertEquals("disabled", context.getMetadata().get("skillContextMode"));
-        assertNull(context.getSkillContext());
         verify(toolProvider, never()).renderSkillContext(anyCollection(), anyInt());
     }
 
@@ -89,7 +70,7 @@ class OpsRuntimeSkillResolverTest {
     void frozenPublishedAndCanaryRefsMustMaterializeExactContext() {
         SkillCatalogQueryService catalogQuery = mock(SkillCatalogQueryService.class);
         OpsSkillReleaseService releaseService = mock(OpsSkillReleaseService.class);
-        when(catalogQuery.getSkillVersion(
+        when(catalogQuery.getRuntimeSkillVersion(
                 "project-1", "skill-1", 3, "skill-hash", "package-hash", "PROJECT"))
                 .thenReturn(Map.of(
                         "name", "Published Skill",
@@ -119,8 +100,10 @@ class OpsRuntimeSkillResolverTest {
                                 "packageHash", "candidate-package-hash",
                                 "scope", "PROJECT",
                                 "statusAtUse", "CANARY")));
+        OpsProjectSkillToolProvider provider = mock(OpsProjectSkillToolProvider.class);
+        when(provider.build(eq("project-1"), eq("alice"), eq("run-1"), anyList())).thenReturn(mock(ToolCallback.class));
         OpsRuntimeSkillResolver resolver = resolver(
-                null, catalogQuery, null, releaseService, null, settings(true, "summary"));
+                null, catalogQuery, null, releaseService, provider, settings(true, "summary"));
         OpsRuntimeResourceContext context = context(List.of(), metadata);
 
         resolver.resolve(context);
@@ -131,7 +114,7 @@ class OpsRuntimeSkillResolverTest {
         assertTrue(context.getSkillContext().contains("不适用：生产写操作"));
         assertTrue(context.getSkillContext().contains("published guidance"));
         assertTrue(context.getSkillContext().contains("canary guidance"));
-        verify(catalogQuery).getSkillVersion(
+        verify(catalogQuery).getRuntimeSkillVersion(
                 "project-1", "skill-1", 3, "skill-hash", "package-hash", "PROJECT");
     }
 
@@ -195,11 +178,13 @@ class OpsRuntimeSkillResolverTest {
             OpsSkillReleaseService releaseService,
             OpsProjectSkillToolProvider projectToolProvider,
             OpsRuntimeSkillSettings settings) {
+        if (catalogQuery != null) when(catalogQuery.retainRuntimeCatalogRefs(eq("project-1"), anyList()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
         OpsRuntimeFrozenSkillContextResolver frozenContextResolver =
                 new OpsRuntimeFrozenSkillContextResolver(
                         () -> catalogQuery,
                         () -> releaseService,
-                        settings);
+                        settings, mock(cn.lgs.orbisops.application.skill.SkillRuntimeBudgetPort.class));
         return new OpsRuntimeSkillResolver(
                 () -> toolProvider,
                 () -> authorization,

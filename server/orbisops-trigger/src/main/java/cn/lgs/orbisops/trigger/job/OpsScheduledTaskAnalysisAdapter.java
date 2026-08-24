@@ -6,6 +6,8 @@ import cn.lgs.orbisops.application.project.ProjectDefinitionApplicationService;
 import cn.lgs.orbisops.application.schedule.ScheduledTaskAnalysisPort;
 import cn.lgs.orbisops.application.schedule.ScheduledTaskExecutionCommand;
 import cn.lgs.orbisops.application.schedule.TaskScheduleRuntimeConfiguration;
+import cn.lgs.orbisops.domain.agentdefinition.service.DirectActionDataPolicy;
+import cn.lgs.orbisops.domain.shared.json.CanonicalJson;
 import cn.lgs.orbisops.trigger.application.ops.OpsAnalysisApplicationService;
 import cn.lgs.orbisops.trigger.ops.OpsJsonSnapshotCodec;
 import com.alibaba.fastjson.JSON;
@@ -42,6 +44,9 @@ public final class OpsScheduledTaskAnalysisAdapter implements
 
     @Override
     public OpsAgentRunRequestDTO prepare(ScheduledTaskExecutionCommand command, Long executionId) {
+        if (text(command.createdBy()).isBlank()) {
+            throw new IllegalArgumentException("TASK_SCHEDULE_CREATOR_MISSING");
+        }
         TaskScheduleRuntimeConfiguration config = runtimeCodec.decode(command.runtimePayload());
         String defaultAgentId = projects == null ? "" : text(projects.defaultAgentId(config.projectId()));
         String selectedAgentId = StringUtils.hasText(command.agentId())
@@ -52,12 +57,12 @@ public final class OpsScheduledTaskAnalysisAdapter implements
                 || !defaultAgentId.equals(selectedAgentId));
         OpsAgentRunRequestDTO request = OpsAgentRunRequestDTO.builder()
                 .runId("task_" + command.scheduleId() + "_" + executionId)
-                .requestedBy("scheduler:" + command.scheduleId())
+                .requestedBy(command.createdBy())
                 .projectId(config.projectId())
                 .rangeMinutes(config.rangeMinutes() == null ? 15 : config.rangeMinutes())
                 .promWindow(StringUtils.hasText(config.promWindow()) ? config.promWindow() : "5m")
                 .includeRecentLogs(!Boolean.FALSE.equals(config.includeRecentLogs()))
-                .question(scheduledQuestion(command.taskName(), config.prompt()))
+                .question(scheduledQuestion(command.taskName(), config.prompt(), explicitWorkflow))
                 .agentDefinitionId(selectedAgentId)
                 .agentVersion("PINNED_VERSION".equalsIgnoreCase(config.agentBindingMode())
                         ? config.agentVersion() : null)
@@ -93,7 +98,16 @@ public final class OpsScheduledTaskAnalysisAdapter implements
         return OpsJsonSnapshotCodec.write(response);
     }
 
-    private String scheduledQuestion(String taskName, String prompt) {
+    @Override
+    public String runtimeStatus(OpsAnalysisResponseDTO response) {
+        return response == null ? "UNKNOWN" : text(response.getRuntimeStatus());
+    }
+
+    private String scheduledQuestion(String taskName, String prompt, boolean explicitWorkflow) {
+        if (explicitWorkflow && StringUtils.hasText(prompt) && prompt.stripLeading().startsWith("{")) {
+            var input = new DirectActionDataPolicy().parseObject(prompt);
+            return CanonicalJson.stringifyPreservingOrder(input);
+        }
         String name = StringUtils.hasText(taskName) ? taskName.trim() : "周期 Agent 任务";
         return StringUtils.hasText(prompt)
                 ? "定时任务：" + name + "\n执行要求：" + prompt.trim()

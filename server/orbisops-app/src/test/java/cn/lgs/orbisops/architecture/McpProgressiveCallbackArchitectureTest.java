@@ -49,7 +49,7 @@ class McpProgressiveCallbackArchitectureTest {
                 () -> assertTrue(configuration.contains("toolExecutionServiceProvider::getIfAvailable")),
                 () -> assertTrue(configuration.contains("OpsProgressiveMcpCallbackAdapter")),
                 () -> assertTrue(configuration.contains(
-                        "new OpsMcpRemoteClientAdapter(clientRegistry, clientFactory)")),
+                        "new OpsMcpRemoteCatalog(service,catalogs,clientFactory)")),
                 () -> assertTrue(configuration.lines().count() < 60));
     }
 

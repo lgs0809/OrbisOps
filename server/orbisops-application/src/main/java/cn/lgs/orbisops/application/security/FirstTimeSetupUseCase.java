@@ -1,6 +1,7 @@
 package cn.lgs.orbisops.application.security;
 
 import cn.lgs.orbisops.domain.security.AdminUserRole;
+import cn.lgs.orbisops.domain.security.AdminPhoneNumber;
 import cn.lgs.orbisops.domain.security.AdminUserStatus;
 
 import java.util.UUID;
@@ -31,10 +32,15 @@ public final class FirstTimeSetupUseCase {
     }
 
     public synchronized AdminUserLoginResult setup(String username, String password) {
+        return setup(username, password, null);
+    }
+
+    public synchronized AdminUserLoginResult setup(String username, String password, String phone) {
         if (!isRequired()) {
             throw new IllegalStateException(ALREADY_COMPLETED);
         }
         String normalizedUsername = username == null ? "" : username.trim();
+        String normalizedPhone = AdminPhoneNumber.optional(phone);
         String userId = "user-" + UUID.randomUUID();
         boolean created = catalogUseCase.create(new AdminUserCommand(
                 null,
@@ -42,10 +48,11 @@ public final class FirstTimeSetupUseCase {
                 normalizedUsername,
                 password,
                 AdminUserRole.ADMIN.value(),
-                AdminUserStatus.ENABLED));
+                AdminUserStatus.ENABLED,
+                normalizedPhone));
         if (!created) {
             throw new IllegalStateException("FIRST_TIME_SETUP_CREATE_FAILED");
         }
-        return authenticationUseCase.login(new AdminUserLoginCommand(normalizedUsername, password));
+        return authenticationUseCase.login(new AdminUserLoginCommand(normalizedUsername, password, normalizedPhone));
     }
 }

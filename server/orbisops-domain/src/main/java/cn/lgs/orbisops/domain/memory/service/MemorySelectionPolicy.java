@@ -69,6 +69,8 @@ public class MemorySelectionPolicy {
     }
 
     private MemoryMessageCandidate preferNewerMessage(MemoryMessageCandidate left, MemoryMessageCandidate right) {
+        if ("protected_source".equals(left.metadata().get("memory_type"))) return left;
+        if ("protected_source".equals(right.metadata().get("memory_type"))) return right;
         return turnIndex(left.metadata()) >= turnIndex(right.metadata()) ? left : right;
     }
 

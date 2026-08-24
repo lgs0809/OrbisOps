@@ -3,7 +3,7 @@ package cn.lgs.orbisops.trigger.ops;
 import cn.lgs.orbisops.trigger.ops.runtime.OpsRuntimePersistenceException;
 
 import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
-import cn.lgs.orbisops.trigger.ops.skill.SkillRuntimeToolProvider;
+import cn.lgs.orbisops.trigger.ops.runtime.OpsRuntimeSkillResolver;
 import com.alibaba.fastjson.JSONObject;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.ObjectProvider;
@@ -30,7 +30,7 @@ public class OpsAgentLlmClient {
     public OpsAgentLlmClient(
             ApplicationContext applicationContext,
             ObjectProvider<ChatModel> chatModelProvider,
-            ObjectProvider<SkillRuntimeToolProvider> skillToolProvider,
+            ObjectProvider<OpsRuntimeSkillResolver> skillToolProvider,
             ModelAvailabilityPort aiModelAvailability,
             @Qualifier("opsModelCallExecutor") ExecutorService modelCallExecutor) {
         this(
@@ -46,7 +46,7 @@ public class OpsAgentLlmClient {
     public OpsAgentLlmClient(
             ApplicationContext applicationContext,
             ObjectProvider<ChatModel> chatModelProvider,
-            ObjectProvider<SkillRuntimeToolProvider> skillToolProvider,
+            ObjectProvider<OpsRuntimeSkillResolver> skillToolProvider,
             ModelAvailabilityPort aiModelAvailability,
             @Qualifier("opsModelCallExecutor") ExecutorService modelCallExecutor,
             OpsAgentLlmSettings settings) {
@@ -172,9 +172,8 @@ public class OpsAgentLlmClient {
             return result.success()
                     ? result.json()
                     : degrade(agentName, result.reason(), result.exception());
-        } catch (OpsLlmDegradationException error) {
-            throw error;
-        } catch (OpsRuntimePersistenceException error) {
+        } catch (OpsRunCanceledException | OpsLlmSkillContextException
+                 | OpsLlmDegradationException | OpsRuntimePersistenceException error) {
             throw error;
         } catch (Exception error) {
             return degrade(agentName, "调用失败：" + error.getMessage(), error);

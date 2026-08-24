@@ -1,121 +1,75 @@
 package cn.lgs.orbisops.trigger.ops;
 
-import cn.lgs.orbisops.trigger.ops.skill.OpsSkillToolProvider;
+import cn.lgs.orbisops.trigger.ops.runtime.*;
 import org.junit.jupiter.api.Test;
-import org.springframework.ai.tool.ToolCallback;
-
-import java.util.List;
-import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyCollection;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
+import java.util.*;
+import java.util.concurrent.*;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.*;
 
 class OpsLlmSkillContextServiceTest {
-
-    @Test
-    void disabledOrMissingSkillsKeepOriginalPromptWithoutLoadingProvider() {
-        OpsSkillToolProvider provider = mock(OpsSkillToolProvider.class);
-        OpsLlmSkillContextService service = new OpsLlmSkillContextService(() -> provider);
-        String prompt = "system";
-
-        assertSame(prompt, service.withLazyContext(prompt, List.of("skill-a"), false, 1000));
-        assertSame(prompt, service.withLazyContext(prompt, List.of(), true, 1000));
-        assertSame(prompt, service.withEagerContext(prompt, List.of(), 1000));
-        assertTrue(service.skillTool(List.of()).isEmpty());
-        verifyNoInteractions(provider);
-    }
-
-    @Test
-    void lazyContextAppendsBoundSkillSummaryAndUsesConfiguredLimit() {
-        OpsSkillToolProvider provider = mock(OpsSkillToolProvider.class);
-        when(provider.renderSkillSummaryContext(List.of("skill-a"), 1200))
-                .thenReturn("- skill-a: summary");
-        OpsLlmSkillContextService service = new OpsLlmSkillContextService(() -> provider);
-
-        String result = service.withLazyContext(
-                "system",
-                List.of("skill-a"),
-                true,
-                1200);
-
-        assertTrue(result.startsWith("system"));
-        assertTrue(result.contains("### 可用 Skill 与使用边界"));
-        assertTrue(result.contains("- skill-a: summary"));
-        assertTrue(result.contains("Skill 是操作规程，不是事实证据"));
-        verify(provider).renderSkillSummaryContext(List.of("skill-a"), 1200);
-    }
-
-    @Test
-    void blankOrFailedLazyRenderingKeepsOriginalPrompt() {
-        OpsSkillToolProvider blankProvider = mock(OpsSkillToolProvider.class);
-        when(blankProvider.renderSkillSummaryContext(anyCollection(), anyInt()))
-                .thenReturn(" ");
-        String prompt = "system";
-        assertSame(prompt, new OpsLlmSkillContextService(() -> blankProvider)
-                .withLazyContext(prompt, List.of("skill-a"), true, 1000));
-
-        OpsSkillToolProvider failedProvider = mock(OpsSkillToolProvider.class);
-        when(failedProvider.renderSkillSummaryContext(anyCollection(), anyInt()))
-                .thenThrow(new IllegalStateException("load failed"));
-        assertSame(prompt, new OpsLlmSkillContextService(() -> failedProvider)
-                .withLazyContext(prompt, List.of("skill-a"), true, 1000));
-    }
-
-    @Test
-    void eagerContextEnforcesLegacyMinimumAndAppendsFullSkillBody() {
-        OpsSkillToolProvider provider = mock(OpsSkillToolProvider.class);
-        when(provider.renderSkillContext(List.of("skill-a"), 2000))
-                .thenReturn("## Skill: skill-a\nbody");
-        OpsLlmSkillContextService service = new OpsLlmSkillContextService(() -> provider);
-
-        String result = service.withEagerContext(
-                "system",
-                List.of("skill-a"),
-                500);
-
-        assertTrue(result.contains("### 本次已加载 Skill 正文"));
-        assertTrue(result.contains("## Skill: skill-a"));
-        verify(provider).renderSkillContext(List.of("skill-a"), 2000);
-    }
-
-    @Test
-    void skillToolUsesBoundNamesAndMissingProviderReturnsEmpty() {
-        ToolCallback callback = mock(ToolCallback.class);
-        OpsSkillToolProvider provider = mock(OpsSkillToolProvider.class);
-        when(provider.buildSkillToolCallback(List.of("skill-a")))
-                .thenReturn(Optional.of(callback));
-        OpsLlmSkillContextService service = new OpsLlmSkillContextService(() -> provider);
-
-        assertSame(callback, service.skillTool(List.of("skill-a")).orElseThrow());
-        verify(provider).buildSkillToolCallback(List.of("skill-a"));
-        assertTrue(new OpsLlmSkillContextService(() -> null)
-                .skillTool(List.of("skill-a"))
-                .isEmpty());
-    }
-
-    @Test
-    void normalizedNamesTrimDeduplicatePreserveOrderAndRemainImmutable() {
+    @Test void untrustedNamesCannotUseTheLegacyFilesystemProvider() {
         OpsLlmSkillContextService service = new OpsLlmSkillContextService(() -> null);
-
-        List<String> names = service.normalizedNames(List.of(
-                " skill-b ",
-                "",
-                "skill-a",
-                "skill-b",
-                "   "));
-
-        assertEquals(List.of("skill-b", "skill-a"), names);
-        assertThrows(UnsupportedOperationException.class, () -> names.add("skill-c"));
-        assertTrue(service.normalizedNames(null).isEmpty());
-        assertFalse(names.isEmpty());
+        assertEquals("system", service.withLazyContext("system", List.of("a"), false, 100));
+        assertEquals("system", service.withEagerContext("system", List.of(), 100));
+        assertThrows(OpsLlmSkillContextException.class, () -> service.withEagerContext("system", List.of("a"), 100));
+        assertThrows(OpsLlmSkillContextException.class, () -> service.skillTool(List.of("a")));
+    }
+    @Test void lazyAndEagerResolveExactVersionAndUseTheSameRunBudget() {
+        var f = new OpsLlmFrozenSkillTestFixture("a", "Frozen v7. Do not bypass approval.");
+        f.run(() -> {
+            String first = f.service().withLazyContext("system", List.of("a"), true, 5);
+            String retry = f.service().withEagerContext("system", List.of("a"), 100000);
+            assertEquals(first, retry);
+            assertTrue(first.contains("Do not bypass approval."));
+            return null;
+        });
+        verify(f.catalog, times(2)).getRuntimeSkillVersion("p", "a", 7, "frozen-hash", "package-hash", "PROJECT");
+        verify(f.budget, times(2)).reserve(eq("p"), eq("run"), argThat(loads -> loads.size() == 1));
+        assertEquals(2, f.events.size());
+        assertEquals(7, ((Map<?,?>)f.events.get(0).getPayload().get("skillRef")).get("version"));
+    }
+    @Test void revokedVersionAndBudgetFailurePropagateWithoutSuccessfulLoadAudit() {
+        var f = new OpsLlmFrozenSkillTestFixture("a", "body");
+        when(f.catalog.getRuntimeSkillVersion("p", "a", 7, "frozen-hash", "package-hash", "PROJECT"))
+                .thenThrow(new SecurityException("revoked"));
+        OpsLlmSkillContextException error = assertThrows(OpsLlmSkillContextException.class,
+                () -> f.run(() -> f.service().withEagerContext("system", List.of("a"), 6000)));
+        assertInstanceOf(SecurityException.class, error.getCause());
+        assertTrue(f.events.isEmpty()); verifyNoInteractions(f.budget);
+        var b = new OpsLlmFrozenSkillTestFixture("a", "body");
+        doThrow(new IllegalStateException("budget exceeded")).when(b.budget).reserve(anyString(), anyString(), anyList());
+        assertThrows(OpsLlmSkillContextException.class,
+                () -> b.run(() -> b.service().withLazyContext("system", List.of("a"), true, 6000)));
+        assertTrue(b.events.isEmpty());
+    }
+    @Test void toolUsesFrameProjectAndRunAndRechecksCurrentCatalog() {
+        OpsRuntimeSkillResolver resolver = mock(OpsRuntimeSkillResolver.class);
+        when(resolver.catalogTool(any())).thenReturn(Optional.empty());
+        var f = new OpsLlmFrozenSkillTestFixture("a", "body");
+        f.run(() -> new OpsLlmSkillContextService(() -> resolver).skillTool(List.of("attacker-name")));
+        verify(resolver).catalogTool(argThat(ctx -> "p".equals(ctx.getProjectId()) && "run".equals(ctx.getRequest().getRunId())
+                && ctx.getRequest().getMetadata().get("usedSkillVersionRefs").equals(f.frame.selectedRefs())));
+    }
+    @Test void immutableFrameSurvivesNestedAndWorkerThreadCallsWithoutLeaking() throws Exception {
+        var f = new OpsLlmFrozenSkillTestFixture("a", "body");
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            var trace = f.trace();
+            assertSame(f.frame, trace.child("child", "n", "AGENT", "a", "source").skillFrame());
+            String body = executor.submit(OpsLlmTraceContext.wrap(trace,
+                    () -> f.service().withEagerContext("system", List.of("a"), 6000))::get).get();
+            assertTrue(body.contains("body"));
+            assertNull(executor.submit(OpsLlmTraceContext::current).get());
+            assertNull(OpsLlmTraceContext.current());
+            assertThrows(UnsupportedOperationException.class, () -> f.frame.selectedRefs().get(0).put("version", 8));
+        } finally { executor.shutdownNow(); }
+    }
+    @Test void normalizedNamesRemainImmutable() {
+        var service = new OpsLlmSkillContextService(() -> null);
+        var names = service.normalizedNames(Arrays.asList(" b ", "", "a", "b", null));
+        assertEquals(List.of("b", "a"), names);
+        assertThrows(UnsupportedOperationException.class, () -> names.add("c"));
     }
 }

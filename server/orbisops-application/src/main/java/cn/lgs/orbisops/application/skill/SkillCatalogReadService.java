@@ -27,6 +27,7 @@ public final class SkillCatalogReadService implements SkillCatalogPort {
     private final ISkillCatalogRepository catalogRepository;
     private final ISkillPackageRepository packageRepository;
     private final SkillFileSourcePort fileSourcePort;
+    private SkillFileProjectionPort fileProjection;
     private final SkillProjectValidationPort projectValidationPort;
     private final SkillCatalogViewMapper catalogViewMapper;
     private final SkillFileCatalogViewMapper fileViewMapper;
@@ -40,6 +41,15 @@ public final class SkillCatalogReadService implements SkillCatalogPort {
                                    SkillProjectValidationPort projectValidationPort) {
         this(catalogRepository, packageRepository, fileSourcePort, projectValidationPort,
                 new SkillCatalogViewMapper(), new SkillFileCatalogViewMapper(), new SkillCatalogQueryPolicy());
+    }
+
+    public SkillCatalogReadService(ISkillCatalogRepository catalogRepository,
+                                   ISkillPackageRepository packageRepository,
+                                   SkillFileSourcePort fileSourcePort,
+                                   SkillProjectValidationPort projectValidationPort,
+                                   SkillFileProjectionPort fileProjection) {
+        this(catalogRepository,packageRepository,fileSourcePort,projectValidationPort);
+        this.fileProjection=java.util.Objects.requireNonNull(fileProjection);
     }
 
     SkillCatalogReadService(ISkillCatalogRepository catalogRepository,
@@ -93,6 +103,66 @@ public final class SkillCatalogReadService implements SkillCatalogPort {
                 .filter(this::isGlobalFileSkill)
                 .orElseThrow(() -> new IllegalArgumentException("通用 Skill 不存在：" + skillId));
         return snapshot(fileViewMapper.toView(file, true));
+    }
+
+    @Override
+    public List<SkillCatalogSnapshot> listRuntimeGlobalEntries() { return runtimeMetadata(GLOBAL, ""); }
+
+    @Override
+    public List<SkillCatalogSnapshot> listRuntimeProjectEntries(String projectId) {
+        return runtimeMetadata(PROJECT, requiredProject(projectId));
+    }
+
+    @Override
+    public List<String> configuredGlobalSkillIds(String projectId) {
+        return projectValidationPort.configuredSkillIds(requiredProject(projectId));
+    }
+
+    private List<SkillCatalogSnapshot> runtimeMetadata(String scope, String project) {
+        List<Map<String,Object>> database = catalogRepository.available()
+                ? safeEntries(catalogRepository.findEvolutionMetadata(scope, project)).stream()
+                    .map(entry -> catalogViewMapper.toView(entry, false)).toList() : List.of();
+        List<Map<String,Object>> files = runtimeFiles(scope, project).stream()
+                .map(skill -> fileViewMapper.toView(skill, false)).toList();
+        if (fileProjection != null && catalogRepository.available()) {
+            Set<String> managed = fileProjection.managedIds(scope, project);
+            Set<String> live = files.stream().map(this::skillId).collect(java.util.stream.Collectors.toSet());
+            // Removed/unreadable files immediately lose runtime visibility; existing user-owned rows remain independent.
+            return database.stream().filter(entry -> !managed.contains(skillId(entry)) || live.contains(skillId(entry)))
+                    .map(this::snapshot).toList();
+        }
+        return queryPolicy.mergeDatabaseFirst(database, files, this::skillId).stream().map(this::snapshot).toList();
+    }
+
+    @Override
+    public List<SkillCatalogSnapshot> findRuntimeEntries(String scope, String projectId, Set<String> skillIds) {
+        if (skillIds.isEmpty()) return List.of();
+        String project = GLOBAL.equals(scope) ? "" : requiredProject(projectId);
+        boolean stored = catalogRepository.available();
+        var database = stored ? safeEntries(catalogRepository.findEvolutionMetadata(scope, project, skillIds))
+                .stream().map(entry -> catalogViewMapper.toView(entry, false)).toList() : List.<Map<String,Object>>of();
+        if (fileProjection != null && stored) {
+            var managed = fileProjection.managedIds(scope, project, skillIds);
+            if (managed.isEmpty()) return database.stream().map(this::snapshot).toList();
+            var live = runtimeFileIds(scope, project, managed);
+            return database.stream().filter(entry -> !managed.contains(skillId(entry)) || live.contains(skillId(entry)))
+                    .map(this::snapshot).toList();
+        }
+        var files = runtimeFiles(scope, project).stream()
+                .filter(skill -> skillIds.contains(skill.name()))
+                .map(skill -> fileViewMapper.toView(skill, false)).toList();
+        return queryPolicy.mergeDatabaseFirst(database, files, this::skillId).stream().map(this::snapshot).toList();
+    }
+
+    private Set<String> runtimeFileIds(String scope, String project, Set<String> ids) {
+        return runtimeFiles(scope, project).stream().map(SkillFileDefinition::name).filter(ids::contains)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
+    private List<SkillFileDefinition> runtimeFiles(String scope, String project) {
+        return fileSourcePort.findAll().stream()
+                .filter(skill -> GLOBAL.equals(scope) ? isGlobalFileSkill(skill) : isProjectFileSkill(skill, project))
+                .toList();
     }
 
     @Override

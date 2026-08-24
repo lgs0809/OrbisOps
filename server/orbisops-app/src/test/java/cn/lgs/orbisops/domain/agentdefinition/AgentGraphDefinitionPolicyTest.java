@@ -65,7 +65,7 @@ class AgentGraphDefinitionPolicyTest {
                 () -> policy.validate(graph));
 
         assertEquals(
-                "节点 worker 是 ReAct/工具执行节点，必须显式选择 MCP，或显式启用 RAG。"
+                "节点 worker 是 ReAct/工具执行节点，必须显式选择 MCP、启用 RAG 或配置受支持的只读变更查询能力。"
                         + "不能通过节点名称或路由条件推断工具能力",
                 error.getMessage());
     }

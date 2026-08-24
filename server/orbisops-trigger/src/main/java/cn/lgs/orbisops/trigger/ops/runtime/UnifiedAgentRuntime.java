@@ -37,6 +37,14 @@ public final class UnifiedAgentRuntime {
         return lifecycle.succeedWorkSession(context);
     }
 
+    public boolean isWorkSessionSuspension(RuntimeException error) {
+        return lifecycle.isWorkSessionSuspension(error);
+    }
+
+    public OpsAgentChatResponse suspendWorkSession(OpsWorkSessionRuntimeContext context, RuntimeException error) {
+        return lifecycle.suspendWorkSession(context, error);
+    }
+
     public boolean isWorkSessionCancellation(RuntimeException error) {
         return lifecycle.isWorkSessionCancellation(error);
     }

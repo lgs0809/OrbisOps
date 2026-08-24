@@ -27,6 +27,50 @@ import static org.mockito.Mockito.when;
 class OpsChangePackageToolCollaboratorsTest {
 
     @Test
+    void recoveryObjectsSurviveModelInputAndStringsStillCannotAuthorizeProductionWrites() {
+        var operation = JSON.parseObject("""
+                {"operationId":"restore", "mcpId":"service-control", "toolName":"apply",
+                 "arguments":{"expectedVersion":"v1"}, "policyBound":true, "writesTargetResource":true,
+                 "preconditions":{"version":"v1"},
+                 "postCheck":{"toolsetId":"mcp.service-control", "toolName":"read", "arguments":{},
+                              "expectedValues":{"resourceKey":"service://orders/prod","version":"v2"}},
+                 "rollbackPlan":{"summary":"停止后续步骤，记录回执并重新审批恢复方案"},
+                 "rollbackPrecondition":{"summary":"资源仍属于本操作且版本为 v2"},
+                 "manualFallback":{"summary":"自动恢复条件不满足时停止并交接给服务负责人"}}
+                """);
+        var execution = mock(OpsToolExecutionService.class);
+        when(execution.execute(any(), eq("u"))).thenReturn(Map.of("packageId", "prepared"));
+        var gateway = new OpsChangePackageToolExecutionGateway(execution);
+        var context = new OpsChangePackageToolExecutionGateway.Context("p", "u", "r", "s", Map.of(), true);
+        for (var field : List.of("rollbackPrecondition", "manualFallback")) {
+            var malformed = new java.util.LinkedHashMap<String, Object>(operation);
+            malformed.put(field, "文字不能替代对象");
+            assertThrows(IllegalArgumentException.class,
+                    () -> gateway.execute(Map.of("mcpSteps", List.of(malformed)), context));
+        }
+        org.mockito.Mockito.verifyNoInteractions(execution);
+        var input = JSON.parseObject(JSON.toJSONString(Map.of("actions", List.of(operation))), OpsChangePackageToolInput.class);
+        var request = new OpsChangePackageToolRequestFactory().create(
+                new OpsChangePackageToolRequestFactory.Context("p", "r", "b", "hash"), input,
+                List.of(new OpsChangePackageRunEvidenceCollector.Evidence("e", "MCP", "r:read", "read", "2026-09-16", "sha256:hash", Map.of())));
+        assertEquals(input.getActions(), request.get("mcpSteps"));
+        assertEquals("prepared", gateway.execute(request, context).get("packageId"));
+    }
+
+    @Test
+    void modelCannotSaveReviewedProductionActionWithMissingRecoverySafety() {
+        var execution = mock(OpsToolExecutionService.class);
+        var gateway = new OpsChangePackageToolExecutionGateway(execution);
+        var operation = Map.<String, Object>of("policyBound", true, "writesTargetResource", true,
+                "postCheck", Map.of("expectedValues", Map.of("version", "v2")));
+        var context = new OpsChangePackageToolExecutionGateway.Context("p", "u", "r", "s", Map.of(), true);
+        var failure = assertThrows(IllegalArgumentException.class,
+                () -> gateway.execute(Map.of("mcpSteps", List.of(operation)), context));
+        assertTrue(failure.getMessage().contains("ROLLBACK_PLAN_REQUIRED"));
+        org.mockito.Mockito.verifyNoInteractions(execution);
+    }
+
+    @Test
     void evidenceCollectorFiltersEventsAndFreezesReferences() {
         Clock clock = Clock.fixed(Instant.parse("2026-07-26T10:00:00Z"), ZoneOffset.UTC);
         OpsChangePackageRunEvidenceCollector collector =
@@ -166,6 +210,23 @@ class OpsChangePackageToolCollaboratorsTest {
                         List.of()));
 
         assertTrue(error.getMessage().contains("证据"));
+    }
+
+    @Test
+    void prepareRejectsMetadataOnlyPlanAndFreezesReferenceStepsAgainstGovernedActions() {
+        var action = Map.<String, Object>of("operationId", "op-1", "toolName", "apply",
+                "arguments", Map.of("expectedVersion", "v1"), "writesTargetResource", true);
+        var input = new OpsChangePackageToolInput();
+        input.setActions(List.of(action));
+        input.setPreferredPlan(Map.of("forwardOperationId", "op-1"));
+        var context = new OpsChangePackageToolRequestFactory.Context("p", "r", "bundle", "hash");
+        var evidence = List.of(new OpsChangePackageRunEvidenceCollector.Evidence(
+                "e", "MCP", "r:read", "read", "2026-10-07", "hash", Map.of()));
+        var factory = new OpsChangePackageToolRequestFactory();
+        assertThrows(IllegalArgumentException.class, () -> factory.create(context, input, evidence));
+        input.setPreferredPlan(Map.of("steps", List.of(Map.of("operationId", "op-1"))));
+        var request = factory.create(context, input, evidence);
+        assertEquals(List.of(action), ((Map<?, ?>) request.get("preferredPlan")).get("steps"));
     }
 
     @Test

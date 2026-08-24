@@ -121,9 +121,19 @@ public class OpsUserChatController {
                                                    @RequestParam(value = "keyword", required = false) String keyword,
                                                    @RequestParam(value = "favorite", required = false) Boolean favorite,
                                                    @RequestParam(value = "limit", required = false, defaultValue = "50") Integer limit,
+                                                   @RequestParam(value = "projectId", required = false) String projectId,
                                                    HttpServletRequest servletRequest) {
         AdminAuthService.AuthPrincipal principal = principal(servletRequest);
-        return success(chatApplicationService.listSessions(null, agentId, keyword, favorite, limit, actor(principal)));
+        return success(chatApplicationService.listSessions(null, agentId, keyword, favorite, limit, actor(principal), projectId));
+    }
+
+    @GetMapping("/sessions/{sessionId}")
+    public Response<OpsChatSession> session(@PathVariable("sessionId") String sessionId,
+                                            @RequestParam(value = "projectId", required = false) String projectId,
+                                            HttpServletRequest servletRequest) {
+        AdminAuthService.AuthPrincipal principal = principal(servletRequest);
+        OpsChatSession session = chatApplicationService.readSession(sessionId, actor(principal), projectId);
+        return success(session);
     }
 
     @PutMapping("/sessions/{sessionId}")

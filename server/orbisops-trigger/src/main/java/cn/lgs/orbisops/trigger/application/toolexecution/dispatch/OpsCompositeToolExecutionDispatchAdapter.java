@@ -31,6 +31,12 @@ public class OpsCompositeToolExecutionDispatchAdapter implements ToolExecutionDi
 
     @Override
     public Object dispatch(ToolExecutionTarget target, ToolExecutionRequest request) {
+        var control = cn.lgs.orbisops.trigger.ops.OpsRunControlContext.current();
+        if (control != null) {
+            if (!control.runId().equals(request.runId()) || !control.projectId().equals(request.projectId()))
+                throw new IllegalStateException("TOOL_DISPATCH_RUN_BINDING_MISMATCH");
+            control.assertNotCanceled();
+        }
         ToolBinding binding = bindingResolver.resolve(target);
         return invokers.stream()
                 .filter(invoker -> invoker.supports(target, binding))

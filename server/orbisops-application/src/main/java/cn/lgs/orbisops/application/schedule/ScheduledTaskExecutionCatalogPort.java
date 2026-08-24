@@ -12,4 +12,8 @@ public interface ScheduledTaskExecutionCatalogPort {
     void markSucceeded(Long executionId, String output);
 
     void markFailed(Long executionId, String errorMessage, String output);
+
+    void markIncomplete(Long executionId, String status, String output);
+
+    int reconcileWaitingRuns();
 }

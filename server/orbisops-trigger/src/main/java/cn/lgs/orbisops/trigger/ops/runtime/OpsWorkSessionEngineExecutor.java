@@ -14,12 +14,14 @@ final class OpsWorkSessionEngineExecutor {
     void execute(OpsWorkSessionRuntimeContext context) {
         requirePrepared(context);
         requestControl.assertNotCanceled(context.request());
-        context.executed(engineDispatcher.executePlan(
+        try (var control = requestControl.runControl(context.request())) {
+            context.executed(engineDispatcher.executePlan(
                 context.definition(),
                 context.request(),
                 context.plan(),
                 context.events(),
                 context.eventSink()));
+        }
     }
 
     private void requirePrepared(OpsWorkSessionRuntimeContext context) {

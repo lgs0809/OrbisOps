@@ -1,13 +1,12 @@
 package cn.lgs.orbisops.trigger.ops.skill;
 
-import cn.lgs.orbisops.trigger.ops.OpsAgentLlmClient;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -40,41 +39,33 @@ class OpsSkillEvolutionQualityGateTest {
     }
 
     @Test
-    void deterministicAuthoringDoesNotCreateGenericSkillWithoutEvidence() {
-        OpsAgentLlmClient llmClient = mock(OpsAgentLlmClient.class);
-        when(llmClient.available()).thenReturn(false);
-        OpsSkillAuthoringAgent agent = new OpsSkillAuthoringAgent(llmClient);
-
-        Map<String, Object> candidate = agent.author(Map.of(
-                "normalizedUserGoal", "排查订单问题",
-                "toolEvidence", List.of(),
-                "evidenceRefs", List.of()));
-
-        assertEquals("NO_CHANGE", candidate.get("patchType"));
-        assertEquals(List.of(), candidate.get("changes"));
+    void missingModelNeverCreatesARuleCandidateEvenWithDetailedEvidence() {
+        var client=mock(OpsSkillAuthoringModelClient.class);
+        when(client.available()).thenReturn(false);
+        var agent=new OpsSkillAuthoringAgent(client);
+        for(var input:List.of(Map.<String,Object>of(),Map.<String,Object>of(
+                "runId","run-1","normalizedUserGoal","排查下单失败","finalOutput",reusableReport(),
+                "toolEvidence",List.of("prometheus","elasticsearch"),
+                "evidenceRefs",List.of(Map.of("resultId","result-1","outputHash","hash-1"))))) {
+            var error=assertThrows(IllegalStateException.class,()->agent.author(input));
+            assertEquals("SKILL_EVOLUTION_MODEL_UNAVAILABLE",error.getMessage());
+        }
+        org.mockito.Mockito.verify(client,org.mockito.Mockito.never()).generate(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any());
     }
 
-    @Test
-    void deterministicAuthoringUsesStableSpecificKeyInsteadOfSharedFallback() {
-        OpsAgentLlmClient llmClient = mock(OpsAgentLlmClient.class);
-        when(llmClient.available()).thenReturn(false);
-        OpsSkillAuthoringAgent agent = new OpsSkillAuthoringAgent(llmClient);
+    @Test void invalidModelCandidateNeverFallsBackToRuleGeneration() {
+        var client=mock(OpsSkillAuthoringModelClient.class);when(client.available()).thenReturn(true);
+        when(client.generate(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any()))
+                .thenReturn(com.alibaba.fastjson.JSON.parseObject("{\"patchType\":\"CREATE_SKILL\",\"changes\":[]}"));
+        assertEquals("SKILL_AUTHORING_MODEL_INVALID",assertThrows(IllegalStateException.class,
+                ()->new OpsSkillAuthoringAgent(client).author(Map.of("finalOutput",reusableReport()))).getMessage());
+    }
 
-        Map<String, Object> candidate = agent.author(Map.of(
-                "runId", "run-1",
-                "normalizedUserGoal", "排查下单失败",
-                "finalOutput", reusableReport(),
-                "toolEvidence", List.of("prometheus", "elasticsearch"),
-                "evidenceRefs", List.of(Map.of("resultId", "result-1", "outputHash", "hash-1"))));
-
-        Map<?, ?> change = (Map<?, ?>) ((List<?>) candidate.get("changes")).get(0);
-        assertEquals("UPDATE_DIAGNOSTIC_RECIPE", candidate.get("patchType"));
-        assertFalse("run-derived-recipe".equals(change.get("key")));
-        assertFalse(String.valueOf(change.get("key")).isBlank());
-        List<?> artifacts = (List<?>) candidate.get("artifacts");
-        assertEquals(2, artifacts.size());
-        assertEquals("resources/diagnostic-recipe.json", ((Map<?, ?>) artifacts.get(0)).get("path"));
-        assertEquals("evals/regression-cases.json", ((Map<?, ?>) artifacts.get(1)).get("path"));
+    @Test void authorPreservesTheSelectedTargetInsteadOfAllowingLaterRebinding() {
+        var client=mock(OpsSkillAuthoringModelClient.class);when(client.available()).thenReturn(true);
+        when(client.generate(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any()))
+                .thenReturn(com.alibaba.fastjson.JSON.parseObject("{\"patchType\":\"UPDATE_DIAGNOSTIC_RECIPE\",\"targetSkillId\":\"frozen-project-skill\",\"reason\":\"SYNTHETIC qualified extension\",\"changes\":[{\"section\":\"diagnosticRecipe\",\"key\":\"fixture\",\"value\":\"SYNTHETIC\"}]}"));
+        assertEquals("frozen-project-skill",new OpsSkillAuthoringAgent(client).author(Map.of()).get("targetSkillId"));
     }
 
     private String reusableReport() {

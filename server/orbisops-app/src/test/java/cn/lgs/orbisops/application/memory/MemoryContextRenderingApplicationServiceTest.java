@@ -11,6 +11,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class MemoryContextRenderingApplicationServiceTest {
 
@@ -81,6 +82,20 @@ class MemoryContextRenderingApplicationServiceTest {
         assertTrue(result.context().startsWith("### 运维上下文记忆"));
         assertTrue(result.context().contains("..."));
         assertTrue(result.truncated());
+    }
+
+    @Test
+    void protectedSourceRemainsWholeAndCanonicalTailIsChronological() {
+        String constraint = "禁止修改订单服务，" + "完整边界条件".repeat(180) + "；待确认审批范围。";
+        var source = new MemoryMessageCandidate("s1", "u1", "user", constraint, "", Map.of("messageSeq", 1L, "memory_type", "protected_source"));
+        var later = new MemoryMessageCandidate("s1", "u1", "assistant", "later-answer", "", Map.of("messageSeq", 6L, "memory_type", "conversation_tail"));
+        var earlier = new MemoryMessageCandidate("s1", "u1", "user", "earlier-question", "", Map.of("messageSeq", 5L, "memory_type", "conversation_tail"));
+        var result = service.render(new MemoryContextRenderingRequest(List.of(), List.of(), List.of(later, earlier, source), 3, 3, 3, 4000));
+        assertTrue(result.context().contains(constraint));
+        assertTrue(result.context().indexOf("earlier-question") < result.context().indexOf("later-answer"));
+        var tooLarge = new MemoryMessageCandidate("s1", "u1", "user", constraint.repeat(3), "", source.metadata());
+        assertThrows(MemoryContextIntegrityException.class, () -> service.render(new MemoryContextRenderingRequest(
+                List.of(), List.of(), List.of(tooLarge), 1, 1, 1, 1200)));
     }
 
     @Test

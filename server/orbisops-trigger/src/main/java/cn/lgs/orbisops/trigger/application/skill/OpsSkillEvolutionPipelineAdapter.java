@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.List;
 
 /** Outer adapter for authoring, similarity, JSON and runtime audit concerns used by Skill Evolution. */
 @Component
@@ -23,21 +24,35 @@ public class OpsSkillEvolutionPipelineAdapter implements
     private final OpsSkillAuthoringAgent authoringAgent;
     private final OpsSkillSimilarityService similarityService;
     private final OpsConfigAuditService auditService;
+    private final cn.lgs.orbisops.application.skill.SkillEvolutionRelatedSkillService relatedSkillService;
 
     public OpsSkillEvolutionPipelineAdapter(
             OpsSkillAuthoringAgent authoringAgent,
             OpsSkillSimilarityService similarityService,
             OpsConfigAuditService auditService) {
+        this(authoringAgent,similarityService,auditService,null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public OpsSkillEvolutionPipelineAdapter(OpsSkillAuthoringAgent authoringAgent,OpsSkillSimilarityService similarityService,
+            OpsConfigAuditService auditService,cn.lgs.orbisops.application.skill.SkillEvolutionRelatedSkillService relatedSkillService) {
+        this.relatedSkillService=relatedSkillService;
         this.authoringAgent = authoringAgent;
         this.similarityService = similarityService;
         this.auditService = auditService;
     }
 
     @Override
+    public boolean available() { return authoringAgent.available(); }
+
+    @Override
     public SkillEvolutionAuthoredCandidate author(Map<String, Object> input) {
         Map<String, Object> result = authoringAgent.author(
                 input == null ? Map.of() : input);
         return SkillEvolutionAuthoredCandidate.from(result == null ? Map.of() : result);
+    }
+    @Override public SkillEvolutionAuthoredCandidate author(Map<String,Object> input,cn.lgs.orbisops.application.skill.SkillAuthoringProgressPort progress) {
+        return SkillEvolutionAuthoredCandidate.from(authoringAgent.author(input,progress));
     }
 
     @Override
@@ -47,6 +62,31 @@ public class OpsSkillEvolutionPipelineAdapter implements
         Map<String, Object> result = similarityService.bestMatch(
                 text(projectId),
                 candidate == null ? Map.of() : candidate);
+        return similarityMatch(result);
+    }
+
+    @Override
+    public cn.lgs.orbisops.application.skill.SkillEvolutionRelatedSkills relatedSkills(String projectId,Map<String,Object> input) {
+        requireRelatedStore();
+        return new cn.lgs.orbisops.application.skill.SkillEvolutionRelatedSkills(projectId,relatedSkillService.select(projectId,input));
+    }
+
+    @Override
+    public void validateRelatedSkills(String projectId,List<Map<String,Object>> skills) {
+        requireRelatedStore();relatedSkillService.requireCurrent(projectId,skills);
+    }
+
+    @Override
+    public SkillEvolutionSimilarityMatch bestFrozenMatch(String projectId,Map<String,Object> candidate,List<Map<String,Object>> skills) {
+        validateRelatedSkills(projectId,skills);
+        return similarityMatch(similarityService.bestFrozenMatch(projectId,candidate,skills));
+    }
+
+    private void requireRelatedStore() {
+        if(relatedSkillService==null) throw new IllegalStateException("SKILL_EVOLUTION_RELATED_SKILL_STORE_REQUIRED");
+    }
+
+    private SkillEvolutionSimilarityMatch similarityMatch(Map<String,Object> result) {
         Map<String, Object> safe = result == null ? Map.of() : result;
         if (safe.isEmpty()) return SkillEvolutionSimilarityMatch.none();
         return new SkillEvolutionSimilarityMatch(

@@ -3,6 +3,7 @@ package cn.lgs.orbisops.trigger.ops.runtime;
 import cn.lgs.orbisops.application.changepackage.ChangePackageLandingJournalPort;
 import cn.lgs.orbisops.application.changepackage.LandingOperationFact;
 import cn.lgs.orbisops.application.toolexecution.ToolExecutionIdempotencyPort;
+import cn.lgs.orbisops.domain.analysis.service.AnalysisTaskPresentationPolicy;
 import cn.lgs.orbisops.domain.changepackage.model.ChangePackageStatus;
 import cn.lgs.orbisops.domain.worksession.runtime.model.TriggerSource;
 import org.springframework.stereotype.Component;
@@ -22,11 +23,13 @@ public final class OpsApprovedLandingAgentRunCoordinator {
     private final UnifiedAgentRuntime runtime;
     private final ChangePackageLandingJournalPort journalPort;
     private final ToolExecutionIdempotencyPort toolExecutionLedger;
+    private final OpsLandingIndependentVerifier verifier;
 
     public OpsApprovedLandingAgentRunCoordinator(
             UnifiedAgentRuntime runtime,
             ChangePackageLandingJournalPort journalPort,
-            ToolExecutionIdempotencyPort toolExecutionLedger) {
+            ToolExecutionIdempotencyPort toolExecutionLedger,
+            OpsLandingIndependentVerifier verifier) {
         if (runtime == null) throw new IllegalArgumentException("UNIFIED_AGENT_RUNTIME_REQUIRED");
         if (toolExecutionLedger == null) {
             throw new IllegalArgumentException("TOOL_EXECUTION_IDEMPOTENCY_PORT_REQUIRED");
@@ -34,6 +37,7 @@ public final class OpsApprovedLandingAgentRunCoordinator {
         this.runtime = runtime;
         this.journalPort = journalPort;
         this.toolExecutionLedger = toolExecutionLedger;
+        this.verifier = java.util.Objects.requireNonNull(verifier);
     }
 
     public Map<String, Object> execute(ApprovedLandingAgentCommand command) {
@@ -52,6 +56,8 @@ public final class OpsApprovedLandingAgentRunCoordinator {
         metadata.put("landingPolicyVersion", OpsPlatformLandingRuntimeDefinitionFactory.POLICY_VERSION);
         metadata.put("executionStyle", "REACT");
         metadata.put("landingGraphEditable", false);
+        metadata.put(AnalysisTaskPresentationPolicy.PUBLIC_RUN_GOAL_METADATA_KEY,
+                "受控变更包 " + command.approvedPackage().packageId() + " 的落地运行");
 
         OpsAgentChatRequest request = OpsAgentChatRequest.builder()
                 .userId(command.actor())
@@ -75,6 +81,12 @@ public final class OpsApprovedLandingAgentRunCoordinator {
         }
     }
 
+    public Map<String, Object> verifyCompletedOperations(String landingRunId,
+            cn.lgs.orbisops.domain.changepackage.model.ChangePackageLandingPlan plan,
+            String actor, List<LandingOperationFact> facts) {
+        return verifier.verifyCompleted(landingRunId, plan, actor, facts);
+    }
+
     private Map<String, Object> outcome(
             ApprovedLandingAgentCommand command,
             OpsAgentDefinition definition,
@@ -86,7 +98,12 @@ public final class OpsApprovedLandingAgentRunCoordinator {
         boolean unresolvedUnknown = facts.stream().anyMatch(LandingOperationFact::unknown);
         boolean unresolvedToolSideEffect = toolExecutionLedger.hasUnresolvedSideEffect(
                 command.approvedPackage().projectId(), command.landingRunId());
-        boolean anyCompleted = facts.stream().anyMatch(LandingOperationFact::completed);
+        boolean anyCompleted = facts.stream().anyMatch(fact -> fact.succeeded()
+                && !fact.resultId().isBlank() && fact.outputHash().matches("[a-f0-9]{64}")
+                && command.approvedPlan().operations().stream().anyMatch(operation ->
+                        operation.operationId().equals(fact.operationId())
+                        && List.of("WRITE", "MUTATE_TARGET_RESOURCE", "EXECUTE_EXTERNAL_ACTION",
+                                "DELETE_TARGET_RESOURCE").contains(operation.effectType().toUpperCase(Locale.ROOT))));
         LinkedHashMap<String, Object> result = base(command, definition, response, facts);
 
         if (unresolvedUnknown || unresolvedToolSideEffect) {
@@ -121,13 +138,25 @@ public final class OpsApprovedLandingAgentRunCoordinator {
             return Map.copyOf(result);
         }
         if (ChangePackageStatus.LANDED.name().equals(finalStatus)) {
-            result.put("status", ChangePackageStatus.LANDED.name());
-            result.put("eventType", "LANDING_SUCCEEDED");
-            result.put("reasonCode", "");
-            result.put("summary", "Landing ReAct 完成生产变更并确认验收结果。 ");
-            result.put("executedProductionAction", anyCompleted || eventCount(response) > 0);
+            Map<String, Object> verification;
+            try {
+                verification = verifier.verify(command, facts);
+            } catch (RuntimeException unavailable) {
+                result.put("status", ChangePackageStatus.LANDING_FAILED.name());
+                result.put("eventType", "LANDING_FAILED");
+                result.put("reasonCode", "LANDING_VERIFICATION_NOT_RECORDED");
+                result.put("executedProductionAction", anyCompleted);
+                return Map.copyOf(result);
+            }
+            boolean passed = Boolean.TRUE.equals(verification.get("passed"));
+            result.put("status", passed ? ChangePackageStatus.LANDED.name() : ChangePackageStatus.LANDING_FAILED.name());
+            result.put("eventType", passed ? "LANDING_SUCCEEDED" : "LANDING_FAILED");
+            result.put("reasonCode", passed ? "" : "LANDING_INDEPENDENT_VERIFICATION_FAILED");
+            result.put("independentVerification", verification);
+            result.put("executedProductionAction", anyCompleted);
             return Map.copyOf(result);
         }
+
         if (ChangePackageStatus.LANDING_FAILED.name().equals(finalStatus)) {
             result.put("status", ChangePackageStatus.LANDING_FAILED.name());
             result.put("eventType", "LANDING_FAILED");

@@ -4,6 +4,7 @@ import cn.lgs.orbisops.domain.skill.model.SkillExperienceEvidenceReference;
 import cn.lgs.orbisops.domain.skill.model.SkillExperienceInput;
 import cn.lgs.orbisops.domain.skill.model.SkillExperiencePolicyResult;
 import cn.lgs.orbisops.domain.skill.model.SkillExperienceTaskTemplate;
+import cn.lgs.orbisops.domain.skill.model.VerifiedTaskOutcome;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -26,9 +27,14 @@ public class SkillExperienceObservationPolicy {
                     + "\\s*[:=]\\s*([^\\s,;]+)");
 
     public SkillExperiencePolicyResult sanitize(SkillExperienceInput input) {
+        return sanitize(input, VerifiedTaskOutcome.unknown());
+    }
+
+    public SkillExperiencePolicyResult sanitize(SkillExperienceInput input, VerifiedTaskOutcome authority) {
         if (input == null) {
             throw new IllegalArgumentException("SKILL_EXPERIENCE_INPUT_REQUIRED");
         }
+        boolean verified = authority != null && authority.matches(input.projectId(), input.runId());
         String observationType = value(input.observationType()).toUpperCase(Locale.ROOT);
         List<SkillExperienceEvidenceReference> evidence = input.evidenceReferences().stream()
                 .filter(reference -> reference != null
@@ -41,20 +47,20 @@ public class SkillExperienceObservationPolicy {
                 normalizeGoal(input.normalizedUserGoal()),
                 observationType,
                 evidenceTypes(evidence),
-                input.completed() ? "SUCCEEDED" : "INCOMPLETE");
+                verified ? "SUCCEEDED" : "UNVERIFIED");
         List<String> trajectory = abstractTrajectory(
                 input.toolEvidence(),
-                input.completed());
+                verified);
         String finalSummary = abbreviate(mask(input.finalOutput()), 2000);
         double qualityScore = qualityScore(
-                input.completed(),
+                verified,
                 evidence,
                 finalSummary);
         return new SkillExperiencePolicyResult(
                 taskTemplate,
                 trajectory,
                 evidence,
-                input.completed() ? "SUCCEEDED" : "INCOMPLETE",
+                verified ? "SUCCEEDED" : "UNVERIFIED",
                 finalSummary,
                 qualityScore);
     }

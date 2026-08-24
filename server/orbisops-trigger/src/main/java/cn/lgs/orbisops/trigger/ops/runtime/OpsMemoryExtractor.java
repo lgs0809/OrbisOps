@@ -55,4 +55,11 @@ public class OpsMemoryExtractor {
                         settings.modelEnabled(),
                         settings.modelMaxInputChars())));
     }
+    public MemoryExtractionApplicationService.Result extractDurably(OpsMemoryMessage message) {
+        if (!settings.enabled() || message == null || !StringUtils.hasText(message.getContent()))
+            return new MemoryExtractionApplicationService.Result(List.of(), false, "DISABLED");
+        return applicationService.extractDurably(new MemoryExtractionCommand(memoryMapper.snapshot(message),
+                settings.maxItemsPerMessage(), settings.modelEnabled(), settings.modelMaxInputChars()));
+    }
+
 }

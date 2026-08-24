@@ -54,7 +54,12 @@ class SkillEditableWorkspaceBoundaryArchitectureTest {
                 () -> assertTrue(callback.contains("FunctionToolCallback.builder(")),
                 () -> assertTrue(trigger.contains("SkillsTool.Skill")),
                 () -> assertFalse(trigger.contains("Files.")),
-                () -> assertFalse(trigger.contains("StandardCharsets")),
+                // Location/SDK protocol decoding may read bounded UTF-8 resources. All
+                // editable mutations and backups still belong to the workspace adapter.
+                () -> assertTrue(loader.contains("new SafeConstructor(options)")),
+                () -> assertTrue(loader.contains("readNBytes(256 * 1024 + 1)")),
+                () -> assertFalse((provider + catalog + editable + codec + callback).contains("StandardCharsets")),
+                () -> assertFalse(loader.contains("getOutputStream(")),
                 () -> assertFalse(trigger.contains("createTempDirectory")),
                 () -> assertFalse(trigger.contains("BACKUP_TIME_FORMATTER")),
                 () -> assertFalse(trigger.contains("DELETE_MARKER")),

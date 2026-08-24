@@ -10,6 +10,18 @@ import java.util.Map;
 
 public final class ToolExecutionPolicy {
 
+    /** A caller may narrow an invocation to reads; this never grants otherwise denied authority. */
+    public ToolExecutionDecision restrictToReadOnly(ToolExecutionRequest request,
+                                                   ToolExecutionTarget target,
+                                                   ToolExecutionDecision decision) {
+        if (decision.allowed() && Boolean.TRUE.equals(request.requestContext().get("requireReadOnly"))
+                && !target.readOnly()) {
+            return new ToolExecutionDecision(false, "BLOCKED", "READ_ONLY_REQUIRED",
+                    "This verification invocation permits read-only tools only", target.riskLevel(), Map.of());
+        }
+        return decision;
+    }
+
     public String source(ToolExecutionRequest request) {
         return request.scope().name() + ":" + request.toolsetId() + ":" + request.toolName();
     }

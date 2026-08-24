@@ -1,6 +1,8 @@
 ---
 name: ops-main-agent-router
 description: Helps the operations main agent dynamically generate datasource sub-agents and dispatch tasks with evidence budgets.
+whenToUse: ["Plan evidence-driven operations investigation across available project data sources", "需要按问题选择数据源并组织有预算和停止条件的排查"]
+whenNotToUse: ["Granting authority or delegating production mutations", "已有明确单一原子动作而无需组织调查"]
 ---
 
 # ops-main-agent-router Skill

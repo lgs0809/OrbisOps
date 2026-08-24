@@ -118,6 +118,10 @@ public class JdbcChatSessionRepository implements IChatSessionRepository {
         ensureSchema();
         StringBuilder sql = new StringBuilder(baseSelect()).append(" WHERE s.status <> 'DELETED'");
         List<Object> args = new ArrayList<>();
+        if (hasText(safe.projectId())) {
+            sql.append(" AND s.project_id = ?");
+            args.add(safe.projectId());
+        }
         if (hasText(safe.userId())) {
             sql.append(" AND (s.user_id = ? OR EXISTS (SELECT 1 FROM ai_ops_chat_session_participant sp WHERE sp.session_id=s.session_id AND sp.participant_user_id=? AND sp.status='ACTIVE'))");
             args.add(safe.userId());

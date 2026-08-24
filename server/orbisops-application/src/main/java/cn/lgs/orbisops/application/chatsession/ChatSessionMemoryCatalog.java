@@ -38,6 +38,7 @@ public class ChatSessionMemoryCatalog {
         return sessions.values().stream()
                 .filter(session -> !"DELETED".equalsIgnoreCase(value(session.status())))
                 .filter(session -> !hasText(safe.userId()) || canRead(session, safe.userId()))
+                .filter(session -> !hasText(safe.projectId()) || safe.projectId().equals(session.projectId()))
                 .filter(session -> !hasText(safe.agentId()) || safe.agentId().equals(session.agentId()))
                 .filter(session -> safe.favorite() == null || favorite(session) == safe.favorite())
                 .filter(session -> !hasText(safe.keyword()) || matches(session, safe.keyword()))

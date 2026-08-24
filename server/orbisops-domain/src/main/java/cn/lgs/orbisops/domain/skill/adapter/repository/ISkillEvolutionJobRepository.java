@@ -24,15 +24,27 @@ public interface ISkillEvolutionJobRepository {
      */
     Optional<SkillEvolutionJobSnapshot> claimPending(int maxAttempts);
 
-    List<SkillEvolutionJobSnapshot> findJobs(SkillEvolutionJobStatus status, int limit);
+    /** Renew only the current live attempt; an expired or replaced owner cannot revive itself. */
+    boolean renewLease(SkillEvolutionJobSnapshot claim);
+
+    default List<SkillEvolutionJobSnapshot> findJobs(SkillEvolutionJobStatus status, int limit) {
+        return findJobs(null, status, limit);
+    }
+
+    /** Apply optional project scope before ordering and limiting the result. */
+    List<SkillEvolutionJobSnapshot> findJobs(String projectId, SkillEvolutionJobStatus status, int limit);
 
     Optional<SkillEvolutionJobSnapshot> findJob(String jobId);
 
-    SkillEvolutionPatchSnapshot savePatch(SkillEvolutionPatchSnapshot patch);
+    default List<SkillEvolutionPatchSnapshot> findPatches(String jobId, String decision, int limit) {
+        return findPatches(null, jobId, decision, limit);
+    }
 
-    List<SkillEvolutionPatchSnapshot> findPatches(String jobId, String decision, int limit);
+    List<SkillEvolutionPatchSnapshot> findPatches(String projectId, String jobId, String decision, int limit);
 
-    boolean complete(String jobId, SkillEvolutionJobStatus status);
+    /** Atomically append the patch and complete only the owned, unexpired attempt. */
+    Optional<SkillEvolutionPatchSnapshot> complete(SkillEvolutionJobSnapshot claim,
+            SkillEvolutionPatchSnapshot patch, SkillEvolutionJobStatus status);
 
-    boolean rescheduleOrFail(String jobId, SkillEvolutionRetryTransition transition, String lastError);
+    boolean rescheduleOrFail(SkillEvolutionJobSnapshot claim, SkillEvolutionRetryTransition transition, String lastError);
 }

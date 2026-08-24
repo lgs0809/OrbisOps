@@ -43,7 +43,7 @@ public class TaskScheduleApplicationService {
     }
 
     public boolean create(TaskScheduleRequestDTO request) {
-        return catalogUseCase.create(toCommand(request));
+        return catalogUseCase.create(toCommand(request), creator());
     }
 
     public boolean update(TaskScheduleRequestDTO request) {
@@ -66,6 +66,17 @@ public class TaskScheduleApplicationService {
         return executionUseCase.listExecutions(projectId, scheduleId, limit).stream()
                 .map(this::toExecutionResponse)
                 .toList();
+    }
+
+    private String creator() {
+        var attributes = org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+        Object principal = attributes instanceof org.springframework.web.context.request.ServletRequestAttributes servlet
+                ? servlet.getRequest().getAttribute(cn.lgs.orbisops.trigger.http.admin.security.AdminWebSecurityConfig.AUTH_PRINCIPAL_ATTRIBUTE) : null;
+        if (!(principal instanceof cn.lgs.orbisops.trigger.application.security.AdminAuthService.AuthPrincipal actor)
+                || actor.serviceToken() || actor.userId() == null || actor.userId().isBlank()) {
+            throw new IllegalArgumentException("TASK_SCHEDULE_CREATOR_REQUIRED");
+        }
+        return actor.userId();
     }
 
     private TaskScheduleCommand toCommand(TaskScheduleRequestDTO request) {
@@ -108,6 +119,7 @@ public class TaskScheduleApplicationService {
         return TaskScheduleResponseDTO.builder()
                 .id(schedule.id())
                 .projectId(schedule.projectId())
+                .createdBy(schedule.createdBy())
                 .executionType(runtime.executionType())
                 .agentId(schedule.agentId())
                 .agentBindingMode(runtime.agentBindingMode())

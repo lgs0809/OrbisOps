@@ -30,7 +30,9 @@ public class OpsRuntimeContextBundleMapper {
         return new RuntimeContextBundleCreateCommand(
                 layerInput(request, memoryContext, safeMetadata),
                 memoryRefs,
-                requestedSkillIds(safeMetadata),
+                (request == null || request.getTrustedSkillBindings() == null
+                        ? new cn.lgs.orbisops.trigger.ops.runtime.OpsExplicitSkillBindings(List.of())
+                        : request.getTrustedSkillBindings()).merge(requestedSkillIds(safeMetadata)),
                 selectedSkillLimit);
     }
 

@@ -15,16 +15,16 @@ public record SkillRuntimeSelectionSettings(int catalogCandidateLimit,
                                             double llmRerankWeight) {
 
     public SkillRuntimeSelectionSettings {
-        catalogCandidateLimit = clamp(catalogCandidateLimit, 1, 100);
-        selectedLimit = clamp(selectedLimit, 1, 20);
-        maxExplicitSkills = clamp(maxExplicitSkills, 1, 50);
+        catalogCandidateLimit = clamp(catalogCandidateLimit, 1, 20);
+        selectedLimit = clamp(selectedLimit, 1, 3);
+        maxExplicitSkills = clamp(maxExplicitSkills, 1, 3);
         minRelevanceScore = clamp(minRelevanceScore, 0D, 1D);
         similarSuppressionThreshold = clamp(similarSuppressionThreshold, 0D, 1D);
         semanticWeight = clamp(semanticWeight, 0D, 0.8D);
-        semanticRecallLimit = clamp(semanticRecallLimit, 1, 256);
+        semanticRecallLimit = 20;
         categoryBoost = clamp(categoryBoost, 0D, 0.5D);
         negativePenaltyWeight = clamp(negativePenaltyWeight, 0D, 1D);
-        llmRerankCandidateLimit = clamp(llmRerankCandidateLimit, 1, 20);
+        llmRerankCandidateLimit = 20;
         llmRerankWeight = clamp(llmRerankWeight, 0D, 0.8D);
     }
 

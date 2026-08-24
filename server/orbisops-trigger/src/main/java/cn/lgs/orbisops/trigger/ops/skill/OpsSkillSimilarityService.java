@@ -6,12 +6,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
-
+import java.util.List;
 /** Public Skill Evolution similarity facade over typed scoring and catalog matching boundaries. */
 @Service
 public class OpsSkillSimilarityService {
 
     private final OpsSkillSimilarityMatchCoordinator matchCoordinator;
+    private final OpsSkillFrozenSimilarityMatcher frozenMatcher;
 
     public OpsSkillSimilarityService(
             SkillCatalogQueryService catalogQueryService) {
@@ -42,11 +43,14 @@ public class OpsSkillSimilarityService {
                 catalogQueryService,
                 settings,
                 semanticMatcher);
+        this.frozenMatcher=new OpsSkillFrozenSimilarityMatcher(settings,semanticMatcher);
     }
 
-    public Map<String, Object> bestMatch(
-            String projectId,
-            Map<String, Object> candidate) {
+    public Map<String, Object> bestMatch(String projectId, Map<String, Object> candidate) {
         return matchCoordinator.bestMatch(projectId, candidate);
+    }
+
+    public Map<String,Object> bestFrozenMatch(String projectId,Map<String,Object> candidate,List<Map<String,Object>> skills) {
+        return frozenMatcher.bestMatch(projectId,candidate,skills);
     }
 }

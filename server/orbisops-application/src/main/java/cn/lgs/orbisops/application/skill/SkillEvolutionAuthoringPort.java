@@ -8,13 +8,16 @@ import java.util.Map;
 /** Outbound boundary for structured Skill candidate authoring. */
 public interface SkillEvolutionAuthoringPort {
 
+    default boolean available() { return true; }
+
     SkillEvolutionAuthoredCandidate author(Map<String, Object> input);
+    default SkillEvolutionAuthoredCandidate author(Map<String,Object> input,SkillAuthoringProgressPort progress) {return author(input);}
 
     /** Compatibility bridge: legacy authoring adapters are invoked once per explicit direction. */
     default List<SkillEvolutionAuthoredCandidate> authorCandidates(
             Map<String, Object> input,
             int candidateBudget) {
-        int budget = Math.max(2, Math.min(4, candidateBudget));
+        int budget = Math.max(1, Math.min(4, candidateBudget));
         List<SkillEvolutionAuthoredCandidate> result = new ArrayList<>();
         List<SkillAuthoringDirection> directions = requestedDirections(input, budget);
         for (int index = 0; index < budget; index++) {
@@ -46,6 +49,7 @@ public interface SkillEvolutionAuthoringPort {
                 }
             }
         }
+        if (budget == 1 && result.isEmpty()) return List.of(SkillAuthoringDirection.MAINTENANCE_REVIEW);
         for (SkillAuthoringDirection direction : defaultDirections()) {
             if (!result.contains(direction)) result.add(direction);
         }

@@ -3,6 +3,7 @@ package cn.lgs.orbisops.trigger.ops.runtime;
 import cn.lgs.orbisops.trigger.application.agentdefinition.OpsAgentDefinitionQueryGateway;
 import cn.lgs.orbisops.trigger.application.ops.OpsChatApplicationService;
 import cn.lgs.orbisops.trigger.application.security.OpsTrustedRequestMetadata;
+import cn.lgs.orbisops.domain.shared.json.CanonicalJson;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.ObjectProvider;
@@ -33,7 +34,7 @@ class OpsSubWorkflowNodeExecutorTest {
         OpsAgentDefinition child = childDefinition(7, "hash-v7");
         when(definitions.resolveForProject("child-flow", null, false, "project-1"))
                 .thenReturn(child);
-        missingChildRun(chat);
+        committedChildAfterExecution(chat, 7, "hash-v7", "child-result");
         when(chat.chat(any(OpsAgentChatRequest.class), eq("user-1")))
                 .thenReturn(OpsAgentChatResponse.builder().content("child-result").build());
         Object trustedPrincipal = new Object();
@@ -74,7 +75,7 @@ class OpsSubWorkflowNodeExecutorTest {
         OpsSubWorkflowNodeExecutor executor = new OpsSubWorkflowNodeExecutor(definitions, provider(chat));
         when(definitions.resolveForProject("child-flow", 3, false, "project-1"))
                 .thenReturn(childDefinition(3, "hash-v3"));
-        missingChildRun(chat);
+        committedChildAfterExecution(chat, 3, "hash-v3", "ok");
         when(chat.chat(any(OpsAgentChatRequest.class), eq("user-1")))
                 .thenReturn(OpsAgentChatResponse.builder().content("ok").build());
 
@@ -178,7 +179,7 @@ class OpsSubWorkflowNodeExecutorTest {
         OpsSubWorkflowNodeExecutor executor = new OpsSubWorkflowNodeExecutor(definitions, provider(chat));
         when(definitions.resolveForProject("child-flow", null, false, "project-1"))
                 .thenReturn(childDefinition(1, "hash-v1"));
-        missingChildRun(chat);
+        committedChildAfterExecution(chat, 1, "hash-v1", "ok");
         when(chat.chat(any(OpsAgentChatRequest.class), eq("user-1")))
                 .thenReturn(OpsAgentChatResponse.builder().content("ok").build());
 
@@ -193,11 +194,86 @@ class OpsSubWorkflowNodeExecutorTest {
         assertEquals("prepared child input", request.getValue().getQuery());
     }
 
-    private void missingChildRun(OpsChatApplicationService chat) {
-        when(chat.run(anyString(), eq("project-1"))).thenAnswer(invocation -> {
-            throw new IllegalArgumentException(
-                    "Work Session 不存在或不属于当前项目：" + invocation.getArgument(0));
-        });
+    @Test
+    void structuredInputRemainsJsonAndChildOutputIsReadFromCommittedRun() {
+        var definitions = mock(OpsAgentDefinitionQueryGateway.class);
+        var chat = mock(OpsChatApplicationService.class);
+        when(definitions.resolveForProject("child-flow", null, false, "project-1")).thenReturn(childDefinition(1,"h1"));
+        committedChildAfterExecution(chat,1,"h1","committed answer");
+        when(chat.chat(any(),anyString())).thenReturn(OpsAgentChatResponse.builder().content("uncommitted answer").build());
+        var input = Map.of("projectId","project-1","priorEvidence",Map.of("count",100,"queryIds",java.util.List.of("q1")));
+        var result = new OpsSubWorkflowNodeExecutor(definitions,provider(chat)).execute(parentDefinition(),
+                subWorkflowNode(Map.of("inputKey","workflowData_input","structuredOutputKey","investigation")),
+                parentRequest(Map.of()), Map.of("workflowData_input",input));
+        var request = ArgumentCaptor.forClass(OpsAgentChatRequest.class);
+        verify(chat).chat(request.capture(),eq("user-1"));
+        assertEquals(input, CanonicalJson.parseObject(request.getValue().getQuery()));
+        assertEquals("committed answer", result.get("output"));
+        assertEquals("SUCCEEDED", ((Map<?,?>)result.get("workflowData_investigation")).get("executionStatus"));
+    }
+
+    @Test
+    void configuredMissingInputNeverFallsBackToParentQueryOrStartsChild() {
+        var definitions = mock(OpsAgentDefinitionQueryGateway.class);
+        var chat = mock(OpsChatApplicationService.class);
+        when(definitions.resolveForProject("child-flow", null, false, "project-1")).thenReturn(childDefinition(1,"h1"));
+        var error = assertThrows(IllegalArgumentException.class, () -> new OpsSubWorkflowNodeExecutor(definitions,provider(chat))
+                .execute(parentDefinition(), subWorkflowNode(Map.of("inputKey","missing")),parentRequest(Map.of()),Map.of()));
+        assertEquals("SUB_WORKFLOW_INPUT_MISSING:missing",error.getMessage());
+        verify(chat,never()).chat(any(),anyString());
+    }
+
+    @Test
+    void failedWaitingCanceledOrMissingChildCannotCompleteParentEvenWithSuccessfulText() {
+        for (String status : java.util.List.of("FAILED","WAITING_APPROVAL","CANCELED","")) {
+            var definitions = mock(OpsAgentDefinitionQueryGateway.class);
+            var chat = mock(OpsChatApplicationService.class);
+            when(definitions.resolveForProject("child-flow", null, false, "project-1")).thenReturn(childDefinition(1,"h1"));
+            when(chat.run(anyString(),eq("project-1"))).thenReturn(Map.of(),Map.of("status",status));
+            when(chat.chat(any(),anyString())).thenReturn(OpsAgentChatResponse.builder().content("all good").build());
+            var error = assertThrows(IllegalStateException.class, () -> new OpsSubWorkflowNodeExecutor(definitions,provider(chat))
+                    .execute(parentDefinition(),subWorkflowNode(Map.of()),parentRequest(Map.of()),Map.of()));
+            assertEquals("SUB_WORKFLOW_CHILD_RUN_NOT_SUCCEEDED:"+status,error.getMessage());
+        }
+    }
+
+    @Test
+    void terminalSuccessFromDifferentVersionIsRejected() {
+        var definitions = mock(OpsAgentDefinitionQueryGateway.class);
+        var chat = mock(OpsChatApplicationService.class);
+        when(definitions.resolveForProject("child-flow", null, false, "project-1")).thenReturn(childDefinition(1,"h1"));
+        committedChildAfterExecution(chat,2,"h2","wrong version");
+        var error = assertThrows(IllegalStateException.class, () -> new OpsSubWorkflowNodeExecutor(definitions,provider(chat))
+                .execute(parentDefinition(),subWorkflowNode(Map.of()),parentRequest(Map.of()),Map.of()));
+        assertEquals("SUB_WORKFLOW_CHILD_RUN_IDENTITY_CONFLICT",error.getMessage());
+    }
+
+    private void committedChildAfterExecution(OpsChatApplicationService chat, int version, String hash, String answer) {
+        when(chat.run(anyString(), eq("project-1"))).thenReturn(Map.of(), Map.of(
+                "status","SUCCEEDED","agent_id","child-flow","agent_version",version,
+                "agent_definition_hash",hash,"response",Map.of("content",answer)));
+    }
+
+    @Test
+    void longParentIdentitiesFitAllDurableTablesAndKeepDistinctHashSuffixes() {
+        var childIds = new java.util.HashSet<String>();
+        for (String ending : java.util.List.of("a", "b")) {
+            var definitions = mock(OpsAgentDefinitionQueryGateway.class);
+            var chat = mock(OpsChatApplicationService.class);
+            when(definitions.resolveForProject("child-flow", null, false, "project-1")).thenReturn(childDefinition(1,"h1"));
+            committedChildAfterExecution(chat,1,"h1","committed");
+            var parent = parentRequest(Map.of());
+            parent.setRunId("parent-" + "x".repeat(72) + ending);
+            parent.setSessionId("session-" + "y".repeat(72));
+            new OpsSubWorkflowNodeExecutor(definitions,provider(chat)).execute(parentDefinition(),subWorkflowNode(Map.of()),parent,Map.of());
+            var request = ArgumentCaptor.forClass(OpsAgentChatRequest.class);
+            verify(chat).chat(request.capture(),eq("user-1"));
+            assertEquals(80,request.getValue().getRunId().length());
+            assertEquals(80,request.getValue().getSessionId().length());
+            assertTrue(request.getValue().getRunId().matches(".*-sub-[0-9a-f]{16}"));
+            childIds.add(request.getValue().getRunId());
+        }
+        assertEquals(2,childIds.size());
     }
 
     @SuppressWarnings("unchecked")

@@ -54,6 +54,17 @@ public class OpsWorkSessionExecutionAdapter implements WorkSessionLifecyclePort<
     }
 
     @Override
+    public boolean isSuspension(RuntimeException error) {
+        return runtime.isWorkSessionSuspension(error);
+    }
+
+    @Override
+    public OpsAgentChatResponse suspend(OpsWorkSessionRuntimeContext context, RuntimeException error,
+                                       Consumer<OpsRuntimeEvent> eventSink) {
+        return runtime.suspendWorkSession(context, error);
+    }
+
+    @Override
     public boolean isCancellation(RuntimeException error) {
         return runtime.isWorkSessionCancellation(error);
     }

@@ -32,22 +32,27 @@ class ChangePackageLegacyStructuredValueArchitectureTest {
     void factoriesDelegateLegacyDecodingWithoutDuplicateParsers() throws IOException {
         String approval = read(SERVICE + "ChangePackageApprovalAssessmentFactory.java");
         String landing = read(SERVICE + "ChangePackageLandingPlanFactory.java");
+        String executable = read(SERVICE + "ChangePackageExecutablePlanPolicy.java");
         String snapshot = read(SERVICE + "ChangePackageSnapshotFactory.java");
         String validation = read(SERVICE + "ChangePackageValidationWritebackFactory.java");
         String cleanup = read(SERVICE + "ChangePackageCleanupPolicy.java");
 
         assertAll(
                 () -> assertTrue(approval.contains("ChangePackageLegacyStructuredValue.decode(raw)")),
-                () -> assertTrue(landing.contains("ChangePackageLegacyStructuredValue.decode(raw)")),
+                () -> assertTrue(landing.contains("new ChangePackageExecutablePlanPolicy().resolve(snapshot)")),
+                () -> assertTrue(landing.contains("new ChangePackageExecutablePlanPolicy().recordedOperations(snapshot")),
+                () -> assertTrue(executable.contains("ChangePackageLegacyStructuredValue.decode(")),
                 () -> assertTrue(snapshot.contains("ChangePackageLegacyStructuredValue.decode(raw)")),
                 () -> assertTrue(validation.contains("ChangePackageLegacyStructuredValue.decode(raw)")),
                 () -> assertTrue(cleanup.contains("ChangePackageLegacyStructuredValue.decode(raw)")),
                 () -> assertFalse(approval.contains("parseMaybeJson")),
                 () -> assertFalse(landing.contains("parseMaybeJson")),
+                () -> assertFalse(executable.contains("parseMaybeJson")),
                 () -> assertFalse(snapshot.contains("parseMaybeJson")),
                 () -> assertFalse(validation.contains("parseMaybeJson")),
                 () -> assertFalse(approval.contains("CanonicalJson.parse")),
                 () -> assertFalse(landing.contains("CanonicalJson.parse")),
+                () -> assertFalse(executable.contains("CanonicalJson.parse")),
                 () -> assertFalse(snapshot.contains("CanonicalJson.parse")),
                 () -> assertFalse(validation.contains("CanonicalJson.parse")),
                 () -> assertFalse(cleanup.contains("CanonicalJson.parse")));

@@ -56,4 +56,27 @@ class OpsVisibleAnswerStreamProjectorTest {
 
         assertEquals("普通回答", String.join("", deltas));
     }
+
+    @Test
+    void stopsBeforeMalformedClosingOutcomeMarkerAndTrailingFields() {
+        OpsVisibleAnswerStreamProjector projector = new OpsVisibleAnswerStreamProjector();
+        List<String> deltas = new ArrayList<>(projector.accept(
+                "<ops_answer>普通回答\n</ops_outcome>\nrequiresAction=false\n"
+                        + "verificationStatus=NOT_APPLICABLE\nabstained=false\n"
+                        + "evidenceCompleteness=NOT_APPLICABLE\n</ops_outcome>"));
+        deltas.addAll(projector.finish());
+
+        assertEquals("普通回答\n", String.join("", deltas));
+    }
+
+    @Test
+    void stopsBeforeUnwrappedOutcomeFields() {
+        OpsVisibleAnswerStreamProjector projector = new OpsVisibleAnswerStreamProjector();
+        List<String> deltas = new ArrayList<>(projector.accept(
+                "<ops_answer>普通回答\nrequiresAction=false\nverificationStatus=NOT_APPLICABLE\n"
+                        + "abstained=false\nevidenceCompleteness=NOT_APPLICABLE"));
+        deltas.addAll(projector.finish());
+
+        assertEquals("普通回答\n", String.join("", deltas));
+    }
 }

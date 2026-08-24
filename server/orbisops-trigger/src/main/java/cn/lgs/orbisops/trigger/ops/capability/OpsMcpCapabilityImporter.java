@@ -5,6 +5,7 @@ import cn.lgs.orbisops.application.mcp.McpCommands;
 import cn.lgs.orbisops.application.mcp.McpSchemaHydrationRequest;
 import cn.lgs.orbisops.application.mcp.ProgressiveMcpProcessManager;
 import cn.lgs.orbisops.application.project.ProjectExternalMcpApplicationService;
+import cn.lgs.orbisops.trigger.ops.OpsNodeDeadlineContext;
 import cn.lgs.orbisops.trigger.ops.runtime.OpsMcpServerConfig;
 import cn.lgs.orbisops.trigger.ops.runtime.OpsMcpToolProvider;
 import cn.lgs.orbisops.trigger.ops.runtime.OpsProjectMcpRuntimeConfigService;
@@ -84,43 +85,45 @@ final class OpsMcpCapabilityImporter {
                     .resolveForDiscovery(input.projectId(), storedMcpId)
                     .orElseThrow(() -> new IllegalStateException(
                             "MCP_DISCOVERY_CONFIG_NOT_FOUND"));
-            definitions = mcpToolProvider.inspectRemoteToolDefinitions(server);
-            List<Map<String, Object>> discoveredViews = new ArrayList<>();
-            for (Map<String, Object> definition : definitions) {
-                Map<String, Object> hydrated = progressiveMcpProcessManager
-                        .hydrateSchema(new McpSchemaHydrationRequest(
-                                input.projectId(),
-                                storedMcpId,
-                                require(
-                                        text(definition.get("toolName")),
-                                        "MCP_REMOTE_TOOL_NAME_REQUIRED"),
-                                "",
-                                "",
-                                authoritativeDefinition(definition)))
-                        .view();
-                suggestions.add(Map.of(
-                        "toolName", text(hydrated.get("remoteToolName")),
-                        "schemaHash", text(hydrated.get("schemaHash")),
-                        "policyId", text(hydrated.get("policyId")),
-                        "policyStatus", text(hydrated.get("policyStatus")),
-                        "reviewStatus", text(hydrated.get("reviewStatus"))));
-                Map<String, Object> discovered =
-                        new LinkedHashMap<>(definition);
-                discovered.put(
-                        "schemaHash",
-                        text(hydrated.get("schemaHash")));
-                discovered.put(
-                        "policyId",
-                        text(hydrated.get("policyId")));
-                discovered.put(
-                        "policyStatus",
-                        text(hydrated.get("policyStatus")));
-                discovered.put(
-                        "reviewStatus",
-                        text(hydrated.get("reviewStatus")));
-                discoveredViews.add(discovered);
-            }
-            definitions = List.copyOf(discoveredViews);
+            var inspectedDefinitions = mcpToolProvider.inspectRemoteToolDefinitions(server);
+            definitions = OpsNodeDeadlineContext.withTimeout(20, () -> {
+                List<Map<String, Object>> discoveredViews = new ArrayList<>();
+                for (Map<String, Object> definition : inspectedDefinitions) {
+                    Map<String, Object> hydrated = progressiveMcpProcessManager
+                            .hydrateSchema(new McpSchemaHydrationRequest(
+                                    input.projectId(),
+                                    storedMcpId,
+                                    require(
+                                            text(definition.get("toolName")),
+                                            "MCP_REMOTE_TOOL_NAME_REQUIRED"),
+                                    "",
+                                    "",
+                                    authoritativeDefinition(definition)))
+                            .view();
+                    suggestions.add(Map.of(
+                            "toolName", text(hydrated.get("remoteToolName")),
+                            "schemaHash", text(hydrated.get("schemaHash")),
+                            "policyId", text(hydrated.get("policyId")),
+                            "policyStatus", text(hydrated.get("policyStatus")),
+                            "reviewStatus", text(hydrated.get("reviewStatus"))));
+                    Map<String, Object> discovered =
+                            new LinkedHashMap<>(definition);
+                    discovered.put(
+                            "schemaHash",
+                            text(hydrated.get("schemaHash")));
+                    discovered.put(
+                            "policyId",
+                            text(hydrated.get("policyId")));
+                    discovered.put(
+                            "policyStatus",
+                            text(hydrated.get("policyStatus")));
+                    discovered.put(
+                            "reviewStatus",
+                            text(hydrated.get("reviewStatus")));
+                    discoveredViews.add(discovered);
+                }
+                return List.copyOf(discoveredViews);
+            });
             mcp = externalService.recordDiscovery(
                     input.projectId(),
                     storedMcpId,
@@ -160,6 +163,7 @@ final class OpsMcpCapabilityImporter {
         return new McpAuthoritativeToolDefinition(
                 text(safe.get("description")),
                 schema,
+                safe.get("outputSchema"),
                 "REMOTE_MCP_TOOL_DEFINITION");
     }
 

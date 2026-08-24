@@ -45,7 +45,9 @@ public class OpsSemanticLexicalWriteAdapter implements SemanticLexicalWritePort 
         }
         template.update(
                 "INSERT INTO " + safeTableName(tableNameSupplier.get())
-                        + " (content, metadata) VALUES (?, ?::jsonb)",
+                        + " (id, content, metadata) VALUES (?::uuid, ?, ?::jsonb)"
+                        + " ON CONFLICT (id) DO UPDATE SET content=EXCLUDED.content, metadata=EXCLUDED.metadata",
+                document.id(),
                 document.content(),
                 JSON.toJSONString(document.metadata()));
     }

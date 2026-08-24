@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 import java.time.LocalDateTime;
 
@@ -32,10 +33,19 @@ public class AdminUser {
      */
     private String username;
 
+    @ToString.Exclude
+    private String phone;
+
     /**
      * 密码（加密存储）
      */
+    @ToString.Exclude
     private String password;
+
+    @ToString.Exclude
+    private String initialPassword;
+    private Boolean passwordChangeRequired;
+    private Long credentialVersion;
 
     /**
      * 用户角色：admin 管理员，user 普通用户

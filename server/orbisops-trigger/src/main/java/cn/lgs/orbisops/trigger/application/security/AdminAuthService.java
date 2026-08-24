@@ -1,7 +1,11 @@
 package cn.lgs.orbisops.trigger.application.security;
 
 import cn.lgs.orbisops.application.security.JwtRevocationPort;
+import cn.lgs.orbisops.application.security.JwtRevocationUnavailableException;
+import cn.lgs.orbisops.application.security.AdminUserCatalogPort;
+import cn.lgs.orbisops.application.security.AdminUserAuthenticationException;
 import cn.lgs.orbisops.domain.security.AdminUserAccount;
+import cn.lgs.orbisops.domain.security.AdminUserStatus;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.JWTVerifier;
 import com.auth0.jwt.algorithms.Algorithm;
@@ -41,11 +45,28 @@ public class AdminAuthService {
 
     private final JwtRevocationPort jwtRevocationRepository;
 
-    @Autowired
+    private final AdminUserCatalogPort accountCatalog;
+
+    /** Compatibility constructor for standalone JWT/credential tests; Spring uses the catalog-aware constructor. */
     public AdminAuthService(
             JwtRevocationPort jwtRevocationRepository,
             AdminAuthSettings settings) {
+        this(jwtRevocationRepository, settings, null, false);
+    }
+
+    @Autowired
+    public AdminAuthService(JwtRevocationPort jwtRevocationRepository, AdminAuthSettings settings,
+                            AdminUserCatalogPort accountCatalog) {
+        this(jwtRevocationRepository, settings, accountCatalog, true);
+    }
+
+    private AdminAuthService(JwtRevocationPort jwtRevocationRepository, AdminAuthSettings settings,
+                             AdminUserCatalogPort accountCatalog, boolean requireCatalog) {
+        if (requireCatalog && accountCatalog == null) {
+            throw new IllegalArgumentException("ADMIN_USER_CATALOG_PORT_REQUIRED");
+        }
         this.jwtRevocationRepository = jwtRevocationRepository;
+        this.accountCatalog = accountCatalog;
         this.settings = settings == null
                 ? AdminAuthSettings.defaults()
                 : settings;
@@ -66,12 +87,19 @@ public class AdminAuthService {
     public String issueToken(AdminUserAccount adminUser) {
         Instant now = Instant.now();
         String scope = normalizeScope(adminUser.role() == null ? null : adminUser.role().value());
+        String jwtId = UUID.randomUUID().toString();
+        try {
+            isRevokedId(jwtId);
+        } catch (JwtRevocationUnavailableException unavailable) {
+            throw new AdminUserAuthenticationException("登录服务暂不可用，请稍后重试");
+        }
         return JWT.create()
                 .withIssuer(ISSUER)
-                .withJWTId(UUID.randomUUID().toString())
+                .withJWTId(jwtId)
                 .withSubject(adminUser.username())
                 .withClaim("userId", adminUser.userId())
                 .withClaim("scope", scope)
+                .withClaim("credentialVersion", adminUser.credentialVersion())
                 .withIssuedAt(Date.from(now))
                 .withExpiresAt(Date.from(now.plusSeconds(settings.jwtTtlHours() * 3600)))
                 .sign(Algorithm.HMAC256(settings.jwtSecret()));
@@ -99,8 +127,32 @@ public class AdminAuthService {
             if (isRevoked(jwt)) {
                 return Optional.empty();
             }
-            return Optional.of(new AuthPrincipal(jwt.getSubject(), jwt.getClaim("userId").asString(), jwt.getId(), scope, false));
-        } catch (JWTVerificationException e) {
+            String userId = jwt.getClaim("userId").asString();
+            String username = jwt.getSubject();
+            boolean passwordChangeRequired = false;
+            if (accountCatalog != null) {
+                if (!StringUtils.hasText(userId)) {
+                    return Optional.empty();
+                }
+                AdminUserAccount account;
+                try {
+                    account = accountCatalog.findByUserId(userId);
+                } catch (RuntimeException unavailable) {
+                    // Authentication fails closed; do not log driver text or submitted identities.
+                    log.warn("Account verification is temporarily unavailable");
+                    return Optional.empty();
+                }
+                if (account == null || !Integer.valueOf(AdminUserStatus.ENABLED).equals(account.status())
+                        || !scope.equals(normalizeScope(account.role() == null ? null : account.role().value()))
+                        || account.credentialVersion() != (jwt.getClaim("credentialVersion").asLong() == null
+                            ? 0 : jwt.getClaim("credentialVersion").asLong())) {
+                    return Optional.empty();
+                }
+                username = account.username();
+                passwordChangeRequired = account.passwordChangeRequired();
+            }
+            return Optional.of(new AuthPrincipal(username, userId, jwt.getId(), scope, false, passwordChangeRequired));
+        } catch (JWTVerificationException | JwtRevocationUnavailableException e) {
             return Optional.empty();
         }
     }
@@ -122,7 +174,7 @@ public class AdminAuthService {
             persistRevokedToken(jwt);
             return true;
         } catch (Exception e) {
-            log.warn("注销 JWT 失败：{}", e.getMessage());
+            log.warn("注销 JWT 未完成；令牌无效或撤销存储不可用");
             return false;
         }
     }
@@ -181,20 +233,41 @@ public class AdminAuthService {
     }
 
     private boolean isRevoked(DecodedJWT jwt) {
-        if (!StringUtils.hasText(jwt.getId()) || jwtRevocationRepository == null || !jwtRevocationRepository.available()) {
-            return false;
+        if (!StringUtils.hasText(jwt.getId())) {
+            return accountCatalog != null;
         }
-        return jwtRevocationRepository.isRevoked(jwt.getId());
+        return isRevokedId(jwt.getId());
+    }
+
+    private boolean isRevokedId(String jwtId) {
+        if (jwtRevocationRepository == null) {
+            throw new JwtRevocationUnavailableException();
+        }
+        try {
+            return jwtRevocationRepository.available() && jwtRevocationRepository.isRevoked(jwtId);
+        } catch (RuntimeException unavailable) {
+            throw new JwtRevocationUnavailableException();
+        }
     }
 
     private void persistRevokedToken(DecodedJWT jwt) {
-        if (jwtRevocationRepository == null || !jwtRevocationRepository.available()) {
-            return;
+        if (jwtRevocationRepository == null) {
+            throw new JwtRevocationUnavailableException();
         }
         Instant expiresAt = jwt.getExpiresAt() == null ? Instant.now().plusSeconds(3600) : jwt.getExpiresAt().toInstant();
-        jwtRevocationRepository.revoke(jwt.getId(), jwt.getSubject(), expiresAt);
+        try {
+            if (jwtRevocationRepository.available()) {
+                jwtRevocationRepository.revoke(jwt.getId(), jwt.getSubject(), expiresAt);
+            }
+        } catch (RuntimeException unavailable) {
+            throw new JwtRevocationUnavailableException();
+        }
     }
 
-    public record AuthPrincipal(String username, String userId, String jwtId, String scope, boolean serviceToken) {
+    public record AuthPrincipal(String username, String userId, String jwtId, String scope, boolean serviceToken,
+                                boolean passwordChangeRequired) {
+        public AuthPrincipal(String username, String userId, String jwtId, String scope, boolean serviceToken) {
+            this(username, userId, jwtId, scope, serviceToken, false);
+        }
     }
 }

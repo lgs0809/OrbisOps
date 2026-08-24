@@ -20,6 +20,8 @@ public final class OpsChangePackageRuntimeToolContributor implements OpsRuntimeT
 
     static final String GOVERNANCE_PHASE_KEY = "_changePackageGovernancePhase";
     public static final String AVAILABLE_AUTHORITATIVE_SOURCE_TYPES_KEY = "_changePackageAvailableAuthoritativeSourceTypes";
+    /** In-memory hand-off of prior same-session evidence into the governed PREPARE tool. */
+    public static final String SESSION_EVIDENCE_KEY = "_changePackageSessionEvidence";
 
     private final Supplier<OpsChangePackageToolProvider> providerSupplier;
 
@@ -110,6 +112,10 @@ public final class OpsChangePackageRuntimeToolContributor implements OpsRuntimeT
                         "CHANGE_PACKAGE",
                         Set.of(AgentExecutionStage.PREPARE),
                         Set.of(toolName))));
+        ToolCallback statusQuery = provider.buildStatusQuery(context.getProjectId(), actor, runId, request);
+        context.getTools().add(OpsRuntimeGovernedToolCallback.wrap(statusQuery,
+                OpsRuntimeToolAuthorityDescriptor.readOnly("CHANGE_PACKAGE",
+                        Set.of(AgentExecutionStage.PREPARE), Set.of("QueryChangePackageStatus"))));
         context.getMetadata().put("changePackageToolEnabled", true);
         context.getMetadata().put("changePackageRunId", runId);
         context.getMetadata().put("executionTargetIds", executionTargetIds);
@@ -136,6 +142,11 @@ public final class OpsChangePackageRuntimeToolContributor implements OpsRuntimeT
                 || name.contains("elasticsearch")) return "ELASTICSEARCH";
         if (name.contains("rabbitmq")) return "RABBITMQ";
         if (name.contains("redis")) return "REDIS";
+        if (name.contains("service-control") || name.contains("service_control")
+                || "get_service_status".equals(name)
+                || "restart_service_dry_run".equals(name)
+                || "restart_service".equals(name)
+                || "get_operation_receipt".equals(name)) return "SERVICE_CONTROL";
         if (name.contains("mysql") && (name.contains("slow") || name.contains("digest"))) {
             return "MYSQL_SLOW_SQL";
         }

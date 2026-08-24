@@ -1,6 +1,7 @@
 package cn.lgs.orbisops.infrastructure.adapter.repository;
 
 import cn.lgs.orbisops.application.security.JwtRevocationPort;
+import cn.lgs.orbisops.application.security.JwtRevocationUnavailableException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -33,15 +34,15 @@ public class JwtRevocationRepository implements JwtRevocationPort {
 
     @Override
     public boolean available() {
-        return template() != null;
+        return jdbcEnabled;
     }
 
     @Override
     public boolean isRevoked(String jwtId) {
-        JdbcTemplate jdbcTemplate = template();
-        if (jdbcTemplate == null) {
+        if (!jdbcEnabled) {
             return false;
         }
+        JdbcTemplate jdbcTemplate = requiredTemplate();
         try {
             ensureTable(jdbcTemplate);
             Integer count = jdbcTemplate.queryForObject(
@@ -50,17 +51,16 @@ public class JwtRevocationRepository implements JwtRevocationPort {
                     jwtId);
             return count != null && count > 0;
         } catch (DataAccessException e) {
-            logFallback(e);
-            return false;
+            throw unavailable();
         }
     }
 
     @Override
     public void revoke(String jwtId, String subject, Instant expiresAt) {
-        JdbcTemplate jdbcTemplate = template();
-        if (jdbcTemplate == null) {
+        if (!jdbcEnabled) {
             return;
         }
+        JdbcTemplate jdbcTemplate = requiredTemplate();
         try {
             ensureTable(jdbcTemplate);
             jdbcTemplate.update("""
@@ -72,15 +72,21 @@ public class JwtRevocationRepository implements JwtRevocationPort {
                     subject,
                     Date.from(expiresAt));
         } catch (DataAccessException e) {
-            logFallback(e);
+            throw unavailable();
         }
     }
 
-    private JdbcTemplate template() {
-        if (!jdbcEnabled) {
-            return null;
+    private JdbcTemplate requiredTemplate() {
+        JdbcTemplate jdbcTemplate;
+        try {
+            jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
+        } catch (RuntimeException unavailable) {
+            throw unavailable();
         }
-        return jdbcTemplateProvider.getIfAvailable();
+        if (jdbcTemplate == null) {
+            throw unavailable();
+        }
+        return jdbcTemplate;
     }
 
     private void ensureTable(JdbcTemplate jdbcTemplate) {
@@ -110,10 +116,11 @@ public class JwtRevocationRepository implements JwtRevocationPort {
         }
     }
 
-    private void logFallback(Exception e) {
+    private JwtRevocationUnavailableException unavailable() {
         if (!unavailableLogged) {
             unavailableLogged = true;
-            log.warn("后台 JWT 撤销表不可用，注销/撤销能力降级：{}", e.getMessage());
+            log.warn("后台 JWT 撤销存储不可用；认证和注销将拒绝完成");
         }
+        return new JwtRevocationUnavailableException();
     }
 }

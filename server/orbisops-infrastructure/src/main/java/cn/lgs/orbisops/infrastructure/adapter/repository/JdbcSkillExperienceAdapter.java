@@ -86,6 +86,30 @@ public class JdbcSkillExperienceAdapter implements SkillExperiencePort {
                 observation.qualityScore()) == 1;
     }
 
+    @Override public boolean recordVerifiedContribution(SkillExperienceObservation observation) {
+        var v=observation.verifiedTaskOutcome();
+        if (!v.matches(observation.projectId(),observation.runId()) || !"SUCCEEDED".equals(observation.outcome())) return false;
+        boolean inserted = jdbcTemplate.update("""
+                INSERT IGNORE INTO ai_ops_skill_verified_contribution
+                (observation_id,project_id,agent_id,cluster_key,run_id,task_episode_id,task_revision,acceptance_id,condition_key,
+                 observation_type,content_json,evidence_refs_json,task_template_hash,trajectory_hash,quality_score)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """,observation.observationId(),observation.projectId(),observation.agentId(),observation.clusterKey(),observation.runId(),
+                v.taskEpisodeId(),v.revision(),v.verificationId(),v.conditionKey(),observation.observationType(),
+                JSON.toJSONString(Map.of("taskTemplate",taskTemplate(observation),"abstractTrajectory",observation.abstractTrajectory(),"summary",observation.finalSummary())),
+                JSON.toJSONString(evidenceViews(observation)),observation.taskTemplateHash(),observation.trajectoryHash(),observation.qualityScore()) == 1;
+        if (!inserted) jdbcTemplate.update("""
+                UPDATE ai_ops_skill_verified_contribution SET task_revision=?,acceptance_id=?,condition_key=?
+                WHERE observation_id=? AND project_id=? AND run_id=? AND task_episode_id=?
+                """,v.revision(),v.verificationId(),v.conditionKey(),observation.observationId(),observation.projectId(),observation.runId(),v.taskEpisodeId());
+        return inserted;
+    }
+
+    @Override public java.util.Optional<String> recordedClusterKey(String projectId,String agentId,String observationId) {
+        return jdbcTemplate.query("SELECT cluster_key FROM ai_ops_skill_observation WHERE project_id=? AND agent_id=? AND observation_id=?",
+                (r,n)->r.getString(1),projectId,agentId,observationId).stream().findFirst();
+    }
+
     @Override
     public void upsertCluster(SkillExperienceObservation observation) {
         jdbcTemplate.update("""
@@ -113,7 +137,7 @@ public class JdbcSkillExperienceAdapter implements SkillExperiencePort {
             String projectId,
             String agentId,
             String clusterKey) {
-        return jdbcTemplate.queryForObject("""
+        var snapshot = jdbcTemplate.queryForObject("""
                         SELECT observation_count,successful_count,evidence_count,status,version
                         FROM ai_ops_skill_experience_cluster
                         WHERE project_id=? AND agent_id=? AND cluster_key=?
@@ -127,6 +151,8 @@ public class JdbcSkillExperienceAdapter implements SkillExperiencePort {
                 projectId,
                 agentId,
                 clusterKey);
+        int verified=new JdbcVerifiedSkillSourceReader(jdbcTemplate).sources(projectId,agentId,clusterKey).size();
+        return new SkillExperienceClusterSnapshot(snapshot.observationCount(),verified,verified,snapshot.status(),snapshot.version());
     }
 
     @Override
@@ -134,33 +160,12 @@ public class JdbcSkillExperienceAdapter implements SkillExperiencePort {
             String projectId,
             String agentId,
             String clusterKey) {
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
-                SELECT COUNT(DISTINCT o.run_id) AS distinct_runs,
-                       COUNT(DISTINCT e.session_id) AS distinct_sessions,
-                       SUM(CASE
-                             WHEN o.outcome <> 'SUCCEEDED'
-                               OR o.observation_type IN
-                                  ('USER_NEGATIVE_FEEDBACK','ROUTING_CORRECTION','FAILED_THEN_RECOVERED_PATTERN')
-                             THEN 1 ELSE 0 END) AS hard_case_count,
-                       SUM(CASE WHEN o.outcome='SUCCEEDED' THEN 1 ELSE 0 END) AS successful_count,
-                       GROUP_CONCAT(DISTINCT o.observation_type ORDER BY o.observation_type) AS observation_types
-                FROM ai_ops_skill_observation o
-                JOIN ai_ops_skill_run_episode e
-                  ON e.episode_id=o.episode_id AND e.project_id=o.project_id
-                WHERE o.project_id=? AND o.agent_id=? AND o.cluster_key=?
-                """,
-                projectId,
-                agentId,
-                clusterKey);
-        if (rows.isEmpty()) return SkillExperienceClusterEvidence.empty();
-        Map<String, Object> row = rows.get(0);
-        String types = text(row.get("observation_types"));
+        var sources=new JdbcVerifiedSkillSourceReader(jdbcTemplate).sources(projectId,agentId,clusterKey);
         return new SkillExperienceClusterEvidence(
-                integer(row.get("distinct_runs")),
-                integer(row.get("distinct_sessions")),
-                integer(row.get("hard_case_count")),
-                integer(row.get("successful_count")),
-                types.isBlank() ? List.of() : List.of(types.split(",")));
+                sources.size(),(int)sources.stream().map(s->s.get("session_id")).distinct().count(),
+                (int)sources.stream().filter(s->List.of("USER_NEGATIVE_FEEDBACK","ROUTING_CORRECTION","FAILED_THEN_RECOVERED_PATTERN").contains(s.get("observation_type"))).count(),
+                sources.size(),sources.stream().map(s->text(s.get("observation_type"))).distinct().sorted().toList(),
+                (int)sources.stream().map(s->s.get("condition_key")).distinct().count());
     }
 
     @Override
@@ -169,32 +174,32 @@ public class JdbcSkillExperienceAdapter implements SkillExperiencePort {
             String agentId,
             String clusterKey,
             int limit) {
-        return jdbcTemplate.query("""
-                        SELECT o.observation_id,o.run_id,e.session_id,o.observation_type,o.outcome,
-                               o.task_template_hash,o.trajectory_hash,o.content_json,
-                               o.quality_score,o.evidence_refs_json
-                        FROM ai_ops_skill_observation o
-                        JOIN ai_ops_skill_run_episode e
-                          ON e.episode_id=o.episode_id AND e.project_id=o.project_id
-                        WHERE o.project_id=? AND o.agent_id=? AND o.cluster_key=?
-                        ORDER BY o.quality_score DESC,o.create_time DESC
-                        LIMIT ?
-                        """,
-                (rs, rowNum) -> new SkillExperienceConsolidationSample(
-                        text(rs.getString("observation_id")),
-                        text(rs.getString("run_id")),
-                        text(rs.getString("session_id")),
-                        text(rs.getString("observation_type")),
-                        text(rs.getString("outcome")),
-                        text(rs.getString("task_template_hash")),
-                        text(rs.getString("trajectory_hash")),
-                        summary(rs.getString("content_json")),
-                        rs.getDouble("quality_score"),
-                        evidenceReferences(rs.getString("evidence_refs_json"))),
-                projectId,
-                agentId,
-                clusterKey,
-                Math.max(1, Math.min(limit, 32)));
+        return consolidationSamples(projectId,agentId,clusterKey,limit,"");
+    }
+
+    @Override public List<SkillExperienceConsolidationSample> consolidationSamples(String projectId,String agentId,String clusterKey,int limit,String requiredRun) {
+        var sourceReader=new JdbcSkillEvolutionSourceReader(jdbcTemplate);
+        var metadata=new JdbcVerifiedSkillSourceReader(jdbcTemplate).sources(projectId,agentId,clusterKey);
+        int budget=Math.max(1,Math.min(limit,cn.lgs.orbisops.domain.skill.service.SkillSourceBatchPolicy.ARCHIVE_LIMIT));
+        if(metadata.size()>budget && budget>20) throw new IllegalStateException("SKILL_EVOLUTION_SOURCE_ARCHIVE_BUDGET");
+        var selected=new LinkedHashMap<String,Map<String,Object>>();
+        if(!requiredRun.isBlank()) {
+            var current=metadata.stream().filter(r->requiredRun.equals(text(r.get("run_id")))).findFirst()
+                    .orElseThrow(()->new IllegalStateException("SKILL_EVOLUTION_SOURCE_SET_INVALID"));
+            selected.put(text(current.get("acceptance_id")),current);
+        }
+        var conditions=new java.util.HashSet<String>();selected.values().forEach(r->conditions.add(text(r.get("condition_key"))));
+        for(var row:metadata) if(selected.size()<budget && conditions.add(text(row.get("condition_key"))))
+            selected.put(text(row.get("acceptance_id")),row);
+        for(var row:metadata) if(selected.size()<budget) selected.putIfAbsent(text(row.get("acceptance_id")),row);
+        return selected.values().stream().map(r->{
+                    var full=sourceReader.loadAccepted(projectId,text(r.get("run_id")),text(r.get("acceptance_id")));
+                    return new SkillExperienceConsolidationSample(
+                        text(r.get("observation_id")),text(r.get("run_id")),text(r.get("session_id")),text(r.get("observation_type")),"SUCCEEDED",
+                        text(r.get("task_template_hash")),text(r.get("trajectory_hash")),summary(text(r.get("content_json"))),
+                        ((Number)r.get("quality_score")).doubleValue(),evidenceReferences(text(r.get("evidence_refs_json"))),
+                        text(r.get("acceptance_id")),full.sourceHash(),full.episodeJson(),text(r.get("task_episode_id")),text(r.get("condition_key")));
+                }).toList();
     }
 
     @Override

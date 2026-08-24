@@ -39,6 +39,33 @@ class OpsCompositeToolExecutionDispatchAdapterTest {
                         .dispatch(target(), request()));
     }
 
+    @Test
+    void canceledClaimMustRejectBeforeBindingResolutionOrRemoteDispatch() {
+        var registry = new cn.lgs.orbisops.trigger.ops.OpsRunCancellationRegistry();
+        var resolver = org.mockito.Mockito.mock(ToolBindingResolver.class);
+        registry.markCanceled("run-1");
+        try (var ignored = cn.lgs.orbisops.trigger.ops.OpsRunControlContext.open(
+                new cn.lgs.orbisops.trigger.ops.OpsRunControlContext.Binding("run-1", "project-1", Map.of(), registry))) {
+            assertThrows(cn.lgs.orbisops.trigger.ops.OpsRunCanceledException.class, () ->
+                    new OpsCompositeToolExecutionDispatchAdapter(resolver, List.of(internalInvoker(true, "never")))
+                            .dispatch(target(), request()));
+        }
+        org.mockito.Mockito.verifyNoInteractions(resolver);
+    }
+
+    @Test
+    void foreignClaimMustRejectBeforeBindingResolutionOrRemoteDispatch() {
+        var resolver = org.mockito.Mockito.mock(ToolBindingResolver.class);
+        try (var ignored = cn.lgs.orbisops.trigger.ops.OpsRunControlContext.open(
+                new cn.lgs.orbisops.trigger.ops.OpsRunControlContext.Binding("foreign", "project-1", Map.of(),
+                        new cn.lgs.orbisops.trigger.ops.OpsRunCancellationRegistry()))) {
+            assertThrows(IllegalStateException.class, () ->
+                    new OpsCompositeToolExecutionDispatchAdapter(resolver, List.of(internalInvoker(true, "never")))
+                            .dispatch(target(), request()));
+        }
+        org.mockito.Mockito.verifyNoInteractions(resolver);
+    }
+
     private ToolInvoker<InternalToolBinding> internalInvoker(
             boolean supports,
             Object output) {

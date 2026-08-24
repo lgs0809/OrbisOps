@@ -118,6 +118,12 @@ public class JdbcColdMemoryRepository implements IColdMemoryRepository {
         if (!hasText(sessionId)) return;
         JdbcTemplate template = requiredTemplate();
         ensureSchema();
+        // Fence pending/late workers before clearing their source. Keep the sequence monotonic.
+        template.update("""
+                UPDATE ai_ops_conversation_memory_state SET covered_seq=last_seq, summary_revision=summary_revision+1,
+                    summary_content='', protected_messages_json='[]' WHERE session_id=?
+                """, sessionId.trim());
+        template.update("UPDATE ai_ops_memory_post_processing SET status='CANCELED', epoch=epoch+1 WHERE session_id=? AND status<>'COMPLETED'", sessionId.trim());
         template.update("DELETE FROM ai_ops_chat_message WHERE session_id = ?", sessionId.trim());
         template.update("DELETE FROM ai_ops_memory_item WHERE session_id = ?", sessionId.trim());
     }

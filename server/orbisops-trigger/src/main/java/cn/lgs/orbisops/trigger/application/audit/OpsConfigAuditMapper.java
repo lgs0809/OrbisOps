@@ -48,7 +48,7 @@ public class OpsConfigAuditMapper {
                 module,
                 value(targetId),
                 resolveTextField("riskLevel", after, before),
-                "SUCCESS",
+                adminResultStatus(action, after),
                 principal == null ? "" : value(principal.userId()),
                 principal == null ? "" : value(principal.username()),
                 principal == null ? "" : value(principal.scope()),
@@ -56,6 +56,34 @@ public class OpsConfigAuditMapper {
                 value(TraceContext.currentTraceId()),
                 safeJson(before),
                 safeJson(after));
+    }
+
+    /**
+     * Admin mutations historically defaulted every audit row to SUCCESS. That
+     * conflated "the audit write completed" with "the business operation
+     * succeeded", which made actions such as landing-failed appear successful
+     * in the governance UI. Failure outcomes are part of the command boundary:
+     * infer them from the explicit failure action family, while retaining
+     * SUCCESS for ordinary state changes (including a successful reject).
+     */
+    private String adminResultStatus(String action, Object after) {
+        String normalizedAction = value(action).toLowerCase(Locale.ROOT);
+        String normalizedPayloadStatus = value(resolveTextField("status", after))
+                .toUpperCase(Locale.ROOT);
+        boolean failureAction = normalizedAction.matches(".*(?:failed|failure|error|blocked|denied|timeout)$");
+        boolean failurePayload = normalizedPayloadStatus.contains("FAIL")
+                || normalizedPayloadStatus.contains("ERROR")
+                || normalizedPayloadStatus.contains("BLOCK")
+                || normalizedPayloadStatus.contains("DENIED");
+        if (failureAction || failurePayload) {
+            return normalizedPayloadStatus.contains("BLOCK")
+                    || normalizedPayloadStatus.contains("DENIED")
+                    || normalizedAction.endsWith("blocked")
+                    || normalizedAction.endsWith("denied")
+                    ? "BLOCKED"
+                    : "FAILED";
+        }
+        return "SUCCESS";
     }
 
     public ConfigAuditCommand runtimeCommand(

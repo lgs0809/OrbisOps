@@ -1,6 +1,7 @@
 package cn.lgs.orbisops.infrastructure.adapter.repository;
 
 import cn.lgs.orbisops.application.changepackage.LandingOperationJournalPort;
+import cn.lgs.orbisops.application.changepackage.LandingOperationExecutionBinding;
 import cn.lgs.orbisops.application.changepackage.LandingOperationPayload;
 import cn.lgs.orbisops.application.changepackage.LandingOperationRecoveryCandidate;
 import cn.lgs.orbisops.application.changepackage.LandingOperationRecoveryClaim;
@@ -151,6 +152,23 @@ public class JdbcLandingOperationJournalAdapter implements LandingOperationJourn
     }
 
     @Override
+    public List<LandingOperationExecutionBinding> operationExecutionBindings(String landingRunId) {
+        return jdbcTemplate.query("""
+                        SELECT operation_id, execution_key, toolset_id, tool_name, resource_key
+                          FROM ai_ops_change_package_landing_operation_run
+                         WHERE landing_run_id=?
+                         ORDER BY id ASC
+                        """,
+                (rs, rowNum) -> new LandingOperationExecutionBinding(
+                        rs.getString("operation_id"),
+                        rs.getString("execution_key"),
+                        rs.getString("toolset_id"),
+                        rs.getString("tool_name"),
+                        rs.getString("resource_key")),
+                landingRunId);
+    }
+
+    @Override
     public boolean completeFromToolExecution(
             String landingRunId,
             String operationId,
@@ -162,22 +180,23 @@ public class JdbcLandingOperationJournalAdapter implements LandingOperationJourn
                 : payload;
         int updated = jdbcTemplate.update("""
                         UPDATE ai_ops_change_package_landing_operation_run
-                           SET execution_key=?, status='SUCCEEDED', fact_status='COMPLETED',
+                           SET status='SUCCEEDED', fact_status='COMPLETED',
                                reason_code='TOOL_EXECUTION_AUTHORITATIVE_COMPLETION', unknown_reason_code='',
                                result_id=?, output_hash=?, result_json=?, acknowledged_at=CURRENT_TIMESTAMP,
-                               verified_at=CURRENT_TIMESTAMP, worker_id='', lease_expires_at=NULL,
+                               worker_id='', lease_expires_at=NULL,
                                finished_at=CURRENT_TIMESTAMP, state_version=state_version+1
                          WHERE landing_run_id=? AND operation_id=? AND tool_name=?
+                           AND execution_key=?
                            AND fact_status IN ('NONE','UNKNOWN')
                            AND status IN ('PENDING','BLOCKED','RECONCILING')
                         """,
-                executionKey,
                 safe.resultId(),
                 safe.outputHash(),
                 json(safe.raw()),
                 landingRunId,
                 operationId,
-                toolName);
+                toolName,
+                executionKey);
         if (updated == 1) return true;
         if (updated > 1) {
             throw new IllegalStateException("LANDING_TOOL_EXECUTION_PROJECTION_NOT_UNIQUE:" + operationId);

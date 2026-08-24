@@ -38,19 +38,15 @@ public final class SkillReleasePromotionCoordinator {
     public void promoteIfReady(SkillReleaseSnapshot release) {
         SkillReleaseSnapshot canary = requireCanary(release);
         SkillPatchCandidate candidate = candidateService.getCandidate(canary.candidateId());
-        int nextVersion = candidate.baseSkillVersion() + 1;
-        SkillEffectMetrics metrics = metricService.metrics(
-                canary.projectId(), canary.metricSkillId(), nextVersion);
-        if (!metricService.enoughSamples(metrics)) return;
-        SkillEffectMetrics baseline = canary.baselineVersion() > 0
-                ? metricService.metrics(canary.projectId(), canary.targetSkillId(), canary.baselineVersion())
-                : SkillEffectMetrics.empty();
-        String degradation = metricService.degradationReason(metrics, baseline);
-        if (!degradation.isBlank()) {
-            stateCoordinator.move(canary, SkillReleaseStatus.CANARY, SkillReleaseStatus.ROLLED_BACK,
-                    degradation, 0, "", "");
+        var evidence = releasePort.canaryEvidence(canary);
+        if (evidence == null) return;
+        String isolation = evidence.isolationReason();
+        if (!isolation.isBlank()) {
+            requireMove(stateCoordinator.move(canary, SkillReleaseStatus.CANARY, SkillReleaseStatus.ROLLED_BACK,
+                    isolation, 0, "", ""));
             return;
         }
+        if (!evidence.promotable()) return;
         if (!releasePort.claim(canary.releaseId(), SkillReleaseStatus.CANARY, SkillReleaseStatus.PROMOTING)) {
             return;
         }

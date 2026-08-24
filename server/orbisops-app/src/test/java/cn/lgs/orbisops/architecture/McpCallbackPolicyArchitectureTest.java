@@ -47,7 +47,7 @@ class McpCallbackPolicyArchitectureTest {
                 () -> assertTrue(assembler.contains("callbackPolicy.decorate(")),
                 () -> assertTrue(assembler.contains("OpsRuntimeGovernedToolCallback.wrap")),
                 () -> assertTrue(assembler.contains("OpsRuntimeToolAuthorityDescriptor.delegated")),
-                () -> assertTrue(progressive.contains("callbackPolicy.assertAllowed(config, runtimeInvoker.find")),
+                () -> assertTrue(progressive.contains("callbackPolicy.assertAllowed(verified, runtimeInvoker.find")),
                 () -> assertTrue(progressive.contains("callbackPolicy.matchesTool")),
                 () -> assertFalse(provider.contains("private final OpsMcpCallbackPolicyAdapter")),
                 () -> assertFalse(provider.contains("OpsToolExecutionPolicy")),

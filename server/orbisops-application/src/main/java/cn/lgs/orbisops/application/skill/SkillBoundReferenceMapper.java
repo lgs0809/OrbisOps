@@ -17,6 +17,7 @@ public final class SkillBoundReferenceMapper {
         SkillRuntimeCandidate skill = ranked.candidate();
         Map<String, Object> ref = new LinkedHashMap<>();
         ref.put("skillId", skill.skillId());
+        ref.put("projectId", skill.projectId());
         ref.put("version", skill.version());
         ref.put("skillHash", skill.skillHash());
         ref.put("packageHash", skill.packageHash());
@@ -25,6 +26,8 @@ public final class SkillBoundReferenceMapper {
         ref.put("entrypoint", skill.entrypoint());
         ref.put("scope", skill.scope());
         ref.put("statusAtUse", skill.status());
+        ref.put("status", skill.status());
+        ref.put("updateMode", skill.updateMode());
         ref.put("category", skill.routingProfile().category());
         ref.put("subcategory", skill.routingProfile().subcategory());
         ref.put("selectedReason", ranked.explicit()

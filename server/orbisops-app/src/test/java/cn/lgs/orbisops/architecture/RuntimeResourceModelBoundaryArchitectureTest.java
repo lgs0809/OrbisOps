@@ -1,10 +1,15 @@
 package cn.lgs.orbisops.architecture;
 
 import org.junit.jupiter.api.Test;
+import cn.lgs.orbisops.trigger.ops.runtime.OpsRuntimeModelSettings;
+import com.tngtech.archunit.core.importer.ClassFileImporter;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -30,7 +35,8 @@ class RuntimeResourceModelBoundaryArchitectureTest {
                 () -> assertTrue(resolver.contains("ModelAvailabilityPort")),
                 () -> assertTrue(resolver.contains("OpsSecretResolver")),
                 () -> assertTrue(resolver.contains("OpsRuntimeModelSettings")),
-                () -> assertTrue(resolver.contains("OpenAiApi.builder()")),
+                () -> assertTrue(resolver.contains("new OpsResilientOpenAiApi(")),
+                () -> assertTrue(resolver.contains("settings.requestBudgetMillis()")),
                 () -> assertTrue(resolver.contains("OpenAiChatModel.builder()")),
                 () -> assertTrue(resolver.contains("RESOURCE_WARN")),
                 () -> assertFalse(resolver.contains("ApplicationContext")),
@@ -50,8 +56,27 @@ class RuntimeResourceModelBoundaryArchitectureTest {
                 () -> assertTrue(settings.contains("forTest")),
                 () -> assertFalse(settings.contains("ChatModel")),
                 () -> assertFalse(settings.contains("IAiClientModelConfigRepository")),
-                () -> assertFalse(settings.contains("OpsSecretResolver")),
-                () -> assertTrue(settings.lines().count() < 45));
+                () -> assertFalse(settings.contains("OpsSecretResolver")));
+
+        // Enforce the responsibility, rather than mirroring formatting or accessor length.
+        var fields = Arrays.stream(OpsRuntimeModelSettings.class.getDeclaredFields())
+                .filter(field -> !field.isSynthetic()).toList();
+        assertEquals(Set.of("connectTimeoutSeconds", "readTimeoutSeconds", "modelCallTimeoutSeconds"),
+                fields.stream().map(java.lang.reflect.Field::getName).collect(java.util.stream.Collectors.toSet()));
+        assertTrue(fields.stream().allMatch(field -> field.getType() == int.class
+                && Modifier.isPrivate(field.getModifiers()) && Modifier.isFinal(field.getModifiers())));
+        var type = new ClassFileImporter().importClasses(OpsRuntimeModelSettings.class)
+                .get(OpsRuntimeModelSettings.class);
+        assertTrue(type.getDirectDependenciesFromSelf().stream().allMatch(dependency -> {
+            String target = dependency.getTargetClass().getName();
+            return Set.of("int", "long", OpsRuntimeModelSettings.class.getName(),
+                    "java.util.concurrent.TimeUnit", "org.springframework.beans.factory.annotation.Value",
+                    "org.springframework.stereotype.Component").contains(target) || target.startsWith("java.lang.");
+        }), () -> "Unexpected model-settings dependency: " + type.getDirectDependenciesFromSelf());
+        var published = new OpsRuntimeModelSettings(3, 45, 660);
+        assertEquals(45, published.readTimeoutSeconds());
+        assertEquals(660_000L, published.requestBudgetMillis());
+        assertEquals(660, published.synchronousResponseTimeoutSeconds());
     }
 
     @Test

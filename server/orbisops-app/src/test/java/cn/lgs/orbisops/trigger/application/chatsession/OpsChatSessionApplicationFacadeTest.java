@@ -25,6 +25,30 @@ import static org.mockito.Mockito.when;
 
 class OpsChatSessionApplicationFacadeTest {
 
+    @Test void scopedCatalogKeepsTheTrustedActorAndLegacyNullScope() {
+        var sessions = mock(OpsChatSessionService.class);
+        var facade = new OpsChatSessionApplicationFacade(sessions,
+                mock(ProjectDefinitionApplicationService.class), mock(GraphEventApplicationService.class));
+        facade.list("forged-other-user", null, null, null, 100, "trusted-actor", "project-a");
+        verify(sessions).list("trusted-actor", null, null, null, 100, "project-a");
+        facade.list("forged-other-user", null, null, null, 100, "trusted-actor");
+        verify(sessions).list("trusted-actor", null, null, null, 100, null);
+    }
+
+    @Test void directCatalogReadPreservesObserverAccessAndRejectsForeignScopeOrUnrelatedActor() {
+        var sessions = mock(OpsChatSessionService.class);
+        var session = OpsChatSession.builder().sessionId("shared").projectId("project-a").userId("owner").build();
+        when(sessions.get("shared")).thenReturn(Optional.of(session));
+        when(sessions.canRead("shared", "observer")).thenReturn(true);
+        var facade = new OpsChatSessionApplicationFacade(sessions,
+                mock(ProjectDefinitionApplicationService.class), mock(GraphEventApplicationService.class));
+        assertEquals(session, facade.read("shared", "observer", "project-a"));
+        assertEquals(session, facade.read("shared", "observer", null));
+        assertThrows(SecurityException.class, () -> facade.read("shared", "observer", "project-b"));
+        assertThrows(SecurityException.class, () -> facade.read("shared", "not-a-participant", "project-a"));
+        assertThrows(SecurityException.class, () -> facade.read("missing", "observer", "project-a"));
+    }
+
     @Test
     void createBindsScopedUserAndProjectDefaultAgent() {
         OpsChatSessionService sessions = mock(OpsChatSessionService.class);

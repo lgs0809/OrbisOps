@@ -6,6 +6,7 @@ import cn.lgs.orbisops.application.incident.IncidentQueryApplicationService;
 import cn.lgs.orbisops.application.project.ProjectDefinitionApplicationService;
 import cn.lgs.orbisops.application.worksession.run.WorkSessionRunApplicationService;
 import cn.lgs.orbisops.domain.changepackage.service.ChangePackageStatusPolicy;
+import cn.lgs.orbisops.domain.analysis.service.AnalysisTaskPresentationPolicy;
 import cn.lgs.orbisops.domain.incident.model.IncidentSnapshot;
 import cn.lgs.orbisops.domain.incident.model.IncidentStatus;
 import cn.lgs.orbisops.domain.worksession.run.model.WorkSessionRunSnapshot;
@@ -107,17 +108,10 @@ public class OpsAdminDashboardApplicationService {
         result.put("owner", run.owner());
         result.put("agentId", run.agentId());
         result.put("status", run.status().name());
-        result.put("goal", firstText(run.requestPayload().get("query"), run.requestPayload().get("goal"), "Workflow requires human decision"));
+        result.put("goal", AnalysisTaskPresentationPolicy.publicGoal(
+                run.requestPayload(), "Workflow requires human decision"));
         result.put("updatedAt", run.updatedAt().toString());
         return Map.copyOf(result);
     }
 
-    private String firstText(Object... values) {
-        if (values == null) return "";
-        for (Object value : values) {
-            String text = value == null ? "" : String.valueOf(value).trim();
-            if (!text.isBlank()) return text;
-        }
-        return "";
-    }
 }

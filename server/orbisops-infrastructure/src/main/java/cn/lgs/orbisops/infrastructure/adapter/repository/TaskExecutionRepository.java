@@ -131,6 +131,36 @@ public class TaskExecutionRepository implements ScheduledTaskExecutionCatalogPor
     }
 
     @Override
+    public void markIncomplete(Long executionId, String status, String output) {
+        if (!"WAITING_APPROVAL".equals(status) && !"CANCELED".equals(status)) {
+            throw new IllegalArgumentException("SCHEDULED_INCOMPLETE_STATUS_INVALID");
+        }
+        JdbcTemplate jdbc = jdbcTemplate();
+        if (jdbc == null || invalidExecutionId(executionId)) return;
+        jdbc.update("""
+                UPDATE ai_agent_task_execution SET status=?, ended_at=?, output=?, error_message=NULL
+                WHERE id=? AND status='RUNNING'
+                """, status, "CANCELED".equals(status) ? LocalDateTime.now() : null, output, executionId);
+    }
+
+    @Override
+    public int reconcileWaitingRuns() {
+        JdbcTemplate jdbc = jdbcTemplate();
+        if (jdbc == null) return 0;
+        // Read the authoritative Run; never execute or approve a waiting task here.
+        return jdbc.update("""
+                UPDATE ai_agent_task_execution t JOIN ai_ops_agent_run r
+                  ON r.run_id=CONCAT('task_',t.schedule_id,'_',t.id)
+                  AND r.project_id=JSON_UNQUOTE(JSON_EXTRACT(IF(JSON_VALID(t.input),t.input,'{}'),'$.projectId'))
+                SET t.status=CASE WHEN r.status='SUCCEEDED' THEN 'SUCCESS' ELSE r.status END,
+                    t.ended_at=r.updated_at,
+                    t.error_message=r.error_message,
+                    t.output=COALESCE(JSON_UNQUOTE(JSON_EXTRACT(r.response_json,'$.content')),t.output)
+                WHERE t.status='WAITING_APPROVAL' AND r.status IN ('SUCCEEDED','FAILED','CANCELED')
+                """);
+    }
+
+    @Override
     public List<TaskExecutionView> list(Long scheduleId, int limit) {
         JdbcTemplate jdbcTemplate = jdbcTemplate();
         if (jdbcTemplate == null) {

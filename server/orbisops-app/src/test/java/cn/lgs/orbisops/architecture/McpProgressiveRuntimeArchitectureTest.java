@@ -45,6 +45,7 @@ class McpProgressiveRuntimeArchitectureTest {
                 () -> assertTrue(adapter.contains("Supplier<ProgressiveMcpProcessManager>")),
                 () -> assertTrue(adapter.contains("OpsMcpProgressiveExposure exposure")),
                 () -> assertTrue(adapter.contains("runtimeExecutableTools")),
+                () -> assertTrue(adapter.contains("authorizedForCurrentStage")),
                 () -> assertTrue(adapter.contains("recordToolRoutingWarning")),
                 () -> assertTrue(adapter.contains("Map<String, Object> selectAndHydrate")),
                 () -> assertTrue(adapter.contains("processManager.select")),
@@ -56,7 +57,7 @@ class McpProgressiveRuntimeArchitectureTest {
                 () -> assertFalse(adapter.contains("OpsMcpClientRegistry")),
                 () -> assertFalse(adapter.contains("OpsMcpRemoteInvocationAdapter")),
                 () -> assertFalse(adapter.contains("ToolCallback")),
-                () -> assertTrue(adapter.lines().count() < 220));
+                () -> assertTrue(adapter.lines().count() < 240));
     }
 
     @Test

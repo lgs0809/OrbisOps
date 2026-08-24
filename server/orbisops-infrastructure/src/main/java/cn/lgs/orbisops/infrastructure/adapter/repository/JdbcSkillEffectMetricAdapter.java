@@ -89,11 +89,15 @@ public class JdbcSkillEffectMetricAdapter implements SkillEffectMetricPort {
         int needsReplan = transition(before, after, "needsReplan");
         int negative = transition(before, after, "userNegativeFeedback");
         int created = transition(before, after, "changePackageCreated");
+        int successful = transition(before, after, "success");
+        int sufficient = transition(before, after, "evidenceSufficient");
         if (approved == 0
                 && landed == 0
                 && needsReplan == 0
                 && negative == 0
-                && created == 0) {
+                && created == 0
+                && successful == 0
+                && sufficient == 0) {
             return;
         }
         int updated = jdbcTemplate.update("""
@@ -102,7 +106,9 @@ public class JdbcSkillEffectMetricAdapter implements SkillEffectMetricPort {
                     change_package_approved_count=GREATEST(0,change_package_approved_count+?),
                     landing_succeeded_count=GREATEST(0,landing_succeeded_count+?),
                     user_negative_feedback_count=GREATEST(0,user_negative_feedback_count+?),
-                    needs_replan_count=GREATEST(0,needs_replan_count+?)
+                    needs_replan_count=GREATEST(0,needs_replan_count+?),
+                    successful_run_count=GREATEST(0,successful_run_count+?),
+                    evidence_sufficient_count=GREATEST(0,evidence_sufficient_count+?)
                 WHERE project_id=? AND skill_id=? AND skill_version=? AND metric_window='LIFETIME'
                 """,
                 created,
@@ -110,6 +116,8 @@ public class JdbcSkillEffectMetricAdapter implements SkillEffectMetricPort {
                 landed,
                 negative,
                 needsReplan,
+                successful,
+                sufficient,
                 projectId,
                 skillId,
                 version);

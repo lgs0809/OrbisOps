@@ -102,9 +102,10 @@ class OpsMcpRemoteInvocationAdapterTest {
         OpsMcpClientRegistry.ClientHandle handle = mock(OpsMcpClientRegistry.ClientHandle.class);
         ReentrantLock expiringLock = new ReentrantLock() {
             @Override
-            public void lock() {
-                super.lock();
-                config.setAuthorityDeadline(Instant.now().minusSeconds(1));
+            public boolean tryLock(long timeout, java.util.concurrent.TimeUnit unit) throws InterruptedException {
+                boolean acquired = super.tryLock(timeout, unit);
+                if (acquired) config.setAuthorityDeadline(Instant.now().minusSeconds(1));
+                return acquired;
             }
         };
         when(handle.lock()).thenReturn(expiringLock);

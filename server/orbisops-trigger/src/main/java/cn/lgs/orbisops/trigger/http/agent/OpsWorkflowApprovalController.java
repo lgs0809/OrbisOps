@@ -61,16 +61,19 @@ public class OpsWorkflowApprovalController {
                 runId,
                 projectId,
                 actor(principal),
-                required(request == null ? null : request.get("decision"), "审批决定不能为空")));
+                required(request == null ? null : request.get("decision"), "审批决定不能为空"),
+                required(request == null ? null : request.get("approvalId"), "必须指定已查看的审批记录")));
     }
 
     @PostMapping("/runs/{runId}/workflow-approval/resume")
     public Response<Map<String, Object>> retryResume(@PathVariable("runId") String runId,
                                                       @RequestParam("projectId") String projectId,
+                                                      @RequestBody Map<String, Object> request,
                                                       HttpServletRequest servletRequest) {
         AdminAuthService.AuthPrincipal principal = principal(servletRequest);
         assertProjectAccess(projectId, principal);
-        return success(approvals.retryResume(runId, projectId, actor(principal)));
+        return success(approvals.retryResume(runId, projectId, actor(principal),
+                required(request == null ? null : request.get("approvalId"), "必须指定已查看的审批记录")));
     }
 
     private AdminAuthService.AuthPrincipal principal(HttpServletRequest request) {

@@ -10,4 +10,6 @@ public interface ScheduledTaskAnalysisPort<Q, R> {
     R execute(Q request);
 
     String renderOutput(R response);
+
+    String runtimeStatus(R response);
 }

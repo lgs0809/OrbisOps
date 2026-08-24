@@ -34,14 +34,8 @@ public final class SkillReleaseRollbackCoordinator {
         String skillId = active.targetSkillId();
         int version = active.releasedVersion();
         if (skillId.isBlank() || version <= 0) return;
-        SkillEffectMetrics metrics = metricService.metrics(
-                active.projectId(), skillId, version);
-        SkillEffectMetrics baseline = active.baselineVersion() > 0
-                ? metricService.metrics(active.projectId(), skillId, active.baselineVersion())
-                : SkillEffectMetrics.empty();
-        String degradation = metricService.enoughSamples(metrics)
-                ? metricService.degradationReason(metrics, baseline)
-                : "";
+        var evidence = releasePort.canaryEvidence(active);
+        String degradation = evidence == null ? "" : evidence.isolationReason();
         if (degradation.isBlank()
                 || !releasePort.claim(
                         active.releaseId(),
@@ -50,20 +44,14 @@ public final class SkillReleaseRollbackCoordinator {
             return;
         }
         SkillReleaseSnapshot rollingBack = active.transitionTo(SkillReleaseStatus.ROLLING_BACK);
-        if (rollingBack.baselineVersion() > 0) {
-            skillManagementUseCase.rollbackProjectVersion(
-                    rollingBack.projectId(),
-                    skillId,
-                    rollingBack.baselineVersion(),
-                    "SYSTEM_SKILL_RELEASE_GUARD");
-        }
+        var recovery = skillManagementUseCase.recoverProjectRelease(rollingBack);
         if (!stateCoordinator.move(
                 rollingBack,
                 SkillReleaseStatus.ROLLING_BACK,
-                SkillReleaseStatus.ROLLED_BACK,
-                degradation,
-                version,
-                rollingBack.releasedSkillHash(),
+                recovery.restored() ? SkillReleaseStatus.ROLLED_BACK : SkillReleaseStatus.DISABLED,
+                degradation + ":" + recovery.reason(),
+                recovery.version(),
+                recovery.skillHash(),
                 skillId)) {
             throw new IllegalStateException("SKILL_RELEASE_STATE_CONFLICT");
         }

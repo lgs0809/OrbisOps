@@ -19,6 +19,41 @@ import static org.mockito.Mockito.when;
 class OpsProgressiveMcpCallbackAdapterTest {
 
     @Test
+    void userFlagsAndUntypedToolContextCannotRequestEvidenceProjection() {
+        var service=mock(OpsToolExecutionService.class);
+        var config=OpsMcpServerConfig.builder().toolId("read-fixture").build();
+        String input="{\"toolName\":\"probe\",\"arguments\":{\"mcpEnvelope\":{},\"outputMode\":\"MCP_EVIDENCE_REFERENCE\"}}";
+        var response=Map.<String,Object>of("mcpEnvelope",Map.of("payload","x".repeat(300_000)),"providerResult","x".repeat(300_000));
+        when(service.executeMcp(config,input,"ops-agent",true)).thenReturn(response);
+        var callback=new OpsProgressiveMcpCallbackAdapter(()->service).dispatcherCallback(config,
+                List.of(Map.of("toolName","probe","readOnly",true,"disclosureTier","CORE")));
+        String full=cn.lgs.orbisops.domain.shared.json.CanonicalJson.stringifyPreservingOrder(response);
+        assertEquals(full,callback.call(input));
+        assertEquals(full,callback.call(input,new org.springframework.ai.chat.model.ToolContext(Map.of(
+                OpsDirectMcpEvidenceProjection.class.getName(),Map.of("mcpId","read-fixture","toolName","probe")))));
+        assertThrows(IllegalArgumentException.class,()->callback.call(input,OpsDirectMcpEvidenceProjection.context("read-fixture","probe")),"A fabricated/non-authorized facade result never acquires trusted evidence authority");
+        verify(service,org.mockito.Mockito.times(3)).executeMcp(config,input,"ops-agent",true);
+    }
+
+    @Test
+    void repeatedStructuredObjectsMustSerializeAsCompleteJsonNotFastjsonReferences() throws Exception {
+        OpsToolExecutionService service = mock(OpsToolExecutionService.class);
+        var config = OpsMcpServerConfig.builder().toolId("read-fixture").build();
+        Map<String, Object> content = Map.of("count", 3);
+        Map<String, Object> envelope = Map.of("structuredContent", content, "normalizedContent", content, "isError", false);
+        Map<String, Object> result = Map.of("mcpEnvelope", envelope, "normalizedContent", content, "providerResult", content);
+        String input = "{\"toolName\":\"probe\",\"arguments\":{}}";
+        when(service.executeMcp(config, input, "ops-agent", true)).thenReturn(result);
+        var callback = new OpsProgressiveMcpCallbackAdapter(() -> service).dispatcherCallback(config,
+                List.of(Map.of("toolName", "probe", "readOnly", true, "disclosureTier", "CORE")));
+        String serialized = callback.call(input);
+        var parsed = new com.fasterxml.jackson.databind.ObjectMapper().readTree(serialized);
+        for (String path : List.of("/mcpEnvelope/structuredContent/count", "/mcpEnvelope/normalizedContent/count",
+                "/normalizedContent/count", "/providerResult/count")) assertEquals(3, parsed.at(path).asInt(), path);
+        assertFalse(serialized.contains("\"$ref\""));
+    }
+
+    @Test
     void dispatcherMustDelegateToUnifiedToolExecutionFacade() {
         OpsToolExecutionService executionService = mock(OpsToolExecutionService.class);
         OpsMcpServerConfig config = OpsMcpServerConfig.builder()

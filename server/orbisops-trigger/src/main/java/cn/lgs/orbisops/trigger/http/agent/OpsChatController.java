@@ -124,8 +124,19 @@ public class OpsChatController {
                                                        @RequestParam(value = "keyword", required = false) String keyword,
                                                        @RequestParam(value = "favorite", required = false) Boolean favorite,
                                                        @RequestParam(value = "limit", required = false, defaultValue = "50") Integer limit,
+                                                       @RequestParam(value = "projectId", required = false) String projectId,
                                                        HttpServletRequest servletRequest) {
-        return success(chatApplicationService.listSessions(userId, agentId, keyword, favorite, limit, scopedUserId(principal(servletRequest))));
+        AdminAuthService.AuthPrincipal principal = principal(servletRequest);
+        return success(chatApplicationService.listSessions(userId, agentId, keyword, favorite, limit, scopedUserId(principal), projectId));
+    }
+
+    @GetMapping("/sessions/{sessionId}")
+    public Response<OpsChatSession> session(@PathVariable("sessionId") String sessionId,
+                                            @RequestParam(value = "projectId", required = false) String projectId,
+                                            HttpServletRequest servletRequest) {
+        AdminAuthService.AuthPrincipal principal = principal(servletRequest);
+        OpsChatSession session = chatApplicationService.readSession(sessionId, scopedUserId(principal), projectId);
+        return success(session);
     }
 
     @GetMapping("/sessions/{sessionId}/messages")

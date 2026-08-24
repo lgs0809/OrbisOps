@@ -80,6 +80,33 @@ class OpsTypedWorkflowExecutionCoordinatorTest {
         assertEquals("NOT_DURABLE_EXECUTION", events.get(0).getPayload().get("reasonCode"));
     }
 
+    @Test
+    void trustedLandingKeepsItsOwnDurableLifecycleInsteadOfCompilingAUserWorkflow() {
+        var validator = mock(OpsAgentDefinitionValidator.class);
+        var coordinator = coordinator(validator, new OpsTypedWorkflowSettings("GUARDED", 3));
+        var definition = new OpsPlatformLandingRuntimeDefinitionFactory().create("project-1");
+        var request = durableRequest();
+        request.getMetadata().put(OpsAgentRunExecutionContextFactory.TRUSTED_APPROVED_PACKAGE_KEY,
+                new cn.lgs.orbisops.domain.worksession.runtime.model.ApprovedPackageSnapshot(
+                        "cp-1", 1, "hash-1", "project-1", "prod", "", java.time.Instant.now().plusSeconds(60)));
+        new OpsAgentRunExecutionContextFactory().bindServerContext(request, definition);
+        var events = new ArrayList<OpsRuntimeEvent>();
+        assertDoesNotThrow(() -> coordinator.begin(definition, request, definition.getNodes(), events, null));
+        verifyNoInteractions(validator);
+        assertEquals("PLATFORM_LANDING_WORK_SESSION", events.get(0).getPayload().get("reasonCode"));
+    }
+
+    @Test
+    void platformLabelWithoutServerIssuedLandingAuthorityCannotSkipWorkflowGuards() {
+        var validator = mock(OpsAgentDefinitionValidator.class);
+        var coordinator = coordinator(validator, new OpsTypedWorkflowSettings("GUARDED", 3));
+        var definition = new OpsPlatformLandingRuntimeDefinitionFactory().create("project-1");
+        var request = durableRequest();
+        request.getMetadata().put("landingApproved", true);
+        assertThrows(SecurityException.class,
+                () -> coordinator.begin(definition, request, definition.getNodes(), new ArrayList<>(), null));
+    }
+
     private OpsTypedWorkflowExecutionCoordinator coordinator(
             OpsAgentDefinitionValidator validator,
             OpsTypedWorkflowSettings settings) {

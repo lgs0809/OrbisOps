@@ -12,7 +12,8 @@ import java.util.Map;
 import java.util.concurrent.RejectedExecutionException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 class MemoryPostProcessingApplicationServiceTest {
 
@@ -132,6 +133,57 @@ class MemoryPostProcessingApplicationServiceTest {
                 false));
 
         assertTrue(operations.isEmpty());
+    }
+
+    @Test void durableDispatchReturnsBeforeTheQueuedModelRunsAndDefersItsFailureWithoutCompleting() {
+        var repository=mock(cn.lgs.orbisops.domain.memory.adapter.repository.IConversationMemoryRepository.class);
+        var extraction=mock(MemoryExtractionPort.class);
+        var source=new ColdMemoryMessageSnapshot("s1","u1","user","captured message","now",Map.of());
+        var job=new cn.lgs.orbisops.domain.memory.model.MemoryProcessingJob(1,"s1",1,"EXTRACTION",8,12,"worker",12,source);
+        when(repository.pending(eq("s1"),eq(12),anyLong())).thenReturn(List.of(1L));
+        when(repository.claim(eq(1L),anyString(),anyLong(),eq(300_000L))).thenReturn(java.util.Optional.of(job));
+        when(extraction.extractDurably(any())).thenReturn(new MemoryExtractionPort.Outcome(List.of(),true,"RULE_FALLBACK_MODEL_PENDING"));
+        var queue=new ArrayList<Runnable>();
+        var service=new MemoryPostProcessingApplicationService(null,extraction,null,null,null,()->queue::add,null,repository,java.time.Clock.systemUTC());
+        service.submit(command(false));
+        assertEquals(1,queue.size());verifyNoInteractions(extraction);
+        verify(repository,never()).claim(anyLong(),anyString(),anyLong(),anyLong());
+        queue.get(0).run();
+        verify(extraction).extractDurably(any());
+        verify(repository).defer(eq(job),eq("RULE_FALLBACK_MODEL_PENDING"),eq("MEMORY_EXTRACTION_MODEL_DEFERRED"),anyLong(),any());
+        verify(repository,never()).complete(any(),anyString(),anyLong(),any());
+    }
+
+    @Test void disabledModelDoesNotEraseAnAlreadyPersistedExtractionSupplement() {
+        var repository=mock(cn.lgs.orbisops.domain.memory.adapter.repository.IConversationMemoryRepository.class);
+        var extraction=mock(MemoryExtractionPort.class);
+        var source=new ColdMemoryMessageSnapshot("s1","u1","user","captured message","now",Map.of());
+        var job=new cn.lgs.orbisops.domain.memory.model.MemoryProcessingJob(1,"s1",1,"EXTRACTION",8,9,"worker",9,source,"","RULE_FALLBACK_MODEL_PENDING");
+        when(repository.pending(eq("s1"),eq(12),anyLong())).thenReturn(List.of(1L));
+        when(repository.claim(eq(1L),anyString(),anyLong(),eq(300_000L))).thenReturn(java.util.Optional.of(job));
+        when(extraction.extractDurably(any())).thenReturn(new MemoryExtractionPort.Outcome(List.of(),false,"RULES_ONLY"));
+        var service=new MemoryPostProcessingApplicationService(null,extraction,null,null,null,()->Runnable::run,null,repository,java.time.Clock.systemUTC());
+        service.submit(command(false));
+        verify(repository).retry(eq(job),eq("MEMORY_EXTRACTION_MODEL_DISABLED"),anyLong());
+        verify(repository,never()).complete(any(),anyString(),anyLong(),any());
+        verify(repository,never()).defer(any(),anyString(),anyString(),anyLong(),any());
+    }
+
+    @Test void semanticLexicalFallbackKeepsTheSameDurableTaskPendingAndRevokedSourcesNeverCallThePort() {
+        var repository=mock(cn.lgs.orbisops.domain.memory.adapter.repository.IConversationMemoryRepository.class);
+        var semantic=mock(SemanticMemoryWritePort.class);
+        var source=new ColdMemoryMessageSnapshot("s1","u1","user","semantic source","now",Map.of());
+        var job=new cn.lgs.orbisops.domain.memory.model.MemoryProcessingJob(1,"s1",1,"SEMANTIC",8,12,"worker",12,source,"","LEXICAL_MODEL_PENDING","frozen");
+        when(repository.pending(eq("s1"),eq(12),anyLong())).thenReturn(List.of(1L));
+        when(repository.claim(eq(1L),anyString(),anyLong(),eq(300_000L))).thenReturn(java.util.Optional.of(job));
+        when(repository.validSemanticSource(eq(job),anyLong())).thenReturn(true,false);
+        when(semantic.appendDurably(job)).thenReturn(new SemanticMemoryWritePort.Outcome("LEXICAL",true,"EMBEDDING_TEMPORARILY_UNAVAILABLE"));
+        var service=new MemoryPostProcessingApplicationService(semantic,null,null,null,null,()->Runnable::run,null,repository,java.time.Clock.systemUTC());
+        service.submit(command(false));
+        verify(repository).defer(eq(job),eq("LEXICAL_MODEL_PENDING"),eq("EMBEDDING_TEMPORARILY_UNAVAILABLE"),anyLong(),isNull());
+        service.submit(command(false));verify(semantic,times(1)).appendDurably(job);
+        verify(repository).block(eq(job),eq("MEMORY_SEMANTIC_SOURCE_OR_OWNER_CHANGED"),anyLong());
+        verify(repository,never()).complete(any(),anyString(),anyLong(),any());
     }
 
     private MemoryPostProcessingCommand command(boolean extractionAsyncEnabled) {

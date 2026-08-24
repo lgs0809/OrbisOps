@@ -28,6 +28,9 @@ public final class WorkSessionExecutionProcessManager<I, C, O, E> {
             port.execute(context, eventSink);
             return port.succeed(context, eventSink);
         } catch (RuntimeException error) {
+            if (port.isSuspension(error)) {
+                return port.suspend(context, error, eventSink);
+            }
             if (port.isCancellation(error)) {
                 return port.cancel(context, error, eventSink);
             }

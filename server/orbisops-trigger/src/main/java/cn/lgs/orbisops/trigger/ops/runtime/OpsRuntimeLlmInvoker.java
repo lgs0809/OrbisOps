@@ -2,6 +2,9 @@ package cn.lgs.orbisops.trigger.ops.runtime;
 
 import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
 import cn.lgs.orbisops.trigger.ops.OpsNodeDeadlineContext;
+import cn.lgs.orbisops.trigger.ops.OpsModelCallAwaiter;
+import cn.lgs.orbisops.trigger.ops.OpsRunControlContext;
+import cn.lgs.orbisops.trigger.ops.OpsRunCanceledException;
 import org.springframework.ai.chat.client.ChatClient;
 
 import java.util.ArrayList;
@@ -66,9 +69,9 @@ final class OpsRuntimeLlmInvoker {
             failedPayload.put("durationMs", elapsedMs(startedNanos));
             failedPayload.put("error", error.getMessage());
             record(events, eventSink, OpsRuntimeEvent.builder()
-                    .eventType("MODEL_CALL_FAILED")
-                    .status("FAILED")
-                    .summary("模型调用失败：" + error.getMessage())
+                    .eventType(error instanceof OpsRunCanceledException ? "MODEL_CALL_CANCELLED" : "MODEL_CALL_FAILED")
+                    .status(error instanceof OpsRunCanceledException ? "CANCELED" : "FAILED")
+                    .summary(error instanceof OpsRunCanceledException ? "用户取消了模型调用。" : "模型调用失败：" + error.getMessage())
                     .payload(payloadWithElapsed(failedPayload, requestStartedNanos))
                     .build());
             throw error;
@@ -103,11 +106,11 @@ final class OpsRuntimeLlmInvoker {
                 .build());
         AtomicBoolean firstChunk = new AtomicBoolean(false);
         try {
-            builder.build()
+            boundedModelCall(() -> OpsModelCallAwaiter.cancellable(builder.build()
                     .prompt()
                     .user(userPrompt)
                     .stream()
-                    .content()
+                    .content())
                     .doOnNext(chunk -> {
                         if (chunk == null || chunk.isEmpty()) return;
                         if (firstChunk.compareAndSet(false, true)) {
@@ -129,16 +132,16 @@ final class OpsRuntimeLlmInvoker {
                                 .content(chunk)
                                 .build());
                     })
-                    .blockLast();
+                    .blockLast());
         } catch (RuntimeException error) {
             Map<String, Object> failedPayload = modelCallPayload(systemPrompt, userPrompt, bundle);
             failedPayload.put("durationMs", elapsedMs(startedNanos));
             failedPayload.put("outputChars", content.length());
             failedPayload.put("error", error.getMessage());
             record(events, eventSink, OpsRuntimeEvent.builder()
-                    .eventType("MODEL_CALL_FAILED")
-                    .status("FAILED")
-                    .summary("模型流式调用失败：" + error.getMessage())
+                    .eventType(error instanceof OpsRunCanceledException ? "MODEL_CALL_CANCELLED" : "MODEL_CALL_FAILED")
+                    .status(error instanceof OpsRunCanceledException ? "CANCELED" : "FAILED")
+                    .summary(error instanceof OpsRunCanceledException ? "用户取消了模型调用。" : "模型流式调用失败：" + error.getMessage())
                     .payload(payloadWithElapsed(failedPayload, requestStartedNanos))
                     .build());
             throw error;
@@ -222,9 +225,15 @@ final class OpsRuntimeLlmInvoker {
         if (timeoutMillis <= 0L) {
             throw new IllegalStateException("模型调用开始前节点总时限已耗尽");
         }
-        Future<T> future = modelCallExecutor.submit(invocation::get);
+        Long nodeDeadline = OpsNodeDeadlineContext.captureDeadline();
+        var control = OpsRunControlContext.current();
+        Future<T> future = modelCallExecutor.submit(
+                () -> OpsRunControlContext.withBinding(control, () -> {
+                    if (control != null) control.assertNotCanceled();
+                    return OpsNodeDeadlineContext.withDeadline(nodeDeadline, invocation);
+                }));
         try {
-            return future.get(timeoutMillis, TimeUnit.MILLISECONDS);
+            return OpsModelCallAwaiter.get(future, timeoutMillis);
         } catch (TimeoutException e) {
             future.cancel(true);
             throw new IllegalStateException("模型调用超过当前总时限 " + timeoutMillis + "ms", e);

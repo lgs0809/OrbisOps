@@ -36,6 +36,72 @@ import static org.mockito.Mockito.when;
 class OpsMcpToolExecutionDispatchHandlerTest {
 
     @Test
+    void strictGenericWriteRetainsExactBusinessArgumentsAndAuthorityOnlyInNativeContext() {
+        var application = mock(McpExecutionApplicationService.class);
+        var configs = mock(OpsProjectMcpRuntimeConfigService.class);
+        when(configs.resolve("project-1", "ops-mcp")).thenReturn(Optional.of(config()));
+        when(application.execute(any())).thenReturn(response(true, "ALLOWED"));
+        var original = request(true);
+        var target = strictTarget("apply_config", false, "{\"value\":{\"type\":\"string\"}}");
+        var context = new java.util.LinkedHashMap<>(original.requestContext());
+        context.put("idempotencyKey", "owned-key");
+        context.put("authorityDeadline", Instant.now().plusSeconds(60));
+        var request = new ToolExecutionRequest(original.projectId(), original.userId(), original.actor(),
+                original.toolsetId(), original.toolName(), original.scope(), Map.of("value", "fixture-4"),
+                original.sessionId(), original.runId(), context, original.landingContext());
+        handler(application, configs).dispatch(target, request);
+        var captor = ArgumentCaptor.forClass(McpExecutionRequest.class);
+        verify(application).execute(captor.capture());
+        var actual = captor.getValue();
+        assertEquals(Map.of("value", "fixture-4"), actual.input().get("arguments"));
+        assertTrue(actual.trustedLandingRuntime());
+        assertEquals("alice", actual.actor());
+        assertEquals("package-1", actual.config().changePackageId());
+        assertEquals("hash-1", actual.config().approvedPackageHash());
+        assertEquals("owned-key", actual.config().headers().get("X-Ops-Execution-Key"));
+    }
+
+    @Test
+    void serviceControlNameAloneDoesNotInventIdentityFieldsInStrictSchema() {
+        var application = mock(McpExecutionApplicationService.class);
+        var configs = mock(OpsProjectMcpRuntimeConfigService.class);
+        when(configs.resolve("project-1", "ops-mcp")).thenReturn(Optional.of(config()));
+        when(application.execute(any())).thenReturn(response(true, "ALLOWED"));
+        handler(application, configs).dispatch(strictTarget("get_service_status", true,
+                "{\"query\":{\"type\":\"string\"}}"), request(false));
+        var captor = ArgumentCaptor.forClass(McpExecutionRequest.class);
+        verify(application).execute(captor.capture());
+        assertEquals(Map.of("query", "error"), captor.getValue().input().get("arguments"));
+    }
+
+    @Test
+    void declaredAuthorityFieldsAreSuppliedForAWriteEvenWhenModelOmitsThem() {
+        var application = mock(McpExecutionApplicationService.class);
+        var configs = mock(OpsProjectMcpRuntimeConfigService.class);
+        when(configs.resolve("project-1", "ops-mcp")).thenReturn(Optional.of(config()));
+        when(application.execute(any())).thenReturn(response(true, "ALLOWED"));
+        var original = request(true);
+        var request = new ToolExecutionRequest(original.projectId(), original.userId(), original.actor(),
+                original.toolsetId(), original.toolName(), original.scope(), original.arguments(),
+                original.sessionId(), original.runId(), Map.of("idempotencyKey", "owned-key"), original.landingContext());
+        handler(application, configs).dispatch(strictTarget("apply_config", false,
+                "{\"projectId\":{},\"executionKey\":{},\"query\":{}}"), request);
+        var captor = ArgumentCaptor.forClass(McpExecutionRequest.class);
+        verify(application).execute(captor.capture());
+        assertEquals(Map.of("query", "error", "projectId", "project-1", "executionKey", "owned-key"),
+                captor.getValue().input().get("arguments"));
+    }
+
+    private ToolExecutionTarget strictTarget(String remoteName, boolean readOnly, String properties) {
+        var provider = new ToolProviderDescriptor(ToolProviderType.MCP, "ops-mcp", "MCP", "",
+                "ops-mcp", remoteName, "{}", "{}");
+        return new ToolExecutionTarget("observability.logs", "project_logs_search", "MCP", readOnly ? "LOW" : "HIGH",
+                readOnly, false, !readOnly, !readOnly, !readOnly, provider,
+                readOnly ? ToolSemantics.readOnlyTool() : ToolSemantics.targetResourceWrite(),
+                ToolSchema.inputOnly("{\"type\":\"object\",\"additionalProperties\":false,\"properties\":" + properties + "}"));
+    }
+
+    @Test
     void supportsOnlyMcpProviderAndInvokesMcpApplicationWithExactRemoteIdentity() {
         McpExecutionApplicationService application = mock(McpExecutionApplicationService.class);
         OpsProjectMcpRuntimeConfigService configs = mock(OpsProjectMcpRuntimeConfigService.class);
@@ -67,6 +133,27 @@ class OpsMcpToolExecutionDispatchHandlerTest {
     }
 
     @Test
+    void readRestrictionSurvivesMappingAndLifecycleIsDelegatedToMcpApplication() {
+        var application = mock(McpExecutionApplicationService.class);
+        var configs = mock(OpsProjectMcpRuntimeConfigService.class);
+        when(configs.resolve("project-1", "ops-mcp")).thenReturn(Optional.of(config()));
+        when(application.execute(any())).thenReturn(response(true, "ALLOWED"));
+        var original = request(false);
+        var context = new java.util.LinkedHashMap<>(original.requestContext());
+        context.put("requireReadOnly", true);
+        context.put("idempotencyKey", "verification-read-1");
+        var restricted = new ToolExecutionRequest(original.projectId(), original.userId(), original.actor(),
+                original.toolsetId(), original.toolName(), original.scope(), original.arguments(),
+                original.sessionId(), original.runId(), context, original.landingContext());
+        handler(application, configs).dispatch(target(), restricted);
+        verify(application).execute(org.mockito.ArgumentMatchers.argThat(r ->
+                Boolean.TRUE.equals(r.input().get("requireReadOnly")) && !r.trustedLandingRuntime()
+                        && !r.config().headers().containsKey("X-Ops-Execution-Key")));
+        org.mockito.Mockito.verify(application, org.mockito.Mockito.never()).activate(any());
+        org.mockito.Mockito.verifyNoMoreInteractions(application);
+    }
+
+    @Test
     void approvedLandingCopiesPackageAuthorityIntoMcpRequest() {
         McpExecutionApplicationService application = mock(McpExecutionApplicationService.class);
         OpsProjectMcpRuntimeConfigService configs = mock(OpsProjectMcpRuntimeConfigService.class);
@@ -88,7 +175,7 @@ class OpsMcpToolExecutionDispatchHandlerTest {
     }
 
     @Test
-    void approvedLandingInjectsAndOverridesRuntimeOwnedRemoteArguments() {
+    void approvedLandingInjectsIdentityWithMatchingServerExecutionKey() {
         McpExecutionApplicationService application = mock(McpExecutionApplicationService.class);
         OpsProjectMcpRuntimeConfigService configs = mock(OpsProjectMcpRuntimeConfigService.class);
         when(configs.resolve("project-1", "ops-mcp")).thenReturn(Optional.of(config()));
@@ -106,7 +193,7 @@ class OpsMcpToolExecutionDispatchHandlerTest {
                         "service", "order-service",
                         "projectId", "spoofed-project",
                         "actor", "mallory",
-                        "executionKey", "spoofed-key",
+                        "executionKey", "trusted-execution-key",
                         "deadline", "2000-01-01T00:00:00Z"),
                 "session-1",
                 "run-1",
@@ -132,6 +219,34 @@ class OpsMcpToolExecutionDispatchHandlerTest {
         assertEquals("alice", arguments.get("actor"));
         assertEquals("trusted-execution-key", arguments.get("executionKey"));
         assertEquals(deadline.toString(), arguments.get("deadline"));
+    }
+
+    @Test
+    void explicitForgedLandingKeyIsRefusedBeforeMcpApplicationExecution() {
+        var application = mock(McpExecutionApplicationService.class);
+        var configs = mock(OpsProjectMcpRuntimeConfigService.class);
+        when(configs.resolve("project-1", "ops-mcp")).thenReturn(Optional.of(config()));
+        var original = request(true);
+        var request = new ToolExecutionRequest(original.projectId(), original.userId(), original.actor(),
+                original.toolsetId(), original.toolName(), original.scope(), Map.of("query", "error", "executionKey", "forged"),
+                original.sessionId(), original.runId(), Map.of("idempotencyKey", "native-key"), original.landingContext());
+        var denied = assertThrows(SecurityException.class, () -> handler(application, configs).dispatch(target(), request));
+        assertEquals("MCP_RUNTIME_OWNED_ARGUMENT_MISMATCH:executionKey", denied.getMessage());
+        org.mockito.Mockito.verifyNoInteractions(application);
+    }
+
+    @Test
+    void landingReadOnlyCallPreservesBusinessArgumentsWithoutInjectingWriteMetadata() {
+        McpExecutionApplicationService application = mock(McpExecutionApplicationService.class);
+        OpsProjectMcpRuntimeConfigService configs = mock(OpsProjectMcpRuntimeConfigService.class);
+        when(configs.resolve("project-1", "ops-mcp")).thenReturn(Optional.of(config()));
+        when(application.execute(any())).thenReturn(response(true, "ALLOWED"));
+        handler(application, configs).dispatch(target(), request(true));
+        ArgumentCaptor<McpExecutionRequest> captor = ArgumentCaptor.forClass(McpExecutionRequest.class);
+        verify(application).execute(captor.capture());
+        assertEquals(Map.of("query", "error"), captor.getValue().input().get("arguments"));
+        assertTrue(captor.getValue().trustedLandingRuntime());
+        assertEquals("package-1", captor.getValue().config().changePackageId());
     }
 
     @Test

@@ -10,9 +10,14 @@ import cn.lgs.orbisops.domain.memory.model.MemoryType;
 import com.alibaba.fastjson.JSON;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -23,7 +28,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 /** JDBC persistence owner for governed explicit memories and their governance records. */
 @Repository
@@ -39,12 +46,45 @@ public class JdbcGovernedMemoryRepository implements IGovernedMemoryRepository {
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
     private final JdbcGovernedMemorySchemaInitializer schemaInitializer;
+    private final RetryTemplate logicalLockRetries = RetryTemplate.builder()
+            .maxAttempts(5)
+            .exponentialBackoff(25, 2, 250, true)
+            .retryOn(PessimisticLockingFailureException.class)
+            .traversingCauses()
+            .build();
 
     public JdbcGovernedMemoryRepository(
             @Qualifier("mysqlJdbcTemplate") ObjectProvider<JdbcTemplate> jdbcTemplateProvider,
             JdbcGovernedMemorySchemaInitializer schemaInitializer) {
         this.jdbcTemplateProvider = jdbcTemplateProvider;
         this.schemaInitializer = schemaInitializer;
+    }
+
+    @Override
+    public <T> T withLogicalLock(String lockKey, Supplier<T> action) {
+        JdbcTemplate template = requiredTemplate();
+        var dataSource = Objects.requireNonNull(template.getDataSource());
+        var transaction = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
+        Supplier<T> locked = () -> transaction.execute(status -> {
+            template.update("INSERT INTO ai_ops_memory_logical_lock(lock_key) VALUES (?) ON DUPLICATE KEY UPDATE lock_key=VALUES(lock_key)", lockKey);
+            template.queryForObject("SELECT lock_key FROM ai_ops_memory_logical_lock WHERE lock_key=? FOR UPDATE", String.class, lockKey);
+            return action.get();
+        });
+        // A REQUIRED participant cannot recover a deadlocked/rollback-only outer transaction.
+        // Keep task completion and local writes atomic; the durable task retries that whole unit.
+        if (TransactionSynchronizationManager.hasResource(dataSource)) return locked.get();
+        // Each failed owned transaction is fully rolled back before a new attempt starts.
+        return logicalLockRetries.execute(context -> locked.get());
+    }
+
+    @Override
+    public void appendSource(String memoryId, String idempotencyKey, String sourceRunId,
+                             List<Map<String, Object>> proofRefs, String actor) {
+        requiredTemplate().update("""
+                INSERT INTO ai_ops_memory_source(idempotency_key, memory_id, source_run_id, proof_refs_json, created_by)
+                VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE idempotency_key=VALUES(idempotency_key)
+                """, idempotencyKey, memoryId, sourceRunId == null ? "" : sourceRunId,
+                JSON.toJSONString(proofRefs), actor == null ? "" : actor);
     }
 
     @Override
@@ -58,8 +98,10 @@ public class JdbcGovernedMemoryRepository implements IGovernedMemoryRepository {
         JdbcTemplate template = requiredTemplate();
         ensureSchema();
         return template.query(
-                        SELECT_COLUMNS + " WHERE idempotency_key = ? LIMIT 1",
+                        SELECT_COLUMNS + " WHERE idempotency_key = ? OR memory_id IN"
+                                + " (SELECT memory_id FROM ai_ops_memory_source WHERE idempotency_key=?) LIMIT 1",
                         this::snapshot,
+                        idempotencyKey.trim(),
                         idempotencyKey.trim())
                 .stream()
                 .findFirst();
@@ -126,6 +168,8 @@ public class JdbcGovernedMemoryRepository implements IGovernedMemoryRepository {
         args.add(safe.sessionId());
         if (hasText(safe.excludedSourceRunId())) {
             sql.append(" AND source_run_id <> ?");
+            args.add(safe.excludedSourceRunId());
+            sql.append(" AND NOT EXISTS (SELECT 1 FROM ai_ops_memory_source ms WHERE ms.memory_id=ai_ops_memory.memory_id AND ms.source_run_id=?)");
             args.add(safe.excludedSourceRunId());
         }
         sql.append(" ORDER BY verified DESC, update_time DESC, id DESC LIMIT ?");

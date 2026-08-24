@@ -55,6 +55,13 @@ public class ColdMemoryStoreApplicationService {
         }
     }
 
+    /** Durable worker entry: errors must roll back its lease-guarded completion transaction. */
+    public void saveItemsStrict(List<ColdMemoryItemSnapshot> items) {
+        if (items == null || items.isEmpty()) return;
+        if (!available()) throw new IllegalStateException("COLD_MEMORY_STORE_UNAVAILABLE");
+        repository.saveItems(items);
+    }
+
     public List<ColdMemoryItemSnapshot> listItems(String sessionId, String userId, int limit) {
         if (!hasText(sessionId) || !available()) return List.of();
         try {

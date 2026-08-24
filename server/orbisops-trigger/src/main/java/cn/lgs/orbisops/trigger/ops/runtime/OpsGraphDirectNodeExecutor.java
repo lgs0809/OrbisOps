@@ -1,6 +1,7 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
 import com.alibaba.fastjson2.JSON;
+import cn.lgs.orbisops.domain.agentdefinition.service.DirectActionDataPolicy;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.util.StringUtils;
 
@@ -26,6 +27,14 @@ final class OpsGraphDirectNodeExecutor {
         if (actions.isEmpty()) {
             throw new IllegalArgumentException("DIRECT_NODE_ACTIONS_REQUIRED");
         }
+        var dataPolicy = new DirectActionDataPolicy();
+        actions.forEach(dataPolicy::validate);
+        Map<String, Object> input = actions.stream().anyMatch(dataPolicy::needsInput)
+                ? dataPolicy.parseObject(context.request().getQuery()) : Map.of();
+        Map<String, Object> workflowData = new LinkedHashMap<>();
+        if (context.state() != null) context.state().data().forEach((key, value) -> {
+            if (key.startsWith("workflowData_")) workflowData.put(key, value);
+        });
         OpsRuntimeResourceBundle bundle = resourceAssembler.assembleNode(
                 context.definition(),
                 context.node(),
@@ -39,9 +48,17 @@ final class OpsGraphDirectNodeExecutor {
         int index = 0;
         for (Map<String, Object> action : actions) {
             index++;
-            Object arguments = action.containsKey("arguments") ? action.get("arguments") : Map.of();
+            Object arguments = dataPolicy.arguments(action, input, workflowData);
             ResolvedAction resolved = resolveAction(action, arguments, tools, index);
-            lastOutput = text(resolved.tool().call(resolved.input()));
+            lastOutput = text("MCP_EVIDENCE_REFERENCE".equals(action.get("outputMode"))
+                    ? resolved.tool().call(resolved.input(), OpsDirectMcpEvidenceProjection.context(resolved.mcpId(), resolved.toolName()))
+                    : resolved.tool().call(resolved.input()));
+            Map<String,Object> structured = action.containsKey("structuredOutputKey") ? dataPolicy.parseObject(lastOutput) : Map.of();
+            if ("MCP_EVIDENCE_REFERENCE".equals(action.get("outputMode"))) {
+                var projected = new OpsDirectMcpEvidenceProjection().project(structured,resolved.mcpId(),resolved.toolName());
+                structured = projected.structured();
+                lastOutput = projected.display();
+            }
 
             Map<String, Object> observation = new LinkedHashMap<>();
             observation.put("index", index);
@@ -57,6 +74,10 @@ final class OpsGraphDirectNodeExecutor {
                 observation.put("outputKey", actionOutputKey);
             }
             observations.add(Map.copyOf(observation));
+            if (action.get("structuredOutputKey") instanceof String key) {
+                workflowData.put("workflowData_" + key, structured);
+                result.put("workflowData_" + key, structured);
+            }
         }
         result.put("directActions", List.copyOf(observations));
         return new OpsGraphNodeExecutionResult(lastOutput, result);

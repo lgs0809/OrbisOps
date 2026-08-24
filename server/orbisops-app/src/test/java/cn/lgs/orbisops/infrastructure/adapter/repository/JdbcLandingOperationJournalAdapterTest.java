@@ -42,7 +42,9 @@ class JdbcLandingOperationJournalAdapterTest {
         when(jdbc.update(
                 argThat(sql -> sql != null
                         && sql.contains("TOOL_EXECUTION_AUTHORITATIVE_COMPLETION")
-                        && sql.contains("execution_key=?")
+                        && sql.contains("WHERE landing_run_id=? AND operation_id=? AND tool_name=?")
+                        && sql.contains("AND execution_key=?")
+                        && !sql.contains("SET execution_key=?")
                         && sql.contains("fact_status='COMPLETED'")),
                 any(Object[].class))).thenReturn(1);
         JdbcLandingOperationJournalAdapter adapter = new JdbcLandingOperationJournalAdapter(jdbc);
@@ -59,6 +61,24 @@ class JdbcLandingOperationJournalAdapterTest {
                         "a".repeat(64)));
 
         assertTrue(completed);
+    }
+
+    @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void exposesStableExecutionBindingsForTheCurrentLandingAttempt() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class)))
+                .thenReturn(List.of());
+        JdbcLandingOperationJournalAdapter adapter = new JdbcLandingOperationJournalAdapter(jdbc);
+
+        assertTrue(adapter.operationExecutionBindings("landing-run-1").isEmpty());
+
+        verify(jdbc).query(
+                argThat(sql -> sql.contains("operation_id, execution_key, toolset_id, tool_name, resource_key")
+                        && sql.contains("WHERE landing_run_id=?")
+                        && sql.contains("ORDER BY id ASC")),
+                any(RowMapper.class),
+                any(Object[].class));
     }
 
     @Test

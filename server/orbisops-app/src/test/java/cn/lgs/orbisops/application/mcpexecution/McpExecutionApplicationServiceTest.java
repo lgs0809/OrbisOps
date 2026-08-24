@@ -19,6 +19,62 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class McpExecutionApplicationServiceTest {
+    @Test void securityExceptionAfterRemoteInvocationCannotClaimPreDispatchDenial() {
+        var runtime = new RuntimeStub(activeSchema(), false, true);
+        var records = new ArrayList<McpExecutionRecordPort.McpExecutionRecordCommand>();
+        var remote = org.mockito.Mockito.mock(McpExecutionRemotePort.class);
+        org.mockito.Mockito.when(remote.call(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.anyString())).thenThrow(new SecurityException("remote rejected after invocation"));
+        var service = service(runtime, remote, (request, target) -> McpExecutionDecision.allowed(Map.of()),
+                command -> { records.add(command); return recorded(command.durationMs()); }, event -> { });
+        assertThrows(McpExecutionDeniedException.class, () -> service.execute(request(List.of("query_metrics"), List.of())));
+        assertEquals(1, records.size());
+        assertEquals(McpExecutionRecordPort.DispatchDisposition.NOT_PROVEN, records.get(0).dispatchDisposition());
+        org.mockito.Mockito.verify(remote).call(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString());
+    }
+
+
+    @Test
+    void productionContractDisclosureDoesNotActivateOrInvokeAndExecutionStillRequiresApproval() {
+        var schema = new java.util.LinkedHashMap<String, Object>(activeSchema());
+        schema.put("effectType", "MUTATE_TARGET_RESOURCE");
+        schema.put("effectScope", "PRODUCTION");
+        schema.put("mutability", "PROD_MUTATING");
+        schema.put("readOnly", false);
+        RuntimeStub runtime = new RuntimeStub(schema, false, false);
+        var remote = org.mockito.Mockito.mock(McpExecutionRemotePort.class);
+        org.mockito.Mockito.when(remote.inspect(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(Map.of("inputSchema", Map.of("required", List.of("expectedVersion"))));
+        var service = service(runtime, remote,
+                (request, target) -> target.requiresChangePackage()
+                        ? McpExecutionDecision.blocked("MCP_TOOL_REQUIRES_CHANGE_PACKAGE", "approval required")
+                        : McpExecutionDecision.allowed(Map.of()),
+                command -> recorded(command.durationMs()), event -> {});
+        var request = request(List.of("query_metrics"), List.of());
+        var disclosure = service.activate(request);
+        assertEquals("SCHEMA_ONLY", disclosure.payload().get("status"));
+        assertEquals(false, disclosure.payload().get("activated"));
+        assertEquals(false, disclosure.payload().get("executionAllowed"));
+        assertEquals(0, runtime.activationCount);
+        assertThrows(McpExecutionDeniedException.class, () -> service.execute(request));
+        org.mockito.Mockito.verify(remote, org.mockito.Mockito.never()).call(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    void staleContractCannotBeDisclosedOrActivated() {
+        var schema = new java.util.LinkedHashMap<String, Object>(activeSchema());
+        schema.put("policyStatus", "STALE");
+        RuntimeStub runtime = new RuntimeStub(schema, false, false);
+        var service = service(runtime, remote(new AtomicBoolean()),
+                (request, target) -> McpExecutionDecision.allowed(Map.of()),
+                command -> recorded(command.durationMs()), event -> {});
+        var result = service.activate(request(List.of("query_metrics"), List.of()));
+        assertFalse(result.allowed());
+        assertEquals("MCP_POLICY_STALE", result.decision());
+        assertEquals(0, runtime.activationCount);
+    }
 
     @Test
     void discoveryAndActivationMustShareRuntimeRemoteAndEvidenceBoundaries() {
@@ -106,6 +162,8 @@ class McpExecutionApplicationServiceTest {
         assertEquals(1, runtime.calls.size());
         assertEquals("BLOCKED", runtime.calls.get(0).status());
         assertEquals("TOOL_BLOCKED", records.get(0).source());
+        assertEquals(McpExecutionRecordPort.DispatchDisposition.PRE_DISPATCH_DENIED,
+                records.get(0).dispatchDisposition());
         assertFalse(records.get(0).verified());
     }
 
@@ -140,6 +198,34 @@ class McpExecutionApplicationServiceTest {
                 routeDenied.response().decision());
         assertEquals("blocked", audits.get(0).action());
         assertEquals(1, routeRuntime.calls.size());
+    }
+
+    @Test
+    void independentVerificationChecksReviewedReadOnlyPolicyBeforeRemoteDispatch() {
+        Map<String, Object> write = new java.util.LinkedHashMap<>(activeSchema());
+        write.put("readOnly", false);
+        write.put("effectType", "MUTATE_TEST_RESOURCE");
+        write.put("prepareAllowed", true);
+        write.put("mutability", "TEST_MUTATING");
+        AtomicBoolean called = new AtomicBoolean();
+        var service = service(new RuntimeStub(write, true, false), remote(called),
+                (request, target) -> McpExecutionDecision.allowed(Map.of()),
+                command -> recorded(command.durationMs()), event -> {});
+        var denied = assertThrows(McpExecutionDeniedException.class, () -> service.execute(request(
+                List.of("query_metrics"), List.of(), Map.of("toolName", "query_metrics", "requireReadOnly", true))));
+        assertTrue(denied.getMessage().contains("READ_ONLY_REQUIRED"));
+        assertFalse(called.get());
+    }
+
+    @Test
+    void reviewedReadOnlyToolRemainsUsableForIndependentVerification() {
+        AtomicBoolean called = new AtomicBoolean();
+        var service = service(new RuntimeStub(activeSchema(), false, true), remote(called),
+                (request, target) -> McpExecutionDecision.allowed(Map.of()),
+                command -> recorded(command.durationMs()), event -> {});
+        assertTrue(service.execute(request(List.of("query_metrics"), List.of(),
+                Map.of("toolName", "query_metrics", "requireReadOnly", true))).allowed());
+        assertTrue(called.get());
     }
 
     private McpExecutionApplicationService service(
@@ -211,6 +297,7 @@ class McpExecutionApplicationServiceTest {
         private final Map<String, Object> schema;
         private final boolean requiresActivation;
         private final boolean activated;
+        private int activationCount;
         private final List<McpRuntimeCallEvent> calls = new ArrayList<>();
 
         private RuntimeStub(
@@ -233,6 +320,7 @@ class McpExecutionApplicationServiceTest {
                 String toolName,
                 String reason,
                 Map<String, Object> remoteDefinition) {
+            activationCount++;
             return new McpRuntimeActivation("SUCCEEDED", Map.of("status", "SUCCEEDED"));
         }
 

@@ -114,7 +114,11 @@ class OpsGraphFeedbackLoopRuntimeTest {
         String prompt = promptAssembler.systemPrompt(definition, node, null);
 
         assertFalse(prompt.contains("全局约束：输出完整诊断报告。"));
-        assertEquals("节点约束：只返回 Prometheus 原始 observation。", prompt);
+        assertTrue(prompt.startsWith("节点约束：只返回 Prometheus 原始 observation。\n\n"));
+        assertTrue(prompt.contains("### 本轮服务器时间基准"));
+        assertEquals(1, prompt.split("currentTimeUtc:", -1).length - 1);
+        assertFalse(prompt.contains("### 全局 System Prompt"));
+        assertFalse(prompt.contains("### ReAct 证据与最终结果协议"));
     }
 
     @Test
@@ -1007,6 +1011,7 @@ class OpsGraphFeedbackLoopRuntimeTest {
                 analysisCoordinator,
                 routingPolicy,
                 conditionEvaluator,
+                null,
                 null,
                 null,
                 null);

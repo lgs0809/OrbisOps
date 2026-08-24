@@ -43,13 +43,16 @@ class OpsSkillEvolutionJobAdaptersTest {
         OpsChatSessionService chats = mock(OpsChatSessionService.class);
         when(graphEvents.list("run-1")).thenReturn(List.of(new GraphEvent(
                 "run-1", "", 1L, "TOOL_FINISHED", "node-1", "TOOL", "agent-1", "runtime",
-                "SUCCEEDED", "done", "", "", 5L, Map.of("contextBundleHash", "ctx-1"))));
+                "SUCCEEDED", "done", "", "", 5L, Map.of(
+                        "contextBundleHash", "ctx-1",
+                        "content", "tool result"))));
         when(chats.messages("session-1", 200)).thenReturn(List.of(
                 OpsChatMessageView.builder().role("user").content("goal").build()));
         OpsSkillEvolutionInputAdapter adapter = new OpsSkillEvolutionInputAdapter(graphEvents, chats);
 
         assertAll(
                 () -> assertEquals("TOOL_FINISHED", adapter.trace("run-1").get(0).eventType()),
+                () -> assertEquals("tool result", adapter.trace("run-1").get(0).content()),
                 () -> assertEquals("ctx-1", adapter.trace("run-1").get(0).payload().get("contextBundleHash")),
                 () -> assertEquals("user", adapter.messages("session-1", 200).get(0).role()),
                 () -> assertEquals("goal", adapter.messages("session-1", 200).get(0).content()),

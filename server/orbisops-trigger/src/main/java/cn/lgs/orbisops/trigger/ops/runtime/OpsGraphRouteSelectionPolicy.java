@@ -61,8 +61,9 @@ final class OpsGraphRouteSelectionPolicy {
     }
 
     boolean useParallelConditionalEdges(OpsWorkflowNode node) {
+        String configured = value(configText(node, "routeMode")).trim().toUpperCase(Locale.ROOT).replace('-', '_');
         return !("ROUTER".equals(normalizeType(node == null ? null : node.getType()))
-                && "single".equalsIgnoreCase(value(configText(node, "routeMode")).trim()));
+                && java.util.Set.of("SINGLE", "FIRST_MATCH", "DEFAULT_ONLY").contains(configured));
     }
 
     OpsGraphConditionEvaluator.Context conditionContext() {

@@ -75,9 +75,35 @@ public class JdbcConfigAuditSchemaInitializer {
                       UNIQUE KEY uk_project_id (project_id)
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='运维审计策略表'
                     """);
+            repairLegacyResultStatuses(jdbc);
         } catch (DataAccessException e) {
             throw new IllegalStateException("配置审计表初始化失败，禁止降级为内存审计：" + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Correct rows written before the audit command boundary carried an
+     * explicit business outcome. The migration is intentionally conservative:
+     * only SUCCESS rows whose action name is an unambiguous failure family are
+     * changed, so ordinary actions such as reject remain successful commands.
+     */
+    private void repairLegacyResultStatuses(JdbcTemplate jdbc) {
+        jdbc.update("""
+                UPDATE ai_ops_config_audit
+                   SET result_status = CASE
+                       WHEN LOWER(action_name) LIKE '%blocked'
+                         OR LOWER(action_name) LIKE '%denied'
+                       THEN 'BLOCKED'
+                       ELSE 'FAILED'
+                   END
+                 WHERE result_status = 'SUCCESS'
+                   AND (LOWER(action_name) LIKE '%failed'
+                     OR LOWER(action_name) LIKE '%failure'
+                     OR LOWER(action_name) LIKE '%error'
+                     OR LOWER(action_name) LIKE '%blocked'
+                     OR LOWER(action_name) LIKE '%denied'
+                     OR LOWER(action_name) LIKE '%timeout')
+                """);
     }
 
     private void ensureGovernanceColumns(JdbcTemplate jdbc) {

@@ -42,12 +42,9 @@ public class OpsMemoryModelSummaryAdapter implements MemoryModelSummaryPort {
     @Override
     public String summarize(List<ColdMemoryMessageSnapshot> messages, int maxInputChars) {
         ChatModel chatModel = modelResolver.resolve();
-        if (messages == null
-                || messages.isEmpty()
-                || chatModel == null
-                || !modelResolver.chatAvailable()) {
-            return "";
-        }
+        if (messages == null || messages.isEmpty()) return "";
+        if (chatModel == null || !modelResolver.chatAvailable())
+            throw new IllegalStateException("MEMORY_SUMMARY_MODEL_UNAVAILABLE");
         String content = ChatClient.builder(chatModel)
                 .defaultSystem("""
                         你是运维 Agent 的会话记忆压缩器。请把超出短期窗口的历史对话压缩成后续排障仍有用的摘要。
@@ -62,7 +59,8 @@ public class OpsMemoryModelSummaryAdapter implements MemoryModelSummaryPort {
                 .user(abbreviate(transcript(messages), Math.max(1200, maxInputChars)))
                 .call()
                 .content();
-        return abbreviate(content == null ? "" : content.trim(), 1600);
+        if (content == null || content.isBlank()) throw new IllegalStateException("MEMORY_SUMMARY_MODEL_EMPTY");
+        return abbreviate(content.trim(), 1600);
     }
 
     String transcript(List<ColdMemoryMessageSnapshot> messages) {

@@ -30,6 +30,31 @@ import static org.mockito.Mockito.when;
 class OpsRuntimeModelResolverTest {
 
     @Test
+    void deterministicApprovalGraphAndDirectNodeDoNotResolveOrCallModels() {
+        ModelAvailabilityPort availability = mock(ModelAvailabilityPort.class);
+        OpsRuntimeModelResolver resolver = resolver(
+                () -> { throw new AssertionError("No model needed"); },
+                () -> { throw new AssertionError("No model needed"); },
+                () -> { throw new AssertionError("No model catalog needed"); },
+                () -> { throw new AssertionError("No provider catalog needed"); }, availability, secretResolver(null));
+        OpsWorkflowNode direct = OpsWorkflowNode.builder().nodeId("read").type("AGENT").mode("direct").build();
+        var graph = OpsAgentDefinition.builder().agentId("deterministic")
+                .nodes(List.of(OpsWorkflowNode.builder().type("START").build(), direct,
+                        OpsWorkflowNode.builder().type("SUB_WORKFLOW").agent("child").build(),
+                        OpsWorkflowNode.builder().type("HUMAN_APPROVAL").build(), OpsWorkflowNode.builder().type("END").build())).build();
+        var context = OpsRuntimeResourceContext.builder().definition(graph).build();
+        org.junit.jupiter.api.Assertions.assertNull(resolver.resolve(context));
+        context.setNode(direct);
+        org.junit.jupiter.api.Assertions.assertNull(resolver.resolve(context));
+        org.mockito.Mockito.verifyNoInteractions(availability);
+        assertEquals("NOT_REQUIRED_BY_DETERMINISTIC_NODES", context.getMetadata().get("modelResolution"));
+        var childLlm = OpsWorkflowNode.builder().type("AGENT").mode("LLM").build();
+        var child = OpsAgentDefinition.builder().nodes(List.of(childLlm)).build();
+        assertTrue(OpsRuntimeModelRequirement.requiresChatModel(OpsRuntimeResourceContext.builder().definition(child).build()));
+        assertTrue(OpsRuntimeModelRequirement.requiresChatModel(OpsRuntimeResourceContext.builder().node(childLlm).build()));
+    }
+
+    @Test
     void blankModelMustUseNamedDefaultAndAssertAvailability() {
         ChatModel namedDefault = mock(ChatModel.class);
         ModelAvailabilityPort availability = mock(ModelAvailabilityPort.class);
@@ -64,7 +89,7 @@ class OpsRuntimeModelResolverTest {
     }
 
     @Test
-    void missingConfiguredModelMustRecordCompatibilityWarningAndFallback() {
+    void missingConfiguredModelMustFailWithoutSilentFallback() {
         ChatModel fallback = mock(ChatModel.class);
         AiClientModelCatalogPort modelRepository = mock(AiClientModelCatalogPort.class);
         AiClientApiCatalogPort apiRepository = mock(AiClientApiCatalogPort.class);
@@ -78,17 +103,13 @@ class OpsRuntimeModelResolverTest {
                 mock(ModelAvailabilityPort.class),
                 secretResolver(null));
 
-        ChatModel resolved = resolver.resolve(context("missing-model", events));
-
-        assertSame(fallback, resolved);
-        assertTrue(events.stream().anyMatch(event ->
-                "RESOURCE_WARN".equals(event.getEventType())
-                        && event.getSummary().contains("Model 配置不存在或未启用")
-                        && "AGENT:agent-1".equals(event.getPayload().get("owner"))));
+        assertEquals("MODEL_BINDING_UNAVAILABLE", assertThrows(IllegalStateException.class,
+                () -> resolver.resolve(context("missing-model", events))).getMessage());
+        org.mockito.Mockito.verifyNoInteractions(fallback);
     }
 
     @Test
-    void unavailableRepositoriesMustFailOpenOnlyToExplicitDefaultModel() {
+    void unavailableRepositoriesMustNotReplaceAnExplicitModelBinding() {
         ChatModel fallback = mock(ChatModel.class);
         List<OpsRuntimeEvent> events = new ArrayList<>();
         OpsRuntimeModelResolver resolver = resolver(
@@ -99,9 +120,9 @@ class OpsRuntimeModelResolverTest {
                 mock(ModelAvailabilityPort.class),
                 secretResolver(null));
 
-        assertSame(fallback, resolver.resolve(context("model-1", events)));
-        assertTrue(events.stream().anyMatch(event ->
-                event.getSummary().contains("Model 配置库不可用")));
+        assertEquals("MODEL_CATALOG_UNAVAILABLE", assertThrows(IllegalStateException.class,
+                () -> resolver.resolve(context("model-1", events))).getMessage());
+        org.mockito.Mockito.verifyNoInteractions(fallback);
     }
 
     @Test
@@ -136,6 +157,7 @@ class OpsRuntimeModelResolverTest {
         ChatModel resolved = resolver.resolve(context);
 
         assertInstanceOf(OpenAiChatModel.class, resolved);
+        assertEquals(Boolean.FALSE, ((org.springframework.ai.openai.OpenAiChatOptions) resolved.getDefaultOptions()).getParallelToolCalls());
         assertEquals("gpt-test", context.getMetadata().get("modelName"));
         assertEquals("api-1", context.getMetadata().get("apiId"));
     }
@@ -184,6 +206,7 @@ class OpsRuntimeModelResolverTest {
         ChatModel resolved = resolver.resolve(context);
 
         assertInstanceOf(OpenAiChatModel.class, resolved);
+        assertEquals(Boolean.FALSE, ((org.springframework.ai.openai.OpenAiChatOptions) resolved.getDefaultOptions()).getParallelToolCalls());
         assertEquals("model-1", context.getModelId());
         assertEquals("PROJECT_DEFAULT", context.getMetadata().get("modelSelectionSource"));
         assertEquals("model-1", context.getMetadata().get("defaultModelId"));

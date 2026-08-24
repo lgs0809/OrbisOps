@@ -25,6 +25,8 @@ class CrossContextApplicationServiceDependencyArchitectureTest {
     private static final String APPLICATION_IMPORT = "import cn.lgs.orbisops.application.";
 
     private static final Set<String> ALLOWED_IMPORTS = Set.of(
+            "episode/BackgroundModelRecoveryService.java -> security.BackgroundTaskOwnerAccessPort",
+            "security/BackgroundTaskOwnerAccessPolicy.java -> project.BackgroundProjectAccessPort",
             "agentdefinition/ProjectDefaultAgentBootstrapUseCase.java -> agenteval.AgentEvalCreateSuiteCommand",
             "agentdefinition/ProjectDefaultAgentEvalPort.java -> agenteval.AgentEvalCreateSuiteCommand",
             "agentdefinition/ProjectDefaultAgentEvalSuiteFactory.java -> agenteval.AgentEvalCreateSuiteCommand",

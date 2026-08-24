@@ -47,10 +47,16 @@ public final class OpsLlmTraceContext {
                         String nodeId,
                         String nodeType,
                         String agent,
-                        String source) {
+                        String source,
+                        cn.lgs.orbisops.trigger.ops.runtime.OpsRuntimeSkillFrame skillFrame) {
+
+        public Trace(List<OpsRuntimeEvent> events, Consumer<OpsRuntimeEvent> eventSink,
+                     String owner, String nodeId, String nodeType, String agent, String source) {
+            this(events, eventSink, owner, nodeId, nodeType, agent, source, null);
+        }
 
         public Trace child(String owner, String nodeId, String nodeType, String agent, String source) {
-            return new Trace(events, eventSink, owner, nodeId, nodeType, agent, source);
+            return new Trace(events, eventSink, owner, nodeId, nodeType, agent, source, skillFrame);
         }
 
         public void record(OpsRuntimeEvent event) {

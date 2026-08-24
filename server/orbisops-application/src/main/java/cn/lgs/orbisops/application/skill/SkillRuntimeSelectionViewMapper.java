@@ -46,6 +46,14 @@ public final class SkillRuntimeSelectionViewMapper {
     }
 
     public SelectRuntimeSkillsQuery.Result frozenResult(
+            SkillRuntimeSelection selection) {
+        var mapped=result(selection);
+        return new SelectRuntimeSkillsQuery.Result(mapped.catalogRefs(),selection.selected().stream()
+                .map(boundReferences::frozenCatalogRef).toList(),mapped.suppressedRefs(),
+                mapped.activeCount(),mapped.catalogCount(),mapped.selectedCount());
+    }
+
+    public SelectRuntimeSkillsQuery.Result frozenResult(
             List<Map<String, Object>> catalogRefs,
             List<SkillRuntimeSelection.RankedSkill> ranked) {
         List<Map<String, Object>> selected = ranked == null

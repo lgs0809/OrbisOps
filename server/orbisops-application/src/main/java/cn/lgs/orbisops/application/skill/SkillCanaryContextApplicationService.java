@@ -2,6 +2,8 @@ package cn.lgs.orbisops.application.skill;
 
 import cn.lgs.orbisops.domain.skill.model.SkillCanaryCandidateSnapshot;
 import cn.lgs.orbisops.domain.skill.model.SkillFrozenCandidateSnapshot;
+import cn.lgs.orbisops.domain.skill.service.SkillCanaryApplicabilityPolicy;
+import java.util.Comparator;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -31,11 +33,20 @@ public class SkillCanaryContextApplicationService {
             String projectId,
             String agentId,
             String runId) {
-        if (!canaryService.selected(projectId, agentId, runId)) return List.of();
-        return List.copyOf(releasePort.findCanaryCandidates(
-                projectId,
-                agentId,
-                3));
+        // A legacy caller without task text cannot establish applicability.
+        return resolveCandidates(projectId, agentId, runId, "");
+    }
+
+    public List<SkillCanaryCandidateSnapshot> resolveCandidates(
+            String projectId, String agentId, String runId, String query) {
+        if (query == null || query.isBlank() || !canaryService.selected(projectId, agentId, runId)) return List.of();
+        var applicability = new SkillCanaryApplicabilityPolicy();
+        return releasePort.findCanaryCandidates(projectId, agentId, 20).stream()
+                .map(candidate -> Map.entry(candidate, applicability.score(projectId, agentId, query, candidate)))
+                .filter(entry -> entry.getValue() > 0)
+                .sorted(Comparator.<Map.Entry<SkillCanaryCandidateSnapshot, Double>, Double>comparing(Map.Entry::getValue)
+                        .reversed().thenComparing(entry -> entry.getKey().releaseId()))
+                .limit(3).map(Map.Entry::getKey).toList();
     }
 
     public List<Map<String, Object>> resolveRefs(

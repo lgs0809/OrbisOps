@@ -33,7 +33,7 @@ class SkillHintAndMultiCandidateArchitectureTest {
     }
 
     @Test
-    void authoringMustSupportAuditedTwoToFourCandidatesWithoutBreakingLegacyPort() throws IOException {
+    void authoringDefaultsToOneAuditedProposalAndKeepsExplicitBoundedComparisons() throws IOException {
         String port = read(APPLICATION + "SkillEvolutionAuthoringPort.java");
         String service = read(APPLICATION + "SkillEvolutionMultiCandidateAuthoringService.java");
         String audit = read(APPLICATION + "SkillEvolutionAuthoringAudit.java");
@@ -42,7 +42,9 @@ class SkillHintAndMultiCandidateArchitectureTest {
         assertAll(
                 () -> assertTrue(port.contains("SkillEvolutionAuthoredCandidate author(")),
                 () -> assertTrue(port.contains("default List<SkillEvolutionAuthoredCandidate> authorCandidates")),
-                () -> assertTrue(service.contains("Math.max(2, Math.min(4, requestedBudget))")),
+                () -> assertTrue(service.contains("DEFAULT_BUDGET = 1")),
+                () -> assertTrue(service.contains("Math.max(1, Math.min(4, requestedBudget))")),
+                () -> assertFalse(service.contains("fallbackAuthor")),
                 () -> assertTrue(service.contains("CanonicalObjectHasher.sha256(safeInput)")),
                 () -> assertTrue(service.contains("candidateDirections")),
                 () -> assertTrue(audit.contains("modelId")),

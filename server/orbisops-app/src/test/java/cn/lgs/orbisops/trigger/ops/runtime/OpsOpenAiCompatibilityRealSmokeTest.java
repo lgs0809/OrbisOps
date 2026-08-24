@@ -9,6 +9,7 @@ import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.retry.support.RetryTemplate;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class OpsOpenAiCompatibilityRealSmokeTest {
 
@@ -27,11 +28,12 @@ class OpsOpenAiCompatibilityRealSmokeTest {
         OpenAiChatModel model = OpenAiChatModel.builder()
                 .openAiApi(api)
                 .retryTemplate(RetryTemplate.builder().maxAttempts(1).noBackoff().build())
-                .defaultOptions(OpenAiChatOptions.builder().model("gpt-5.4-mini").build())
+                .defaultOptions(OpenAiChatOptions.builder().model("gpt-6-luna").build())
                 .build();
 
-        String content = model.call(new Prompt("Reply exactly SPRING_AI_REAL_OK"))
-                .getResult().getOutput().getText();
+        var response = model.call(new Prompt("Reply exactly SPRING_AI_REAL_OK"));
+        assertEquals("gpt-6-luna", response.getMetadata().getModel());
+        String content = response.getResult().getOutput().getText();
 
         assertTrue(content.contains("SPRING_AI_REAL_OK"));
     }

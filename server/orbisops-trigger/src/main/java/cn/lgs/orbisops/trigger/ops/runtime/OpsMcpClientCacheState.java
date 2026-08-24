@@ -53,15 +53,23 @@ final class OpsMcpClientCacheState {
             if (client == null) {
                 throw new IllegalStateException("MCP_CLIENT_FACTORY_RETURNED_NULL");
             }
-            return new OpsMcpClientRegistry.ClientHandle(client, config, now);
+            return new OpsMcpClientRegistry.ClientHandle(key, client, config, now);
         });
     }
 
     int invalidateAll() {
         int count = clients.size();
-        clients.forEach((ignored, cached) -> closeQuietly(cached));
-        clients.clear();
+        clients.forEach((ignored, cached) -> invalidate(cached));
         return count;
+    }
+
+    boolean invalidate(OpsMcpClientRegistry.ClientHandle handle) {
+        if (handle == null) return false;
+        handle.invalidate();
+        // A late failure from an old handle must not remove a replacement under the same key.
+        if (!clients.remove(handle.cacheKey(), handle)) return false;
+        closeQuietly(handle);
+        return true;
     }
 
     int cleanupExpired() {
@@ -85,6 +93,7 @@ final class OpsMcpClientCacheState {
             if (!expired(cached, now)) {
                 return false;
             }
+            cached.invalidate();
             closeQuietly(cached.client());
             return true;
         } finally {
@@ -95,15 +104,17 @@ final class OpsMcpClientCacheState {
     private boolean expired(
             OpsMcpClientRegistry.ClientHandle cached,
             long now) {
-        return now - cached.lastUsedAtMillis() > settings.ttlMillis();
+        return cached.invalidated() || now - cached.lastUsedAtMillis() > settings.ttlMillis();
     }
 
     private void closeQuietly(OpsMcpClientRegistry.ClientHandle cached) {
         if (cached == null) {
             return;
         }
+        cached.invalidate();
         cached.lock().lock();
         try {
+            cached.invalidate();
             closeQuietly(cached.client());
         } finally {
             cached.lock().unlock();

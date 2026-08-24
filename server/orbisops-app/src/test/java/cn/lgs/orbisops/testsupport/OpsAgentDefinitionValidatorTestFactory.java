@@ -24,6 +24,11 @@ public final class OpsAgentDefinitionValidatorTestFactory {
 
     public static OpsAgentDefinitionValidator create(
             McpClientCatalogPort mcpRepository) {
+        return create(mcpRepository, null);
+    }
+
+    public static OpsAgentDefinitionValidator create(McpClientCatalogPort mcpRepository,
+            cn.lgs.orbisops.application.skill.SkillCatalogPort skillCatalog) {
         OpsAgentToolNamePolicy toolNamePolicy = new OpsAgentToolNamePolicy();
         OpsAgentMcpServerDefinitionPolicy mcpServerPolicy =
                 new OpsAgentMcpServerDefinitionPolicy(toolNamePolicy);
@@ -38,7 +43,7 @@ public final class OpsAgentDefinitionValidatorTestFactory {
         OpsAgentProjectCapabilityReferenceValidator capabilityValidator =
                 new OpsAgentProjectCapabilityReferenceValidator(
                         () -> mcpRepository,
-                        () -> null,
+                        () -> skillCatalog,
                         () -> null,
                         () -> null,
                         () -> null,

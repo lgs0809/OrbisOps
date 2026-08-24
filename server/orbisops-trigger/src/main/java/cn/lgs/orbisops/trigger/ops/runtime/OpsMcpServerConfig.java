@@ -1,5 +1,6 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
+import cn.lgs.orbisops.application.changepackage.LandingOperationExecutionBinding;
 import com.alibaba.fastjson.annotation.JSONField;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
@@ -14,7 +15,7 @@ import java.util.List;
 import java.util.Map;
 
 @Data
-@Builder
+@Builder(toBuilder = true)
 @AllArgsConstructor
 @NoArgsConstructor
 public class OpsMcpServerConfig {
@@ -41,8 +42,25 @@ public class OpsMcpServerConfig {
 
     @JsonIgnore
     @JSONField(serialize = false)
+    private Boolean verifiedReadOnly;
+
+    @JsonIgnore
+    @JSONField(serialize = false)
+    private Map<String, Object> verifiedToolSchema;
+
+    @JsonIgnore
+    @JSONField(serialize = false)
     @Builder.Default
     private Map<String, Object> workSessionClaim = new LinkedHashMap<>();
+
+    /**
+     * Platform-owned bindings for the frozen Landing operations projected onto this run.
+     * They are runtime-only and never part of persisted/user-visible MCP configuration.
+     */
+    @JsonIgnore
+    @JSONField(serialize = false)
+    @Builder.Default
+    private List<LandingOperationExecutionBinding> landingOperationBindings = new ArrayList<>();
 
     private String transport;
     private String command;

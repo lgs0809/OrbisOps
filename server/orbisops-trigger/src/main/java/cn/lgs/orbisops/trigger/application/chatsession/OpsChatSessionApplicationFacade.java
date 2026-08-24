@@ -84,6 +84,11 @@ public final class OpsChatSessionApplicationFacade {
             Boolean favorite,
             Integer limit,
             String scopedUserId) {
+        return list(requestedUserId, agentId, keyword, favorite, limit, scopedUserId, null);
+    }
+
+    public List<OpsChatSession> list(String requestedUserId, String agentId, String keyword,
+                                    Boolean favorite, Integer limit, String scopedUserId, String projectId) {
         String userId = StringUtils.hasText(scopedUserId)
                 ? scopedUserId
                 : requestedUserId;
@@ -92,7 +97,18 @@ public final class OpsChatSessionApplicationFacade {
                 agentId,
                 keyword,
                 favorite,
-                limit == null ? 50 : limit);
+                limit == null ? 50 : limit,
+                projectId);
+    }
+
+    public OpsChatSession read(String sessionId, String actor, String projectId) {
+        accessUseCase.assertRead(sessionId, actor);
+        OpsChatSession session = sessionService.get(sessionId)
+                .orElseThrow(() -> new IllegalArgumentException("会话不存在"));
+        if (StringUtils.hasText(projectId) && !projectId.trim().equals(session.getProjectId())) {
+            throw new SecurityException("SESSION_PROJECT_SCOPE_MISMATCH");
+        }
+        return session;
     }
 
     public List<OpsChatMessageView> messages(

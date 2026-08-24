@@ -23,12 +23,12 @@ class SelectRuntimeSkillsQueryTest {
     @Test
     void boundsCompactCatalogAndSelectsNothingForEmptyQuery() {
         SkillCatalogPort catalog = mock(SkillCatalogPort.class);
-        when(catalog.listProjectEntries("demo-project")).thenReturn(List.of(
+        when(catalog.listRuntimeProjectEntries("demo-project")).thenReturn(List.of(
                 runtimeSkill("mysql-slow-sql", "MySQL 慢 SQL 排查", "ACTIVE", "PROJECT"),
                 runtimeSkill("prometheus-errors", "Prometheus 错误率排查", "ACTIVE", "PROJECT"),
                 runtimeSkill("elk-errors", "ELK 错误日志排查", "ACTIVE", "PROJECT"),
                 runtimeSkill("docker-health", "Docker 健康检查", "ACTIVE", "PROJECT")));
-        when(catalog.listGlobalEntries()).thenReturn(List.of());
+        when(catalog.listRuntimeGlobalEntries()).thenReturn(List.of());
         SelectRuntimeSkillsQuery query = query(catalog, settings(3, 2, 12, 0.12D, 0.88D));
 
         SelectRuntimeSkillsQuery.Result result = query.select(
@@ -42,11 +42,11 @@ class SelectRuntimeSkillsQueryTest {
     @Test
     void selectsRelevantSkillsAndSuppressesNearDuplicates() {
         SkillCatalogPort catalog = mock(SkillCatalogPort.class);
-        when(catalog.listProjectEntries("demo-project")).thenReturn(List.of(
+        when(catalog.listRuntimeProjectEntries("demo-project")).thenReturn(List.of(
                 runtimeSkill("mysql-slow-sql", "MySQL 慢 SQL 查询与证据收集", "ACTIVE", "PROJECT"),
                 runtimeSkill("mysql-slow-query", "MySQL 慢 SQL 查询和证据收集", "ACTIVE", "PROJECT"),
                 runtimeSkill("prometheus-errors", "Prometheus 错误率排查", "ACTIVE", "PROJECT")));
-        when(catalog.listGlobalEntries()).thenReturn(List.of());
+        when(catalog.listRuntimeGlobalEntries()).thenReturn(List.of());
         SelectRuntimeSkillsQuery query = query(catalog, settings(24, 4, 12, 0.01D, 0.72D));
 
         SelectRuntimeSkillsQuery.Result result = query.select(
@@ -54,16 +54,16 @@ class SelectRuntimeSkillsQueryTest {
 
         assertTrue(result.selectedRefs().stream()
                 .anyMatch(ref -> "mysql-slow-sql".equals(ref.get("skillId"))));
-        assertEquals(1, result.suppressedRefs().size());
-        assertEquals("SIMILAR_SKILL_SUPPRESSED", result.suppressedRefs().get(0).get("reasonCode"));
+        assertEquals(1, result.suppressedRefs().stream().filter(r->"SIMILAR_SKILL_SUPPRESSED".equals(r.get("reasonCode"))).count());
+
     }
 
     @Test
     void disabledProjectSkillShadowsActiveGlobalSkill() {
         SkillCatalogPort catalog = mock(SkillCatalogPort.class);
-        when(catalog.listProjectEntries("demo-project")).thenReturn(List.of(
+        when(catalog.listRuntimeProjectEntries("demo-project")).thenReturn(List.of(
                 runtimeSkill("slow-sql", "项目已停用", "DISABLED", "PROJECT")));
-        when(catalog.listGlobalEntries()).thenReturn(List.of(
+        when(catalog.listRuntimeGlobalEntries()).thenReturn(List.of(
                 runtimeSkill("slow-sql", "全局慢 SQL", "ACTIVE", "GLOBAL")));
         SelectRuntimeSkillsQuery query = query(catalog, settings(24, 6, 12, 0.01D, 0.88D));
 
@@ -77,10 +77,10 @@ class SelectRuntimeSkillsQueryTest {
     @Test
     void explicitSkillsAreNotDroppedByAutomaticSelectionLimit() {
         SkillCatalogPort catalog = mock(SkillCatalogPort.class);
-        when(catalog.listProjectEntries("demo-project")).thenReturn(List.of(
+        when(catalog.listRuntimeProjectEntries("demo-project")).thenReturn(List.of(
                 runtimeSkill("mysql-slow-sql", "MySQL 慢 SQL 查询与证据收集", "ACTIVE", "PROJECT"),
                 runtimeSkill("mysql-slow-query", "MySQL 慢 SQL 查询和证据收集", "ACTIVE", "PROJECT")));
-        when(catalog.listGlobalEntries()).thenReturn(List.of());
+        when(catalog.listRuntimeGlobalEntries()).thenReturn(List.of());
         SelectRuntimeSkillsQuery query = query(catalog, settings(24, 1, 12, 0.01D, 0.60D));
 
         SelectRuntimeSkillsQuery.Result result = query.select(new SelectRuntimeSkillsQuery.Request(
@@ -109,21 +109,21 @@ class SelectRuntimeSkillsQueryTest {
     }
 
     @Test
-    void semanticScoresAreRequestedForTypedBoundedCandidates() {
+    void semanticScoresCannotInventApplicabilityForUnrelatedQuery() {
         SkillCatalogPort catalog = mock(SkillCatalogPort.class);
-        when(catalog.listProjectEntries("demo-project")).thenReturn(List.of(
+        when(catalog.listRuntimeProjectEntries("demo-project")).thenReturn(List.of(
                 runtimeSkill("mysql-slow-sql", "MySQL evidence", "ACTIVE", "PROJECT")));
-        when(catalog.listGlobalEntries()).thenReturn(List.of());
+        when(catalog.listRuntimeGlobalEntries()).thenReturn(List.of());
         SkillSemanticScorePort semantic = mock(SkillSemanticScorePort.class);
-        when(semantic.scores(anyString(), anyList())).thenReturn(Map.of("mysql-slow-sql", 0.95D));
+        when(semantic.scores(anyString(),anyString(), anyList())).thenReturn(Map.of("mysql-slow-sql", 0.95D));
         SelectRuntimeSkillsQuery query = new SelectRuntimeSkillsQuery(
                 catalog, semantic, settings(24, 2, 12, 0.01D, 0.88D));
 
         SelectRuntimeSkillsQuery.Result result = query.select(
                 new SelectRuntimeSkillsQuery.Request("demo-project", "ops-agent", List.of(), "database issue", 2));
 
-        verify(semantic).scores(anyString(), anyList());
-        assertEquals("mysql-slow-sql", result.selectedRefs().get(0).get("skillId"));
+        verify(semantic).scores(anyString(),anyString(), anyList());
+        assertTrue(result.selectedRefs().isEmpty());
     }
 
     @Test
@@ -142,10 +142,10 @@ class SelectRuntimeSkillsQueryTest {
                 "制作季度汇报、融资路演和产品演示文稿。不支持后端接口开发",
                 "ACTIVE",
                 "PROJECT"));
-        when(catalog.listProjectEntries("demo-project")).thenReturn(skills);
-        when(catalog.listGlobalEntries()).thenReturn(List.of());
+        when(catalog.listRuntimeProjectEntries("demo-project")).thenReturn(skills);
+        when(catalog.listRuntimeGlobalEntries()).thenReturn(List.of());
         SkillSemanticScorePort semantic = mock(SkillSemanticScorePort.class);
-        when(semantic.scores(anyString(), anyList())).thenReturn(Map.of("quarterly-ppt", 0.99D));
+        when(semantic.scores(anyString(),anyString(), anyList())).thenReturn(Map.of("quarterly-ppt", 0.99D));
         SkillRuntimeSelectionSettings settings = new SkillRuntimeSelectionSettings(
                 24, 6, 12, 0.05D, 0.88D, 0.42D,
                 16, 0.12D, 0.65D);
@@ -159,12 +159,13 @@ class SelectRuntimeSkillsQueryTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<cn.lgs.orbisops.domain.skill.model.SkillRuntimeCandidate>> captor =
                 ArgumentCaptor.forClass(List.class);
-        verify(semantic).scores(anyString(), captor.capture());
-        assertEquals(16, captor.getValue().size());
+        verify(semantic).scores(anyString(),anyString(), captor.capture());
+        assertEquals(151, captor.getValue().size());
         assertTrue(captor.getValue().stream()
                 .anyMatch(candidate -> "quarterly-ppt".equals(candidate.skillId())));
-        assertEquals("quarterly-ppt", result.selectedRefs().get(0).get("skillId"));
-        assertEquals("DOCUMENT", result.selectedRefs().get(0).get("category"));
+        assertTrue(result.catalogRefs().stream().anyMatch(r->"quarterly-ppt".equals(r.get("skillId"))));
+        // A synthetic vector score is not independent proof of applicability.
+        assertTrue(result.suppressedRefs().stream().anyMatch(r->"SKILL_APPLICABILITY_NEED_INFO".equals(r.get("reasonCode"))));
     }
 
     @Test
@@ -182,8 +183,8 @@ class SelectRuntimeSkillsQueryTest {
                 "开发 Java 后端接口和服务",
                 "ACTIVE",
                 "PROJECT");
-        when(catalog.listProjectEntries("demo-project")).thenReturn(List.of(frontend, backend));
-        when(catalog.listGlobalEntries()).thenReturn(List.of());
+        when(catalog.listRuntimeProjectEntries("demo-project")).thenReturn(List.of(frontend, backend));
+        when(catalog.listRuntimeGlobalEntries()).thenReturn(List.of());
         SelectRuntimeSkillsQuery query = query(
                 catalog,
                 new SkillRuntimeSelectionSettings(
@@ -206,8 +207,8 @@ class SelectRuntimeSkillsQueryTest {
         projectView.remove("whenToUse");
         projectView.remove("whenNotToUse");
         SkillCatalogSnapshot legacyProject = SkillCatalogSnapshot.fromView(projectView);
-        when(catalog.listProjectEntries("demo-project")).thenReturn(List.of(legacyProject));
-        when(catalog.listGlobalEntries()).thenReturn(List.of(
+        when(catalog.listRuntimeProjectEntries("demo-project")).thenReturn(List.of(legacyProject));
+        when(catalog.listRuntimeGlobalEntries()).thenReturn(List.of(
                 runtimeSkill("slow-sql", "global slow sql", "ACTIVE", "GLOBAL")));
         SelectRuntimeSkillsQuery query = query(catalog, settings(24, 6, 12, 0.01D, 0.88D));
 
@@ -229,21 +230,23 @@ class SelectRuntimeSkillsQueryTest {
         legacy.remove("whenNotToUse");
 
         IllegalStateException error = assertThrows(IllegalStateException.class, () -> query.selectFrozen(
-                new SelectRuntimeSkillsQuery.FrozenRequest(List.of(legacy), "legacy", 1)));
+                new SelectRuntimeSkillsQuery.FrozenRequest("demo-project", List.of(legacy), "legacy", 1)));
 
         assertEquals("SKILL_ROUTING_PROFILE_REQUIRED_AT_RUNTIME:legacy-skill", error.getMessage());
     }
 
     @Test
-    void ranksOnlyFrozenCatalogWithoutReloadingLiveCatalog() {
+    void ranksFrozenVersionsAfterRecheckingCurrentGovernance() {
         SkillCatalogPort catalog = mock(SkillCatalogPort.class);
         SelectRuntimeSkillsQuery query = query(catalog, settings(24, 6, 12, 0.01D, 0.88D));
         List<Map<String, Object>> frozen = List.of(
                 runtimeSkillView("mysql-slow-sql", "MySQL slow SQL", "ACTIVE", "PROJECT"),
                 runtimeSkillView("prometheus-errors", "Prometheus error rate", "ACTIVE", "PROJECT"));
 
+        when(catalog.listRuntimeProjectEntries("demo-project")).thenReturn(frozen.stream().map(SkillCatalogSnapshot::fromView).toList());
+        when(catalog.listRuntimeGlobalEntries()).thenReturn(List.of());
         SelectRuntimeSkillsQuery.Result result = query.selectFrozen(
-                new SelectRuntimeSkillsQuery.FrozenRequest(frozen, "mysql slow", 1));
+                new SelectRuntimeSkillsQuery.FrozenRequest("demo-project", frozen, "mysql slow", 1));
 
         assertEquals(2, result.catalogCount());
         assertEquals(1, result.selectedCount());

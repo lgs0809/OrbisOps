@@ -29,6 +29,21 @@ public class OpsChangePackageLandingRuntimeAdapter implements ChangePackageLandi
     }
 
     @Override
+    public Map<String, Object> verifyCompletedOperations(ChangePackageCurrent current,
+            ChangePackageVersion approvedVersion, ChangePackageLandingPlan plan, String landingRunId,
+            String actor, java.util.List<cn.lgs.orbisops.application.changepackage.LandingOperationFact> facts) {
+        if (landingAgentRunCoordinator == null) throw new IllegalStateException("LANDING_INDEPENDENT_VERIFIER_UNAVAILABLE");
+        if (!current.packageId().equals(plan.packageId()) || !current.projectId().equals(plan.projectId())
+                || current.pointer().approvedVersion() != approvedVersion.version()
+                || !current.pointer().approvedPackageHash().equals(approvedVersion.packageHash())
+                || plan.approvedVersion() != approvedVersion.version()
+                || !plan.approvedPackageHash().equals(approvedVersion.packageHash())) {
+            throw new SecurityException("LANDING_RECOVERY_APPROVED_POINTER_DRIFT");
+        }
+        return landingAgentRunCoordinator.verifyCompletedOperations(landingRunId, plan, actor, facts);
+    }
+
+    @Override
     public ChangePackageLandingRuntimeResult execute(ChangePackageCurrent current,
                                                      ChangePackageVersion approvedVersion,
                                                      ChangePackageLandingPlan plan,

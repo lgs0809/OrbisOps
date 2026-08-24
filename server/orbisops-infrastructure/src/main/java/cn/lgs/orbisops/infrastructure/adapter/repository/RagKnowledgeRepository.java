@@ -65,19 +65,26 @@ public class RagKnowledgeRepository implements IRagKnowledgeRepository {
         if (jdbcTemplate == null) {
             return List.of();
         }
+        StringBuilder where = new StringBuilder(" WHERE content IS NOT NULL");
+        List<Object> args = new ArrayList<>();
+        // The aggregate catalog is the global knowledge boundary. Legacy rows
+        // created before scope metadata existed are global only when they also
+        // have no project id; project rows must never be promoted into it.
+        appendScopeFilter(where, args, "GLOBAL");
         return jdbcTemplate.query("""
                         SELECT coalesce(metadata->>'knowledge', 'default') AS knowledge_tag,
                                count(*) AS chunk_count,
                                count(DISTINCT coalesce(metadata->>'source', metadata->>'file_name', id::text)) AS document_count
                         FROM %s
-                        WHERE content IS NOT NULL
+                        %s
                         GROUP BY coalesce(metadata->>'knowledge', 'default')
                         ORDER BY chunk_count DESC
-                        """.formatted(qualifiedVectorTableName()),
+                        """.formatted(qualifiedVectorTableName(), where),
                 (rs, rowNum) -> Map.of(
                         "knowledgeTag", rs.getString("knowledge_tag"),
                         "chunkCount", rs.getLong("chunk_count"),
-                        "documentCount", rs.getLong("document_count")));
+                        "documentCount", rs.getLong("document_count")),
+                args.toArray());
     }
 
     @Override
@@ -531,14 +538,28 @@ public class RagKnowledgeRepository implements IRagKnowledgeRepository {
             sql.append(" AND metadata->>'knowledge' = ?");
             args.add(filter.knowledge());
         }
-        if (StringUtils.hasText(filter.knowledgeScope())) {
-            sql.append(" AND metadata->>'knowledge_scope' = ?");
-            args.add(filter.knowledgeScope());
-        }
+        appendScopeFilter(sql, args, filter.knowledgeScope());
         if (StringUtils.hasText(filter.projectId())) {
             sql.append(" AND metadata->>'project_id' = ?");
             args.add(filter.projectId());
         }
+    }
+
+    private void appendScopeFilter(StringBuilder sql, List<Object> args, String scope) {
+        if (!StringUtils.hasText(scope)) {
+            return;
+        }
+        if ("GLOBAL".equalsIgnoreCase(scope)) {
+            // Rows written by the legacy importer have no scope metadata. Treat
+            // only rows without both scope and project identity as global so a
+            // malformed project row cannot cross the project isolation boundary.
+            sql.append(" AND (metadata->>'knowledge_scope' = ?");
+            args.add("GLOBAL");
+            sql.append(" OR (metadata->>'knowledge_scope' IS NULL AND metadata->>'project_id' IS NULL))");
+            return;
+        }
+        sql.append(" AND metadata->>'knowledge_scope' = ?");
+        args.add(scope);
     }
 
     private String normalizedScope(String scope) {

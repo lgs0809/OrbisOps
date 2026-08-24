@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -33,13 +34,18 @@ public class AdminUserRequestDTO implements Serializable {
     private String userId;
 
     /**
-     * 用户名（登录账号）
+     * 显示名称；旧账号同时保留为兼容登录标识
      */
     private String username;
+
+    /** 手机号登录标识；旧账号可为空。 */
+    @ToString.Exclude
+    private String phone;
 
     /**
      * 密码（加密存储）
      */
+    @ToString.Exclude
     private String password;
 
     /**

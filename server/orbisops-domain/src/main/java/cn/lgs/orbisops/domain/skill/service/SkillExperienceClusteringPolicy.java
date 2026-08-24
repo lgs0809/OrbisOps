@@ -81,7 +81,8 @@ public final class SkillExperienceClusteringPolicy {
         families.put("DOCUMENT", List.of(
                 "文档", "报告", "汇报", "document", "report",
                 "presentation"));
-        return Map.copyOf(families);
+        // The first matching family wins; Map.copyOf deliberately has unspecified iteration order.
+        return java.util.Collections.unmodifiableMap(families);
     }
 
     private String value(String value) {

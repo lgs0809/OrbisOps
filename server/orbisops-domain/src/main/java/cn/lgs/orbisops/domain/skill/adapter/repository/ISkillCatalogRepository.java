@@ -8,12 +8,28 @@ import cn.lgs.orbisops.domain.skill.model.SkillGovernanceUpdate;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface ISkillCatalogRepository {
 
     boolean available();
 
     List<SkillCatalogEntry> findAll(String scope, String projectId, boolean includeContent);
+
+    /** Body-free metadata; runtime may still need an explicitly bound replaced method. */
+    default List<SkillCatalogEntry> findEvolutionMetadata(String scope, String projectId) {
+        throw new IllegalStateException("SKILL_EVOLUTION_METADATA_STORE_REQUIRED");
+    }
+
+    default List<SkillCatalogEntry> findEvolutionMetadata(String scope, String projectId, Set<String> skillIds) {
+        return findEvolutionMetadata(scope, projectId).stream()
+                .filter(entry -> skillIds.contains(entry.skillId())).toList();
+    }
+
+    /** New authoring references exclude replaced or rolled-back branches; historical/bound reads remain separate. */
+    default List<SkillCatalogEntry> findAuthoringMetadata(String scope,String projectId) {
+        return findEvolutionMetadata(scope,projectId);
+    }
 
     Optional<SkillCatalogEntry> find(String scope, String projectId, String skillId, boolean includeContent);
 

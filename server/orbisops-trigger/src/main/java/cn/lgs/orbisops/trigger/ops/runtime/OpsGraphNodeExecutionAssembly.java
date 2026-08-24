@@ -23,7 +23,8 @@ final class OpsGraphNodeExecutionAssembly {
             OpsGraphConditionEvaluator conditionEvaluator,
             OpsSubWorkflowNodeExecutor subWorkflowNodeExecutor,
             OpsTelemetryService telemetryService,
-            GraphEventApplicationService graphEventService) {
+            GraphEventApplicationService graphEventService,
+            OpsWorkflowChangeContextReader changeContextReader) {
         OpsGraphNodePromptContextPolicy promptContextPolicy =
                 new OpsGraphNodePromptContextPolicy(
                         analysisRoutingPolicy,
@@ -46,7 +47,7 @@ final class OpsGraphNodeExecutionAssembly {
         OpsGraphDirectNodeExecutor directNodeExecutor =
                 new OpsGraphDirectNodeExecutor(resourceAssembler);
         OpsGraphRouterNodeExecutor routerNodeExecutor =
-                new OpsGraphRouterNodeExecutor();
+                new OpsGraphRouterNodeExecutor(java.time.Clock.systemUTC(),changeContextReader);
         OpsGraphNodeBodyExecutor bodyExecutor = new OpsGraphNodeBodyExecutor(
                 graphRuntimeStateManager,
                 analysisStateManager,

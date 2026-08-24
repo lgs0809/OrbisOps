@@ -72,6 +72,11 @@ public final class OpsAgentWorkflowStructuralCompiler {
         AgentWorkflowDefinition typed;
         try {
             typed = mapper.workflowDefinition(definition);
+            if (definition.getNodes() != null) {
+                for (OpsWorkflowNode node : definition.getNodes()) {
+                    if (node != null) OpsWorkflowNodeOutputContract.compile(node);
+                }
+            }
         } catch (RuntimeException error) {
             WorkflowCompilationFailure failure = new WorkflowCompilationFailure(
                     WorkflowCompilationErrorCode.SCHEMA_INVALID,

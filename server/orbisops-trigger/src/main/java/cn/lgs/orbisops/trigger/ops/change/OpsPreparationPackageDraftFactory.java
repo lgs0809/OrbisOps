@@ -150,7 +150,13 @@ final class OpsPreparationPackageDraftFactory {
     }
 
     private String targetEnvironment(List<Map<String, Object>> operations) {
-        List<String> environments = (operations == null ? List.<Map<String, Object>>of() : operations).stream()
+        List<Map<String, Object>> safe = operations == null ? List.of() : operations;
+        List<Map<String, Object>> landing = safe.stream()
+                .filter(operation -> !preparationValidation(operation))
+                .toList();
+        // A test validation is evidence for the change, not a second Landing target.
+        // Keep its own environment on the operation and preserve rejection of multiple Landing targets.
+        List<String> environments = (landing.isEmpty() ? safe : landing).stream()
                 .map(operation -> text(operation == null ? null : operation.get("targetEnvironment"), ""))
                 .filter(value -> !value.isBlank())
                 .distinct()
@@ -159,6 +165,15 @@ final class OpsPreparationPackageDraftFactory {
             throw new IllegalArgumentException("CHANGE_PACKAGE_MULTIPLE_TARGET_ENVIRONMENTS_UNSUPPORTED");
         }
         return environments.isEmpty() ? "" : environments.get(0);
+    }
+
+    private boolean preparationValidation(Map<String, Object> operation) {
+        return operation != null && Boolean.TRUE.equals(operation.get("prepareAllowed"))
+                && !Boolean.TRUE.equals(operation.get("writesTargetResource"))
+                && List.of("VALIDATE_ONLY", "DRY_RUN", "MUTATE_EPHEMERAL", "MUTATE_TEST_RESOURCE")
+                        .contains(text(operation.get("effectType"), ""))
+                && !List.of("PRODUCTION", "TARGET_RESOURCE_WRITE").contains(text(operation.get("effectScope"), ""))
+                && !List.of("PROD_MUTATING", "DESTRUCTIVE").contains(text(operation.get("mutability"), ""));
     }
 
     private String summaryFor(String assessment, String question) {

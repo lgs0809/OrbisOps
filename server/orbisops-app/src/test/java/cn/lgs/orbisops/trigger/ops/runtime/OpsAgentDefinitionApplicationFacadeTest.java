@@ -440,7 +440,7 @@ class OpsAgentDefinitionApplicationFacadeTest {
                 OpsAgentDefinitionApplicationFacade.DEFAULT_AGENT_ID,
                 jdbcEnabled);
         OpsAgentDefinitionApplicationAssembly assembly = OpsAgentDefinitionApplicationAssembly.create(
-                OpsAgentDefinitionValidatorTestFactory.create(),
+                OpsAgentDefinitionValidatorTestFactory.create(null, testSkillCatalog()),
                 definitionRepository,
                 graphRepository,
                 capabilityRepository,
@@ -452,6 +452,19 @@ class OpsAgentDefinitionApplicationFacadeTest {
                 assembly,
                 settings,
                 transactionPort);
+    }
+
+    private cn.lgs.orbisops.application.skill.SkillCatalogPort testSkillCatalog() {
+        // This graph-persistence fixture binds one synthetic global Skill; it is not model evidence.
+        var catalog = mock(cn.lgs.orbisops.application.skill.SkillCatalogPort.class);
+        java.util.Map<String,Object> view = new java.util.LinkedHashMap<>();
+        view.put("skillId", "diagnosis"); view.put("scope", "GLOBAL"); view.put("projectId", "");
+        view.put("name", "diagnosis"); view.put("description", "synthetic diagnosis method");
+        view.put("status", "ENABLED"); view.put("version", 1); view.put("skillHash", "synthetic-hash");
+        view.put("whenToUse", List.of("diagnosis")); view.put("whenNotToUse", List.of("production write"));
+        when(catalog.listRuntimeGlobalEntries()).thenReturn(List.of(
+                cn.lgs.orbisops.application.skill.SkillCatalogSnapshot.fromView(view)));
+        return catalog;
     }
 
     private AgentDefinitionTransactionPort directTransactionPort() {

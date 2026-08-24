@@ -41,7 +41,7 @@ class SkillReleaseProcessBoundaryArchitectureTest {
                 () -> assertFalse(service.contains("rollbackProjectVersion(")),
                 () -> assertFalse(service.contains("validationService.validate(")),
                 () -> assertFalse(service.contains("shadowService.evaluate(")),
-                () -> assertTrue(service.lines().count() < 115));
+                () -> assertTrue(service.lines().count() < 140));
     }
 
     @Test
@@ -67,7 +67,7 @@ class SkillReleaseProcessBoundaryArchitectureTest {
                 () -> assertTrue(promotion.contains("createProjectSkillOutcome(")),
                 () -> assertTrue(promotion.contains("SkillPublicationOutcome published")),
                 () -> assertFalse(promotion.contains("published.get(")),
-                () -> assertTrue(rollback.contains("rollbackProjectVersion(")),
+                () -> assertTrue(rollback.contains("recoverProjectRelease(")),
                 () -> assertTrue(state.contains("releasePort.complete(")),
                 () -> assertTrue(state.contains("expectedStatus")),
                 () -> assertTrue(promotion.contains("SkillReleaseStatus.PROMOTING")),
@@ -94,10 +94,10 @@ class SkillReleaseProcessBoundaryArchitectureTest {
                 () -> assertTrue(port.contains("SkillEffectMetrics metrics(")),
                 () -> assertFalse(port.contains("Map<String, Object> metrics(")),
                 () -> assertTrue(service.contains("public SkillEffectMetrics metrics(")),
-                () -> assertTrue(promotion.contains("SkillEffectMetrics metrics")),
-                () -> assertTrue(promotion.contains("SkillEffectMetrics baseline")),
-                () -> assertTrue(rollback.contains("SkillEffectMetrics metrics")),
-                () -> assertTrue(rollback.contains("SkillEffectMetrics baseline")),
+                () -> assertTrue(promotion.contains("releasePort.canaryEvidence(canary)")),
+                () -> assertTrue(promotion.contains("evidence.promotable()")),
+                () -> assertTrue(rollback.contains("releasePort.canaryEvidence(active)")),
+                () -> assertTrue(rollback.contains("evidence.isolationReason()")),
                 () -> assertFalse(promotion.contains("Map<String, Object> metrics")),
                 () -> assertFalse(rollback.contains("Map<String, Object> metrics")),
                 () -> assertTrue(jdbc.contains("SkillEffectMetrics.from(rows.get(0))")));

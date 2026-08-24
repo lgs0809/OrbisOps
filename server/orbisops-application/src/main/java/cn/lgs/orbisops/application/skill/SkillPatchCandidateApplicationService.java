@@ -4,6 +4,7 @@ import cn.lgs.orbisops.domain.shared.service.CanonicalObjectHasher;
 import cn.lgs.orbisops.domain.skill.model.SkillPatchCandidate;
 import cn.lgs.orbisops.domain.skill.model.SkillPatchCandidateStatus;
 import cn.lgs.orbisops.domain.skill.model.SkillPatchRiskLevel;
+import cn.lgs.orbisops.domain.skill.model.SkillEvolutionJobSnapshot;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -29,6 +30,16 @@ public class SkillPatchCandidateApplicationService {
     }
 
     public SkillPatchCandidate createCandidate(Map<String, Object> request) {
+        return candidatePort.create(draft(request));
+    }
+
+    public Map<String,Object> createEvolution(Map<String,Object> request, SkillEvolutionJobSnapshot claim, String sourceHash) {
+        if (claim==null || claim.sourceId().isBlank() || sourceHash==null || sourceHash.isBlank())
+            throw new IllegalStateException("SKILL_EVOLUTION_ACCEPTED_CLAIM_REQUIRED");
+        return SkillPatchCandidateView.of(candidatePort.createEvolution(draft(request),claim,sourceHash,text(request.get("authoringPlanId")),text(request.get("authoringPlanHash"))));
+    }
+
+    private SkillPatchCandidate draft(Map<String,Object> request) {
         Map<String, Object> candidate = new LinkedHashMap<>(
                 request == null ? Map.of() : request);
         String projectId = required(candidate.get("projectId"), "projectId 不能为空");
@@ -60,7 +71,7 @@ public class SkillPatchCandidateApplicationService {
                 "",
                 null,
                 null);
-        return candidatePort.create(authored);
+        return authored;
     }
 
     public Map<String, Object> get(String candidateId) {

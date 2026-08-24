@@ -73,6 +73,25 @@ class OpsChangePackagePreparationServiceTest {
     }
 
     @Test
+    void prepareAndRevisionRejectMalformedFrozenBusinessCriteriaBeforeProducingPlan() {
+        OpsChangePackagePreparationService service = service(defaultAgent(), defaultBundle());
+        Map<String, Object> criteria = new LinkedHashMap<>(Map.ofEntries(
+                Map.entry("kind", "OBSERVABILITY_SLO_V1"), Map.entry("serviceId", "orders"),
+                Map.entry("environment", "test"), Map.entry("expectedVersion", "v2"),
+                Map.entry("baselineVersion", "v1"), Map.entry("resourceIdentity", "service://orders/test"),
+                Map.entry("routeDefinition", "/orders/id"), Map.entry("collectionDefinition", Map.of("description", "raw scrapes")),
+                Map.entry("changeKind", "RELEASE")));
+        var request = withRuntimeBundle(Map.of("projectId", "demo-project", "verificationCriteria", List.of(criteria)));
+        assertEquals("CHANGE_VERIFICATION_CRITERIA_STRING_REQUIRED:collectionDefinition",
+                assertThrows(IllegalArgumentException.class, () -> service.prepare(request, "alice")).getMessage());
+        assertEquals("CHANGE_VERIFICATION_CRITERIA_STRING_REQUIRED:collectionDefinition",
+                assertThrows(IllegalArgumentException.class, () -> service.revise("cp-1", request, "alice")).getMessage());
+        criteria.put("collectionDefinition", "raw-scrapes-v1");
+        assertEquals(List.of(criteria), service.prepare(request, "alice").snapshotInput().get("verificationCriteria"));
+        assertEquals(List.of(criteria), service.revise("cp-1", request, "alice").changes().get("verificationCriteria"));
+    }
+
+    @Test
     void forgedContextBundleHashIsRejectedBeforePlanGeneration() {
         @SuppressWarnings("unchecked")
         ObjectProvider<OpsRuntimeContextBundleAdapter> bundleProvider =

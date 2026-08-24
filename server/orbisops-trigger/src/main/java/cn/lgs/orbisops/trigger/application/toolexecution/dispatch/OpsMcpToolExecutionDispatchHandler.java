@@ -18,6 +18,7 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /** ACL from the unified Tool execution language into the MCP execution context. */
 @Component
@@ -72,15 +73,22 @@ public final class OpsMcpToolExecutionDispatchHandler implements OpsToolExecutio
         String remoteToolName = first(provider.remoteToolName(), target.toolName());
         OpsMcpServerConfig executionConfig = executionConfig(
                 resolved, target, request, mcpId, remoteToolName);
-        String rawInput = JSON.toJSONString(Map.of(
-                "toolName", remoteToolName,
-                "arguments", remoteArguments(request, executionConfig)));
+        Map<String, Object> input = new LinkedHashMap<>();
+        input.put("toolName", remoteToolName);
+        input.put("arguments", remoteArguments(target, request, executionConfig, remoteToolName));
+        boolean readOnlyVerification = Boolean.TRUE.equals(request.requestContext().get("requireReadOnly"));
+        if (readOnlyVerification) input.put("requireReadOnly", true);
+        if (Boolean.TRUE.equals(request.requestContext().get("allowReadOnlyActivation"))) {
+            input.put("allowReadOnlyActivation", true);
+        }
+        String rawInput = JSON.toJSONString(input);
         McpExecutionRequest mcpRequest = mapper.request(
                 executionConfig,
                 rawInput,
                 request.actor(),
                 request.scope() == ToolExecutionScope.APPROVED_LANDING);
         try {
+            // The MCP application owns current policy, conditional activation, and physical dispatch.
             McpExecutionResponse response = mcpExecution.execute(mcpRequest);
             Map<String, Object> payload = new LinkedHashMap<>(mapper.view(response));
             preserveProviderResultIdentity(payload);
@@ -100,24 +108,60 @@ public final class OpsMcpToolExecutionDispatchHandler implements OpsToolExecutio
     }
 
     private Map<String, Object> remoteArguments(
+            ToolExecutionTarget target,
             ToolExecutionRequest request,
-            OpsMcpServerConfig executionConfig) {
+            OpsMcpServerConfig executionConfig,
+            String remoteToolName) {
         Map<String, Object> arguments = new LinkedHashMap<>(
                 request.arguments() == null ? Map.of() : request.arguments());
+        // Service-control MCP schemas require platform identity fields.  The model is
+        // allowed to omit them (and often does for a short natural-language request),
+        // so the unified dispatcher supplies the authoritative project and actor before
+        // the request crosses the remote MCP boundary.  Other MCP tools keep the exact
+        // model-provided argument shape because their schemas may reject extra fields.
+        if (isServiceControlTool(remoteToolName)) {
+            putAuthorityArgument(target, arguments, "projectId", request.projectId());
+            putAuthorityArgument(target, arguments, "actor", request.actor());
+        }
         if (request.scope() != ToolExecutionScope.APPROVED_LANDING) {
             return Map.copyOf(arguments);
         }
-        if (!request.projectId().isBlank()) arguments.put("projectId", request.projectId());
-        if (!request.actor().isBlank()) arguments.put("actor", request.actor());
+        putAuthorityArgument(target, arguments, "projectId", request.projectId());
+        putAuthorityArgument(target, arguments, "actor", request.actor());
         String executionKey = first(
                 request.requestContext().get("idempotencyKey"),
                 request.landingContext().get("executionKey"));
-        if (!executionKey.isBlank()) arguments.put("executionKey", executionKey);
+        if (arguments.containsKey("executionKey") && !executionKey.equals(String.valueOf(arguments.get("executionKey")))) {
+            throw new SecurityException("MCP_RUNTIME_OWNED_ARGUMENT_MISMATCH:executionKey");
+        }
+        putAuthorityArgument(target, arguments, "executionKey", executionKey);
         Instant deadline = authorityDeadline(
                 request.requestContext().get("authorityDeadline"),
                 executionConfig == null ? null : executionConfig.getAuthorityDeadline());
-        if (deadline != null) arguments.put("deadline", deadline.toString());
+        if (deadline != null) putAuthorityArgument(target, arguments, "deadline", deadline.toString());
         return Map.copyOf(arguments);
+    }
+
+    private void putAuthorityArgument(ToolExecutionTarget target, Map<String, Object> arguments,
+                                      String key, String value) {
+        if (value == null || value.isBlank()) return;
+        // Every MCP contract can reject unknown properties. Keep execution authority
+        // in runtime context unless the tool declares the field or the caller supplied it.
+        // Supplied identity fields are still overwritten, never trusted as authority.
+        Map<String, Object> schema = JSON.parseObject(target.schema().inputSchemaJson());
+        Object properties = schema == null ? null : schema.get("properties");
+        if (arguments.containsKey(key)
+                || (properties instanceof Map<?, ?> fields && fields.containsKey(key))) {
+            arguments.put(key, value);
+        }
+    }
+
+    private boolean isServiceControlTool(String remoteToolName) {
+        return Set.of(
+                "get_service_status",
+                "restart_service_dry_run",
+                "restart_service",
+                "get_operation_receipt").contains(remoteToolName);
     }
 
     private void preserveProviderResultIdentity(Map<String, Object> payload) {
@@ -181,15 +225,19 @@ public final class OpsMcpToolExecutionDispatchHandler implements OpsToolExecutio
                 .notificationTools(source.getNotificationTools())
                 .blockedTools(source.getBlockedTools())
                 .build();
-        putHeader(config, "X-Ops-Execution-Key", first(
-                request.requestContext().get("idempotencyKey"),
-                landing.get("executionKey")));
-        putHeader(config, "X-Ops-Fencing-Token", first(
-                request.requestContext().get("fencingToken"),
-                landing.get("fencingToken")));
-        putHeader(config, "X-Ops-Deadline", first(
-                request.requestContext().get("deadline"),
-                landing.get("deadline")));
+        // Approved receipt reads retain the same server-owned correlation identity.
+        // The actual remote schema decides whether it is also a declared argument.
+        if (approvedLanding || !Boolean.TRUE.equals(request.requestContext().get("requireReadOnly"))) {
+            putHeader(config, "X-Ops-Execution-Key", first(
+                    request.requestContext().get("idempotencyKey"),
+                    landing.get("executionKey")));
+            putHeader(config, "X-Ops-Fencing-Token", first(
+                    request.requestContext().get("fencingToken"),
+                    landing.get("fencingToken")));
+            putHeader(config, "X-Ops-Deadline", first(
+                    request.requestContext().get("deadline"),
+                    landing.get("deadline")));
+        }
         return config;
     }
 

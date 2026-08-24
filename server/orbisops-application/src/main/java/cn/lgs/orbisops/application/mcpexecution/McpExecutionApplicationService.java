@@ -79,6 +79,29 @@ public final class McpExecutionApplicationService {
         }
         try {
             Map<String, Object> definition = remote.inspect(request.config(), toolName);
+            McpRuntimeToolSchema disclosed = runtime.hydrate(request, toolName, definition);
+            McpExecutionDecision reviewed = policy.policyDecision(disclosed.attributes(), toolName);
+            if (!reviewed.allowed()) {
+                return blockedResponse(request, toolName, reviewed, 0L);
+            }
+            McpExecutionTarget disclosedTarget = policy.target(request.config(), toolName, disclosed.attributes());
+            if (Boolean.TRUE.equals(request.input().get("requireReadOnly")) && !disclosedTarget.readOnly()) {
+                return blockedResponse(request, toolName, McpExecutionDecision.blocked(
+                        "READ_ONLY_REQUIRED", "Independent verification permits reviewed read-only tools only"), 0L);
+            }
+            if (!request.trustedLandingRuntime() && disclosedTarget.requiresChangePackage()) {
+                // Reading a reviewed contract grants no runtime activation or execution authority.
+                Map<String, Object> payload = new LinkedHashMap<>();
+                payload.put("status", "SCHEMA_ONLY");
+                payload.put("toolName", toolName);
+                payload.put("definition", definition);
+                payload.put("activated", false);
+                payload.put("executionAllowed", false);
+                payload.put("requiresApprovedPackage", true);
+                payload.put("nextStep", "使用此参数定义生成 ChangePackage；审批前不得调用该工具，审批后仅由 Landing 运行时执行。");
+                return recordResponse(request, toolName, "MCP_TOOL_DISCLOSURE",
+                        "SCHEMA_ONLY", payload, true, "ALLOWED", 0L);
+            }
             McpRuntimeActivation activation = runtime.activate(
                     request, toolName, text(request.input().get("reason")), definition);
             return recordResponse(
@@ -104,12 +127,24 @@ public final class McpExecutionApplicationService {
         }
 
         McpRuntimeToolSchema schema = schema(request, toolName);
-        McpExecutionDecision policyDecision = policy.policyDecision(schema.attributes(), toolName);
-        if (!policyDecision.allowed()) {
-            recordRuntimeBlock(request, toolName, policyDecision, 0L);
-            throw denied(request, toolName, policyDecision, elapsed(started));
+        McpExecutionTarget target = checkedTarget(request, toolName, schema, started);
+        if (!request.trustedLandingRuntime()
+                && (Boolean.TRUE.equals(request.input().get("requireReadOnly"))
+                    || Boolean.TRUE.equals(request.input().get("allowReadOnlyActivation")))
+                && target.readOnly()
+                && schema.requiresActivation()
+                && !runtime.activated(request.config(), toolName)) {
+            // A legacy hint is advisory; only the current native readonly target can use this activation.
+            // CORE and already activated tools retain their existing execution lifecycle.
+            request = restrictedReadOnlyRequest(request);
+            McpExecutionResponse activation = activate(request);
+            if (!activation.allowed()) {
+                throw new McpExecutionDeniedException(activation.decision(), activation);
+            }
+            // Remote disclosure may change the reviewed policy; never use the earlier target.
+            schema = schema(request, toolName);
+            target = checkedTarget(request, toolName, schema, started);
         }
-
         if (!request.trustedLandingRuntime()
                 && schema.requiresActivation()
                 && !runtime.activated(request.config(), toolName)) {
@@ -119,7 +154,6 @@ public final class McpExecutionApplicationService {
             throw denied(request, toolName, denied, elapsed(started));
         }
 
-        McpExecutionTarget target = policy.target(request.config(), toolName, schema.attributes());
         McpExecutionDecision route = router.decide(request, target);
         if (!route.allowed()) {
             recordRuntimeBlock(request, toolName, route, 0L);
@@ -141,8 +175,34 @@ public final class McpExecutionApplicationService {
         } catch (SecurityException error) {
             String code = policy.remoteReasonCode(error.getMessage());
             McpExecutionDecision denied = McpExecutionDecision.blocked(code, message(error, code));
-            throw denied(request, toolName, denied, elapsed(started));
+            throw denied(request, toolName, denied, elapsed(started), false);
         }
+    }
+
+    private McpExecutionRequest restrictedReadOnlyRequest(McpExecutionRequest request) {
+        if (Boolean.TRUE.equals(request.input().get("requireReadOnly"))) return request;
+        Map<String, Object> input = new LinkedHashMap<>(request.input());
+        input.put("requireReadOnly", true);
+        return new McpExecutionRequest(request.config(), request.actor(),
+                cn.lgs.orbisops.domain.shared.json.CanonicalJson.stringifyPreservingOrder(input),
+                input, request.trustedLandingRuntime());
+    }
+
+    private McpExecutionTarget checkedTarget(McpExecutionRequest request, String toolName,
+            McpRuntimeToolSchema schema, long started) {
+        McpExecutionDecision decision = policy.policyDecision(schema.attributes(), toolName);
+        if (!decision.allowed()) {
+            recordRuntimeBlock(request, toolName, decision, 0L);
+            throw denied(request, toolName, decision, elapsed(started));
+        }
+        McpExecutionTarget target = policy.target(request.config(), toolName, schema.attributes());
+        if (Boolean.TRUE.equals(request.input().get("requireReadOnly")) && !target.readOnly()) {
+            McpExecutionDecision restriction = McpExecutionDecision.blocked(
+                    "READ_ONLY_REQUIRED", "Independent verification permits reviewed read-only tools only");
+            recordRuntimeBlock(request, toolName, restriction, 0L);
+            throw denied(request, toolName, restriction, elapsed(started));
+        }
+        return target;
     }
 
     private McpRuntimeToolSchema schema(McpExecutionRequest request, String toolName) {
@@ -161,7 +221,12 @@ public final class McpExecutionApplicationService {
             String toolName,
             McpExecutionDecision decision,
             long durationMs) {
-        McpExecutionResponse response = blockedResponse(request, toolName, decision, durationMs);
+        return denied(request, toolName, decision, durationMs, true);
+    }
+
+    private McpExecutionDeniedException denied(McpExecutionRequest request, String toolName,
+            McpExecutionDecision decision, long durationMs, boolean beforeDispatch) {
+        McpExecutionResponse response = blockedResponse(request, toolName, decision, durationMs, beforeDispatch);
         String message = decision.reasonCode() + "：" + decision.message();
         return new McpExecutionDeniedException(message, response);
     }
@@ -171,6 +236,11 @@ public final class McpExecutionApplicationService {
             String toolName,
             McpExecutionDecision decision,
             long durationMs) {
+        return blockedResponse(request, toolName, decision, durationMs, true);
+    }
+
+    private McpExecutionResponse blockedResponse(McpExecutionRequest request, String toolName,
+            McpExecutionDecision decision, long durationMs, boolean beforeDispatch) {
         Map<String, Object> output = policy.blockedPayload(request.config(), toolName, decision);
         audits.record(new McpExecutionAuditPort.McpExecutionAuditEvent(
                 request.config().projectId(), "blocked",
@@ -178,7 +248,9 @@ public final class McpExecutionApplicationService {
                 Map.of("reasonCode", decision.reasonCode(), "runId", request.config().runId())));
         return recordResponse(
                 request, toolName, "TOOL_BLOCKED", "BLOCKED", output,
-                false, decision.decision(), durationMs);
+                false, decision.decision(), durationMs, beforeDispatch
+                        ? McpExecutionRecordPort.DispatchDisposition.PRE_DISPATCH_DENIED
+                        : McpExecutionRecordPort.DispatchDisposition.NOT_PROVEN);
     }
 
     private McpExecutionResponse recordResponse(
@@ -190,16 +262,39 @@ public final class McpExecutionApplicationService {
             boolean allowed,
             String decision,
             long durationMs) {
+        return recordResponse(request, toolName, source, status, output, allowed, decision, durationMs,
+                McpExecutionRecordPort.DispatchDisposition.NOT_PROVEN);
+    }
+
+    private McpExecutionResponse recordResponse(McpExecutionRequest request, String toolName, String source,
+            String status, Object output, boolean allowed, String decision, long durationMs,
+            McpExecutionRecordPort.DispatchDisposition disposition) {
         McpExecutionRecordedResult recorded = records.record(
                 new McpExecutionRecordPort.McpExecutionRecordCommand(
                         request, toolName, source, status, output, durationMs,
-                        allowed && !"TOOL_BLOCKED".equals(source)));
+                        allowed && !"TOOL_BLOCKED".equals(source), disposition));
         Map<String, Object> payload = new LinkedHashMap<>();
         if (output instanceof Map<?, ?> map) {
             map.forEach((key, value) -> payload.put(String.valueOf(key), value));
         } else {
             String raw = output == null ? "" : String.valueOf(output);
             payload.put("rawPreview", raw.length() <= 2000 ? raw : raw.substring(0, 2000));
+            // Structured control results must not be reconstructed from a truncated display preview.
+            if (raw.startsWith("{")) {
+                try {
+                    Map<String, Object> envelope = cn.lgs.orbisops.domain.shared.json.CanonicalJson.parseObject(raw);
+                    if ("1".equals(String.valueOf(envelope.get("orbisopsResultVersion")))
+                            && envelope.containsKey("normalizedContent")) {
+                        payload.put("mcpEnvelope", envelope);
+                        payload.put("normalizedContent", envelope.get("normalizedContent"));
+                        if (envelope.get("normalizedContent") instanceof Map<?, ?> provider) {
+                            payload.put("providerResult", provider);
+                        }
+                    }
+                } catch (IllegalArgumentException invalidLegacyJson) {
+                    // Legacy plain text remains display-only; production MCP callbacks validate their envelope.
+                }
+            }
         }
         return new McpExecutionResponse(
                 allowed,

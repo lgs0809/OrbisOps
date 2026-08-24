@@ -108,6 +108,16 @@ class OpsChangePackageProofVerifierTest {
                 fixture.current(), fixture.version()));
     }
 
+    @Test
+    void executablePackageWithMetadataOnlyPreferredPlanCannotReachApproval() {
+        var snapshot = highRiskSnapshot();
+        snapshot.put("landingPlan", Map.of("preferredPlan", Map.of("forwardOperationId", "op-1")));
+        var fixture = fixture(snapshot, ChangePackageType.MCP_OPERATION_PACKAGE, "HIGH");
+        var error = assertThrows(IllegalArgumentException.class,
+                () -> new OpsChangePackageProofVerifier(null, null).verifyPackageBeforeApprove(fixture.current(), fixture.version()));
+        org.junit.jupiter.api.Assertions.assertTrue(error.getMessage().contains("EXPLICIT_FORWARD_STEPS_REQUIRED"));
+    }
+
     private Map<String, Object> highRiskSnapshot() {
         return targetWriteSnapshot("HIGH");
     }

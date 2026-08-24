@@ -227,7 +227,7 @@ class WorkSessionRunApplicationServiceTest {
                 "run-1", "p1", "s1", "u1", "agent-1", 7, "definition-hash",
                 "PROJECT_PRE_APPROVAL", WorkSessionRunStatus.RECOVERABLE, "attempt-old",
                 4L, 2L, "", "", null, false, Map.of(), "manifest-hash",
-                Map.of("query", "排查失败", "metadata", Map.of("source", "chat")), Map.of(), "",
+                Map.of("query", "排查失败", "trustedObserveOnly", true, "metadata", Map.of("source", "chat")), Map.of(), "",
                 NOW.minusSeconds(60), NOW));
 
         assertEquals(claim, mapped);
@@ -235,6 +235,9 @@ class WorkSessionRunApplicationServiceTest {
         assertEquals(7, resumed.getAgentVersion());
         assertEquals("PROJECT_PRE_APPROVAL", resumed.getMetadata().get("executionHarness"));
         assertEquals("attempt-old", resumed.getMetadata().get("resumedFromAttemptId"));
+        assertTrue(resumed.getTrustedObserveOnly());
+        assertEquals(true, mapper.startCommand(resumed, definition, null,
+                OpsExecutionHarness.PROJECT_PRE_APPROVAL).requestPayload().get("trustedObserveOnly"));
     }
 
     private WorkSessionRunApplicationService service(FakeRepository repository) {

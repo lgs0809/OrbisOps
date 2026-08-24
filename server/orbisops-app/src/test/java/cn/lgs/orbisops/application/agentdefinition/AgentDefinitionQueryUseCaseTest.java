@@ -32,6 +32,19 @@ class AgentDefinitionQueryUseCaseTest {
     }
 
     @Test
+    void adminDetailFindsNewestDraftWithoutRequiringAPublishedCurrentPointer() {
+        @SuppressWarnings("unchecked")
+        AgentDefinitionQueryPort<Definition, String> port = mock(AgentDefinitionQueryPort.class);
+        var useCase = new AgentDefinitionQueryUseCase<>(port);
+        Definition draft = new Definition("draft-only", true);
+        when(port.listVersions("draft-only")).thenReturn(List.of(draft));
+        when(port.listAll()).thenReturn(List.of());
+        assertEquals(draft, useCase.find("draft-only"));
+        verify(port, org.mockito.Mockito.never()).listAll();
+        assertNull(useCase.find(""));
+    }
+
+    @Test
     void bindingsPreferStoredRowsAndFallBackToDerivedDefinition() {
         @SuppressWarnings("unchecked")
         AgentDefinitionQueryPort<Definition, String> port = mock(AgentDefinitionQueryPort.class);

@@ -43,6 +43,28 @@ class OpsMcpRemoteClientAdapterTest {
     }
 
     @Test
+    void catalogReconnectsOnceAfterPeerSessionLossButNeverReplaysBusinessOpen() {
+        var registry = mock(OpsMcpClientRegistry.class);
+        var factory = mock(OpsMcpClientFactory.class);
+        var handle = mock(OpsMcpClientRegistry.ClientHandle.class);
+        var config = OpsMcpServerConfig.builder().name("catalog").build();
+        when(factory.cacheKey(config)).thenReturn("key");
+        when(registry.acquire(eq("key"), eq(config), any())).thenReturn(handle);
+        when(registry.toolCallbacks(handle)).thenReturn(new ToolCallback[]{callback("read", "read", "{}")});
+        var lost = new OpsMcpCallFailure(OpsMcpCallFailure.Kind.TRANSPORT_ERROR, "SESSION_NOT_FOUND", false);
+        org.mockito.Mockito.doThrow(lost).doNothing().when(registry).initialize(handle);
+        var adapter = new OpsMcpRemoteClientAdapter(registry, factory);
+        assertEquals("read", adapter.inspectDefinition(config, "read").get("toolName"));
+        verify(registry, org.mockito.Mockito.times(2)).initialize(handle);
+        verify(registry).invalidate(handle);
+        org.mockito.Mockito.doThrow(lost).when(registry).initialize(handle);
+        assertThrows(OpsMcpCallFailure.class, () -> adapter.open(config));
+        verify(registry, org.mockito.Mockito.times(3)).initialize(handle);
+        assertThrows(OpsMcpCallFailure.class, () -> adapter.inspectDefinitions(config));
+        verify(registry, org.mockito.Mockito.times(5)).initialize(handle);
+    }
+
+    @Test
     void sessionMustDefensivelyCopyCallbackSnapshot() {
         OpsMcpClientRegistry.ClientHandle handle = mock(OpsMcpClientRegistry.ClientHandle.class);
         ToolCallback original = callback("search_logs", "Search logs", "{\"type\":\"object\"}");

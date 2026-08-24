@@ -7,6 +7,7 @@ import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.agent.flow.agent.ParallelAgent;
 import com.alibaba.cloud.ai.graph.agent.flow.agent.SequentialAgent;
 import org.springframework.util.StringUtils;
+import org.springframework.ai.template.NoOpTemplateRenderer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,12 +26,13 @@ final class OpsAgentScopePipelineFactory {
     private final OpsAgentScopeFlowPolicy flowPolicy;
     private final ExecutorService modelCallExecutor;
     private final int modelCallTimeoutSeconds;
+    private final OpsMcpDiscoveryPolicy discoveryPolicy;
 
     OpsAgentScopePipelineFactory(OpsRuntimePromptAssembler promptAssembler,
                                  Executor executor,
                                  OpsAgentScopeConfigPolicy configPolicy,
                                  OpsAgentScopeFlowPolicy flowPolicy) {
-        this(promptAssembler, executor, configPolicy, flowPolicy, null, 240);
+        this(promptAssembler, executor, configPolicy, flowPolicy, null, 240, OpsMcpDiscoveryPolicy.defaults());
     }
 
     OpsAgentScopePipelineFactory(OpsRuntimePromptAssembler promptAssembler,
@@ -38,13 +40,14 @@ final class OpsAgentScopePipelineFactory {
                                  OpsAgentScopeConfigPolicy configPolicy,
                                  OpsAgentScopeFlowPolicy flowPolicy,
                                  ExecutorService modelCallExecutor,
-                                 int modelCallTimeoutSeconds) {
+                                 int modelCallTimeoutSeconds, OpsMcpDiscoveryPolicy discoveryPolicy) {
         this.promptAssembler = promptAssembler;
         this.executor = executor;
         this.configPolicy = configPolicy;
         this.flowPolicy = flowPolicy;
         this.modelCallExecutor = modelCallExecutor;
         this.modelCallTimeoutSeconds = Math.max(1, modelCallTimeoutSeconds);
+        this.discoveryPolicy = discoveryPolicy;
     }
 
     Prepared prepare(OpsAgentDefinition definition,
@@ -123,6 +126,9 @@ final class OpsAgentScopePipelineFactory {
             agents.add(ReactAgent.builder()
                     .name(agentName)
                     .model(bundle.getChatModel())
+                    .chatOptions(OpsAgentScopeConfigPolicy.toolCallingOptions().build())
+                    // OrbisOps already assembled this instruction; JSON/tool schemas are literal data.
+                    .templateRenderer(new NoOpTemplateRenderer())
                     .instruction(promptAssembler.agentInstruction(
                             definition, config, bundle))
                     .tools(bundle.getTools())
@@ -133,6 +139,7 @@ final class OpsAgentScopePipelineFactory {
                                     events,
                                     eventSink,
                                     agentName),
+                            new OpsMcpDisclosureInterceptor(bundle, event -> record(events, eventSink, event), discoveryPolicy),
                             new OpsToolRoundSynthesisInterceptor(budget.maxRounds()))
                     .compileConfig(CompileConfig.builder()
                             .recursionLimit(budget.recursionLimit())

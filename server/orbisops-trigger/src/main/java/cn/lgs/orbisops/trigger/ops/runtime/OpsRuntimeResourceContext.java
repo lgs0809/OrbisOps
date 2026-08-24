@@ -34,6 +34,8 @@ public class OpsRuntimeResourceContext {
     private Boolean changePackageEnabled;
     private String skillContext;
     private ChatModel chatModel;
+    private java.util.function.BiFunction<OpsMcpServerConfig,String,Map<String,Object>> mcpDefinitionReader;
+    private java.util.function.Function<OpsMcpServerConfig,List<Map<String,Object>>> mcpDefinitionsReader;
 
     @Builder.Default
     private Set<String> skillNames = new LinkedHashSet<>();
@@ -80,6 +82,8 @@ public class OpsRuntimeResourceContext {
                 .definition(definition)
                 .agentVersion(definition == null ? null : definition.getVersion())
                 .chatModel(chatModel)
+                .mcpDefinitionReader(mcpDefinitionReader)
+                .mcpDefinitionsReader(mcpDefinitionsReader)
                 .projectId(projectId)
                 .ragEnabled(ragEnabled)
                 .knowledgeBaseId(knowledgeBaseId)

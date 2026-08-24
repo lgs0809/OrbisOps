@@ -12,6 +12,17 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 class ChangePackageCanonicalHasherTest {
 
     @Test
+    void nativeLandingExecutionIdentityRetainsTheExistingUnquotedNewlineProtocol() {
+        String existing = "6470733496d9f10bfef97d960b7d709fa34fe26b65a38fcac6979f0706962790";
+        assertEquals(existing, ChangePackageCanonicalHasher.landingExecutionKey(
+                "project-1", "cp-1", "1", "approved-hash", "op-1", "operation-hash"));
+        assertNotEquals(existing, ChangePackageCanonicalHasher.landingExecutionKey(
+                "project-2", "cp-1", "1", "approved-hash", "op-1", "operation-hash"));
+        assertNotEquals(existing, ChangePackageCanonicalHasher.landingExecutionKey(
+                "project-1", "cp-1", "2", "approved-hash", "op-1", "operation-hash"));
+    }
+
+    @Test
     void canonicalHashIsStableAcrossMapInsertionOrder() {
         Map<String, Object> first = new LinkedHashMap<>();
         first.put("projectId", "project-1");

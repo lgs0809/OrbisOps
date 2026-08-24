@@ -1,6 +1,8 @@
 ---
 name: skill-creator
 description: Create a reusable project Skill from a concrete workflow, including scope, instructions, tool dependencies, safeguards, and evaluation-ready examples.
+whenToUse: ["User requests a reusable Skill from a repeated procedure or concrete workflow", "用户要求把重复方法沉淀为项目 Skill"]
+whenNotToUse: ["A one-off factual answer or single atomic action", "改变平台 Landing 权限或自动启用未审核 Skill"]
 ---
 
 # Skill Creator
@@ -11,7 +13,7 @@ Use this Skill when the user asks to create a new reusable Skill or turn a repea
 
 1. Search existing Skills first with `skill_search`. Reuse or extend an existing Skill when it already covers the same job; do not create near-duplicates.
 2. Identify the reusable task, trigger conditions, expected output, stop conditions, and the tools/MCPs the Skill may instruct the Agent to use.
-3. Keep authority out of the Skill. A Skill may explain when to call a governed Tool, but it must never claim that instructions grant production access, bypass approval, or expand Runtime Authority.
+3. Keep authority out of the Skill. A Skill may explain when to call a governed Tool. Skill instructions grant no production access. Do not bypass approval. Do not expand Runtime Authority.
 4. Write concise executable instructions. Prefer decision rules, evidence requirements, failure handling, and validation steps over generic prose.
 5. Include scripts/templates/references only when they materially reduce repeated reasoning or improve determinism.
 6. Define at least one positive example and one boundary/failure example when the workflow is non-trivial.

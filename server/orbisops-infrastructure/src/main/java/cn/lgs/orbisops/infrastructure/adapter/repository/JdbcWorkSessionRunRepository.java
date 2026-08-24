@@ -1,6 +1,7 @@
 package cn.lgs.orbisops.infrastructure.adapter.repository;
 
 import cn.lgs.orbisops.domain.worksession.run.adapter.repository.IWorkSessionRunRepository;
+import cn.lgs.orbisops.domain.shared.service.CanonicalObjectHasher;
 import cn.lgs.orbisops.domain.worksession.run.model.WorkSessionCheckpoint;
 import cn.lgs.orbisops.domain.worksession.run.model.WorkSessionParticipantRole;
 import cn.lgs.orbisops.domain.worksession.run.model.WorkSessionRecoveryCandidate;
@@ -67,6 +68,7 @@ public class JdbcWorkSessionRunRepository implements IWorkSessionRunRepository {
                     run_manifest_json=?, run_manifest_hash=?, updated_at=?
                 WHERE run_id=? AND project_id=?
                   AND status IN ('PENDING','RECOVERABLE','WAITING_APPROVAL')
+                  AND cancel_requested=0
                   AND user_id=? AND session_id=?
                   AND agent_id=? AND agent_version=? AND agent_definition_hash=? AND execution_harness=?
                 """,
@@ -150,7 +152,8 @@ public class JdbcWorkSessionRunRepository implements IWorkSessionRunRepository {
                 UPDATE ai_ops_agent_run FORCE INDEX (uk_run_id)
                 SET run_manifest_json=?, run_manifest_hash=?, state_version=state_version+1, updated_at=?
                 WHERE run_id=? AND project_id=? AND current_attempt_id=? AND lease_token=?
-                  AND fencing_token=? AND status='RUNNING'
+                  AND fencing_token=? AND status='RUNNING' AND cancel_requested=0
+                  AND lease_expires_at>CURRENT_TIMESTAMP(6)
                 """,
                 JSON.toJSONString(manifest), manifestHash, timestamp(updatedAt),
                 claim.runId(), claim.projectId(), claim.attemptId(), claim.leaseToken(), claim.fencingToken());
@@ -171,6 +174,7 @@ public class JdbcWorkSessionRunRepository implements IWorkSessionRunRepository {
                 SET lease_expires_at=?, updated_at=?
                 WHERE run_id=? AND project_id=? AND current_attempt_id=? AND lease_token=?
                   AND fencing_token=? AND status='RUNNING' AND cancel_requested=0
+                  AND lease_expires_at>CURRENT_TIMESTAMP(6)
                 """,
                 timestamp(leaseExpiresAt), timestamp(updatedAt), claim.runId(), claim.projectId(),
                 claim.attemptId(), claim.leaseToken(), claim.fencingToken());
@@ -192,6 +196,7 @@ public class JdbcWorkSessionRunRepository implements IWorkSessionRunRepository {
                     lease_token='', lease_expires_at=NULL, updated_at=?
                 WHERE run_id=? AND project_id=? AND current_attempt_id=? AND lease_token=?
                   AND fencing_token=? AND status='RUNNING' AND cancel_requested=0
+                  AND lease_expires_at>CURRENT_TIMESTAMP(6)
                 """,
                 timestamp(updatedAt), claim.runId(), claim.projectId(), claim.attemptId(),
                 claim.leaseToken(), claim.fencingToken());
@@ -254,10 +259,12 @@ public class JdbcWorkSessionRunRepository implements IWorkSessionRunRepository {
                     response_json=?, error_message=?, updated_at=?
                 WHERE run_id=? AND project_id=? AND current_attempt_id=? AND lease_token=?
                   AND fencing_token=? AND status='RUNNING'
+                  AND lease_expires_at>CURRENT_TIMESTAMP(6)
+                  AND (cancel_requested=0 OR ?='CANCELED')
                 """,
                 status.name(), responsePayload == null || responsePayload.isEmpty()
-                        ? null : JSON.toJSONString(responsePayload), errorMessage, timestamp(updatedAt),
-                claim.runId(), claim.projectId(), claim.attemptId(), claim.leaseToken(), claim.fencingToken());
+                        ? null : cn.lgs.orbisops.domain.shared.json.CanonicalJson.stringifyPreservingOrder(responsePayload), errorMessage, timestamp(updatedAt),
+                claim.runId(), claim.projectId(), claim.attemptId(), claim.leaseToken(), claim.fencingToken(), status.name());
         if (updated != 1) return false;
         jdbcTemplate.update("""
                 UPDATE ai_ops_agent_run_attempt
@@ -278,14 +285,26 @@ public class JdbcWorkSessionRunRepository implements IWorkSessionRunRepository {
             String actor,
             String reason,
             Instant updatedAt) {
-        return jdbcTemplate.update("""
+        int updated = jdbcTemplate.update("""
                 UPDATE ai_ops_agent_run FORCE INDEX (uk_run_id)
                 SET cancel_requested=1, cancel_requested_at=CURRENT_TIMESTAMP(3), cancel_requested_by=?,
-                    cancel_reason=?, state_version=state_version+1, updated_at=?
+                    cancel_reason=?, state_version=state_version+1, updated_at=?,
+                    status=CASE WHEN status='RUNNING' THEN status ELSE 'CANCELED' END
                 WHERE run_id=? AND project_id=? AND state_version=?
+                  AND (cancel_requested=0 OR status='RECOVERABLE')
                   AND status IN ('PENDING','RUNNING','WAITING_APPROVAL','RECOVERABLE')
                 """,
-                actor, reason, timestamp(updatedAt), runId, projectId, expectedVersion) == 1;
+                actor, reason, timestamp(updatedAt), runId, projectId, expectedVersion);
+        if (updated != 1) return false;
+        // Suspended runs have no live worker to finish cancellation. Preserve old lost attempts for audit.
+        jdbcTemplate.update("""
+                UPDATE ai_ops_agent_run_attempt a JOIN ai_ops_agent_run r
+                  ON r.run_id=a.run_id AND r.current_attempt_id=a.attempt_id
+                SET a.status='CANCELED', a.finished_at=CURRENT_TIMESTAMP(6), a.error_message=?
+                WHERE r.run_id=? AND r.project_id=? AND r.status='CANCELED'
+                  AND a.status IN ('PENDING','WAITING_APPROVAL')
+                """, reason, runId, projectId);
+        return true;
     }
 
     @Override
@@ -316,11 +335,14 @@ public class JdbcWorkSessionRunRepository implements IWorkSessionRunRepository {
     @Override
     public List<WorkSessionRecoveryCandidate> findExpiredLeases(int limit, Instant now) {
         List<Map<String, Object>> expired = jdbcTemplate.queryForList("""
-                SELECT run_id, project_id, current_attempt_id, state_version
-                FROM ai_ops_agent_run
-                WHERE status='RUNNING' AND lease_expires_at IS NOT NULL
-                  AND lease_expires_at<?
-                ORDER BY lease_expires_at ASC LIMIT ?
+                SELECT r.run_id, r.project_id, r.current_attempt_id, r.state_version, r.fencing_token, r.cancel_requested,
+                       a.fencing_token AS attempt_fencing_token, a.status AS attempt_status
+                FROM ai_ops_agent_run r
+                LEFT JOIN ai_ops_agent_run_attempt a
+                  ON a.attempt_id=r.current_attempt_id AND a.run_id=r.run_id AND a.project_id=r.project_id
+                WHERE r.status='RUNNING' AND r.lease_expires_at IS NOT NULL
+                  AND r.lease_expires_at<?
+                ORDER BY r.lease_expires_at ASC LIMIT ?
                 """,
                 timestamp(now), Math.max(1, Math.min(limit, 200)));
         List<WorkSessionRecoveryCandidate> result = new ArrayList<>();
@@ -328,9 +350,9 @@ public class JdbcWorkSessionRunRepository implements IWorkSessionRunRepository {
             String runId = text(row.get("run_id"));
             String projectId = text(row.get("project_id"));
             List<Map<String, Object>> checkpoints = jdbcTemplate.queryForList("""
-                    SELECT checkpoint_seq, checkpoint_type, checkpoint_json
+                    SELECT checkpoint_seq, checkpoint_type, project_id, attempt_id, checkpoint_json, checkpoint_hash
                     FROM ai_ops_agent_run_checkpoint
-                    WHERE run_id=? AND checkpoint_type IN ('TOOL_EXECUTION_STARTED','TOOL_EXECUTION_COMPLETED')
+                    WHERE run_id=? AND checkpoint_type IN ('TOOL_EXECUTION_STARTED','TOOL_EXECUTION_COMPLETED','TOOL_EXECUTION_BLOCKED')
                     ORDER BY checkpoint_seq ASC
                     """, runId);
             Map<String, Map<String, Object>> startedByCall = new LinkedHashMap<>();
@@ -360,16 +382,75 @@ public class JdbcWorkSessionRunRepository implements IWorkSessionRunRepository {
                 if (!readOnly || writesTargetResource) unsafeIncomplete++;
             }
             if (startedByCall.isEmpty() && completedCalls.isEmpty()
-                    && toolResults != null && toolResults > 0) {
+                    && toolResults != null && toolResults > 0
+                    && !hasCompletePreDispatchDenialProof(row, checkpoints, toolResults)) {
                 unsafeIncomplete = 1;
             }
             result.add(new WorkSessionRecoveryCandidate(
                     runId, projectId, text(row.get("current_attempt_id")), number(row.get("state_version")),
                     startedByCall.size(), completedCalls.size(),
                     toolResults == null ? 0 : toolResults,
-                    unsafeIncomplete));
+                    unsafeIncomplete, bool(row.get("cancel_requested"))));
         }
         return List.copyOf(result);
+    }
+
+    /** Only native, current-claim records can prove that a result never crossed dispatch. */
+    private boolean hasCompletePreDispatchDenialProof(
+            Map<String, Object> run,
+            List<Map<String, Object>> checkpoints,
+            int resultCount) {
+        String runId = text(run.get("run_id"));
+        String projectId = text(run.get("project_id"));
+        String attemptId = text(run.get("current_attempt_id"));
+        long fence = number(run.get("fencing_token"));
+        if (!"RUNNING".equals(text(run.get("attempt_status")))
+                || !(run.get("attempt_fencing_token") instanceof Number)
+                || fence != number(run.get("attempt_fencing_token"))) return false;
+        Map<String, Map<String, Object>> proofs = new LinkedHashMap<>();
+        Set<String> toolCalls = new LinkedHashSet<>();
+        for (Map<String, Object> checkpoint : checkpoints) {
+            if (!"TOOL_EXECUTION_BLOCKED".equals(text(checkpoint.get("checkpoint_type")))) continue;
+            Map<String, Object> payload = objectMap(text(checkpoint.get("checkpoint_json")));
+            String resultId = text(payload.get("resultId"));
+            String callId = text(payload.get("toolCallId"));
+            if (!projectId.equals(text(checkpoint.get("project_id")))
+                    || !attemptId.equals(text(checkpoint.get("attempt_id")))
+                    || !projectId.equals(text(payload.get("projectId")))
+                    || !runId.equals(text(payload.get("runId")))
+                    || !attemptId.equals(text(payload.get("attemptId")))
+                    || !(payload.get("fencingToken") instanceof Number)
+                    || fence != number(payload.get("fencingToken"))
+                    || !"PRE_DISPATCH_DENIED".equals(text(payload.get("dispatchBoundary")))
+                    || resultId.isBlank() || callId.isBlank()
+                    || !CanonicalObjectHasher.sha256(payload).equals(text(checkpoint.get("checkpoint_hash")))
+                    || proofs.putIfAbsent(resultId, payload) != null || !toolCalls.add(callId)) return false;
+        }
+        if (proofs.size() != resultCount) return false;
+        List<Map<String, Object>> results = jdbcTemplate.queryForList("""
+                SELECT result_id, toolset_id, tool_name, source, status,
+                       query_text, input_hash, full_output, output_hash
+                FROM ai_ops_tool_result WHERE run_id=? AND project_id=?
+                """, runId, projectId);
+        if (results.size() != resultCount) return false;
+        for (Map<String, Object> result : results) {
+            Map<String, Object> proof = proofs.get(text(result.get("result_id")));
+            if (proof == null || !"TOOL_BLOCKED".equals(text(result.get("source")))
+                    || !"BLOCKED".equals(text(result.get("status")))
+                    || !text(result.get("toolset_id")).equals(text(proof.get("toolsetId")))
+                    || !text(result.get("tool_name")).equals(text(proof.get("toolName")))
+                    || !text(result.get("input_hash")).equals(text(proof.get("inputHash")))
+                    || !text(result.get("output_hash")).equals(text(proof.get("outputHash")))
+                    || !CanonicalObjectHasher.sha256Text(rawText(result.get("query_text")))
+                            .equals(text(result.get("input_hash")))
+                    || !CanonicalObjectHasher.sha256Text(rawText(result.get("full_output")))
+                            .equals(text(result.get("output_hash")))) return false;
+        }
+        return true;
+    }
+
+    private String rawText(Object value) {
+        return value == null ? "" : String.valueOf(value);
     }
 
     @Override
@@ -383,7 +464,7 @@ public class JdbcWorkSessionRunRepository implements IWorkSessionRunRepository {
                 SET status=?, state_version=state_version+1, worker_id='', lease_token='', lease_expires_at=NULL,
                     error_message=?, updated_at=?
                 WHERE run_id=? AND project_id=? AND status='RUNNING' AND state_version=?
-                  AND lease_expires_at<CURRENT_TIMESTAMP
+                  AND lease_expires_at<CURRENT_TIMESTAMP(6)
                 """,
                 decision.status().name(), decision.reasonCode(), timestamp(updatedAt),
                 candidate.runId(), candidate.projectId(), candidate.stateVersion());
@@ -411,6 +492,7 @@ public class JdbcWorkSessionRunRepository implements IWorkSessionRunRepository {
                 SET next_checkpoint_seq=LAST_INSERT_ID(next_checkpoint_seq + 1), updated_at=?
                 WHERE run_id=? AND project_id=? AND current_attempt_id=? AND lease_token=?
                   AND fencing_token=? AND status='RUNNING' AND cancel_requested=0
+                  AND lease_expires_at>CURRENT_TIMESTAMP(6)
                 """,
                 timestamp(checkpoint.createdAt()), claim.runId(), claim.projectId(), claim.attemptId(),
                 claim.leaseToken(), claim.fencingToken());

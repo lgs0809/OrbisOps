@@ -4,6 +4,7 @@ import cn.lgs.orbisops.application.mcp.McpPolicySuggestion;
 import cn.lgs.orbisops.application.mcp.McpPolicySuggestionPort;
 import cn.lgs.orbisops.domain.mcp.model.McpRiskLevel;
 import cn.lgs.orbisops.trigger.ops.OpsAgentLlmClient;
+import cn.lgs.orbisops.trigger.ops.OpsNodeDeadlineContext;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import lombok.extern.slf4j.Slf4j;
@@ -36,7 +37,8 @@ public class OpsMcpPolicySuggestionAdapter implements McpPolicySuggestionPort {
 
     @Override
     public Optional<McpPolicySuggestion> suggest(SuggestionRequest request) {
-        if (request == null || llmClient == null || !llmClient.available()) return Optional.empty();
+        if (request == null || llmClient == null || !llmClient.available()
+                || OpsNodeDeadlineContext.remainingMillis(5000) <= 0) return Optional.empty();
         try {
             Map<String, Object> payload = new LinkedHashMap<>();
             payload.put("projectId", request.projectId());
@@ -46,8 +48,10 @@ public class OpsMcpPolicySuggestionAdapter implements McpPolicySuggestionPort {
             payload.put("schemaHash", request.schemaHash());
             payload.put("metadataComplete", request.metadataComplete());
             payload.put("toolSnapshot", request.toolSnapshot());
-            JSONObject raw = llmClient.chatJsonObject(
-                    "ops-mcp-tool-policy-classifier", SYSTEM_PROMPT, JSON.toJSONString(payload));
+            // Suggestions never grant authority. A slow optional classifier must not hold
+            // catalog discovery open for the full interactive-agent model timeout.
+            JSONObject raw = OpsNodeDeadlineContext.withTimeout(5, () -> llmClient.chatJsonObject(
+                    "ops-mcp-tool-policy-classifier", SYSTEM_PROMPT, JSON.toJSONString(payload)));
             if (raw == null || raw.isEmpty()) return Optional.empty();
             Map<String, Object> source = new LinkedHashMap<>(raw);
             return Optional.of(new McpPolicySuggestion(

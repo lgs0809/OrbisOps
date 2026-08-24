@@ -109,7 +109,9 @@ final class OpsProjectMcpConfigBuilder {
                 .toolCapabilities(Map.of(
                         "resourceEnvironment", "external",
                         "permissionProfile", "DATA_READONLY",
-                        "allowedStages", "INVESTIGATE,PREPARE",
+                        // Connection availability is distinct from per-tool execution authority.
+                        // Progressive tools still require a reviewed policy and approved LANDING binding.
+                        "allowedStages", "INVESTIGATE,PREPARE,LANDING",
                         "readOnly", "true",
                         "riskLevel", "HIGH",
                         "effectCeiling", "READ_ONLY",

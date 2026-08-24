@@ -38,12 +38,30 @@ public class SkillEvolutionInputPolicy {
                 .limit(MAX_TOOL_EVENTS)
                 .toList();
 
-        String finalReport = source.trace().stream()
+        List<SkillEvolutionTraceEvent> finalEvents = source.trace().stream()
                 .filter(event -> FINAL_EVENT_TYPES.contains(event.eventType().toUpperCase(Locale.ROOT)))
-                .map(event -> fallback(event.summary(), text(event.payload())))
-                .filter(this::hasText)
-                .reduce((left, right) -> right)
-                .orElse("");
+                .toList();
+        // FINAL_OUTPUT/NODE_END carry the actual user-visible answer in content,
+        // while DONE/RUN_FINISHED intentionally carry only a short lifecycle
+        // summary. Prefer content across all terminal events so a later generic
+        // DONE event cannot erase the reusable report needed by the evolver.
+        String finalContent = lastText(finalEvents.stream()
+                .map(SkillEvolutionTraceEvent::content)
+                .toList());
+        String finalReport = finalContent;
+        String terminalSummary = lastText(finalEvents.stream()
+                .map(event -> firstText(event.summary(), text(event.payload())))
+                .toList());
+        if (finalReport.isBlank()) finalReport = terminalSummary;
+        if (isGenericFinalSummary(finalReport)) {
+            String assistantReport = source.messages().stream()
+                    .filter(message -> "assistant".equalsIgnoreCase(message.role()))
+                    .map(SkillEvolutionMessage::content)
+                    .filter(this::hasText)
+                    .reduce((left, right) -> right)
+                    .orElse("");
+            if (hasText(assistantReport)) finalReport = abbreviate(assistantReport, MAX_USER_GOAL_LENGTH);
+        }
 
         boolean hasCompleted = source.trace().stream().anyMatch(event ->
                 "SUCCEEDED".equalsIgnoreCase(event.status())
@@ -65,6 +83,7 @@ public class SkillEvolutionInputPolicy {
                 .map(value -> abbreviate(value, MAX_USER_GOAL_LENGTH))
                 .orElse("");
         String normalizedUserGoal = hasText(messageUserGoal) ? messageUserGoal : traceUserGoal;
+        if (hasText(source.acceptedGoal())) normalizedUserGoal = source.acceptedGoal();
         boolean hasMessages = !source.messages().isEmpty() || hasText(traceUserGoal);
 
         List<SkillEvolutionEvidenceReference> evidenceReferences = evidenceReferences(source.trace());
@@ -79,7 +98,9 @@ public class SkillEvolutionInputPolicy {
                 !toolEvents.isEmpty(),
                 hasMessages,
                 evidenceReferences,
-                contextBundleHash);
+                contextBundleHash,
+                source.episodeJson(),
+                source.sourceHash());
     }
 
     /** Cheap deterministic gate executed before any Skill Evolution LLM pipeline call. */
@@ -143,6 +164,28 @@ public class SkillEvolutionInputPolicy {
 
     private String fallback(String value, String fallback) {
         return hasText(value) ? value : text(fallback);
+    }
+
+    private String firstText(String... values) {
+        if (values == null) return "";
+        for (String value : values) {
+            if (hasText(value)) return value.trim();
+        }
+        return "";
+    }
+
+    private String lastText(List<String> values) {
+        if (values == null) return "";
+        for (int index = values.size() - 1; index >= 0; index--) {
+            String value = values.get(index);
+            if (hasText(value)) return value.trim();
+        }
+        return "";
+    }
+
+    private boolean isGenericFinalSummary(String value) {
+        String normalized = value == null ? "" : value.trim();
+        return normalized.isBlank() || "Agent 输出完成。".equals(normalized);
     }
 
     private boolean hasText(String value) {

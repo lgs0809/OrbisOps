@@ -84,6 +84,9 @@ class OpsProjectMcpRuntimeConfigFactoryTest {
         assertEquals("https://mcp.example.test/mcp", config.getUrl());
         assertEquals("Bearer ${env:TEST_MCP_TOKEN}", config.getHeaders().get("Authorization"));
         assertEquals(List.of("search_logs"), config.getAllowedTools());
+        assertEquals("INVESTIGATE,PREPARE,LANDING", config.getToolCapabilities().get("allowedStages"));
+        assertEquals("true", config.getToolCapabilities().get("readOnly"));
+        assertEquals(true, config.getProgressiveManaged());
     }
 
     @Test

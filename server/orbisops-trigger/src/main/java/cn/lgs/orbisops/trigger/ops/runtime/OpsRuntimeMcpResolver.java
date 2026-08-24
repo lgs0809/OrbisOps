@@ -1,6 +1,8 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
 import cn.lgs.orbisops.api.dto.OpsAgentRunRequestDTO;
+import cn.lgs.orbisops.application.changepackage.LandingOperationExecutionBinding;
+import cn.lgs.orbisops.application.changepackage.LandingOperationJournalApplicationService;
 import cn.lgs.orbisops.application.project.ProjectMcpAuthorizationApplicationService;
 import cn.lgs.orbisops.application.worksession.WorkSessionMetadataKeys;
 import cn.lgs.orbisops.domain.worksession.runtime.model.AgentExecutionStage;
@@ -19,26 +21,33 @@ import java.util.function.Supplier;
 
 /** Resolves MCP runtime resources and decorates them with the current execution identity. */
 public final class OpsRuntimeMcpResolver {
-
     private static final Logger log = LoggerFactory.getLogger(OpsRuntimeMcpResolver.class);
 
     private final OpsMcpToolProvider toolProvider;
     private final OpsMcpRuntimeConfigSourceChain configSources;
     private final Supplier<ProjectMcpAuthorizationApplicationService> authorizationSupplier;
     private final OpsMcpRuntimeCatalogReconciler catalogReconciler;
-
+    private final Supplier<LandingOperationJournalApplicationService> landingJournalSupplier;
     public OpsRuntimeMcpResolver(
             OpsMcpToolProvider toolProvider,
             OpsMcpRuntimeConfigSourceChain configSources,
             Supplier<ProjectMcpAuthorizationApplicationService> authorizationSupplier) {
-        this(toolProvider, configSources, authorizationSupplier, null);
+        this(toolProvider, configSources, authorizationSupplier, null, null);
+    }
+    public OpsRuntimeMcpResolver(
+            OpsMcpToolProvider toolProvider,
+            OpsMcpRuntimeConfigSourceChain configSources,
+            Supplier<ProjectMcpAuthorizationApplicationService> authorizationSupplier,
+            OpsMcpRuntimeCatalogReconciler catalogReconciler) {
+        this(toolProvider, configSources, authorizationSupplier, catalogReconciler, null);
     }
 
     public OpsRuntimeMcpResolver(
             OpsMcpToolProvider toolProvider,
             OpsMcpRuntimeConfigSourceChain configSources,
             Supplier<ProjectMcpAuthorizationApplicationService> authorizationSupplier,
-            OpsMcpRuntimeCatalogReconciler catalogReconciler) {
+            OpsMcpRuntimeCatalogReconciler catalogReconciler,
+            Supplier<LandingOperationJournalApplicationService> landingJournalSupplier) {
         if (toolProvider == null) throw new IllegalArgumentException("MCP_TOOL_PROVIDER_REQUIRED");
         if (configSources == null) throw new IllegalArgumentException("MCP_CONFIG_SOURCE_CHAIN_REQUIRED");
         if (authorizationSupplier == null) {
@@ -48,6 +57,7 @@ public final class OpsRuntimeMcpResolver {
         this.configSources = configSources;
         this.authorizationSupplier = authorizationSupplier;
         this.catalogReconciler = catalogReconciler;
+        this.landingJournalSupplier = landingJournalSupplier;
     }
 
     public void resolve(OpsRuntimeResourceContext context) {
@@ -68,6 +78,8 @@ public final class OpsRuntimeMcpResolver {
         servers = enforceCapabilityProfile(context, servers);
         reconcileRuntimeCatalog(context, servers);
         context.setMcpServers(servers);
+        context.setMcpDefinitionReader(toolProvider::currentAuthorizedDefinition);
+        context.setMcpDefinitionsReader(toolProvider::currentAuthorizedDefinitions);
         List<ToolCallback> callbacks = toolProvider.buildToolCallbacks(servers);
         context.setTools(callbacks == null ? new ArrayList<>() : new ArrayList<>(callbacks));
     }
@@ -238,6 +250,7 @@ public final class OpsRuntimeMcpResolver {
         AgentRunExecutionContext executionContext = context.getExecutionContext();
         String stage = toolCallStage(context);
         OpsRuntimeAgentAuthority agentAuthority = OpsRuntimeAgentAuthority.resolve(context);
+        List<LandingOperationExecutionBinding> landingBindings = landingBindings(context, executionContext);
         for (OpsMcpServerConfig server : servers) {
             if (server == null) continue;
             if (!StringUtils.hasText(server.getProjectId())) {
@@ -250,6 +263,7 @@ public final class OpsRuntimeMcpResolver {
             server.setToolCallStage(stage);
             server.setRuntimeAuthority(agentAuthority.name());
             server.setAuthorityDeadline(executionContext == null ? null : executionContext.deadline());
+            server.setLandingOperationBindings(landingBindings);
             if (executionContext != null
                     && executionContext.stage() == AgentExecutionStage.LANDING) {
                 var approved = executionContext.approvedPackage().orElseThrow();
@@ -261,6 +275,27 @@ public final class OpsRuntimeMcpResolver {
             } else {
                 server.setLandingApproved(false);
             }
+        }
+    }
+
+    private List<LandingOperationExecutionBinding> landingBindings(
+            OpsRuntimeResourceContext context,
+            AgentRunExecutionContext executionContext) {
+        if (executionContext == null || executionContext.stage() != AgentExecutionStage.LANDING) {
+            return List.of();
+        }
+        String landingRunId = runtimeRunId(context.getRequest());
+        if (!StringUtils.hasText(landingRunId) || landingJournalSupplier == null) return List.of();
+        LandingOperationJournalApplicationService journal = landingJournalSupplier.get();
+        if (journal == null) {
+            throw new IllegalStateException("LANDING_OPERATION_JOURNAL_SERVICE_UNAVAILABLE");
+        }
+        try {
+            List<LandingOperationExecutionBinding> bindings = journal.operationExecutionBindings(landingRunId);
+            return bindings == null ? List.of() : List.copyOf(bindings);
+        } catch (RuntimeException error) {
+            throw new IllegalStateException(
+                    "LANDING_OPERATION_BINDINGS_LOAD_FAILED：run=" + landingRunId, error);
         }
     }
 

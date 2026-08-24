@@ -9,4 +9,7 @@ import java.util.Map;
 public interface SkillSemanticScorePort {
 
     Map<String, Double> scores(String query, List<SkillRuntimeCandidate> candidates);
+    default Map<String, Double> scores(String projectId,String query,List<SkillRuntimeCandidate> candidates) {
+        return scores(query,candidates);
+    }
 }

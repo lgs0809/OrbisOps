@@ -14,6 +14,12 @@ class SkillExperienceClusteringPolicyTest {
     private final SkillExperienceClusteringPolicy policy =
             new SkillExperienceClusteringPolicy();
 
+    @Test void overlappingTermsFollowDocumentedPriorityInsteadOfHashMapIterationOrder() {
+        assertEquals("AVAILABILITY",policy.problemFamily("数据库不可用并报错，延迟升高"));
+        assertEquals("ERROR_DIAGNOSIS",policy.problemFamily("数据库错误率和整体延迟"));
+        assertEquals("PERFORMANCE",policy.problemFamily("数据库慢查询"));
+    }
+
     @Test
     void groupsRephrasedFailuresButSeparatesPerformanceCases() {
         Map<String, Object> first = policy.clusterIdentity(

@@ -1,6 +1,8 @@
 ---
 name: mysql-slow-sql-agent
 description: MySQL slow SQL sub-agent loop policy for operations investigations.
+whenToUse: ["Investigate actual MySQL slow SQL, statement digests or SELECT execution plans", "已有 SQL 问题或指标日志指向数据库耗时，需要只读核对"]
+whenNotToUse: ["Database mutation, schema changes or repair execution", "没有数据库线索时把慢接口直接归因为 SQL"]
 ---
 
 # mysql-slow-sql-agent Skill

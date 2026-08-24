@@ -1,6 +1,7 @@
 package cn.lgs.orbisops.application.security;
 
 import cn.lgs.orbisops.domain.security.AdminCredentialRules;
+import cn.lgs.orbisops.domain.security.AdminPhoneNumber;
 import cn.lgs.orbisops.domain.security.AdminUserAccount;
 import cn.lgs.orbisops.domain.security.AdminUserRole;
 import cn.lgs.orbisops.domain.security.AdminUserStatus;
@@ -8,9 +9,13 @@ import cn.lgs.orbisops.domain.security.AdminUserStatus;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 /** Application process manager for administrator/user account catalog operations. */
 public final class AdminUserCatalogUseCase {
+
+    private static final int USER_ID_MAX_LENGTH = 64;
+    private static final int USERNAME_MAX_LENGTH = 50;
 
     private final AdminUserCatalogPort catalogPort;
     private final AdminUserAuthenticationPort authenticationPort;
@@ -49,12 +54,19 @@ public final class AdminUserCatalogUseCase {
 
     public boolean create(AdminUserCommand requested) {
         AdminUserCommand command = requireCommand(requested);
-        if (!hasText(command.userId())
+        String phone = AdminPhoneNumber.optional(command.phone());
+        String userId = hasText(command.userId()) ? command.userId().trim()
+                : phone == null ? null : "user-" + UUID.randomUUID();
+        if (!hasText(userId)
                 || !hasText(command.username())
                 || !hasText(command.credential())) {
             throw new IllegalArgumentException("用户ID、用户名和密码不能为空");
         }
-        AdminUserRole role = AdminUserRole.parse(command.userRole(), AdminUserRole.ADMIN);
+        validateIdentifierLength(userId, USER_ID_MAX_LENGTH, "用户ID");
+        validateIdentifierLength(command.username(), USERNAME_MAX_LENGTH, "用户名");
+        ensurePhoneAvailable(phone, null);
+        AdminUserRole role = AdminUserRole.parse(command.userRole(),
+                phone == null ? AdminUserRole.ADMIN : AdminUserRole.USER);
         Integer status = AdminUserStatus.validate(command.status());
         boolean encoded = authenticationPort.isEncoded(command.credential());
         credentialRules.validate(command.credential(), encoded);
@@ -62,13 +74,17 @@ public final class AdminUserCatalogUseCase {
         LocalDateTime now = LocalDateTime.now(clock);
         AdminUserAccount account = new AdminUserAccount(
                 command.id(),
-                command.userId(),
-                command.username(),
+                userId,
+                command.username().trim(),
                 storedCredential,
                 role,
                 status == null ? AdminUserStatus.ENABLED : status,
                 now,
-                now);
+                now,
+                phone,
+                storedCredential,
+                true,
+                0);
         return catalogPort.insert(account);
     }
 
@@ -77,6 +93,11 @@ public final class AdminUserCatalogUseCase {
         if (command.id() == null) {
             throw new IllegalArgumentException("ID不能为空");
         }
+        AdminUserAccount existing = catalogPort.findById(command.id());
+        if (existing != null && hasText(command.userId()) && !command.userId().equals(existing.userId())) {
+            throw new IllegalArgumentException("用户ID不可修改");
+        }
+        ensurePhoneAvailable(AdminPhoneNumber.optional(command.phone()), existing);
         return catalogPort.updateById(updateAccount(command));
     }
 
@@ -85,6 +106,7 @@ public final class AdminUserCatalogUseCase {
         if (!hasText(command.userId())) {
             throw new IllegalArgumentException("用户ID不能为空");
         }
+        ensurePhoneAvailable(AdminPhoneNumber.optional(command.phone()), catalogPort.findByUserId(command.userId()));
         return catalogPort.updateByUserId(updateAccount(command));
     }
 
@@ -139,13 +161,14 @@ public final class AdminUserCatalogUseCase {
     }
 
     private AdminUserAccount updateAccount(AdminUserCommand command) {
+        if (hasText(command.username())) {
+            validateIdentifierLength(command.username(), USERNAME_MAX_LENGTH, "用户名");
+        }
         AdminUserRole role = AdminUserRole.parse(command.userRole(), null);
         Integer status = AdminUserStatus.validate(command.status());
         String storedCredential = null;
         if (hasText(command.credential())) {
-            boolean encoded = authenticationPort.isEncoded(command.credential());
-            credentialRules.validate(command.credential(), encoded);
-            storedCredential = authenticationPort.encodeForStorage(command.credential());
+            throw new IllegalArgumentException("请使用重置初始密码功能；新密码由用户自己设置");
         }
         return new AdminUserAccount(
                 command.id(),
@@ -155,7 +178,18 @@ public final class AdminUserCatalogUseCase {
                 role,
                 status,
                 null,
-                LocalDateTime.now(clock));
+                LocalDateTime.now(clock),
+                AdminPhoneNumber.optional(command.phone()));
+    }
+
+    private void ensurePhoneAvailable(String phone, AdminUserAccount existing) {
+        if (phone == null) {
+            return;
+        }
+        AdminUserAccount owner = catalogPort.findByPhone(phone);
+        if (owner != null && (existing == null || !owner.userId().equals(existing.userId()))) {
+            throw new IllegalArgumentException("手机号已被使用");
+        }
     }
 
     private AdminUserCommand requireCommand(AdminUserCommand command) {
@@ -171,5 +205,11 @@ public final class AdminUserCatalogUseCase {
 
     private boolean hasText(String value) {
         return value != null && !value.trim().isBlank();
+    }
+
+    private void validateIdentifierLength(String value, int maxLength, String label) {
+        if (value.trim().length() > maxLength) {
+            throw new IllegalArgumentException(label + "长度不能超过 " + maxLength + " 个字符");
+        }
     }
 }

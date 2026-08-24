@@ -69,6 +69,22 @@ class OpsUserChangePackageControllerTest {
         verify(permissionService).capabilities(eq("project-1"), any());
     }
 
+    @Test
+    void verificationRequiresProjectViewAndLandingPermissionBeforeInvocation() {
+        var queries = mock(ChangePackageQueryService.class);
+        var permissions = mock(OpsChangePackagePermissionService.class);
+        var landing = mock(LandChangePackageUseCase.class);
+        var controller = new OpsUserChangePackageController(mock(PrepareChangePackageUseCase.class),
+                mock(ValidateChangePackageUseCase.class), mock(ReviewChangePackageUseCase.class), landing,
+                queries, permissions, mock(OpsChannelApprovalCardService.class));
+        when(queries.detail("cp-1")).thenReturn(Map.of("projectId", "project-1"));
+        org.mockito.Mockito.doThrow(new SecurityException("denied"))
+                .when(permissions).assertCanLandPackage(eq("project-1"), any());
+        assertThrows(SecurityException.class, () -> controller.verifyLanding("cp-1", authenticatedUserRequest()));
+        org.mockito.Mockito.verifyNoInteractions(landing);
+        verify(permissions).assertCanViewPackage(eq("project-1"), any());
+    }
+
     private OpsUserChangePackageController controller(ChangePackageQueryService queries,
                                                        OpsChangePackagePermissionService permissionService) {
         return new OpsUserChangePackageController(

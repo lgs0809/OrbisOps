@@ -63,6 +63,8 @@ public class OpsMcpClientRegistry {
         log.info("MCP 运行时连接缓存已全部失效");
     }
 
+    public boolean invalidate(ClientHandle handle) { return cacheState.invalidate(handle); }
+
     public void cleanupExpiredClients() {
         cacheState.cleanupExpired();
     }
@@ -80,15 +82,30 @@ public class OpsMcpClientRegistry {
         private final OpsMcpServerConfig config;
         private final ReentrantLock lock = new ReentrantLock();
         private final AtomicBoolean initialized = new AtomicBoolean(false);
+        private final AtomicBoolean invalidated = new AtomicBoolean(false);
+        private final String cacheKey;
         private volatile long lastUsedAtMillis;
 
         ClientHandle(
                 McpSyncClient client,
                 OpsMcpServerConfig config,
                 long lastUsedAtMillis) {
+            this("", client, config, lastUsedAtMillis);
+        }
+
+        ClientHandle(String cacheKey, McpSyncClient client, OpsMcpServerConfig config, long lastUsedAtMillis) {
+            this.cacheKey = cacheKey;
             this.client = client;
             this.config = config;
             this.lastUsedAtMillis = lastUsedAtMillis;
+        }
+
+        String cacheKey() { return cacheKey; }
+        boolean invalidated() { return invalidated.get(); }
+        void invalidate() { invalidated.set(true); initialized.set(false); }
+        public void assertValid() {
+            if (invalidated()) throw new OpsMcpCallFailure(
+                    OpsMcpCallFailure.Kind.TRANSPORT_ERROR, "STALE_CLIENT_HANDLE", false);
         }
 
         public McpSyncClient client() {

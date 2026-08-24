@@ -31,4 +31,8 @@ public final class LandChangePackageUseCase {
         cleanupUseCase.cleanup(command);
         return queryPort.detail(command.packageId());
     }
+
+    public Map<String, Object> verifyLanding(String packageId, String actor) {
+        return landingProcessManager.verifyLanding(packageId, actor);
+    }
 }

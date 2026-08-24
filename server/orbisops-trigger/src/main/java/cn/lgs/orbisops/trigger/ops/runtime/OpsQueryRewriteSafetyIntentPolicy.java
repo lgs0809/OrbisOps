@@ -12,6 +12,10 @@ import java.util.regex.Pattern;
 final class OpsQueryRewriteSafetyIntentPolicy {
 
     private static final List<Pattern> SAFETY_CRITICAL_INTENT = List.of(
+            // Preserve legitimate user constraints as well as requests to bypass them.
+            Pattern.compile("(?i)(不要|不得|禁止|不能|do not|must not|never).{0,24}(发布|修改|变更|写入|重启|执行|deploy|publish|modify|write|restart|execute)"),
+            Pattern.compile("(?i)(待审批|审批后|审批前|未审批|批准后|pending approval|after approval|before approval|until approved)"),
+            Pattern.compile("(?i)(生产|prod(?:uction)?).{0,16}(只读|read.only)|(只读|read.only).{0,16}(生产|prod(?:uction)?)"),
             Pattern.compile("(?i)(绕过|忽略|跳过|bypass|skip).{0,16}(审批|approval|沙箱|sandbox|landing|验证|verification|审计|audit)"),
             Pattern.compile("(?i)(直接|立即).{0,16}(生产|prod(?:uction)?).{0,16}(修改|变更|写入|重启|执行|sql|delete|update|write|restart|change)"),
             Pattern.compile("(?i)(验证失败|verification\\s+fail(?:ed|ure)?).{0,24}(恢复|resolved|succeeded|成功)"),

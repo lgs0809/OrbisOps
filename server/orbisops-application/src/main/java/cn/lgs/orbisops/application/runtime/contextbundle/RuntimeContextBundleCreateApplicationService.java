@@ -71,7 +71,7 @@ public final class RuntimeContextBundleCreateApplicationService {
         }
         List<Map<String, Object>> selectedSkills = policy.selectSkillRefs(
                 selection,
-                canarySkills.resolve(input.projectId(), input.agentId(), input.runId()),
+                canarySkills.resolve(input.projectId(), input.agentId(), input.runId(), input.query()),
                 command.selectedSkillLimit());
         bundle.put("skillCatalogRefs", selection.catalogRefs());
         bundle.put("skillCatalogHash", policy.hashObject(selection.catalogRefs()));

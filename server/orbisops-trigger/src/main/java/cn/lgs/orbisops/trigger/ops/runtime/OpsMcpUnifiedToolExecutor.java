@@ -1,5 +1,6 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
+import cn.lgs.orbisops.application.changepackage.LandingOperationExecutionBinding;
 import cn.lgs.orbisops.domain.shared.service.CanonicalObjectHasher;
 import cn.lgs.orbisops.trigger.ops.toolset.OpsToolExecutionService;
 import com.alibaba.fastjson.JSON;
@@ -8,7 +9,6 @@ import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.util.StringUtils;
 
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,6 +19,9 @@ final class OpsMcpUnifiedToolExecutor {
 
     private final Supplier<OpsToolExecutionService> toolExecutionServiceSupplier;
     private final OpsMcpProposedActionFactory proposedActions = new OpsMcpProposedActionFactory();
+    private final OpsMcpToolInputSupport inputSupport = new OpsMcpToolInputSupport();
+    private final OpsLandingOperationBindingResolver landingBindings =
+            new OpsLandingOperationBindingResolver();
 
     OpsMcpUnifiedToolExecutor(Supplier<OpsToolExecutionService> toolExecutionServiceSupplier) {
         if (toolExecutionServiceSupplier == null) {
@@ -34,19 +37,23 @@ final class OpsMcpUnifiedToolExecutor {
             List<Map<String, Object>> runtimeTools,
             String callbackName) {
         try {
-            String requestedToolName = requestedToolName(toolInput);
-            boolean readOnly = readOnly(runtimeTools, requestedToolName);
+            String requestedToolName = inputSupport.requestedToolName(toolInput);
+            Map<String, Object> requestedArguments = inputSupport.dispatcherArguments(toolInput);
+            LandingOperationExecutionBinding binding = landingBindings.resolve(
+                    config, requestedToolName, requestedArguments);
+            boolean readOnly = inputSupport.readOnly(runtimeTools, requestedToolName);
             if (readOnly) {
                 return landing(config)
-                        ? service().executeLandingMcp(config, toolInput, "ops-agent", true)
+                        ? executeLanding(config, toolInput, requestedToolName, binding, true, "")
                         : service().executeMcp(config, toolInput, "ops-agent", true);
             }
             if (proposedActions.applies(config)) {
-                return proposedActions.create(config, requestedToolName, argumentsFromDispatcher(toolInput));
+                return proposedActions.create(config, requestedToolName, requestedArguments);
             }
-            String idempotencyKey = idempotencyKey(config, callbackName, toolInput, toolContext);
+            String idempotencyKey = idempotencyKey(
+                    config, callbackName, toolInput, toolContext, binding);
             return landing(config)
-                    ? service().executeLandingMcp(config, toolInput, "ops-agent", idempotencyKey)
+                    ? executeLanding(config, toolInput, requestedToolName, binding, false, idempotencyKey)
                     : service().executeMcp(config, toolInput, "ops-agent", idempotencyKey);
         } catch (OpsToolExecutionService.ToolBlockedException error) {
             Map<String, Object> envelope = new LinkedHashMap<>(error.envelope());
@@ -69,66 +76,24 @@ final class OpsMcpUnifiedToolExecutor {
             boolean readOnly) {
         Map<String, Object> envelope = new LinkedHashMap<>();
         envelope.put("toolName", remoteToolName);
-        envelope.put("arguments", arguments(toolInput));
+        Map<String, Object> requestedArguments = inputSupport.arguments(toolInput);
+        envelope.put("arguments", requestedArguments);
         String routedInput = JSON.toJSONString(envelope);
+        LandingOperationExecutionBinding binding = landingBindings.resolve(
+                config, remoteToolName, requestedArguments);
         if (readOnly) {
             return landing(config)
-                    ? service().executeLandingMcp(config, routedInput, "ops-agent", true)
+                    ? executeLanding(config, routedInput, remoteToolName, binding, true, "")
                     : service().executeMcp(config, routedInput, "ops-agent", true);
         }
         if (proposedActions.applies(config)) {
-            return proposedActions.create(config, remoteToolName, arguments(toolInput));
+            return proposedActions.create(config, remoteToolName, requestedArguments);
         }
-        String idempotencyKey = idempotencyKey(config, remoteToolName, toolInput, toolContext);
+        String idempotencyKey = idempotencyKey(
+                config, remoteToolName, toolInput, toolContext, binding);
         return landing(config)
-                ? service().executeLandingMcp(config, routedInput, "ops-agent", idempotencyKey)
+                ? executeLanding(config, routedInput, remoteToolName, binding, false, idempotencyKey)
                 : service().executeMcp(config, routedInput, "ops-agent", idempotencyKey);
-    }
-
-    private Map<String, Object> arguments(String toolInput) {
-        if (!StringUtils.hasText(toolInput)) return Map.of();
-        try {
-            Map<String, Object> parsed = JSON.parseObject(toolInput, LinkedHashMap.class);
-            return parsed == null
-                    ? Map.of()
-                    : Collections.unmodifiableMap(new LinkedHashMap<>(parsed));
-        } catch (RuntimeException error) {
-            throw new IllegalArgumentException("MCP_TOOL_INPUT_MUST_BE_JSON_OBJECT", error);
-        }
-    }
-
-    private Map<String, Object> argumentsFromDispatcher(String toolInput) {
-        if (!StringUtils.hasText(toolInput)) return Map.of();
-        try {
-            Map<String, Object> parsed = JSON.parseObject(toolInput, LinkedHashMap.class);
-            Object value = parsed == null ? null : parsed.get("arguments");
-            if (value instanceof Map<?, ?> map) {
-                Map<String, Object> result = new LinkedHashMap<>();
-                map.forEach((key, item) -> result.put(String.valueOf(key), item));
-                return Collections.unmodifiableMap(result);
-            }
-            return Map.of();
-        } catch (RuntimeException error) {
-            throw new IllegalArgumentException("MCP_TOOL_INPUT_MUST_BE_JSON_OBJECT", error);
-        }
-    }
-
-    private String requestedToolName(String toolInput) {
-        if (!StringUtils.hasText(toolInput)) return "";
-        try {
-            return value(JSON.parseObject(toolInput).get("toolName"));
-        } catch (RuntimeException ignored) {
-            return "";
-        }
-    }
-
-    private boolean readOnly(List<Map<String, Object>> runtimeTools, String toolName) {
-        if (runtimeTools == null || runtimeTools.isEmpty() || !StringUtils.hasText(toolName)) return false;
-        return runtimeTools.stream()
-                .filter(item -> toolName.equals(value(item.get("toolName"))))
-                .findFirst()
-                .map(item -> Boolean.TRUE.equals(item.get("readOnly")))
-                .orElse(false);
     }
 
     private boolean landing(OpsMcpServerConfig config) {
@@ -141,7 +106,11 @@ final class OpsMcpUnifiedToolExecutor {
             OpsMcpServerConfig config,
             String callbackName,
             String toolInput,
-            ToolContext toolContext) {
+            ToolContext toolContext,
+            LandingOperationExecutionBinding binding) {
+        if (landing(config) && binding != null && StringUtils.hasText(binding.executionKey())) {
+            return binding.executionKey();
+        }
         String toolCallId = toolCallId(toolContext, callbackName, toolInput);
         Map<String, Object> identity = new LinkedHashMap<>();
         identity.put("projectId", config == null ? "" : value(config.getProjectId()));
@@ -164,7 +133,34 @@ final class OpsMcpUnifiedToolExecutor {
         return "mcp:" + CanonicalObjectHasher.sha256(identity);
     }
 
+    private Map<String, Object> executeLanding(
+            OpsMcpServerConfig config,
+            String toolInput,
+            String toolName,
+            LandingOperationExecutionBinding binding,
+            boolean readOnly,
+            String fallbackKey) {
+        if (binding == null) {
+            return readOnly
+                    ? service().executeLandingMcp(config, toolInput, "ops-agent", true)
+                    : service().executeLandingMcp(config, toolInput, "ops-agent", fallbackKey);
+        }
+        return service().executeLandingMcp(
+                config,
+                toolInput,
+                "ops-agent",
+                binding.executionKey(),
+                readOnly,
+                landingBindings.operationId(binding, toolName));
+    }
+
     private String toolCallId(ToolContext context, String callbackName, String toolInput) {
+        if (context != null && context.getContext().get(OpsMcpDisclosureInterceptor.NATIVE_INVOCATION)
+                instanceof OpsMcpDisclosureInterceptor.NativeInvocation invocation
+                && value(callbackName).equals(invocation.dispatcher())
+                && value(toolInput).equals(invocation.routedInput())) {
+            return value(invocation.callId());
+        }
         if (context == null || context.getToolCallHistory() == null) return "";
         List<Message> history = context.getToolCallHistory();
         for (int messageIndex = history.size() - 1; messageIndex >= 0; messageIndex--) {

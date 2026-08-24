@@ -1,6 +1,8 @@
 ---
 name: prometheus-agent
 description: Generic Prometheus metric evidence policy for project operations investigations.
+whenToUse: ["Inspect actual Prometheus metrics for service health, latency, errors or resource usage", "需要查询当前项目真实时序指标"]
+whenNotToUse: ["Application log, stack trace or SOP retrieval", "指标不足时编造实时健康结论"]
 ---
 
 # prometheus-agent Skill

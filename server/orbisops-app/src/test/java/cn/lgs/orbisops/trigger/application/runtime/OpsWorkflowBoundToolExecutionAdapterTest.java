@@ -57,6 +57,7 @@ class OpsWorkflowBoundToolExecutionAdapterTest {
         assertEquals("run-1:tool-node:2:3", request.requestContext().get("idempotencyKey"));
         assertEquals("tool-node", request.requestContext().get("workflowNodeId"));
         assertEquals(true, request.requestContext().get("workflowTool"));
+        assertEquals(true, request.requestContext().get("requireReadOnly"));
         assertTrue(String.valueOf(request.requestContext().get("boundResourceSnapshotHash"))
                 .matches("[0-9a-f]{64}"));
         assertEquals("result-1", result.resultId());

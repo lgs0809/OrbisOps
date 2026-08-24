@@ -8,6 +8,10 @@ import java.util.Map;
 /** Spring AI input protocol for the PrepareChangePackage tool. */
 public final class OpsChangePackageToolInput {
 
+    @com.fasterxml.jackson.annotation.JsonPropertyDescription("实际服务目录中的服务 ID，不得猜造")
+    private String serviceId;
+    @com.fasterxml.jackson.annotation.JsonPropertyDescription("审批前冻结的验收标准。需要业务 Workflow C 时提供一个 OBSERVABILITY_SLO_V1 对象。serviceId/environment/expectedVersion/baselineVersion/resourceIdentity/routeDefinition/collectionDefinition/changeKind 必须是非空字符串，采集定义和路由直接引用真实回执中的字符串，不能用解释对象或列表替代；maxErrorRate/maxP95Seconds/minQps/maxQps 必须是有限数值。资源和采集定义来自真实证据，阈值来自约定，不得编造或放宽。")
+    private List<Map<String, Object>> verificationCriteria = new ArrayList<>();
     private String incidentId;
     private String environment;
     private String title;
@@ -20,12 +24,17 @@ public final class OpsChangePackageToolInput {
     private Map<String, Object> preflightResult = new LinkedHashMap<>();
     private Map<String, Object> dryRunResult = new LinkedHashMap<>();
     private Map<String, Object> approvalBoundary = new LinkedHashMap<>();
+    @com.fasterxml.jackson.annotation.JsonPropertyDescription("正常落地计划必须提供 steps 数组，每个步骤用 operationId 引用 actions 中同一权威操作，或提供与它相同的完整步骤。不能只写 summary/normalSequence 等说明并让系统猜顺序；recoveryOperationId 引用的恢复动作不得出现在正常 steps，恢复条件放在前向操作的 rollbackPlan 中。")
     private Map<String, Object> preferredPlan = new LinkedHashMap<>();
     private Map<String, Object> adjustmentPolicy = new LinkedHashMap<>();
 
     public OpsChangePackageToolInput() {
     }
 
+    public String getServiceId() { return serviceId; }
+    public void setServiceId(String serviceId) { this.serviceId = serviceId; }
+    public List<Map<String, Object>> getVerificationCriteria() { return verificationCriteria; }
+    public void setVerificationCriteria(List<Map<String, Object>> verificationCriteria) { this.verificationCriteria = verificationCriteria; }
     public String getIncidentId() { return incidentId; }
     public void setIncidentId(String incidentId) { this.incidentId = incidentId; }
     public String getEnvironment() { return environment; }

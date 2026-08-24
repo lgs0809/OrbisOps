@@ -74,6 +74,7 @@ public final class SkillPackageQueryService {
         result.putAll(versionView(exact));
         result.put("currentVersion", identity.version());
         result.put("currentSkillHash", identity.skillHash());
+        result.put("currentPackageHash", result.get("packageHash"));
         result.put("statusAtUse", current.get("status"));
         return withArtifactMetadata(result, identity.key());
     }
@@ -188,6 +189,11 @@ public final class SkillPackageQueryService {
         data.put("projectId", version.key().projectId());
         data.put("scope", version.key().scope());
         data.put("version", version.key().version());
+        Map<String,Object> manifest = CanonicalJson.parseObject(manifestJson);
+        Map<?,?> metadata = manifest.get("metadata") instanceof Map<?,?> values ? values : Map.of();
+        data.put("name", fallback(metadata.get("name"), version.key().skillId()));
+        data.put("skillName", data.get("name"));
+        data.put("description", text(metadata.get("description")));
         data.put("content", version.content());
         data.put("sourceType", version.sourceType());
         data.put("sourceTraceId", version.sourceTraceId());

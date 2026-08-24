@@ -45,6 +45,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class AgentWorkflowCompilationPipelineTest {
 
     @Test
+    void humanApprovalMustPublishWithoutAnArtificialModelAgent() {
+        AgentWorkflowCompilationResult result = pipeline().compile(
+                definition(List.of(node("approval", "HUMAN_APPROVAL", "")), List.of()),
+                AgentWorkflowCompilationHooks.noop());
+        assertTrue(result.report().successful());
+        assertEquals(expectedStages(), result.report().completedStages());
+        assertEquals("human-approval-node", result.output().nodes().get(0).compilerId());
+    }
+
+    @Test
     void validDefinitionMustCompileThroughAllStagesInOrder() {
         AtomicInteger capabilityChecks = new AtomicInteger();
         AtomicInteger securityChecks = new AtomicInteger();
@@ -211,6 +221,19 @@ class AgentWorkflowCompilationPipelineTest {
                 new CapabilityReferenceValidationStage(),
                 new TopologyValidationStage(new AgentGraphDefinitionPolicy()),
                 new NodeDefinitionCompilationStage(compilers)));
+    }
+
+    @Test
+    void publishedStartNodeMustRejectInvalidRealCallBudgets() {
+        for (Object invalid : List.of(0, -1, 1.5, "12", 1001, Double.NaN)) {
+            var start = new cn.lgs.orbisops.domain.agentdefinition.model.AgentWorkflowNodeDefinition(
+                    "start", AgentWorkflowNodeType.START, "START", "", "", "", "", List.of(),
+                    Map.of("maxRealToolCalls", invalid));
+            assertThrows(IllegalArgumentException.class, () -> new BoundaryNodeCompiler().compile(start, null));
+        }
+        var valid = new cn.lgs.orbisops.domain.agentdefinition.model.AgentWorkflowNodeDefinition(
+                "start", AgentWorkflowNodeType.START, "START", "", "", "", "", List.of(), Map.of("maxRealToolCalls", 12));
+        assertEquals(12, new BoundaryNodeCompiler().compile(valid, null).config().get("maxRealToolCalls"));
     }
 
     private AgentWorkflowCompilationHooks hooks(

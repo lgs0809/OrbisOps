@@ -7,6 +7,9 @@ public interface ModelAvailabilityPort {
 
     boolean isEmbeddingAvailable();
 
+    /** Configuration intent is distinct from temporary endpoint readiness. */
+    default boolean isEmbeddingConfigured() {return isEmbeddingAvailable();}
+
     boolean isRerankAvailable(String apiKey);
 
     boolean isApiKeyUsable(String apiKey);

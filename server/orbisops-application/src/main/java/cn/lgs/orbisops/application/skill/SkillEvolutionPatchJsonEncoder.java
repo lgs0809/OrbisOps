@@ -39,6 +39,7 @@ public final class SkillEvolutionPatchJsonEncoder {
         data.put("hasCompleted", summary.hasCompleted());
         data.put("hasToolEvidence", summary.hasToolEvidence());
         data.put("hasMessages", summary.hasMessages());
+        data.put("evolutionSourceHash", summary.sourceHash());
         return data;
     }
 

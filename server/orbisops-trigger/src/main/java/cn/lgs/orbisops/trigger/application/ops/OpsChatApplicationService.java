@@ -150,13 +150,23 @@ public class OpsChatApplicationService {
                                              Boolean favorite,
                                              Integer limit,
                                              String scopedUserId) {
+        return listSessions(requestedUserId, agentId, keyword, favorite, limit, scopedUserId, null);
+    }
+
+    public List<OpsChatSession> listSessions(String requestedUserId, String agentId, String keyword,
+                                            Boolean favorite, Integer limit, String scopedUserId, String projectId) {
         return chatSessionFacade.list(
                 requestedUserId,
                 agentId,
                 keyword,
                 favorite,
                 limit,
-                scopedUserId);
+                scopedUserId,
+                projectId);
+    }
+
+    public OpsChatSession readSession(String sessionId, String actor, String projectId) {
+        return chatSessionFacade.read(sessionId, actor, projectId);
     }
 
     public List<OpsChatMessageView> messages(String sessionId, Integer limit, String scopedUserId) {

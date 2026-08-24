@@ -128,6 +128,12 @@ public final class WorkSessionRunPolicy {
                     WorkSessionRunStatus.RECOVERY_REVIEW_REQUIRED,
                     "TOOL_EXECUTION_REPLAY_NOT_SAFE");
         }
+        // Cancellation forbids replay, but cannot erase an uncertain write above.
+        if (candidate.cancelRequested()) {
+            return new WorkSessionRecoveryDecision(
+                    candidate.runId(), candidate.projectId(), candidate.attemptId(),
+                    WorkSessionRunStatus.CANCELED, "CANCELED_AFTER_LEASE_EXPIRY");
+        }
         String reasonCode = !candidate.hasToolExecution()
                 ? "LEASE_EXPIRED_BEFORE_TOOL_EXECUTION"
                 : candidate.hasIncompleteToolExecution()

@@ -60,7 +60,7 @@ class SkillEvolutionMultiCandidateAuthoringServiceTest {
     }
 
     @Test
-    void candidateBudgetMustStayWithinTwoAndFour() {
+    void defaultAndExplicitOneMakeOnlyOneAuthoringRequest() {
         List<Map<String, Object>> requests = new ArrayList<>();
         SkillEvolutionAuthoringPort legacy = input -> {
             requests.add(new LinkedHashMap<>(input));
@@ -73,10 +73,27 @@ class SkillEvolutionMultiCandidateAuthoringServiceTest {
         SkillEvolutionMultiCandidateAuthoringService service =
                 new SkillEvolutionMultiCandidateAuthoringService(legacy);
 
-        assertEquals(2, service.author(Map.of(), 1).size());
+        assertEquals(1, service.author(Map.of(), 1).size());
         assertEquals(4, service.author(Map.of(), 9).size());
-        assertEquals(3, service.author(Map.of(), 0).size());
-        assertEquals(9, requests.size());
+        assertEquals(1, service.author(Map.of(), 0).size());
+        assertEquals(6, requests.size());
+        assertEquals("MAINTENANCE_REVIEW", requests.get(0).get("candidateDirection"));
+        assertEquals("MAINTENANCE_REVIEW", requests.get(5).get("candidateDirection"));
+    }
+
+    @Test void emptyAdapterResponseDoesNotSpendAdditionalPhysicalAttempts() {
+        var port=new SkillEvolutionAuthoringPort() {
+            @Override public SkillEvolutionAuthoredCandidate author(Map<String,Object> input) {
+                throw new AssertionError("No implicit fallback author request is permitted");
+            }
+            @Override public List<SkillEvolutionAuthoredCandidate> authorCandidates(Map<String,Object> input,int budget) {
+                assertEquals(1,budget); return List.of();
+            }
+        };
+        var result=new SkillEvolutionMultiCandidateAuthoringService(port).author(Map.of(),1);
+        assertEquals(1,result.size());
+        assertTrue(!result.get(0).candidate().reusableChange());
+        assertEquals(1,result.get(0).audit().candidateBudget());
     }
 
     @Test

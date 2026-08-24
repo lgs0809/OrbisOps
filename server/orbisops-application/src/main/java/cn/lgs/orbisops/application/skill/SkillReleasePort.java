@@ -10,6 +10,13 @@ import java.util.Optional;
 
 /** Persistence boundary for typed Skill release and canary facts. */
 public interface SkillReleasePort {
+    default java.util.Map<String,Object> observationContract(cn.lgs.orbisops.domain.skill.model.SkillPatchCandidate candidate) {
+        return java.util.Map.of();
+    }
+
+    default cn.lgs.orbisops.domain.skill.model.SkillCanaryEvidence canaryEvidence(SkillReleaseSnapshot release) {
+        return cn.lgs.orbisops.domain.skill.model.SkillCanaryEvidence.unknown();
+    }
 
     Optional<SkillReleaseSnapshot> findByCandidate(String candidateId);
 

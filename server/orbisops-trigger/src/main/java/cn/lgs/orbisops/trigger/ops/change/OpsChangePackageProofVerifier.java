@@ -46,11 +46,13 @@ public final class OpsChangePackageProofVerifier {
             return;
         }
         if (!type.executable()) return;
-        if (approvalSnapshot.operations().isEmpty()) {
+        var selected = new cn.lgs.orbisops.domain.changepackage.service.ChangePackageExecutablePlanPolicy()
+                .resolve(approvalSnapshot.values());
+        if (selected.isEmpty()) {
             throw new IllegalStateException("变更包缺少 mcpSteps/landingPlan operations");
         }
         List<ChangePackageApprovalOperation> operations =
-                OPERATION_MAPPER.map(approvalSnapshot.operations());
+                OPERATION_MAPPER.map(selected);
         OPERATION_POLICY.verify(
                 current.state().value(ChangePackageCurrentField.RISK_LEVEL),
                 operations);

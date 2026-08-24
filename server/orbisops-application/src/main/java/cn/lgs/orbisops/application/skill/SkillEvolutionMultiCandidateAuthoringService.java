@@ -10,10 +10,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-/** Authors 2-4 audited candidates with distinct optimization directions. */
+/** One proposal by default; explicitly requested comparison directions remain bounded and audited. */
 public final class SkillEvolutionMultiCandidateAuthoringService {
 
-    private static final int DEFAULT_BUDGET = 3;
+    private static final int DEFAULT_BUDGET = 1;
 
     private final SkillEvolutionAuthoringPort port;
 
@@ -42,7 +42,7 @@ public final class SkillEvolutionMultiCandidateAuthoringService {
         for (int index = 0; index < budget; index++) {
             SkillAuthoringDirection direction = directions.get(index);
             SkillEvolutionAuthoredCandidate candidate = index < raw.size()
-                    ? raw.get(index) : fallbackAuthor(safeInput, direction, budget, index);
+                    ? raw.get(index) : SkillEvolutionAuthoredCandidate.from(Map.of());
             if (candidate == null) candidate = SkillEvolutionAuthoredCandidate.from(Map.of());
             result.add(audited(candidate, safeInput, direction, budget, index, inputHash));
         }
@@ -51,19 +51,7 @@ public final class SkillEvolutionMultiCandidateAuthoringService {
 
     public int boundedBudget(int requestedBudget) {
         if (requestedBudget <= 0) return DEFAULT_BUDGET;
-        return Math.max(2, Math.min(4, requestedBudget));
-    }
-
-    private SkillEvolutionAuthoredCandidate fallbackAuthor(
-            Map<String, Object> input,
-            SkillAuthoringDirection direction,
-            int budget,
-            int index) {
-        Map<String, Object> request = new LinkedHashMap<>(input);
-        request.put("candidateDirection", direction.name());
-        request.put("candidateIndex", index);
-        request.put("candidateBudget", budget);
-        return port.author(Map.copyOf(request));
+        return Math.max(1, Math.min(4, requestedBudget));
     }
 
     private SkillEvolutionAuthoredCandidateOption audited(
@@ -101,6 +89,9 @@ public final class SkillEvolutionMultiCandidateAuthoringService {
     private List<SkillAuthoringDirection> directions(
             Map<String, Object> input,
             int budget) {
+        // Normal evolution selects the operation from evidence; a legacy patch direction
+        // must not preselect the decision before the author reviews related methods.
+        if (budget == 1) return List.of(SkillAuthoringDirection.MAINTENANCE_REVIEW);
         Set<SkillAuthoringDirection> ordered = new LinkedHashSet<>();
         for (String layer : diagnosisLayers(input.get("defectDiagnoses"))) {
             switch (layer) {

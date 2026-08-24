@@ -123,7 +123,8 @@ final class OpsGraphNodeBodyExecutor {
                 context.node().getNodeId(),
                 context.nodeType(),
                 context.node().getAgent(),
-                context.routeKey());
+                context.routeKey(),
+                context.request().getTrustedSkillFrame());
         Map<String, Object> result = OpsNodeDeadlineContext.withTimeout(
                 context.analysisState().analysisRequest().getNodeTimeoutSeconds(),
                 () -> {

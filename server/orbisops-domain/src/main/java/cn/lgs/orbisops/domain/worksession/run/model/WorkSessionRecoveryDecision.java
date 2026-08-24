@@ -12,7 +12,8 @@ public record WorkSessionRecoveryDecision(
         projectId = required(projectId, "WORK_SESSION_PROJECT_ID_REQUIRED");
         attemptId = required(attemptId, "WORK_SESSION_ATTEMPT_ID_REQUIRED");
         if (status != WorkSessionRunStatus.RECOVERABLE
-                && status != WorkSessionRunStatus.RECOVERY_REVIEW_REQUIRED) {
+                && status != WorkSessionRunStatus.RECOVERY_REVIEW_REQUIRED
+                && status != WorkSessionRunStatus.CANCELED) {
             throw new IllegalArgumentException("WORK_SESSION_RECOVERY_STATUS_INVALID");
         }
         reasonCode = required(reasonCode, "WORK_SESSION_RECOVERY_REASON_REQUIRED");

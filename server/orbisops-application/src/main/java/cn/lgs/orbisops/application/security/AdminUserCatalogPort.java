@@ -23,6 +23,8 @@ public interface AdminUserCatalogPort {
 
     AdminUserAccount findByUsername(String username);
 
+    AdminUserAccount findByPhone(String phone);
+
     List<AdminUserAccount> listEnabled();
 
     List<AdminUserAccount> listByStatus(Integer status);

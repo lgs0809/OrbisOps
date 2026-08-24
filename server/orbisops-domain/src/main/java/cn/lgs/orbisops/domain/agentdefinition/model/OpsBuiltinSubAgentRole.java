@@ -13,7 +13,7 @@ public enum OpsBuiltinSubAgentRole {
             "ValidateCodeCandidate", "code_read", "code_grep", "code_glob", "code_lsp",
             "code_enter_worktree", "code_edit", "code_write", "code_bash",
             "code_compute_diff", "code_commit_repair", "code_exit_worktree",
-            "PrepareChangePackage", "ManageInspectionTask", "tool_result_*")),
+            "PrepareChangePackage", "QueryChangePackageStatus", "ManageInspectionTask", "tool_result_*")),
     EVIDENCE_EXPLORER(List.of(
             "Skill", "UseProjectSkill", "knowledge_retrieve", "project_mcp_*", "mcp_tool_catalog_*",
             "enable_mcp_tool_*", "prometheus_query", "elasticsearch_search", "tool_result_*")),
@@ -28,7 +28,7 @@ public enum OpsBuiltinSubAgentRole {
             "code_compute_diff", "project_mcp_*", "mcp_tool_catalog_*", "enable_mcp_tool_*",
             "tool_result_*")),
     EVIDENCE_CRITIC(List.of("UseProjectSkill", "tool_result_*")),
-    CHANGE_PACKAGE_COMPOSER(List.of("PrepareChangePackage", "tool_result_*"));
+    CHANGE_PACKAGE_COMPOSER(List.of("PrepareChangePackage", "QueryChangePackageStatus", "tool_result_*"));
 
     private final List<String> defaultAllowedTools;
 

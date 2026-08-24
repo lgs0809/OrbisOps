@@ -93,7 +93,7 @@ class OpsRuntimeResourceContextFactoryTest {
                 new ArrayList<>(),
                 null);
 
-        assertEquals("request-model", context.getModelId());
+        assertEquals("node-model", context.getModelId());
         assertTrue(context.getRagEnabled());
         assertEquals("node-kb", context.getKnowledgeBaseId());
         assertTrue(context.getRepairEnabled());
@@ -179,7 +179,7 @@ class OpsRuntimeResourceContextFactoryTest {
                         .executionTargetIds(List.of("definition-target"))
                         .build(),
                 scope,
-                OpsAgentChatRequest.builder().build(),
+                OpsAgentChatRequest.builder().modelId("request-model").build(),
                 new ArrayList<>(),
                 null);
 
@@ -194,6 +194,19 @@ class OpsRuntimeResourceContextFactoryTest {
                 List.copyOf(context.getMcpIds()));
         assertEquals(List.of("definition-target", "scope-target"),
                 List.copyOf(context.getExecutionTargetIds()));
+    }
+
+    @Test
+    void unboundNodesAndScopesMustUseChatSelectionThenDefinitionDefault() {
+        var factory = factory();
+        var definition = OpsAgentDefinition.builder().modelId("definition-model").build();
+        var node = OpsWorkflowNode.builder().nodeId("unbound").modelId(" ").build();
+        var scope = OpsAgentScopeConfig.builder().agentId("unbound-child").build();
+        var selected = OpsAgentChatRequest.builder().modelId("request-model").build();
+        assertEquals("request-model", factory.node(definition, node, selected, new ArrayList<>(), null).getModelId());
+        assertEquals("request-model", factory.agentScope(definition, scope, selected, new ArrayList<>(), null).getModelId());
+        assertEquals("definition-model", factory.node(definition, node, null, new ArrayList<>(), null).getModelId());
+        assertEquals("definition-model", factory.agentScope(definition, scope, null, new ArrayList<>(), null).getModelId());
     }
 
     private OpsRuntimeResourceContextFactory factory() {

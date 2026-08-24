@@ -76,6 +76,10 @@ public class LandingOperationJournalApplicationService {
                 text(landingRunId), text(toolsetId), text(toolName));
     }
 
+    public List<LandingOperationExecutionBinding> operationExecutionBindings(String landingRunId) {
+        return journalPort.operationExecutionBindings(text(landingRunId));
+    }
+
     public void completeFromToolExecution(
             String landingRunId,
             String operationId,

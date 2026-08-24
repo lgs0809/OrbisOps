@@ -13,17 +13,21 @@ class SkillRetrievalPipelineArchitectureTest {
     private static final Path ROOT = Path.of("..").toAbsolutePath().normalize();
 
     @Test
-    void runtimeSelectionMustRecallBeforeSemanticAndLlmReranking() throws Exception {
+    void runtimeSelectionMustRecallIndependentlyBeforeFusionAndReranking() throws Exception {
         String query = read("orbisops-application/src/main/java/"
                 + "cn/lgs/orbisops/application/skill/SelectRuntimeSkillsQuery.java");
-        int recall = query.indexOf("recallPolicy.recall(");
-        int semantic = query.indexOf("semanticScorePort.scores(");
-        int rerank = query.indexOf("rerankPort.scores(");
-
+        String hybrid = read("orbisops-application/src/main/java/"
+                + "cn/lgs/orbisops/application/skill/SkillHybridRetrieval.java");
+        int recall = hybrid.indexOf("lexical.recall(query,authorized,");
+        int semantic = hybrid.indexOf("semantic.scores(projectId,query,authorized)");
+        int fusion = hybrid.indexOf("policy.fuse(words,vectors,exact)");
+        int rerank = hybrid.indexOf("reranker.scores(query,documents)");
+        assertTrue(query.contains("new SkillHybridRetrieval("));
         assertTrue(recall >= 0);
         assertTrue(semantic > recall);
-        assertTrue(rerank > semantic);
-        assertTrue(query.contains("llmRerankCandidateLimit()"));
+        assertTrue(fusion > semantic);
+        assertTrue(rerank > fusion);
+        assertFalse(hybrid.contains("semantic.scores(projectId,query,words)"));
     }
 
     @Test
@@ -31,19 +35,26 @@ class SkillRetrievalPipelineArchitectureTest {
         String adapter = read("orbisops-trigger/src/main/java/"
                 + "cn/lgs/orbisops/trigger/application/skill/OpsSkillLlmRerankAdapter.java");
 
-        assertTrue(adapter.contains("routingProfile().searchDescription()"));
-        assertTrue(adapter.contains("routingProfile().exclusions()"));
+        String projection = read("orbisops-domain/src/main/java/"
+                + "cn/lgs/orbisops/domain/skill/service/SkillRouteProjectionIdentity.java");
+        assertTrue(adapter.contains("SkillRouteProjectionIdentity.rerankDocument(c)"));
+        assertTrue(projection.contains("routingProfile().searchDescription()"));
+        assertTrue(projection.contains("routingProfile().exclusions()"));
         assertFalse(adapter.contains("candidate.content("));
         assertFalse(adapter.contains("SKILL.md content"));
+        assertFalse(adapter.contains("OpsAgentLlmClient"));
+        assertFalse(projection.contains(".content()"));
     }
 
     @Test
     void semanticEmbeddingMustExcludeNegativeRoutingText() throws Exception {
-        String adapter = read("orbisops-trigger/src/main/java/"
-                + "cn/lgs/orbisops/trigger/application/skill/OpsSkillSemanticScoreAdapter.java");
-
-        assertTrue(adapter.contains("candidate.retrievalDescriptor()"));
-        assertFalse(adapter.contains("candidate.descriptor()"));
+        String projection = read("orbisops-domain/src/main/java/"
+                + "cn/lgs/orbisops/domain/skill/service/SkillRouteProjectionIdentity.java");
+        String worker = read("orbisops-trigger/src/main/java/"
+                + "cn/lgs/orbisops/trigger/application/skill/OpsSkillRouteProjectionWorker.java");
+        assertTrue(projection.contains("bounded(c.retrievalDescriptor(),300)"));
+        assertFalse(projection.contains("c.descriptor()"));
+        assertTrue(worker.contains("model.embedBackground(SkillRouteProjectionIdentity.document(candidate),false)"));
     }
 
     private String read(String relative) throws Exception {

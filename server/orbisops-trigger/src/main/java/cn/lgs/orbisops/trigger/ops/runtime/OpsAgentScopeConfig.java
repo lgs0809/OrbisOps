@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Builder
@@ -21,6 +22,7 @@ public class OpsAgentScopeConfig {
     private String instruction;
     private String modelId;
     private String outputKey;
+    private Map<?, ?> outputContract;
     private Boolean ragEnabled;
     private String knowledgeBaseId;
     private Integer maxIterations;
@@ -29,6 +31,7 @@ public class OpsAgentScopeConfig {
     private Boolean inheritProjectCapabilities;
     private Boolean repairEnabled;
     private Boolean changePackageEnabled;
+    private Boolean changePackageStatusEnabled;
 
     @Builder.Default
     private List<OpsMcpServerConfig> mcpServers = new ArrayList<>();

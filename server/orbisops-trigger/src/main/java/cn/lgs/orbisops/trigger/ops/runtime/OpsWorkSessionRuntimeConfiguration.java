@@ -85,12 +85,13 @@ public class OpsWorkSessionRuntimeConfiguration {
             ObjectProvider<OpsTaskContextAdapter> taskContextService,
             ObjectProvider<OpsAgentGraphCompilerAdapter> graphCompilerAdapter,
             ObjectProvider<OpsChatApplicationService> chatApplicationService,
+            OpsWorkflowChangeContextReader changeContextReader,
             ObjectProvider<OpsNodeExecutionStrategyRegistry> nodeExecutionStrategyRegistry,
             ObjectProvider<ToolLoopCoordinator> toolLoopCoordinator,
             ObjectProvider<OpsSkillRuntimeUsageRecorder> skillRuntimeUsageRecorder,
             @Qualifier("opsSubAgentExecutor") Executor opsSubAgentExecutor,
             @Qualifier("opsModelCallExecutor") ExecutorService opsModelCallExecutor,
-            OpsAgentLlmSettings llmSettings) {
+            OpsAgentLlmSettings llmSettings, OpsMcpDiscoveryPolicy discoveryPolicy) {
         OpsWorkSessionRunAdapter requiredRunService = Objects.requireNonNull(
                 workSessionRunService,
                 "OpsWorkSessionRunAdapter 不能为空；Work Session 不允许使用内存运行状态降级");
@@ -153,7 +154,7 @@ public class OpsWorkSessionRuntimeConfiguration {
                 promptAssembler,
                 opsSubAgentExecutor,
                 opsModelCallExecutor,
-                llmSettings.modelCallTimeoutSeconds());
+                llmSettings.modelCallTimeoutSeconds(), discoveryPolicy);
         OpsAgentScopeExecutionCoordinator agentScopeExecutionCoordinator =
                 new OpsAgentScopeExecutionCoordinator(
                         agentScopeExecutor,
@@ -177,7 +178,8 @@ public class OpsWorkSessionRuntimeConfiguration {
                         promptAssembler,
                         llmInvoker,
                         analysisStateManager,
-                        runtimeEventJournal);
+                        runtimeEventJournal,
+                        graphEventService);
         OpsGraphRuntimeStateManager graphRuntimeStateManager =
                 new OpsGraphRuntimeStateManager();
         OpsGraphConditionEvaluator conditionEvaluator =
@@ -231,7 +233,8 @@ public class OpsWorkSessionRuntimeConfiguration {
                         conditionEvaluator,
                         subWorkflowNodeExecutor,
                         telemetryService,
-                        graphEventService);
+                        graphEventService,
+                        changeContextReader);
         OpsGraphNodeExecutionCoordinator.Hooks graphNodeHooks = graphNodeHooks(
                 requestControl,
                 nodeExecutionPolicy,

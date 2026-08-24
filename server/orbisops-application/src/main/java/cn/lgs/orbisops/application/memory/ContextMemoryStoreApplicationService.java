@@ -87,6 +87,17 @@ public class ContextMemoryStoreApplicationService {
         }
     }
 
+    public void saveExtractedItemsStrict(List<ColdMemoryItemSnapshot> items) {
+        if (items == null || items.isEmpty()) return;
+        IContextMemoryRepository target = requireRepository();
+        for (ColdMemoryItemSnapshot item : items) {
+            projectionPolicy.project(item).ifPresent(snapshot -> {
+                target.upsert(snapshot);
+                audit("upsert", refreshed(snapshot));
+            });
+        }
+    }
+
     private ContextMemorySnapshot refreshed(ContextMemorySnapshot fallback) {
         return repository.findByMemoryId(fallback.memoryId()).orElse(fallback);
     }

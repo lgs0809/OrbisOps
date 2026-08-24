@@ -1,10 +1,8 @@
 package cn.lgs.orbisops.trigger.ops.skill;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.embedding.EmbeddingModel;
-import org.springframework.beans.factory.ObjectProvider;
+import cn.lgs.orbisops.trigger.application.skill.OpsSkillRetrievalHttpClient;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -20,22 +18,20 @@ import java.util.Map;
 @Service
 public class OpsSkillSemanticMatcher {
 
-    private final ObjectProvider<EmbeddingModel> embeddingModelProvider;
+    private final OpsSkillRetrievalHttpClient embeddingModel;
     private final OpsSkillSemanticSettings settings;
     private final OpsSkillEmbeddingScoreCoordinator scoreCoordinator;
 
     public OpsSkillSemanticMatcher(
-            @Qualifier("ragEmbeddingModel")
-            ObjectProvider<EmbeddingModel> embeddingModelProvider) {
-        this(embeddingModelProvider, OpsSkillSemanticSettings.defaults());
+            OpsSkillRetrievalHttpClient embeddingModel) {
+        this(embeddingModel, OpsSkillSemanticSettings.defaults());
     }
 
     @Autowired
     public OpsSkillSemanticMatcher(
-            @Qualifier("ragEmbeddingModel")
-            ObjectProvider<EmbeddingModel> embeddingModelProvider,
+            OpsSkillRetrievalHttpClient embeddingModel,
             OpsSkillSemanticSettings settings) {
-        this.embeddingModelProvider = embeddingModelProvider;
+        this.embeddingModel = embeddingModel;
         this.settings = settings == null
                 ? OpsSkillSemanticSettings.defaults()
                 : settings;
@@ -51,8 +47,8 @@ public class OpsSkillSemanticMatcher {
                 || documents.isEmpty()) {
             return Map.of();
         }
-        EmbeddingModel model = embeddingModelProvider.getIfAvailable();
-        if (model == null) {
+        OpsSkillRetrievalHttpClient model = embeddingModel;
+        if (model == null || !model.configured()) {
             return Map.of();
         }
         try {

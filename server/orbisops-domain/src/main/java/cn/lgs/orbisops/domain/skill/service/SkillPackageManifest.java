@@ -52,10 +52,18 @@ public final class SkillPackageManifest {
                                      Limits limits) {
         List<Map<String, Object>> artifacts = artifactInputs(versionArtifacts);
         Map<String, Object> sourceManifest = manifest(sourceManifestJson);
+        Map<String, Object> routing = map(first(sourceManifest, "routingProfile", "routing"));
+        // Restore the historical retrieval boundary, without inferring new rules from today's description.
+        SkillRoutingProfile sourceRouting = routing.isEmpty() ? null : new SkillRoutingProfilePolicy()
+                .requireCanonicalProfile(text(routing.get("category"), ""),
+                        text(first(routing, "subcategory", "subCategory"), ""), "", "",
+                        first(routing, "whenToUse", "useCases"), first(routing, "whenNotToUse", "exclusions"),
+                        first(routing, "keywords", "capabilityHints"));
         return packageOf(scope, projectId, skillId, name, description, version, entrypointContent,
                 artifacts,
                 sourceManifest.getOrDefault("dependencies", List.of()),
                 sourceManifest.getOrDefault("evalSuites", List.of()),
+                sourceRouting,
                 limits);
     }
 

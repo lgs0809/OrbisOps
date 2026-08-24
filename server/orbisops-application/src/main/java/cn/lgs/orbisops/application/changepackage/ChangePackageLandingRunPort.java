@@ -11,6 +11,9 @@ public interface ChangePackageLandingRunPort {
 
     Optional<ChangePackageLandingRun> find(String runId);
 
+    /** Original authenticated execution owner; recovery must not invent a worker principal. */
+    default String executionActor(String runId) { return ""; }
+
     List<ChangePackageLandingRun> findStrandedTerminalRuns(int limit);
 
     List<ChangePackageLandingRun> findLateCompletedFailedRuns(int limit);

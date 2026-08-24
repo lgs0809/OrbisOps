@@ -77,7 +77,27 @@ public class SkillPatchValidationApplicationService {
                 SkillPatchCandidateStatus.require(decision.status()),
                 decision.valid()
                         ? "VALIDATION_PASSED"
-                        : String.join(",", decision.failures()));
+                        : failureCode(decision));
         return decision;
+    }
+
+    /** Release admission is separate from optional platform regression evaluation. */
+    public SkillPatchValidationDecision validateMinimumDecision(String candidateId, List<String> contentFailures) {
+        SkillPatchValidationDecision decision = validationPolicy.evaluate(
+                candidateService.getCandidate(candidateId), contentFailures);
+        validationResultPort.upsert(candidateId, "MINIMUM_CHECKS", decision.status(),
+                decision.valid() ? 1D : 0D, Map.of("policy", SkillAutomaticPublicationService.POLICY,
+                        "failures", decision.failures(), "regressionEvaluated", false));
+        candidateService.updateStatus(candidateId, SkillPatchCandidateStatus.require(decision.status()),
+                decision.valid() ? "MINIMUM_CHECKS_PASSED" : failureCode(decision));
+        return decision;
+    }
+
+    /** Full explanations belong to validation result_json; reason_code is a bounded identifier. */
+    private String failureCode(SkillPatchValidationDecision decision) {
+        String codes=decision.failures().stream().map(reason->reason.split(":",2)[0])
+                .distinct().collect(java.util.stream.Collectors.joining(","));
+        return !codes.isBlank() && codes.length()<=128 && codes.matches("[A-Z][A-Z0-9_,]*")
+                ?codes:decision.status();
     }
 }

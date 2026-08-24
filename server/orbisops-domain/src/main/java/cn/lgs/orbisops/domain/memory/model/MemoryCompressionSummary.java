@@ -3,7 +3,9 @@ package cn.lgs.orbisops.domain.memory.model;
 /** Summary content and provenance selected for context compression. */
 public record MemoryCompressionSummary(
         String content,
-        String source) {
+        String source, boolean modelPending) {
+
+    public MemoryCompressionSummary(String content, String source) { this(content, source, false); }
 
     public MemoryCompressionSummary {
         content = value(content);

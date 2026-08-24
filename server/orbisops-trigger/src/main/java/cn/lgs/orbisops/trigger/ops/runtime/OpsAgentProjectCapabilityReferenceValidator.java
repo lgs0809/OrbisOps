@@ -8,7 +8,8 @@ import cn.lgs.orbisops.application.project.ProjectMcpAuthorizationApplicationSer
 import cn.lgs.orbisops.application.project.ProjectMcpRuntimeDescriptorApplicationService;
 import cn.lgs.orbisops.application.project.ProjectSkillAuthorizationApplicationService;
 import cn.lgs.orbisops.domain.agentdefinition.service.AgentReferenceSyntaxPolicy;
-import cn.lgs.orbisops.trigger.ops.skill.SkillRuntimeToolProvider;
+import cn.lgs.orbisops.application.skill.SkillCatalogPort;
+import cn.lgs.orbisops.application.skill.SkillRuntimeCatalogAccess;
 import cn.lgs.orbisops.trigger.ops.source.OpsSourceRepositoryService;
 import org.springframework.util.StringUtils;
 
@@ -22,7 +23,7 @@ public final class OpsAgentProjectCapabilityReferenceValidator
     private final AgentReferenceSyntaxPolicy referenceSyntaxPolicy =
             new AgentReferenceSyntaxPolicy();
     private final Supplier<McpClientCatalogPort> mcpRepositorySupplier;
-    private final Supplier<SkillRuntimeToolProvider> skillToolProviderSupplier;
+    private final Supplier<SkillCatalogPort> skillCatalogSupplier;
     private final Supplier<ProjectDefinitionApplicationService> projectDefinitionSupplier;
     private final Supplier<ProjectMcpAuthorizationApplicationService> mcpAuthorizationSupplier;
     private final Supplier<ProjectSkillAuthorizationApplicationService> skillAuthorizationSupplier;
@@ -31,7 +32,7 @@ public final class OpsAgentProjectCapabilityReferenceValidator
 
     public OpsAgentProjectCapabilityReferenceValidator(
             Supplier<McpClientCatalogPort> mcpRepositorySupplier,
-            Supplier<SkillRuntimeToolProvider> skillToolProviderSupplier,
+            Supplier<SkillCatalogPort> skillCatalogSupplier,
             Supplier<ProjectDefinitionApplicationService> projectDefinitionSupplier,
             Supplier<ProjectMcpAuthorizationApplicationService> mcpAuthorizationSupplier,
             Supplier<ProjectSkillAuthorizationApplicationService> skillAuthorizationSupplier,
@@ -39,8 +40,8 @@ public final class OpsAgentProjectCapabilityReferenceValidator
             Supplier<OpsSourceRepositoryService> sourceRepositorySupplier) {
         this.mcpRepositorySupplier = required(
                 mcpRepositorySupplier, "MCP_REPOSITORY_SUPPLIER_REQUIRED");
-        this.skillToolProviderSupplier = required(
-                skillToolProviderSupplier, "SKILL_TOOL_PROVIDER_SUPPLIER_REQUIRED");
+        this.skillCatalogSupplier = required(
+                skillCatalogSupplier, "SKILL_CATALOG_SUPPLIER_REQUIRED");
         this.projectDefinitionSupplier = required(
                 projectDefinitionSupplier, "PROJECT_DEFINITION_SUPPLIER_REQUIRED");
         this.mcpAuthorizationSupplier = required(
@@ -68,25 +69,23 @@ public final class OpsAgentProjectCapabilityReferenceValidator
             List<String> skills,
             String owner,
             String projectId) {
-        SkillRuntimeToolProvider skillToolProvider = skillToolProviderSupplier.get();
-        ProjectSkillAuthorizationApplicationService authorization =
-                skillAuthorizationSupplier.get();
-        for (String skill : skills == null ? List.<String>of() : skills) {
-            referenceSyntaxPolicy.validateSkill(skill, owner);
-            if (skillToolProvider != null
-                    && skillToolProvider.listSkillSummaries().stream()
-                    .noneMatch(item -> skill.equals(item.name()))) {
-                throw new IllegalArgumentException(
-                        owner + " 引用了不存在的 skill：" + skill);
-            }
-            if (StringUtils.hasText(projectId)
-                    && authorization != null
-                    && !authorization.allows(projectId, skill)) {
-                throw new IllegalArgumentException(
-                        owner + " 引用了未授权给项目 " + projectId
-                                + " 的 skill：" + skill);
-            }
+        List<String> requested = skills == null ? List.of() : skills;
+        requested.forEach(skill -> referenceSyntaxPolicy.validateSkill(skill, owner));
+        if (requested.isEmpty()) return;
+        SkillCatalogPort catalog = skillCatalogSupplier.get();
+        if (catalog == null) throw new IllegalStateException("SKILL_CATALOG_REQUIRED_FOR_BINDING");
+        java.util.Set<String> available = new java.util.HashSet<>();
+        if (StringUtils.hasText(projectId)) {
+            new SkillRuntimeCatalogAccess(catalog).active(projectId)
+                    .forEach(skill -> available.add(skill.skillId()));
+        } else {
+            catalog.listRuntimeGlobalEntries().stream().map(entry -> entry.runtimeCandidate())
+                    .filter(skill -> "GLOBAL".equals(skill.scope()) && skill.projectId().isBlank()
+                            && skill.activeAtUse() && skill.routingReady())
+                    .forEach(skill -> available.add(skill.skillId()));
         }
+        for (String skill : requested) if (!available.contains(skill)) throw new IllegalArgumentException(
+                owner + " 引用了不存在、未启用或未授权给项目的 skill：" + skill);
     }
 
     public void validateMcpReferences(

@@ -72,8 +72,8 @@ class ColdMemoryPersistenceArchitectureTest {
             }
         }
 
-        assertEquals(Set.of(REPOSITORY), owners,
-                "Cold Memory mutation SQL must stay behind IColdMemoryRepository");
+        assertEquals(Set.of(REPOSITORY, "orbisops-infrastructure/src/main/java/cn/lgs/orbisops/infrastructure/adapter/repository/JdbcConversationMemoryRepository.java"), owners,
+                "Cold Memory mutation SQL must stay behind cold/conversation repository ports");
     }
 
     @Test

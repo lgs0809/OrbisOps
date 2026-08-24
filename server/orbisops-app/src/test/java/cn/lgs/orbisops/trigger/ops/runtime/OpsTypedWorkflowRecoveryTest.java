@@ -13,6 +13,8 @@ import cn.lgs.orbisops.domain.runtime.workflow.model.DurableWorkflowWaitState;
 import cn.lgs.orbisops.domain.shared.service.CanonicalObjectHasher;
 import cn.lgs.orbisops.trigger.application.runtime.OpsRuntimeContextBundleAdapter;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -31,8 +33,9 @@ import static org.mockito.Mockito.when;
 
 class OpsTypedWorkflowRecoveryTest {
 
-    @Test
-    void resumedRunMustRecoverPinnedPlanAndReplayCompletedNodeOutput() {
+    @ParameterizedTest
+    @ValueSource(ints = {1, 2, 3})
+    void resumedRunMustRecoverPinnedPlanAndReplayCompletedNodeOutput(int completedAttempt) {
         OpsAgentDefinitionValidator validator = mock(OpsAgentDefinitionValidator.class);
         OpsRuntimeWorkflowBindingAdapter binding = mock(OpsRuntimeWorkflowBindingAdapter.class);
         OpsDurableWorkflowRuntimeCoordinator durable = mock(OpsDurableWorkflowRuntimeCoordinator.class);
@@ -48,7 +51,7 @@ class OpsTypedWorkflowRecoveryTest {
         DurableWorkflowNodeState nodeState = new DurableWorkflowNodeState(
                 "node-1",
                 DurableWorkflowNodeStatus.SUCCEEDED,
-                1,
+                completedAttempt,
                 outputHash,
                 "",
                 "",
@@ -65,7 +68,9 @@ class OpsTypedWorkflowRecoveryTest {
                 Map.of("node-1", nodeState),
                 List.of(),
                 Map.of(),
-                Map.of("nodeOutput:node-1", cachedOutput),
+                completedAttempt == 1 ? Map.of("nodeOutput:node-1", cachedOutput)
+                        : Map.of("nodeOutput:node-1:" + completedAttempt, cachedOutput,
+                        "nodeOutputHash:node-1:" + completedAttempt, outputHash),
                 DurableWorkflowWaitState.none(),
                 "",
                 "",
@@ -76,6 +81,15 @@ class OpsTypedWorkflowRecoveryTest {
         when(resources.assembleAgent(any(), any(), any(), any())).thenReturn(runtime);
         when(binding.bind(any(), any(), anyMap(), any(), any(), any(), any())).thenReturn(plan);
         when(plan.planHash()).thenReturn("plan-hash");
+        when(plan.runId()).thenReturn("run-1");
+        when(plan.projectId()).thenReturn("project-1");
+        when(plan.sessionId()).thenReturn("session-1");
+        when(plan.agentId()).thenReturn("agent-1");
+        when(plan.contextBundleId()).thenReturn("bundle-1");
+        when(plan.definitionVersion()).thenReturn(1);
+        when(compiled.agentId()).thenReturn("agent-1");
+        when(compiled.definitionVersion()).thenReturn(1);
+        when(compiled.definitionHash()).thenReturn("definition-hash");
         when(plan.definitionHash()).thenReturn("definition-hash");
         when(plan.contextBundleHash()).thenReturn("context-hash");
         when(plan.nodes()).thenReturn(List.of(boundNode));
@@ -129,5 +143,7 @@ class OpsTypedWorkflowRecoveryTest {
         assertEquals(cachedOutput, replayed.get());
         assertEquals("TYPED_WORKFLOW_NODE_REPLAYED",
                 events.get(events.size() - 1).getEventType());
+        assertEquals(completedAttempt, events.get(events.size() - 1).getPayload().get("attempt"));
+        assertTrue(coordinator.replayCompletedNode(request, definition.getNodes().get(0), events, null).isEmpty());
     }
 }

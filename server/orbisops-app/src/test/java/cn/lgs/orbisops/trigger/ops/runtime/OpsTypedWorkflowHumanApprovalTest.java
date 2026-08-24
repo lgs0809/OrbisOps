@@ -119,6 +119,15 @@ class OpsTypedWorkflowHumanApprovalTest {
         when(resources.assembleAgent(any(), any(), any(), any())).thenReturn(runtime);
         when(binding.bind(any(), any(), anyMap(), any(), any(), any(), any())).thenReturn(plan);
         when(plan.planHash()).thenReturn("plan-hash");
+        when(plan.runId()).thenReturn("run-1");
+        when(plan.projectId()).thenReturn("project-1");
+        when(plan.sessionId()).thenReturn("session-1");
+        when(plan.agentId()).thenReturn("agent-1");
+        when(plan.contextBundleId()).thenReturn("bundle-1");
+        when(plan.definitionVersion()).thenReturn(1);
+        when(compiled.agentId()).thenReturn("agent-1");
+        when(compiled.definitionVersion()).thenReturn(1);
+        when(compiled.definitionHash()).thenReturn("definition-hash");
         when(plan.definitionHash()).thenReturn("definition-hash");
         when(plan.contextBundleHash()).thenReturn("context-hash");
         when(plan.nodes()).thenReturn(List.of());

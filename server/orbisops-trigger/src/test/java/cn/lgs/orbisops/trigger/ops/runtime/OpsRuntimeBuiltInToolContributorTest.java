@@ -96,6 +96,9 @@ class OpsRuntimeBuiltInToolContributorTest {
         OpsChangePackageToolProvider changeProvider =
                 mock(OpsChangePackageToolProvider.class);
         ToolCallback tool = tool("PrepareChangePackage");
+        ToolCallback statusQuery = tool("QueryChangePackageStatus");
+        when(changeProvider.buildStatusQuery(eq("project-1"), eq("alice"), eq("run-1"), any(OpsAgentChatRequest.class)))
+                .thenReturn(statusQuery);
         when(changeProvider.available("project-1", List.of("target-1")))
                 .thenReturn(true);
         List<OpsRuntimeEvent> events = new ArrayList<>();
@@ -127,6 +130,8 @@ class OpsRuntimeBuiltInToolContributorTest {
         contributor.contribute(context);
 
         assertSame(tool, ((OpsRuntimeGovernedToolCallback) context.getTools().get(0)).delegate());
+        assertEquals(2, context.getTools().size());
+        assertSame(statusQuery, ((OpsRuntimeGovernedToolCallback) context.getTools().get(1)).delegate());
         assertEquals("run-1", context.getMetadata().get("changePackageRunId"));
         assertEquals(List.of("target-1"), context.getMetadata().get("executionTargetIds"));
     }

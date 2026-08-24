@@ -56,14 +56,14 @@ class OpsWorkflowApprovalControllerTest {
         OpsWorkflowApprovalWebApplicationService approvals = mock(OpsWorkflowApprovalWebApplicationService.class);
         AuthorizeProjectAccessUseCase projectAccess = mock(AuthorizeProjectAccessUseCase.class);
         OpsWorkflowApprovalController controller = new OpsWorkflowApprovalController(approvals, projectAccess);
-        when(approvals.decide("run-1", "project-1", "user-1", "APPROVE"))
+        when(approvals.decide("run-1", "project-1", "user-1", "APPROVE", "workflow-approval-1"))
                 .thenReturn(Map.of("status", "APPROVED"));
 
         var response = controller.decide(
-                "run-1", "project-1", Map.of("decision", "APPROVE", "actor", "attacker"), request("user", false));
+                "run-1", "project-1", Map.of("decision", "APPROVE", "actor", "attacker", "approvalId", "workflow-approval-1"), request("user", false));
 
         assertEquals("APPROVED", response.getData().get("status"));
-        verify(approvals).decide("run-1", "project-1", "user-1", "APPROVE");
+        verify(approvals).decide("run-1", "project-1", "user-1", "APPROVE", "workflow-approval-1");
     }
 
     @Test
@@ -77,7 +77,7 @@ class OpsWorkflowApprovalControllerTest {
                         "run-1", "project-1", Map.of("decision", "APPROVE"), request("admin", true)));
 
         assertEquals("WORKFLOW_APPROVAL_HUMAN_ACTOR_REQUIRED", failure.getMessage());
-        verify(approvals, never()).decide(eq("run-1"), eq("project-1"), eq("user-1"), eq("APPROVE"));
+        verify(approvals, never()).decide(eq("run-1"), eq("project-1"), eq("user-1"), eq("APPROVE"), eq("workflow-approval-1"));
     }
 
     @Test
@@ -85,12 +85,12 @@ class OpsWorkflowApprovalControllerTest {
         OpsWorkflowApprovalWebApplicationService approvals = mock(OpsWorkflowApprovalWebApplicationService.class);
         AuthorizeProjectAccessUseCase projectAccess = mock(AuthorizeProjectAccessUseCase.class);
         OpsWorkflowApprovalController controller = new OpsWorkflowApprovalController(approvals, projectAccess);
-        when(approvals.retryResume("run-1", "project-1", "user-1"))
+        when(approvals.retryResume("run-1", "project-1", "user-1", "workflow-approval-1"))
                 .thenReturn(Map.of("status", "APPROVED", "resumeRequired", true));
 
-        controller.retryResume("run-1", "project-1", request("admin", false));
+        controller.retryResume("run-1", "project-1", Map.of("approvalId", "workflow-approval-1"), request("admin", false));
 
-        verify(approvals).retryResume("run-1", "project-1", "user-1");
+        verify(approvals).retryResume("run-1", "project-1", "user-1", "workflow-approval-1");
     }
 
     private MockHttpServletRequest request(String scope, boolean serviceToken) {

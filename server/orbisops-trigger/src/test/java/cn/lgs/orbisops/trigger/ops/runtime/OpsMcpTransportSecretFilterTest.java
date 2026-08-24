@@ -41,6 +41,16 @@ class OpsMcpTransportSecretFilterTest {
     }
 
     @Test
+    void defaultPolicyCarriesExecutionMetadataButExplicitOperatorRestrictionsStillApply() {
+        Map<String, String> headers = Map.of("X-Ops-Execution-Key", "operation-1",
+                "X-Ops-Fencing-Token", "7", "X-Ops-Deadline", "2026-09-10T00:00:00Z");
+        assertEquals(headers, filter.safeHeaders("test-mcp", headers, OpsMcpTransportSecuritySettings.defaults()));
+        assertThrows(IllegalArgumentException.class, () -> filter.safeHeaders("test-mcp", headers, settings));
+        assertThrows(IllegalArgumentException.class, () -> filter.safeHeaders("test-mcp",
+                Map.of("Cookie", "session=value"), OpsMcpTransportSecuritySettings.defaults()));
+    }
+
+    @Test
     void disabledSecurityPreservesOriginalMapIdentity() {
         Map<String, String> source = new LinkedHashMap<>();
         source.put("DB_PASSWORD", "secret");

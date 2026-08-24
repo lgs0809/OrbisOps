@@ -20,18 +20,16 @@ import java.util.function.Supplier;
 /** Application process manager for the Skill Evolution job and patch lifecycle. */
 public class SkillEvolutionJobApplicationService {
 
-    private static final int CHAT_MESSAGE_LIMIT = 200;
-
     private final ISkillEvolutionJobRepository repository;
     private final SkillEvolutionJobPolicy jobPolicy;
     private final SkillEvolutionInputPolicy inputPolicy;
-    private final SkillEvolutionTraceInputPort traceInputPort;
-    private final SkillEvolutionChatInputPort chatInputPort;
+    private final SkillEvolutionSourcePort sourcePort;
     private final SkillEvolutionPipelinePort pipelinePort;
     private final SkillEvolutionPatchJsonEncoder jsonCodecPort;
     private final Supplier<String> patchIdSupplier;
     private final SkillEvolutionAuditPort auditPort;
     private final Clock clock;
+    private final SkillEvolutionLeasePort leases;
 
     public SkillEvolutionJobApplicationService(
             ISkillEvolutionJobRepository repository,
@@ -44,17 +42,33 @@ public class SkillEvolutionJobApplicationService {
             Supplier<String> patchIdSupplier,
             SkillEvolutionAuditPort auditPort,
             Clock clock) {
+        this(repository,jobPolicy,inputPolicy,
+                job -> new SkillEvolutionInput(traceInputPort.trace(job.runId()), chatInputPort.messages(job.sessionId(),200)),
+                pipelinePort,jsonCodecPort,patchIdSupplier,auditPort,clock);
+    }
+
+    public SkillEvolutionJobApplicationService(ISkillEvolutionJobRepository repository,
+            SkillEvolutionJobPolicy jobPolicy, SkillEvolutionInputPolicy inputPolicy, SkillEvolutionSourcePort sourcePort,
+            SkillEvolutionPipelinePort pipelinePort, SkillEvolutionPatchJsonEncoder jsonCodecPort,
+            Supplier<String> patchIdSupplier, SkillEvolutionAuditPort auditPort, Clock clock) {
+        this(repository,jobPolicy,inputPolicy,sourcePort,pipelinePort,jsonCodecPort,patchIdSupplier,auditPort,clock,
+                SkillEvolutionLeasePort.unmanaged());
+    }
+
+    public SkillEvolutionJobApplicationService(ISkillEvolutionJobRepository repository,
+            SkillEvolutionJobPolicy jobPolicy, SkillEvolutionInputPolicy inputPolicy, SkillEvolutionSourcePort sourcePort,
+            SkillEvolutionPipelinePort pipelinePort, SkillEvolutionPatchJsonEncoder jsonCodecPort,
+            Supplier<String> patchIdSupplier, SkillEvolutionAuditPort auditPort, Clock clock, SkillEvolutionLeasePort leases) {
         if (repository == null) throw new IllegalArgumentException("SKILL_EVOLUTION_JOB_REPOSITORY_REQUIRED");
-        if (traceInputPort == null) throw new IllegalArgumentException("SKILL_EVOLUTION_TRACE_INPUT_PORT_REQUIRED");
-        if (chatInputPort == null) throw new IllegalArgumentException("SKILL_EVOLUTION_CHAT_INPUT_PORT_REQUIRED");
+        if (sourcePort == null) throw new IllegalArgumentException("SKILL_EVOLUTION_SOURCE_PORT_REQUIRED");
         if (pipelinePort == null) throw new IllegalArgumentException("SKILL_EVOLUTION_PIPELINE_PORT_REQUIRED");
         if (jsonCodecPort == null) throw new IllegalArgumentException("SKILL_EVOLUTION_JSON_CODEC_PORT_REQUIRED");
         if (patchIdSupplier == null) throw new IllegalArgumentException("SKILL_EVOLUTION_PATCH_ID_SUPPLIER_REQUIRED");
         this.repository = repository;
+        this.leases = java.util.Objects.requireNonNull(leases);
         this.jobPolicy = jobPolicy == null ? new SkillEvolutionJobPolicy() : jobPolicy;
         this.inputPolicy = inputPolicy == null ? new SkillEvolutionInputPolicy() : inputPolicy;
-        this.traceInputPort = traceInputPort;
-        this.chatInputPort = chatInputPort;
+        this.sourcePort = sourcePort;
         this.pipelinePort = pipelinePort;
         this.jsonCodecPort = jsonCodecPort;
         this.patchIdSupplier = patchIdSupplier;
@@ -68,6 +82,9 @@ public class SkillEvolutionJobApplicationService {
             String projectId,
             String agentId,
             String triggerReason) {
+        // Recovery has owner/configuration/cooldown checks; a legacy enqueue flag cannot bypass them.
+        if ("MANUAL_RETRY".equals(value(triggerReason)))
+            throw new IllegalArgumentException("BACKGROUND_MODEL_USE_AUTHORIZED_RECOVERY");
         String run = value(runId);
         if (run.isBlank()) {
             return SkillEvolutionEnqueueResult.skipped("SKIP_MISSING_CANONICAL_RUN_ID");
@@ -99,12 +116,15 @@ public class SkillEvolutionJobApplicationService {
         int limit = jobPolicy.listLimit(configuredLimit);
         List<SkillEvolutionEnqueueResult> results = new ArrayList<>();
         for (SkillEvolutionRunCandidate candidate : repository.findUnqueuedRunCandidates(limit)) {
-            results.add(enqueue(
+            try { results.add(enqueue(
                     candidate.runId(),
                     candidate.sessionId(),
                     candidate.projectId(),
                     candidate.agentId(),
-                    "RUN_COMPLETED_BACKGROUND"));
+                    "RUN_COMPLETED_BACKGROUND")); }
+            catch (IllegalStateException invalidSource) {
+                results.add(SkillEvolutionEnqueueResult.skipped("SKIP_ACCEPTED_SOURCE_UNAVAILABLE"));
+            }
         }
         return List.copyOf(results);
     }
@@ -117,12 +137,22 @@ public class SkillEvolutionJobApplicationService {
         for (int index = 0; index < batchSize; index++) {
             SkillEvolutionJobSnapshot job = repository.claimPending(maxAttempts).orElse(null);
             if (job == null) break;
-            results.add(process(job, maxAttempts));
+            try (var lease = leases.maintain(job)) {
+                lease.requireOwned();
+                results.add(process(job, maxAttempts, lease));
+            } catch (IllegalStateException lost) {
+                if (!"SKILL_EVOLUTION_CLAIM_LOST".equals(lost.getMessage())) throw lost;
+                results.add(SkillEvolutionJobRunResult.failed(job.jobId(), "CLAIM_LOST", lost.getMessage()));
+            }
         }
         return List.copyOf(results);
     }
 
     public List<SkillEvolutionJobSnapshot> listJobs(String status, int limit) {
+        return listJobs(null, status, limit);
+    }
+
+    public List<SkillEvolutionJobSnapshot> listJobs(String projectId, String status, int limit) {
         if (!repository.available()) return List.of();
         SkillEvolutionJobStatus filter = null;
         String value = value(status);
@@ -133,7 +163,7 @@ public class SkillEvolutionJobApplicationService {
                 return List.of();
             }
         }
-        return repository.findJobs(filter, jobPolicy.listLimit(limit));
+        return repository.findJobs(projectId, filter, jobPolicy.listLimit(limit));
     }
 
     public SkillEvolutionJobSnapshot getJob(String jobId) {
@@ -145,17 +175,20 @@ public class SkillEvolutionJobApplicationService {
     }
 
     public List<SkillEvolutionPatchSnapshot> listPatches(String jobId, String decision, int limit) {
-        if (!repository.available()) return List.of();
-        return repository.findPatches(jobId, decision, jobPolicy.listLimit(limit));
+        return listPatches(null, jobId, decision, limit);
     }
 
-    private SkillEvolutionJobRunResult process(SkillEvolutionJobSnapshot job, int maxAttempts) {
+    public List<SkillEvolutionPatchSnapshot> listPatches(String projectId, String jobId, String decision, int limit) {
+        if (!repository.available()) return List.of();
+        return repository.findPatches(projectId, jobId, decision, jobPolicy.listLimit(limit));
+    }
+
+    private SkillEvolutionJobRunResult process(SkillEvolutionJobSnapshot job, int maxAttempts, SkillEvolutionLeasePort.Scope lease) {
         try {
-            SkillEvolutionInput input = new SkillEvolutionInput(
-                    traceInputPort.trace(job.runId()),
-                    chatInputPort.messages(job.sessionId(), CHAT_MESSAGE_LIMIT));
+            SkillEvolutionInput input = sourcePort.load(job);
             SkillEvolutionInputSummary summary = inputPolicy.summarize(input);
             String skipReason = inputPolicy.skipReason(summary);
+            if (input.trace().isEmpty() && input.messages().isEmpty()) skipReason="SKIP_TASK_OUTCOME_UNVERIFIED";
             SkillEvolutionPipelineDecision pipeline = skipReason.isBlank()
                     ? pipelinePort.decide(new SkillEvolutionPipelineRequest(
                             job.projectId(),
@@ -163,12 +196,12 @@ public class SkillEvolutionJobApplicationService {
                             job.runId(),
                             job.sessionId(),
                             job.triggerReason(),
-                            summary))
+                            summary, null, job))
                     : new SkillEvolutionPipelineDecision(
                             "SKIPPED", skipReason, "", "", "{}", "SKIPPED");
 
             PatchDecision decision = patchDecision(pipeline, summary);
-            SkillEvolutionPatchSnapshot stored = repository.savePatch(new SkillEvolutionPatchSnapshot(
+            SkillEvolutionPatchSnapshot patch = new SkillEvolutionPatchSnapshot(
                     0L,
                     requirePatchId(patchIdSupplier.get()),
                     job.jobId(),
@@ -182,18 +215,21 @@ public class SkillEvolutionJobApplicationService {
                     null,
                     decision.skippedReason(),
                     null,
-                    null));
+                    null);
             SkillEvolutionJobStatus terminalStatus = jobPolicy.terminalStatus(decision.decision());
-            repository.complete(job.jobId(), terminalStatus);
+            lease.requireOwned();
+            SkillEvolutionPatchSnapshot stored = repository.complete(job, patch, terminalStatus).orElse(null);
+            if (stored==null) return SkillEvolutionJobRunResult.failed(job.jobId(),"CLAIM_LOST","SKILL_EVOLUTION_CLAIM_LOST");
             if (auditPort != null) auditPort.recordJobCompleted(job, decision.decision(), stored, terminalStatus);
             return SkillEvolutionJobRunResult.completed(stored);
         } catch (Exception error) {
+            lease.requireOwned();
             SkillEvolutionRetryTransition transition = jobPolicy.failureTransition(
-                    job.attempts(),
-                    maxAttempts,
-                    clock.instant());
-            repository.rescheduleOrFail(job.jobId(), transition, error.getMessage());
-            if (auditPort != null) auditPort.recordJobFailed(job, transition, error.getMessage());
+                    job, maxAttempts, clock.instant(), error.getMessage());
+            if (!repository.rescheduleOrFail(job, transition, error.getMessage()))
+                return SkillEvolutionJobRunResult.failed(job.jobId(),"CLAIM_LOST","SKILL_EVOLUTION_CLAIM_LOST");
+            if (auditPort != null) auditPort.recordJobFailed(job, transition,
+                    error instanceof SkillGroupingDeferredException deferred ? deferred.diagnostic() : error.getMessage());
             return SkillEvolutionJobRunResult.failed(
                     job.jobId(),
                     transition.status().name(),

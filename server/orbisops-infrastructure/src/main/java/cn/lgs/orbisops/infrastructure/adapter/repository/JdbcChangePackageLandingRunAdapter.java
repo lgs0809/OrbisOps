@@ -49,6 +49,12 @@ public class JdbcChangePackageLandingRunAdapter implements ChangePackageLandingR
     }
 
     @Override
+    public String executionActor(String runId) {
+        return template().queryForObject("SELECT actor FROM ai_ops_change_package_landing_run WHERE run_id=?",
+                String.class, required(runId));
+    }
+
+    @Override
     public List<ChangePackageLandingRun> findStrandedTerminalRuns(int limit) {
         return template().queryForList("""
                 SELECT r.*
@@ -75,6 +81,8 @@ public class JdbcChangePackageLandingRunAdapter implements ChangePackageLandingR
                  AND p.landing_run_id=r.run_id
                 WHERE p.status='LANDING_FAILED'
                   AND r.status='FAILED'
+                  AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(r.result_json,'$.reasonCode')),'')
+                      <> 'LANDING_INDEPENDENT_VERIFICATION_FAILED'
                   AND p.approved_version=r.approved_version
                   AND p.approved_package_hash=r.approved_package_hash
                   AND EXISTS (

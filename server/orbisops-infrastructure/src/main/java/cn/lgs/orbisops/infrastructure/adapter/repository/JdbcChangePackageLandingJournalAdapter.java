@@ -26,6 +26,7 @@ public class JdbcChangePackageLandingJournalAdapter implements ChangePackageLand
     private static final String FACT_NONE = "NONE";
     private static final String FACT_UNKNOWN = "UNKNOWN";
     private static final String FACT_COMPLETED = "COMPLETED";
+    private static final String STATUS_PENDING = "PENDING";
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -44,21 +45,32 @@ public class JdbcChangePackageLandingJournalAdapter implements ChangePackageLand
         JdbcTemplate template = requireTemplate();
         for (ChangePackageLandingOperation operation : plan.operations()) {
             String executionKey = executionKey(plan, operation);
+            String operationJson = JSON.toJSONString(operation.raw());
             List<Map<String, Object>> prior = template.queryForList("""
-                    SELECT fact_status, status, landing_run_id
+                    SELECT landing_run_id, package_id, project_id, approved_version,
+                           approved_package_hash, operation_id, operation_hash, fact_status, status
                     FROM ai_ops_change_package_landing_operation_run
                     WHERE execution_key=?
                     LIMIT 1
                     """, executionKey);
             if (!prior.isEmpty()) {
-                String factStatus = text(prior.get(0).get("fact_status"));
+                Map<String, Object> priorRow = prior.get(0);
+                assertStableIdentity(priorRow, plan, operation);
+                String factStatus = text(priorRow.get("fact_status"));
                 if (FACT_UNKNOWN.equals(factStatus) || FACT_COMPLETED.equals(factStatus)) {
                     throw new IllegalStateException("LANDING_OPERATION_RECONCILIATION_REQUIRED：operation="
                             + operation.operationId() + " fact=" + factStatus);
                 }
+                String priorLandingRunId = text(priorRow.get("landing_run_id"));
+                if (!landingRunId.equals(priorLandingRunId)
+                        && !priorLandingRunId.isBlank()
+                        && FACT_NONE.equals(factStatus)
+                        && STATUS_PENDING.equals(text(priorRow.get("status")))) {
+                    rebindProvenUnexecutedAttempt(template, landingRunId, plan, operation,
+                            executionKey, operationJson, priorLandingRunId);
+                }
                 continue;
             }
-            String operationJson = JSON.toJSONString(operation.raw());
             template.update("""
                             INSERT INTO ai_ops_change_package_landing_operation_run
                             (operation_run_id, landing_run_id, package_id, project_id, approved_version,
@@ -74,6 +86,65 @@ public class JdbcChangePackageLandingJournalAdapter implements ChangePackageLand
                     operation.operationHash(), executionKey, operation.adapterType(), operation.toolsetId(),
                     operation.toolName(), operation.resourceKey(), normalizeEffectType(operation.effectType()),
                     sha256(operationJson), operationJson, operationJson);
+        }
+    }
+
+    /**
+     * The journal has one canonical row per stable execution identity because that identity is
+     * also the idempotency key sent to the target. A retry is a new Landing attempt, not a new
+     * remote execution. Only a process-manager proof of {@code fact_status=NONE,status=PENDING}
+     * permits rotating the attempt-owned columns to the fresh LandingRun. UNKNOWN/COMPLETED rows
+     * stay immutable until reconciliation, so an uncertain or already-applied write can never be
+     * hidden by a retry. This keeps the operation facts and the UI projection attached to the
+     * attempt that actually ran while preserving the target's once-only execution identity.
+     */
+    private void rebindProvenUnexecutedAttempt(
+            JdbcTemplate template,
+            String landingRunId,
+            ChangePackageLandingPlan plan,
+            ChangePackageLandingOperation operation,
+            String executionKey,
+            String operationJson,
+            String priorLandingRunId) {
+        int rebound = template.update("""
+                UPDATE ai_ops_change_package_landing_operation_run
+                   SET operation_run_id=?, landing_run_id=?, status='PENDING', fact_status='NONE',
+                       dispatch_attempts=0, state_version=0, fencing_token=0, worker_id='',
+                       lease_expires_at=NULL, claimed_at=NULL, remote_request_id='',
+                       remote_result_id='', dispatched_at=NULL, acknowledged_at=NULL,
+                       verified_at=NULL, unknown_reason_code='', result_id='', output_hash='',
+                       reason_code='', precondition_result_json=NULL, execution_result_json=NULL,
+                       post_check_result_json=NULL, rollback_status='', rollback_result_json=NULL,
+                       rollback_at=NULL, result_json=?, started_at=CURRENT_TIMESTAMP,
+                       finished_at=NULL
+                 WHERE execution_key=? AND landing_run_id=?
+                   AND package_id=? AND project_id=? AND approved_version=?
+                   AND approved_package_hash=? AND operation_id=? AND operation_hash=?
+                   AND fact_status='NONE' AND status='PENDING'
+                """,
+                "lro-" + UUID.randomUUID(), landingRunId, operationJson,
+                executionKey, priorLandingRunId, plan.packageId(), plan.projectId(),
+                plan.approvedVersion(), plan.approvedPackageHash(), operation.operationId(),
+                operation.operationHash());
+        if (rebound != 1) {
+            throw new IllegalStateException("LANDING_OPERATION_REBIND_CONFLICT：operation="
+                    + operation.operationId());
+        }
+    }
+
+    private void assertStableIdentity(
+            Map<String, Object> prior,
+            ChangePackageLandingPlan plan,
+            ChangePackageLandingOperation operation) {
+        boolean same = plan.packageId().equals(text(prior.get("package_id")))
+                && plan.projectId().equals(text(prior.get("project_id")))
+                && plan.approvedVersion() == intValue(prior.get("approved_version"))
+                && plan.approvedPackageHash().equals(text(prior.get("approved_package_hash")))
+                && operation.operationId().equals(text(prior.get("operation_id")))
+                && operation.operationHash().equals(text(prior.get("operation_hash")));
+        if (!same) {
+            throw new IllegalStateException("LANDING_OPERATION_IDENTITY_CONFLICT：operation="
+                    + operation.operationId());
         }
     }
 
@@ -94,7 +165,9 @@ public class JdbcChangePackageLandingJournalAdapter implements ChangePackageLand
     @Override
     public List<LandingOperationFact> operationFacts(String landingRunId) {
         return requireTemplate().queryForList("""
-                        SELECT operation_id, status, fact_status, reason_code, result_id, output_hash
+                        SELECT landing_run_id, package_id, project_id, approved_version, approved_package_hash,
+                               operation_id, operation_hash, execution_key, operation_snapshot_json,
+                               status, fact_status, reason_code, result_id, output_hash
                         FROM ai_ops_change_package_landing_operation_run
                         WHERE landing_run_id=?
                         ORDER BY id ASC
@@ -126,8 +199,9 @@ public class JdbcChangePackageLandingJournalAdapter implements ChangePackageLand
     }
 
     private String executionKey(ChangePackageLandingPlan plan, ChangePackageLandingOperation operation) {
-        return sha256(plan.projectId() + "\n" + plan.packageId() + "\n" + plan.approvedVersion() + "\n"
-                + plan.approvedPackageHash() + "\n" + operation.operationId() + "\n" + operation.operationHash());
+        return cn.lgs.orbisops.domain.changepackage.service.ChangePackageCanonicalHasher.landingExecutionKey(
+                plan.projectId(), plan.packageId(), String.valueOf(plan.approvedVersion()), plan.approvedPackageHash(),
+                operation.operationId(), operation.operationHash());
     }
 
     private String normalizeEffectType(String value) {
@@ -153,5 +227,9 @@ public class JdbcChangePackageLandingJournalAdapter implements ChangePackageLand
 
     private String text(Object value) {
         return value == null ? "" : String.valueOf(value).trim();
+    }
+
+    private int intValue(Object value) {
+        return value instanceof Number number ? number.intValue() : Integer.parseInt(text(value));
     }
 }

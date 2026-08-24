@@ -14,6 +14,8 @@ import io.modelcontextprotocol.json.schema.jackson.JacksonJsonSchemaValidatorSup
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import reactor.netty.http.client.HttpClient;
 
 import java.net.http.HttpRequest;
 import java.time.Duration;
@@ -26,13 +28,23 @@ public class OpsMcpClientFactory {
     private final OpsMcpTransportSecurityPolicy securityPolicy;
     private final McpJsonMapper jsonMapper;
     private final JsonSchemaValidator jsonSchemaValidator;
+    private final java.util.function.ToIntFunction<cn.lgs.orbisops.domain.runtime.workflow.adapter.repository.IWorkflowToolCallBudgetRepository.Dispatch> dispatchBudget;
+    private final java.util.Map<McpSyncClient, java.lang.ref.WeakReference<OpsMcpSingleAttemptTransport>> transports =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
 
     public OpsMcpClientFactory(OpsSecretResolver secretResolver,
                                OpsMcpTransportSecurityPolicy securityPolicy) {
+        this(secretResolver, securityPolicy, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public OpsMcpClientFactory(OpsSecretResolver secretResolver, OpsMcpTransportSecurityPolicy securityPolicy,
+                              cn.lgs.orbisops.application.workflow.WorkflowToolCallBudgetApplicationService budget) {
         this.secretResolver = secretResolver;
         this.securityPolicy = securityPolicy;
         this.jsonMapper = new JacksonMcpJsonMapper(new ObjectMapper());
         this.jsonSchemaValidator = new JacksonJsonSchemaValidatorSupplier().get();
+        this.dispatchBudget = budget == null ? dispatch -> 0 : budget::reserve;
     }
 
     public McpSyncClient create(OpsMcpServerConfig config) {
@@ -53,15 +65,22 @@ public class OpsMcpClientFactory {
                     .requestBuilder(requestBuilder)
                     .jsonMapper(jsonMapper)
                     .build();
-            return McpClient.sync(sseTransport)
-                    .requestTimeout(Duration.ofSeconds(timeoutSeconds))
-                    .jsonSchemaValidator(jsonSchemaValidator)
-                    .build();
+            return singleAttempt(sseTransport);
         }
         if ("streamable-http".equals(transport)) {
             RemoteAddress address = normalizeStreamableHttpAddress(secretResolver.resolve(config.getUrl()));
             securityPolicy.assertRemoteAddressAllowed(config, address.baseUri());
             WebClient.Builder webClientBuilder = WebClient.builder()
+                    // Decode HTTP content encodings before the SDK's strict JSON-RPC parser.
+                    // Neither redirects nor connection resets may silently redispatch a write.
+                    .clientConnector(new ReactorClientHttpConnector(HttpClient.create()
+                            .compress(true).followRedirect(false).disableRetry(true)))
+                    .codecs(codecs -> codecs.defaultCodecs().maxInMemorySize(2 * 1024 * 1024))
+                    .filter((request, next) -> next.exchange(request).flatMap(response ->
+                            request.method() == org.springframework.http.HttpMethod.POST
+                                    && response.statusCode().isError() && response.statusCode().value() != 404
+                                    ? response.createException().flatMap(reactor.core.publisher.Mono::error)
+                                    : reactor.core.publisher.Mono.just(response)))
                     .baseUrl(address.baseUri())
                     .defaultHeaders(headers -> securityPolicy.safeHeaders(config, secretResolver.resolveMap(config.getHeaders()))
                             .forEach(headers::add));
@@ -70,10 +89,7 @@ public class OpsMcpClientFactory {
                     .jsonMapper(jsonMapper)
                     .openConnectionOnStartup(true)
                     .build();
-            return McpClient.sync(httpTransport)
-                    .requestTimeout(Duration.ofSeconds(timeoutSeconds))
-                    .jsonSchemaValidator(jsonSchemaValidator)
-                    .build();
+            return singleAttempt(httpTransport);
         }
         if (!"stdio".equals(transport)) {
             throw new IllegalArgumentException("当前节点 MCP 仅支持 stdio/sse/streamable-http，server=" + config.getName() + ", transport=" + config.getTransport());
@@ -92,28 +108,59 @@ public class OpsMcpClientFactory {
                 .args(args)
                 .env(securityPolicy.safeEnv(config, secretResolver.resolveMap(config.getEnv())))
                 .build();
-        return McpClient.sync(new StdioClientTransport(parameters, jsonMapper))
-                .requestTimeout(Duration.ofSeconds(timeoutSeconds))
-                .jsonSchemaValidator(jsonSchemaValidator)
-                .build();
+        return singleAttempt(new StdioClientTransport(parameters, jsonMapper));
+    }
+
+    private McpSyncClient singleAttempt(io.modelcontextprotocol.spec.McpClientTransport transport) {
+        OpsMcpSingleAttemptTransport bounded = new OpsMcpSingleAttemptTransport(transport, dispatchBudget);
+        McpSyncClient client = McpClient.sync(bounded).requestTimeout(Duration.ofSeconds(60))
+                .initializationTimeout(Duration.ofSeconds(15)).transportContextProvider(OpsMcpRequestScope::transportContext)
+                // Output validation is performed once at our full-envelope callback boundary.
+                .enableCallToolSchemaCaching(false).jsonSchemaValidator(jsonSchemaValidator).build();
+        transports.put(client, new java.lang.ref.WeakReference<>(bounded));
+        return client;
+    }
+
+    void onConnectionFailure(McpSyncClient client, Runnable invalidator) {
+        var reference = transports.get(client);
+        var transport = reference == null ? null : reference.get();
+        if (transport != null) transport.onBroken(invalidator);
     }
 
     public String cacheKey(OpsMcpServerConfig config) {
         if (config == null) {
             throw new IllegalArgumentException("MCP_CLIENT_CONFIG_REQUIRED");
         }
-        return String.join("|",
-                value(config.getName()),
-                value(config.getTransport()),
-                value(config.getCommand()),
-                value(config.getUrl()),
-                String.valueOf(config.getArgs()),
-                String.valueOf(secretResolver.redactMap(config.getEnv())),
-                String.valueOf(secretResolver.redactMap(config.getHeaders())),
-                String.valueOf(config.getToolCapabilities()),
-                String.valueOf(config.getAllowedTools()),
-                String.valueOf(config.getNotificationTools()),
-                String.valueOf(config.getBlockedTools()));
+        java.util.Map<String, Object> identity = new java.util.LinkedHashMap<>();
+        identity.put("projectId", value(config.getProjectId()));
+        identity.put("name", value(config.getName()));
+        identity.put("transport", value(config.getTransport()));
+        identity.put("command", secretResolver.resolve(config.getCommand()));
+        identity.put("url", secretResolver.resolve(config.getUrl()));
+        identity.put("args", safeArgs(config));
+        identity.put("env", secretResolver.resolveMap(config.getEnv()));
+        identity.put("headers", secretResolver.resolveMap(config.getHeaders()));
+        identity.put("timeoutSeconds", config.getTimeoutSeconds());
+        identity.put("toolCapabilities", config.getToolCapabilities());
+        identity.put("allowedTools", config.getAllowedTools());
+        identity.put("notificationTools", config.getNotificationTools());
+        identity.put("blockedTools", config.getBlockedTools());
+        // Different credentials must never collide after redaction. The cache key itself reveals no secret.
+        return "mcp-v2:" + cn.lgs.orbisops.domain.shared.service.CanonicalObjectHasher.sha256(identity);
+    }
+
+    /** Stable trusted access identity, independent of Run, phase and local tool selection. */
+    public String catalogIdentity(OpsMcpServerConfig config) {
+        var identity=new java.util.LinkedHashMap<String,Object>();
+        identity.put("project",value(config.getProjectId()));
+        identity.put("server",StringUtils.hasText(config.getMcpId())?config.getMcpId():config.getName());
+        identity.put("transport",securityPolicy.normalizeTransport(config.getTransport()));
+        identity.put("command",value(secretResolver.resolve(config.getCommand())));
+        identity.put("url",value(secretResolver.resolve(config.getUrl())));
+        identity.put("args",safeArgs(config));
+        identity.put("env",secretResolver.resolveMap(config.getEnv()));
+        identity.put("headers",secretResolver.resolveMap(config.getHeaders()));
+        return cn.lgs.orbisops.domain.shared.service.CanonicalObjectHasher.sha256(identity);
     }
 
     private List<String> safeArgs(OpsMcpServerConfig config) {

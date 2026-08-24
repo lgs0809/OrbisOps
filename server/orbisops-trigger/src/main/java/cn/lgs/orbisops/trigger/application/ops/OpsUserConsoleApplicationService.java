@@ -8,6 +8,7 @@ import cn.lgs.orbisops.application.project.AuthorizeProjectAccessUseCase;
 import cn.lgs.orbisops.application.project.ProjectCatalogEntry;
 import cn.lgs.orbisops.application.worksession.run.WorkSessionRunApplicationService;
 import cn.lgs.orbisops.domain.incident.model.IncidentStatus;
+import cn.lgs.orbisops.domain.analysis.service.AnalysisTaskPresentationPolicy;
 import cn.lgs.orbisops.domain.worksession.run.model.WorkSessionRunSnapshot;
 import cn.lgs.orbisops.domain.worksession.run.model.WorkSessionRunStatus;
 import cn.lgs.orbisops.trigger.application.security.AdminAuthService;
@@ -193,10 +194,8 @@ public class OpsUserConsoleApplicationService {
         item.put("owner", run.owner());
         item.put("agentId", run.agentId());
         item.put("status", run.status().name());
-        item.put("goal", text(firstNonNull(
-                run.requestPayload().get("query"),
-                run.requestPayload().get("goal"),
-                "Workflow requires human decision")));
+        item.put("goal", AnalysisTaskPresentationPolicy.publicGoal(
+                run.requestPayload(), "Workflow requires human decision"));
         item.put("updatedAt", run.updatedAt().toString());
         return Map.copyOf(item);
     }

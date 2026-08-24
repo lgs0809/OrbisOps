@@ -58,8 +58,13 @@ public final class TaskScheduleCatalogUseCase {
     }
 
     public boolean create(TaskScheduleCommand requested) {
+        return create(requested, null);
+    }
+
+    public boolean create(TaskScheduleCommand requested, String createdBy) {
+        String owner = requireText(createdBy, "TASK_SCHEDULE_CREATOR_REQUIRED");
         LocalDateTime now = LocalDateTime.now(clock);
-        TaskScheduleDefinition schedule = normalize(requireCommand(requested), null, now);
+        TaskScheduleDefinition schedule = normalize(requireCommand(requested), null, now, owner);
         boolean created = catalogPort.insert(schedule);
         if (created) {
             auditPort.created(schedule);
@@ -74,7 +79,7 @@ public final class TaskScheduleCatalogUseCase {
         }
         TaskScheduleDefinition before = requireSchedule(command.id());
         assertProject(before, command.projectId());
-        TaskScheduleDefinition after = normalize(command, before, LocalDateTime.now(clock));
+        TaskScheduleDefinition after = normalize(command, before, LocalDateTime.now(clock), before.createdBy());
         boolean updated = catalogPort.update(after);
         if (updated) {
             auditPort.updated(command.id(), before, after);
@@ -114,7 +119,7 @@ public final class TaskScheduleCatalogUseCase {
     private TaskScheduleDefinition normalize(
             TaskScheduleCommand command,
             TaskScheduleDefinition before,
-            LocalDateTime now) {
+            LocalDateTime now, String createdBy) {
         String taskName = requireText(command.taskName(), "任务名称不能为空");
         String cronExpression = requireText(command.cronExpression(), "Cron 表达式不能为空");
         String projectId = requireProjectId(command.projectId(), "业务系统 projectId 不能为空");
@@ -175,7 +180,7 @@ public final class TaskScheduleCatalogUseCase {
                 runtime,
                 command.status() == null ? before == null ? 1 : before.status() : command.status(),
                 before == null ? now : before.createTime(),
-                now);
+                now, createdBy);
     }
 
     private TaskScheduleDefinition requireSchedule(Long id) {

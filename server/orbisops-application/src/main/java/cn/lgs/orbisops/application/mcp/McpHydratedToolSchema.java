@@ -26,7 +26,18 @@ public record McpHydratedToolSchema(
         String description,
         String schemaSource,
         String schemaHash,
-        McpToolPolicyProjection policy) {
+        McpToolPolicyProjection policy,
+        Object outputSchema) {
+
+    public McpHydratedToolSchema(String projectId, String mcpId, String toolId, String toolName,
+            String remoteToolName, String resourceType, String transportType, int requestTimeout,
+            List<String> allowedActions, McpRiskLevel riskLevel, boolean readOnly, boolean metadataComplete,
+            Map<String, Object> permissionPolicy, boolean schemaHydrated, Object inputSchema,
+            String description, String schemaSource, String schemaHash, McpToolPolicyProjection policy) {
+        this(projectId, mcpId, toolId, toolName, remoteToolName, resourceType, transportType, requestTimeout,
+                allowedActions, riskLevel, readOnly, metadataComplete, permissionPolicy, schemaHydrated,
+                inputSchema, description, schemaSource, schemaHash, policy, null);
+    }
 
     public McpHydratedToolSchema {
         projectId = required(projectId, "MCP_PROJECT_ID_REQUIRED");
@@ -60,7 +71,7 @@ public record McpHydratedToolSchema(
                 resourceType, transportType, requestTimeout, allowedActions,
                 riskLevel, readOnly, metadataComplete, permissionPolicy,
                 schemaHydrated, inputSchema, description, schemaSource, schemaHash,
-                projection);
+                projection, outputSchema);
     }
 
     public Map<String, Object> view() {
@@ -83,6 +94,7 @@ public record McpHydratedToolSchema(
             result.put("schema", inputSchema);
             result.put("description", description);
             result.put("schemaSource", schemaSource);
+            if (outputSchema != null) result.put("outputSchema", outputSchema);
         }
         result.put("schemaHash", schemaHash);
         result.putAll(policy.view());

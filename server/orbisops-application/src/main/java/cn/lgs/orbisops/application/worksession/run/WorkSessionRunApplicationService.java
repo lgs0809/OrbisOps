@@ -224,6 +224,9 @@ public final class WorkSessionRunApplicationService {
 
     public WorkSessionRunSnapshot resumeApproval(String runId, String projectId, String actor) {
         WorkSessionRunSnapshot current = get(runId, projectId);
+        if (current.cancelRequested()) {
+            throw new SecurityException("WORK_SESSION_APPROVAL_CANCEL_REQUESTED");
+        }
         if (current.status() != WorkSessionRunStatus.WAITING_APPROVAL) {
             throw new IllegalStateException(
                     "WORK_SESSION_NOT_WAITING_APPROVAL：当前状态=" + current.status().name());

@@ -23,6 +23,22 @@ class MemoryCompressionPolicyTest {
     private final MemoryCompressionPolicy policy = new MemoryCompressionPolicy(new MemoryContentHashPolicy());
 
     @Test
+    void repeatedCompressionKeepsEarlyConstraintAndUnfinishedWork() {
+        var first = policy.ruleSummary(List.of(
+                message("user", "只读排查，禁止重启订单服务", "t1"),
+                message("assistant", "待确认连接池等待与慢 SQL 的关联", "t2")));
+        var inherited = new ColdMemoryMessageSnapshot("session-1", "user-1", "system",
+                first.content(), "t3", Map.of("memory_type", "summary"));
+        var second = policy.ruleSummary(List.of(inherited,
+                message("user", "继续查询日志", "t4"),
+                message("assistant", "日志已取得", "t5")));
+
+        assertTrue(second.content().contains("禁止重启订单服务"));
+        assertTrue(second.content().contains("待确认连接池等待与慢 SQL 的关联"));
+        assertTrue(second.content().contains("日志已取得"));
+    }
+
+    @Test
     void planRequiresHistoricalThresholdAndKeepsConfiguredRecentMessages() {
         List<ColdMemoryMessageSnapshot> messages = messages(10);
 

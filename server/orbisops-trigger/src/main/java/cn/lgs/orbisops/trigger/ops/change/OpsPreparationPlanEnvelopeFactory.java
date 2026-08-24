@@ -123,7 +123,10 @@ final class OpsPreparationPlanEnvelopeFactory {
     private Map<String, Object> preferredPlan(Input input,
                                               List<Map<String, Object>> candidates) {
         Object provided = input.request().get("preferredPlan");
-        if (provided instanceof Map<?, ?> map) return copy(map);
+        if (provided instanceof Map<?, ?> map) {
+            return new cn.lgs.orbisops.domain.changepackage.service.ChangePackageExecutablePlanPolicy()
+                    .canonicalPreferredPlan(copy(map), input.mcpSteps());
+        }
         Map<String, Object> selected = candidates.isEmpty()
                 ? Map.of()
                 : candidates.get(candidates.size() - 1);

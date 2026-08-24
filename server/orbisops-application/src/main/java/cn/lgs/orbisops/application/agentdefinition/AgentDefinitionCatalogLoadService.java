@@ -59,7 +59,7 @@ public final class AgentDefinitionCatalogLoadService<D> {
                 skippedStoredYamlCurrentAgentIds.add(agentId);
                 continue;
             }
-            mutationService.registerLoaded(definition, true);
+            mutationService.registerStoredSnapshot(definition, true);
         }
 
         for (D definition : safe(sourcePort.loadStoredVersionDefinitions())) {
@@ -73,7 +73,7 @@ public final class AgentDefinitionCatalogLoadService<D> {
                 skippedStoredYamlVersionKeys.add(agentId + "@" + version);
                 continue;
             }
-            mutationService.registerLoaded(definition, false);
+            mutationService.registerStoredSnapshot(definition, false);
         }
 
         D fallbackDefinition = fallbackFactory.create();

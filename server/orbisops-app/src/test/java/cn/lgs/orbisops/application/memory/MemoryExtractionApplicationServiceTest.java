@@ -173,6 +173,18 @@ class MemoryExtractionApplicationServiceTest {
         assertEquals(0, calls.get());
     }
 
+    @Test void ruleFallbackRemainsUsefulButRecordsTheEnabledModelSupplement() {
+        var calls=new AtomicInteger();
+        var service=service((message,limit)->{calls.incrementAndGet();throw new IllegalStateException("temporary network failure");},null);
+        var result=service.extractDurably(new MemoryExtractionCommand(message("记住：以后回答请使用中文。"),6,true,4000));
+        assertTrue(result.modelPending());assertEquals("RULE_FALLBACK_MODEL_PENDING",result.kind());
+        assertFalse(result.candidates().isEmpty());assertEquals(1,calls.get());
+        var disabled=service.extractDurably(new MemoryExtractionCommand(message("记住：以后回答请使用中文。"),6,false,4000));
+        assertFalse(disabled.modelPending());assertEquals(1,calls.get(),"Disabled models must remain disabled");
+        var validEmpty=service((message,limit)->List.of(),null).extractDurably(new MemoryExtractionCommand(message("普通陈述"),6,true,4000));
+        assertFalse(validEmpty.modelPending(),"A valid empty result is not a retryable transport failure");
+    }
+
     private MemoryExtractionApplicationService service(MemoryModelExtractionPort modelPort,
                                                        MemoryExtractionFailurePort failurePort) {
         return new MemoryExtractionApplicationService(

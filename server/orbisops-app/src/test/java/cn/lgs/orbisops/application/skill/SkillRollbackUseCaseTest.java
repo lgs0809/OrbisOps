@@ -30,6 +30,84 @@ import static org.mockito.Mockito.when;
 class SkillRollbackUseCaseTest {
 
     @Test
+    void newMethodWithoutBaselineIsActuallyQuarantinedAndPreservesVersion() {
+        var catalog = mock(ISkillCatalogRepository.class);
+        var packages = mock(ISkillPackageRepository.class);
+        when(catalog.available()).thenReturn(true); when(packages.available()).thenReturn(true);
+        when(catalog.find("PROJECT", "project-1", "slow-sql", true)).thenReturn(Optional.of(projectCurrent("ENABLED", "AUTO")));
+        when(catalog.compareAndSetGovernance(any())).thenReturn(true);
+        var result = useCase(catalog, packages).recoverRelease(release(0, "", 3));
+        assertEquals(false, result.restored()); assertEquals(3, result.version());
+        var update = ArgumentCaptor.forClass(cn.lgs.orbisops.domain.skill.model.SkillGovernanceUpdate.class);
+        verify(catalog).compareAndSetGovernance(update.capture());
+        assertEquals(cn.lgs.orbisops.domain.skill.model.SkillExecutionMode.QUARANTINED, update.getValue().nextState().executionMode());
+        verify(catalog, never()).compareAndSetCurrent(any());
+        verify(packages, never()).appendVersion(any(), any());
+    }
+
+    @Test
+    void unknownBaselineSafetyIsNotTreatedAsPermissionToRestore() {
+        var catalog = mock(ISkillCatalogRepository.class);
+        var packages = mock(ISkillPackageRepository.class);
+        when(catalog.available()).thenReturn(true); when(packages.available()).thenReturn(true);
+        when(catalog.find("PROJECT", "project-1", "slow-sql", true)).thenReturn(Optional.of(projectCurrent("ENABLED", "AUTO")));
+        var key = new SkillPackageKey("PROJECT", "project-1", "slow-sql", 2);
+        when(packages.findVersion(key)).thenReturn(Optional.of(copyWithKey(sourceVersion(), key)));
+        when(catalog.compareAndSetGovernance(any())).thenReturn(true);
+        assertEquals(false, useCase(catalog, packages).recoverRelease(release(2, "hash-2", 3)).restored());
+        verify(catalog, never()).compareAndSetCurrent(any());
+    }
+
+    @Test
+    void verifiedCompatibleBaselineRestoresContentAsANewImmutableVersion() {
+        var catalog = mock(ISkillCatalogRepository.class);
+        var packages = mock(ISkillPackageRepository.class);
+        when(catalog.available()).thenReturn(true); when(packages.available()).thenReturn(true);
+        when(catalog.find("PROJECT", "project-1", "slow-sql", true)).thenReturn(Optional.of(projectCurrent("ENABLED", "AUTO")));
+        var key = new SkillPackageKey("PROJECT", "project-1", "slow-sql", 2);
+        when(packages.findVersion(key)).thenReturn(Optional.of(copyWithKey(sourceVersion(), key)));
+        when(packages.findArtifacts(key)).thenReturn(sourceArtifacts());
+        when(catalog.compareAndSetCurrent(any())).thenReturn(true);
+        var useCase = new SkillRollbackUseCase(catalog, packages, new ImmediateTransactionPort(), SkillPackageManifest.Limits.defaults(),
+                (release, baseline) -> true);
+        var restored = useCase.recoverRelease(release(2, "hash-2", 3));
+        assertEquals(true, restored.restored()); assertEquals(4, restored.version());
+        verify(packages).appendVersion(any(), any());
+        verify(catalog, never()).compareAndSetGovernance(any());
+    }
+
+    @Test
+    void disabledMethodIsNotReportedAsRestoredEvenWithACompatibleHistoricalVersion() {
+        var catalog = mock(ISkillCatalogRepository.class);
+        var packages = mock(ISkillPackageRepository.class);
+        when(catalog.available()).thenReturn(true); when(packages.available()).thenReturn(true);
+        when(catalog.find("PROJECT", "project-1", "slow-sql", true)).thenReturn(Optional.of(projectCurrent("DISABLED", "AUTO")));
+        var key = new SkillPackageKey("PROJECT", "project-1", "slow-sql", 2);
+        when(packages.findVersion(key)).thenReturn(Optional.of(copyWithKey(sourceVersion(), key)));
+        when(catalog.compareAndSetGovernance(any())).thenReturn(true);
+        var useCase = new SkillRollbackUseCase(catalog, packages, new ImmediateTransactionPort(), SkillPackageManifest.Limits.defaults(),
+                (release, baseline) -> true);
+        assertEquals(false, useCase.recoverRelease(release(2, "hash-2", 3)).restored());
+        verify(catalog, never()).compareAndSetCurrent(any());
+        verify(packages, never()).appendVersion(any(), any());
+    }
+
+    @Test
+    void lateReleaseRecoveryCannotOverwriteOrDisableNewerUserVersion() {
+        var catalog = mock(ISkillCatalogRepository.class);
+        var packages = mock(ISkillPackageRepository.class);
+        when(catalog.available()).thenReturn(true); when(packages.available()).thenReturn(true);
+        when(catalog.find("PROJECT", "project-1", "slow-sql", true)).thenReturn(Optional.of(projectCurrent("ENABLED", "AUTO")));
+        assertThrows(IllegalStateException.class, () -> useCase(catalog, packages).recoverRelease(release(0, "", 2)));
+        verify(catalog, never()).compareAndSetCurrent(any()); verify(catalog, never()).compareAndSetGovernance(any());
+    }
+
+    private cn.lgs.orbisops.domain.skill.model.SkillReleaseSnapshot release(int baseline, String baseHash, int version) {
+        return new cn.lgs.orbisops.domain.skill.model.SkillReleaseSnapshot("release", "candidate", "project-1", "agent", "slow-sql",
+                cn.lgs.orbisops.domain.skill.model.SkillReleaseStatus.ROLLING_BACK, 10, baseline, baseHash, "", version, "hash-" + version, Map.of());
+    }
+
+    @Test
     void rollbackAdvancesCurrentPointerAndAppendsImmutableVersion() {
         ISkillCatalogRepository catalogRepository = mock(ISkillCatalogRepository.class);
         ISkillPackageRepository packageRepository = mock(ISkillPackageRepository.class);

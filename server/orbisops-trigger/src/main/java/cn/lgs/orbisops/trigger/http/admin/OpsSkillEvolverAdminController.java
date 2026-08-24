@@ -2,7 +2,11 @@ package cn.lgs.orbisops.trigger.http.admin;
 
 import cn.lgs.orbisops.api.response.Response;
 import cn.lgs.orbisops.trigger.ops.OpsSkillEvolutionService;
+import cn.lgs.orbisops.application.project.AuthorizeProjectAccessUseCase;
+import cn.lgs.orbisops.trigger.application.security.AdminAuthService;
+import cn.lgs.orbisops.trigger.http.admin.security.AdminWebSecurityConfig;
 import cn.lgs.orbisops.types.enums.ResponseCode;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,16 +23,21 @@ import java.util.Map;
 public class OpsSkillEvolverAdminController {
 
     private final OpsSkillEvolutionService skillEvolutionService;
+    private final AuthorizeProjectAccessUseCase access;
 
-    public OpsSkillEvolverAdminController(OpsSkillEvolutionService skillEvolutionService) {
+    public OpsSkillEvolverAdminController(OpsSkillEvolutionService skillEvolutionService, AuthorizeProjectAccessUseCase access) {
         this.skillEvolutionService = skillEvolutionService;
+        this.access = access;
     }
 
     @GetMapping("/jobs")
     public Response<List<Map<String, Object>>> listJobs(
+            @RequestParam(value = "projectId", required = false) String projectId,
             @RequestParam(value = "status", required = false) String status,
-            @RequestParam(value = "limit", required = false, defaultValue = "100") Integer limit) {
-        return success(skillEvolutionService.listJobs(status, limit == null ? 100 : limit));
+            @RequestParam(value = "limit", required = false, defaultValue = "100") Integer limit,
+            HttpServletRequest request) {
+        authorizeQuery(projectId, request);
+        return success(skillEvolutionService.listJobs(projectId, status, limit == null ? 100 : limit));
     }
 
     @GetMapping("/jobs/{jobId}")
@@ -54,10 +63,24 @@ public class OpsSkillEvolverAdminController {
 
     @GetMapping("/patches")
     public Response<List<Map<String, Object>>> listPatches(
+            @RequestParam(value = "projectId", required = false) String projectId,
             @RequestParam(value = "jobId", required = false) String jobId,
             @RequestParam(value = "decision", required = false) String decision,
-            @RequestParam(value = "limit", required = false, defaultValue = "100") Integer limit) {
-        return success(skillEvolutionService.listPatches(jobId, decision, limit == null ? 100 : limit));
+            @RequestParam(value = "limit", required = false, defaultValue = "100") Integer limit,
+            HttpServletRequest request) {
+        authorizeQuery(projectId, request);
+        return success(skillEvolutionService.listPatches(projectId, jobId, decision, limit == null ? 100 : limit));
+    }
+
+    private void authorizeQuery(String projectId, HttpServletRequest request) {
+        if (!(request.getAttribute(AdminWebSecurityConfig.AUTH_PRINCIPAL_ATTRIBUTE)
+                instanceof AdminAuthService.AuthPrincipal principal)
+                || !AdminAuthService.SCOPE_ADMIN.equals(principal.scope())) {
+            throw new SecurityException("SKILL_EVOLVER_ADMIN_REQUIRED");
+        }
+        if (projectId != null && !projectId.isBlank()) {
+            access.requireAccess(projectId.trim(), principal.username(), principal.userId(), true);
+        }
     }
 
     private <T> Response<T> success(T data) {

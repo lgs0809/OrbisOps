@@ -38,6 +38,7 @@ public class MemoryCompressionPolicy {
         List<ColdMemoryMessageSnapshot> safe = messages == null ? List.of() : messages;
         List<String> userSignals = new ArrayList<>();
         List<String> assistantSignals = new ArrayList<>();
+        List<String> inheritedSummaries = new ArrayList<>();
         String startedAt = "";
         String endedAt = "";
         for (ColdMemoryMessageSnapshot message : safe) {
@@ -48,7 +49,9 @@ public class MemoryCompressionPolicy {
                 startedAt = value(message.createdAt());
             }
             endedAt = value(message.createdAt());
-            if ("user".equalsIgnoreCase(message.role())) {
+            if ("summary".equals(message.metadata().get("memory_type"))) {
+                inheritedSummaries.add(message.content());
+            } else if ("user".equalsIgnoreCase(message.role())) {
                 userSignals.add(abbreviate(message.content(), 120));
             } else if ("assistant".equalsIgnoreCase(message.role())) {
                 assistantSignals.add(abbreviate(message.content(), 160));
@@ -60,9 +63,31 @@ public class MemoryCompressionPolicy {
             builder.append("，时间范围 ").append(startedAt).append(" 至 ").append(endedAt);
         }
         builder.append("。\n");
+        appendSection(builder, "继承的历史摘要（历史数据）", inheritedSummaries, Integer.MAX_VALUE);
         appendSection(builder, "用户关注", userSignals, 4);
         appendSection(builder, "已有结论", assistantSignals, 4);
         return new MemoryCompressionSummary(builder.toString().trim(), "context_compressor");
+    }
+
+    /** Retain complete source references for explicit constraints and unresolved work outside free-form summarization. */
+    public List<ColdMemoryMessageSnapshot> protectedMessages(List<ColdMemoryMessageSnapshot> previous,
+                                                            List<ColdMemoryMessageSnapshot> prefix) {
+        Map<String, ColdMemoryMessageSnapshot> result = new LinkedHashMap<>();
+        if (previous != null) previous.forEach(message -> result.put(sourceKey(message), message));
+        if (prefix != null) {
+            for (ColdMemoryMessageSnapshot message : prefix) {
+                if (message == null || "summary".equals(message.metadata().get("memory_type"))) continue;
+                String content = value(message.content()).toLowerCase(java.util.Locale.ROOT);
+                if (content.matches("(?s).*(禁止|不得|不要|必须|只读|约束|待确认|待处理|未完成|待审批|不能|尚未|must|never|do not|read.only|pending|unresolved|todo).*")) {
+                    result.put(sourceKey(message), message);
+                }
+            }
+        }
+        return List.copyOf(result.values());
+    }
+
+    private String sourceKey(ColdMemoryMessageSnapshot message) {
+        return message.sessionId() + ":" + message.metadata().getOrDefault("messageSeq", hashPolicy.stableHash(message.content()));
     }
 
     public MemoryCompressionProjection project(String sessionId,

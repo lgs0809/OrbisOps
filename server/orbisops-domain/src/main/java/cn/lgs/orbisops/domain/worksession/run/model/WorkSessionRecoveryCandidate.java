@@ -8,7 +8,8 @@ public record WorkSessionRecoveryCandidate(
         int toolStartedCount,
         int toolCompletedCount,
         int toolResultCount,
-        int unsafeIncompleteToolCount) {
+        int unsafeIncompleteToolCount,
+        boolean cancelRequested) {
 
     public WorkSessionRecoveryCandidate {
         runId = required(runId, "WORK_SESSION_RUN_ID_REQUIRED");
@@ -18,6 +19,14 @@ public record WorkSessionRecoveryCandidate(
         toolCompletedCount = Math.max(0, toolCompletedCount);
         toolResultCount = Math.max(0, toolResultCount);
         unsafeIncompleteToolCount = Math.max(0, unsafeIncompleteToolCount);
+    }
+
+    public WorkSessionRecoveryCandidate(
+            String runId, String projectId, String attemptId, long stateVersion,
+            int toolStartedCount, int toolCompletedCount, int toolResultCount,
+            int unsafeIncompleteToolCount) {
+        this(runId, projectId, attemptId, stateVersion, toolStartedCount,
+                toolCompletedCount, toolResultCount, unsafeIncompleteToolCount, false);
     }
 
     /** Backward-compatible constructor for older callers/tests that only knew aggregate tool facts. */

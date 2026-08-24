@@ -88,6 +88,27 @@ class ChangePackageLandingOperationSafetyPolicyTest {
         assertTrue(policy.targetWrite(operation));
     }
 
+    @Test
+    void supplementalChecksMustBeBoundedAndCannotHideAnEmptyOrNestedContract() {
+        var operation = writeOperation();
+        operation.put("rollbackPlan", Map.of("summary", "stop"));
+        operation.put("rollbackPrecondition", Map.of("version", 2));
+        operation.put("manualFallback", Map.of("owner", "ops"));
+        var check = Map.of("expectedValues", Map.of("version", 2));
+        operation.put("postCheck", Map.of("expectedValues", Map.of("healthy", true),
+                "additionalChecks", java.util.List.of(check)));
+        assertTrue(policy.verifyTargetWriteSafety(operation).allowedOperation());
+        operation.put("additionalChecks", java.util.List.of(check));
+        assertEquals("POST_CHECK_REQUIRED", policy.verifyTargetWriteSafety(operation).reasonCode());
+        operation.remove("additionalChecks");
+        for (Object invalid : java.util.List.of("not a list", java.util.List.of(Map.of()),
+                java.util.List.of(Map.of("additionalChecks", java.util.List.of(check))),
+                java.util.Collections.nCopies(16, check))) {
+            operation.put("postCheck", Map.of("expectedValues", Map.of("healthy", true), "additionalChecks", invalid));
+            assertEquals("POST_CHECK_REQUIRED", policy.verifyTargetWriteSafety(operation).reasonCode());
+        }
+    }
+
     private Map<String, Object> baseOperation() {
         Map<String, Object> operation = new LinkedHashMap<>();
         operation.put("operationId", "op-1");

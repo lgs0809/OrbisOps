@@ -55,11 +55,11 @@ class SubAgentToolBoundaryPolicyTest {
                 "general",
                 1,
                 List.of(),
-                List.of("prometheus_query", "PrepareChangePackage", "code_read", "unsafe_admin"));
+                List.of("prometheus_query", "PrepareChangePackage", "QueryChangePackageStatus", "code_read", "change_package_approve", "unsafe_admin"));
 
         assertEquals("MAIN_ASSISTANT", decision.role());
         assertEquals(
-                List.of("prometheus_query", "PrepareChangePackage", "code_read"),
+                List.of("prometheus_query", "PrepareChangePackage", "QueryChangePackageStatus", "code_read"),
                 decision.permittedToolNames());
     }
 

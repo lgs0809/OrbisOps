@@ -29,7 +29,36 @@ public record McpExecutionConfig(
         boolean landingApproved,
         String changePackageId,
         String approvedPackageHash,
+        int approvedPackageVersion,
+        java.time.Instant authorityDeadline) {
+
+    public McpExecutionConfig(
+        String name,
+        String description,
+        String projectId,
+        String runId,
+        String agentId,
+        String nodeId,
+        String mcpId,
+        String toolId,
+        String operationId,
+        String transport,
+        String command,
+        String url,
+        int timeoutSeconds,
+        List<String> args,
+        Map<String, String> env,
+        Map<String, String> headers,
+        Map<String, String> toolCapabilities,
+        List<String> allowedTools,
+        List<String> notificationTools,
+        List<String> blockedTools,
+        boolean landingApproved,
+        String changePackageId,
+        String approvedPackageHash,
         int approvedPackageVersion) {
+        this(name, description, projectId, runId, agentId, nodeId, mcpId, toolId, operationId, transport, command, url, timeoutSeconds, args, env, headers, toolCapabilities, allowedTools, notificationTools, blockedTools, landingApproved, changePackageId, approvedPackageHash, approvedPackageVersion, null);
+    }
 
     public McpExecutionConfig {
         name = value(name);

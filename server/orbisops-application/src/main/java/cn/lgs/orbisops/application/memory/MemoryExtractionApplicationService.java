@@ -40,14 +40,19 @@ public class MemoryExtractionApplicationService {
                 createdAtSupplier);
     }
 
-    public List<MemoryItemCandidate> extract(MemoryExtractionCommand command) {
+    public List<MemoryItemCandidate> extract(MemoryExtractionCommand command) { return extractDurably(command).candidates(); }
+
+    public record Result(List<MemoryItemCandidate> candidates, boolean modelPending, String kind) { }
+
+    public Result extractDurably(MemoryExtractionCommand command) {
         if (command == null || command.message() == null || !hasText(command.message().content())) {
-            return List.of();
+            return new Result(List.of(), false, "NO_FACTS");
         }
         ColdMemoryMessageSnapshot message = command.message();
         String sourceHash = hashPolicy.stableHash(value(message.role()) + ":" + message.content());
         String createdAt = value(createdAtSupplier.get());
         List<MemoryItemCandidate> candidates = new ArrayList<>();
+        boolean pending = command.modelEnabled() && modelExtractionPort == null;
         if (command.modelEnabled() && modelExtractionPort != null) {
             try {
                 addDrafts(candidates,
@@ -57,10 +62,12 @@ public class MemoryExtractionApplicationService {
                         createdAt);
             } catch (RuntimeException error) {
                 observeFailure("model-extraction", error);
+                pending = true;
             }
         }
         addDrafts(candidates, message, extractionPolicy.ruleDrafts(message), sourceHash, createdAt);
-        return extractionPolicy.distinctAndLimit(candidates, command.maxItems());
+        return new Result(extractionPolicy.distinctAndLimit(candidates, command.maxItems()), pending,
+                pending ? "RULE_FALLBACK_MODEL_PENDING" : command.modelEnabled() ? "MODEL_AND_RULES" : "RULES_ONLY");
     }
 
     private void addDrafts(List<MemoryItemCandidate> candidates,

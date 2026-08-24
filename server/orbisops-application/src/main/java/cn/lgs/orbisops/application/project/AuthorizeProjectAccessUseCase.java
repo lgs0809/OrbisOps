@@ -7,7 +7,7 @@ import cn.lgs.orbisops.domain.project.service.ProjectAccessPolicy;
 import java.util.List;
 import java.util.Set;
 
-public final class AuthorizeProjectAccessUseCase {
+public final class AuthorizeProjectAccessUseCase implements BackgroundProjectAccessPort {
 
     private final ProjectAccessPort port;
     private final ProjectMemberApplicationService memberService;

@@ -21,6 +21,8 @@ public class OpsRuntimeResourceBundle {
     private OpsAgentDefinition definition;
     private Integer agentVersion;
     private ChatModel chatModel;
+    private java.util.function.BiFunction<OpsMcpServerConfig,String,Map<String,Object>> mcpDefinitionReader;
+    private java.util.function.Function<OpsMcpServerConfig,List<Map<String,Object>>> mcpDefinitionsReader;
     private String projectId;
     private Boolean ragEnabled;
     private String knowledgeBaseId;

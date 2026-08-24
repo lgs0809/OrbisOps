@@ -11,4 +11,12 @@ public final class BoundaryNodeCompiler extends AbstractAgentWorkflowNodeCompile
                 AgentWorkflowNodeType.START,
                 AgentWorkflowNodeType.END));
     }
+
+    @Override
+    protected void validate(cn.lgs.orbisops.domain.agentdefinition.model.AgentWorkflowNodeDefinition definition,
+                            AgentWorkflowCompilationContext context) {
+        if (definition.nodeType() == AgentWorkflowNodeType.START) {
+            new cn.lgs.orbisops.domain.runtime.workflow.service.WorkflowToolCallBudgetPolicy().configuredLimit(definition.config());
+        }
+    }
 }

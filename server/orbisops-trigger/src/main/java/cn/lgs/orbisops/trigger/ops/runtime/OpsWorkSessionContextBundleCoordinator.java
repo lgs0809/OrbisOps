@@ -61,6 +61,7 @@ final class OpsWorkSessionContextBundleCoordinator {
             }
             request.getMetadata().put("_runtimeContextBundle", bundle);
             BUNDLE_FIELDS.forEach(key -> request.getMetadata().put(key, bundle.get(key)));
+            request.setTrustedSkillFrame(OpsRuntimeSkillFrame.capture(request));
             record(events, eventSink, OpsRuntimeEvent.builder()
                     .eventType(pinnedResume
                             ? "RUNTIME_CONTEXT_BUNDLE_REUSED"

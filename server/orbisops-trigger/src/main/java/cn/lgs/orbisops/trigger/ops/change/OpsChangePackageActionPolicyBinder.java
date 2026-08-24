@@ -26,13 +26,22 @@ public class OpsChangePackageActionPolicyBinder {
 
     private final McpPolicyQueryService policies;
     private final ProjectMcpRuntimeDescriptorApplicationService descriptors;
+    private final org.springframework.beans.factory.ObjectProvider<OpsPreparePostCheckValidator> postChecks;
 
     public OpsChangePackageActionPolicyBinder(McpPolicyQueryService policies,
                                               ProjectMcpRuntimeDescriptorApplicationService descriptors) {
+        this(policies, descriptors, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public OpsChangePackageActionPolicyBinder(McpPolicyQueryService policies,
+                                              ProjectMcpRuntimeDescriptorApplicationService descriptors,
+                                              org.springframework.beans.factory.ObjectProvider<OpsPreparePostCheckValidator> postChecks) {
         if (policies == null) throw new IllegalArgumentException("MCP_POLICY_QUERY_SERVICE_REQUIRED");
         if (descriptors == null) throw new IllegalArgumentException("PROJECT_MCP_RUNTIME_DESCRIPTOR_SERVICE_REQUIRED");
         this.policies = policies;
         this.descriptors = descriptors;
+        this.postChecks = postChecks;
     }
 
     public List<Map<String, Object>> bind(String projectId, Object rawActions) {
@@ -44,6 +53,7 @@ public class OpsChangePackageActionPolicyBinder {
         for (Object item : list(rawActions)) {
             if (!(item instanceof Map<?, ?> raw)) continue;
             Map<String, Object> action = copy(raw);
+            normalizePostChecks(action);
             String mcpId = text(action.get("mcpId"));
             String toolName = firstText(action, "toolName", "remoteToolName", "name");
             McpToolPolicy policy = byIdentity.get(key(mcpId, toolName));
@@ -65,7 +75,7 @@ public class OpsChangePackageActionPolicyBinder {
                 action.put("toolName", policy.toolName());
                 action.put("remoteToolName", policy.toolName());
                 action.put("adapterType", "MCP");
-                action.put("targetEnvironment", authoritativeTargetEnvironment(projectId, policy.mcpId()));
+                action.put("targetEnvironment", reviewedResourceBinding(projectId, policy, "targetEnvironment"));
                 action.put("schemaHash", policy.schemaHash());
                 action.put("policyId", policy.policyId());
                 action.put("policyStatus", policy.status().name());
@@ -82,18 +92,75 @@ public class OpsChangePackageActionPolicyBinder {
                 action.put("requiresApproval", policy.requiresHumanApproval());
                 action.put("requiresDryRun", policy.requiresDryRun());
                 action.put("requiresRollbackPlan", policy.requiresRollbackPlan());
-                action.put("resourceScope", authoritativeResourceScope(projectId, policy.mcpId()));
+                action.put("resourceScope", reviewedResourceBinding(projectId, policy, "resourceScope"));
                 action.put("arguments", authoritativeArguments(projectId, policy, action.get("arguments")));
                 action.put("policyBound", true);
+                if ("POST_APPROVAL_VALIDATION".equals(text(action.get("purpose")))) {
+                    throw new IllegalArgumentException("CHANGE_PACKAGE_POST_CHECK_MUST_BE_ATTACHED: "
+                            + "将审批后验证放入对应写操作的 postCheck.additionalChecks，并提供明确 expectedValues；普通读取不代表验收通过");
+                }
+                if (action.get("postCheck") instanceof Map<?, ?> check) {
+                    validatePostChecks(projectId, action, copy(check), byIdentity);
+                }
             }
             result.add(Collections.unmodifiableMap(new LinkedHashMap<>(action)));
         }
         return List.copyOf(result);
     }
 
+    private void validatePostChecks(String projectId, Map<String, Object> action,
+                                    Map<String, Object> check, Map<String, McpToolPolicy> policiesByIdentity) {
+        var validator = postChecks == null ? null : postChecks.getIfAvailable();
+        if (validator == null) throw new IllegalStateException("CHANGE_PACKAGE_POST_CHECK_VALIDATOR_REQUIRED");
+        List<Map<String, Object>> checks = new ArrayList<>();
+        checks.add(check);
+        if (check.containsKey("additionalChecks")) {
+            if (!(check.get("additionalChecks") instanceof List<?> additional) || additional.size() > 15)
+                throw new IllegalArgumentException("CHANGE_PACKAGE_ADDITIONAL_CHECKS_INVALID_OR_LIMIT_EXCEEDED");
+            for (var item : additional) {
+                if (!(item instanceof Map<?, ?> raw) || raw.containsKey("additionalChecks"))
+                    throw new IllegalArgumentException("CHANGE_PACKAGE_ADDITIONAL_CHECKS_INVALID_OR_LIMIT_EXCEEDED");
+                checks.add(copy(raw));
+            }
+        }
+        for (var item : checks) {
+            String toolset = text(item.get("toolsetId"));
+            String mcp = toolset.startsWith("mcp.") ? toolset.substring(4) : "";
+            validator.validate(projectId, item, policiesByIdentity.get(key(mcp, text(item.get("toolName")))),
+                    text(action.get("resourceScope")));
+        }
+    }
+
+    /** Accept the unambiguous sibling spelling before freezing hashes; never drop a check. */
+    private void normalizePostChecks(Map<String, Object> action) {
+        if (!action.containsKey("additionalChecks")) return;
+        Object value = action.remove("additionalChecks");
+        Object primary = action.get("postCheck");
+        if (!(primary instanceof Map<?, ?> raw) || !(value instanceof List<?> siblings)) {
+            throw new IllegalArgumentException("CHANGE_PACKAGE_ADDITIONAL_CHECKS_REQUIRE_POST_CHECK_AND_LIST");
+        }
+        Map<String, Object> postCheck = copy(raw);
+        List<Object> checks = new ArrayList<>();
+        if (postCheck.containsKey("additionalChecks")) {
+            if (!(postCheck.get("additionalChecks") instanceof List<?> nested)) {
+                throw new IllegalArgumentException("CHANGE_PACKAGE_ADDITIONAL_CHECKS_MUST_BE_LIST");
+            }
+            checks.addAll(nested);
+        }
+        checks.addAll(siblings);
+        if (checks.size() > 15 || checks.stream().anyMatch(check -> !(check instanceof Map<?, ?> map)
+                || map.containsKey("additionalChecks") || !(map.get("expectedValues") instanceof Map<?, ?> expected)
+                || expected.isEmpty())) {
+            throw new IllegalArgumentException("CHANGE_PACKAGE_ADDITIONAL_CHECKS_INVALID_OR_LIMIT_EXCEEDED");
+        }
+        postCheck.put("additionalChecks", List.copyOf(checks));
+        action.put("postCheck", Collections.unmodifiableMap(postCheck));
+    }
+
     public List<Map<String, Object>> proposalCatalog(String projectId) {
         return reviewedPolicies(projectId).stream()
-                .filter(policy -> !policy.readOnly())
+                .filter(policy -> !policy.readOnly() || (policy.prepareAllowed()
+                        && List.of("VALIDATE_ONLY", "DRY_RUN").contains(policy.effectType())))
                 .map(policy -> catalogEntry(projectId, policy))
                 .toList();
     }
@@ -109,7 +176,7 @@ public class OpsChangePackageActionPolicyBinder {
         entry.put("mcpId", policy.mcpId());
         entry.put("toolName", policy.toolName());
         entry.put("adapterType", "MCP");
-        entry.put("targetEnvironment", authoritativeTargetEnvironment(projectId, policy.mcpId()));
+        entry.put("targetEnvironment", reviewedResourceBinding(projectId, policy, "targetEnvironment"));
         entry.put("schemaHash", policy.schemaHash());
         entry.put("effectType", policy.effectType());
         entry.put("effectScope", policy.effectScope());
@@ -123,7 +190,7 @@ public class OpsChangePackageActionPolicyBinder {
         entry.put("requiresHumanApproval", policy.requiresHumanApproval());
         entry.put("requiresDryRun", policy.requiresDryRun());
         entry.put("requiresRollbackPlan", policy.requiresRollbackPlan());
-        entry.put("resourceScope", authoritativeResourceScope(projectId, policy.mcpId()));
+        entry.put("resourceScope", reviewedResourceBinding(projectId, policy, "resourceScope"));
         entry.put("argumentPolicy", jsonObject(policy.argumentPolicyJson()));
         Map<String, Object> fixedArguments = fixedArguments(projectId, policy.mcpId());
         if (!fixedArguments.isEmpty()) entry.put("fixedArguments", fixedArguments);
@@ -160,6 +227,26 @@ public class OpsChangePackageActionPolicyBinder {
         if (!"service_control".equalsIgnoreCase(text(descriptor.mcp().resourceType()))) return Map.of();
         String service = OpsServiceControlResourceIdentity.serviceName(descriptor.resource().endpoint());
         return Map.of("service", service);
+    }
+
+    private String reviewedResourceBinding(String projectId, McpToolPolicy policy, String field) {
+        String providerValue = "resourceScope".equals(field)
+                ? authoritativeResourceScope(projectId, policy.mcpId())
+                : authoritativeTargetEnvironment(projectId, policy.mcpId());
+        Object raw = jsonObject(policy.argumentPolicyJson()).get("resourceBinding");
+        if (!(raw instanceof Map<?, ?> binding)) return providerValue;
+        String scope = text(binding.get("resourceScope"));
+        String environment = text(binding.get("targetEnvironment"));
+        if (scope.isBlank() || environment.isBlank()) {
+            throw new IllegalArgumentException("MCP_REVIEWED_RESOURCE_BINDING_INCOMPLETE");
+        }
+        String reviewedValue = "resourceScope".equals(field) ? scope : environment;
+        // Per-tool bindings support multi-resource MCP servers, but may never override a
+        // conflicting project resource binding. Model-supplied action fields are already cleared.
+        if (!providerValue.isBlank() && !providerValue.equals(reviewedValue)) {
+            throw new IllegalArgumentException("MCP_REVIEWED_RESOURCE_BINDING_CONFLICT");
+        }
+        return reviewedValue;
     }
 
     private String authoritativeResourceScope(String projectId, String mcpId) {

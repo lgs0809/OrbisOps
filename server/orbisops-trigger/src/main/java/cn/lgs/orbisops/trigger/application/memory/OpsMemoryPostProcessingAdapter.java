@@ -6,6 +6,11 @@ import cn.lgs.orbisops.application.memory.MemoryCompressionPort;
 import cn.lgs.orbisops.application.memory.MemoryExtractionPort;
 import cn.lgs.orbisops.application.memory.MemoryMessageView;
 import cn.lgs.orbisops.application.memory.SemanticMemoryWritePort;
+import cn.lgs.orbisops.application.memory.ContextMemoryStoreApplicationService;
+import cn.lgs.orbisops.application.memory.SemanticMemoryApplicationFacade;
+import cn.lgs.orbisops.application.memory.SemanticMemoryWriteCommand;
+import cn.lgs.orbisops.application.memory.SemanticMemoryWriteResult;
+import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
 import cn.lgs.orbisops.domain.memory.model.ColdMemoryItemSnapshot;
 import cn.lgs.orbisops.trigger.ops.runtime.OpsContextCompressor;
 import cn.lgs.orbisops.trigger.ops.runtime.OpsContextMemoryService;
@@ -13,6 +18,8 @@ import cn.lgs.orbisops.trigger.ops.runtime.OpsMemoryExtractor;
 import cn.lgs.orbisops.trigger.ops.runtime.OpsMemoryMessage;
 import cn.lgs.orbisops.trigger.ops.runtime.OpsSemanticMemoryStore;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -31,6 +38,10 @@ public class OpsMemoryPostProcessingAdapter implements SemanticMemoryWritePort,
     private final OpsContextCompressor contextCompressor;
     private final OpsMemoryRetrievalMapper messageMapper = new OpsMemoryRetrievalMapper();
     private final OpsColdMemoryMapper coldMemoryMapper = new OpsColdMemoryMapper();
+    private ContextMemoryStoreApplicationService durableContextStore;
+    private SemanticMemoryApplicationFacade durableSemanticStore;
+    private ModelAvailabilityPort modelAvailability;
+    private boolean semanticEnabled;
 
     public OpsMemoryPostProcessingAdapter(
             OpsSemanticMemoryStore semanticMemoryStore,
@@ -45,6 +56,47 @@ public class OpsMemoryPostProcessingAdapter implements SemanticMemoryWritePort,
         this.contextCompressor = contextCompressor;
     }
 
+    @Autowired
+    public void configureDurableStores(ContextMemoryStoreApplicationService contextStore,
+                                       SemanticMemoryApplicationFacade semanticStore,
+                                       ModelAvailabilityPort availability,
+                                       @Value("${orbisops.chat.memory.semantic-enabled:false}") boolean enabled) {
+        this.durableContextStore = contextStore;
+        this.durableSemanticStore = semanticStore;
+        this.modelAvailability = availability;
+        this.semanticEnabled = enabled;
+    }
+
+    @Override
+    public String appendDurably(MemoryMessageView message) {
+        if (!semanticEnabled) return "DISABLED";
+        if (durableSemanticStore == null) throw new IllegalStateException("SEMANTIC_MEMORY_STORE_UNAVAILABLE");
+        SemanticMemoryWriteResult result = durableSemanticStore.write(new SemanticMemoryWriteCommand(
+                message.sessionId(), message.userId(), message.role(), message.content(), message.createdAt(), message.metadata(),
+                modelAvailability != null && modelAvailability.isEmbeddingAvailable()));
+        if (!result.written()) throw new IllegalStateException("SEMANTIC_MEMORY_WRITE_FAILED");
+        return result.storage().toUpperCase(java.util.Locale.ROOT);
+    }
+
+    @Override public SemanticMemoryWritePort.Outcome appendDurably(cn.lgs.orbisops.domain.memory.model.MemoryProcessingJob job) {
+        if(!semanticEnabled)return new SemanticMemoryWritePort.Outcome("DISABLED",false,"INTENTIONAL_DISABLED");
+        if(durableSemanticStore==null)throw new IllegalStateException("SEMANTIC_MEMORY_STORE_UNAVAILABLE");
+        if(job.sourceHash()==null || job.sourceHash().isBlank())throw new cn.lgs.orbisops.domain.memory.model.MemoryModelInputInvalidException("MEMORY_SEMANTIC_SOURCE_UNRECORDED");
+        var source=job.message();var metadata=new java.util.LinkedHashMap<>(source.metadata());
+        metadata.put("semantic_job_id",job.id());metadata.put("semantic_epoch",job.epoch());metadata.put("semantic_source_hash",job.sourceHash());
+        var result=durableSemanticStore.write(new SemanticMemoryWriteCommand(source.sessionId(),source.userId(),source.role(),source.content(),source.createdAt(),metadata,
+                modelAvailability!=null && modelAvailability.isEmbeddingAvailable(),modelAvailability!=null && modelAvailability.isEmbeddingConfigured()));
+        if(!result.written())throw new IllegalStateException("SEMANTIC_MEMORY_WRITE_FAILED");
+        return new SemanticMemoryWritePort.Outcome(result.storage().toUpperCase(java.util.Locale.ROOT),result.modelPending(),result.reason());
+    }
+
+    @Override
+    public void saveExtractedItemsStrict(List<ColdMemoryItemSnapshot> items) {
+        if (items == null || items.isEmpty()) return;
+        if (durableContextStore == null) throw new IllegalStateException("CONTEXT_MEMORY_STORE_UNAVAILABLE");
+        durableContextStore.saveExtractedItemsStrict(items);
+    }
+
     @Override
     public void append(MemoryMessageView message) {
         semanticMemoryStore.appendMessage(messageMapper.message(message));
@@ -53,6 +105,20 @@ public class OpsMemoryPostProcessingAdapter implements SemanticMemoryWritePort,
     @Override
     public List<ColdMemoryItemSnapshot> extract(MemoryMessageView message) {
         return coldMemoryMapper.snapshots(memoryExtractor.extract(messageMapper.message(message)));
+    }
+
+    @Override public MemoryExtractionPort.Outcome extractDurably(MemoryMessageView message) {
+        var result = memoryExtractor.extractDurably(messageMapper.message(message));
+        return new MemoryExtractionPort.Outcome(coldMemoryMapper.snapshots(
+                coldMemoryMapper.candidateViews(result.candidates())), result.modelPending(), result.kind());
+    }
+
+    @Override public Runnable prepareCompression(cn.lgs.orbisops.domain.memory.model.MemoryProcessingJob job) {
+        return contextCompressor.prepareCompression(job);
+    }
+
+    @Override public Runnable prepareModelRetry(cn.lgs.orbisops.domain.memory.model.MemoryProcessingJob job) {
+        return contextCompressor.prepareModelRetry(job);
     }
 
     @Override

@@ -2,7 +2,7 @@ package cn.lgs.orbisops.domain.skill.model;
 
 import java.time.Instant;
 
-/** Retry transition after one claimed Skill Evolution job attempt fails. */
+/** Retry or configuration-wait transition. Waiting without a model does not consume an attempt. */
 public record SkillEvolutionRetryTransition(
         SkillEvolutionJobStatus status,
         int attempts,
@@ -10,6 +10,6 @@ public record SkillEvolutionRetryTransition(
 
     public SkillEvolutionRetryTransition {
         if (status == null) throw new IllegalArgumentException("SKILL_EVOLUTION_RETRY_STATUS_REQUIRED");
-        attempts = Math.max(1, attempts);
+        attempts = Math.max(0, attempts);
     }
 }

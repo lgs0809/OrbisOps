@@ -40,6 +40,20 @@ class ToolExecutionPolicyTest {
         assertEquals("abc", policy.responsePayload("abcdef", 3).get("rawPreview"));
     }
 
+    @Test
+    void readRestrictionPreservesReadAccessAndExistingDenials() {
+        var original = request(ToolExecutionScope.PRE_APPROVAL_WORKFLOW);
+        var request = new ToolExecutionRequest(original.projectId(), original.userId(), original.actor(),
+                original.toolsetId(), original.toolName(), original.scope(), original.arguments(),
+                original.sessionId(), original.runId(), Map.of("requireReadOnly", true), Map.of());
+        var read = new ToolExecutionTarget("inspect", "read", "MCP", "LOW", true, false, false, false, false);
+        var allowed = ToolExecutionDecision.allowed("LOW", Map.of());
+        assertEquals(allowed, policy.restrictToReadOnly(request, read, allowed));
+        var denied = new ToolExecutionDecision(false, "BLOCKED", "PROJECT_ACCESS_DENIED", "denied", "HIGH", Map.of());
+        assertEquals(denied, policy.restrictToReadOnly(request, read, denied));
+        assertEquals(denied, policy.restrictToReadOnly(request, target(), denied));
+    }
+
     private ToolExecutionRequest request(ToolExecutionScope scope) {
         return new ToolExecutionRequest(
                 "project-1", "alice", "alice", "code.repair", "code_bash", scope,

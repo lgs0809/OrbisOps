@@ -87,6 +87,9 @@ public class SemanticMemoryPolicy {
     }
 
     public String documentKey(String id, String content, Map<String, Object> metadata) {
+        if(metadata!=null && metadata.get("semantic_job_id") instanceof Number job
+                && metadata.get("semantic_source_hash") instanceof String frozen && !frozen.isBlank())
+            return "semantic:"+job.longValue()+":"+frozen;
         if (hasText(id)) {
             return id;
         }

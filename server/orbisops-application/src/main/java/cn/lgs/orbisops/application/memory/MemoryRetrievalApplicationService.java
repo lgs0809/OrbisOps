@@ -1,8 +1,14 @@
 package cn.lgs.orbisops.application.memory;
 
 import cn.lgs.orbisops.domain.memory.model.ColdMemoryItemSnapshot;
+import cn.lgs.orbisops.domain.memory.model.ColdMemoryMessageSnapshot;
+import cn.lgs.orbisops.domain.memory.model.ConversationMemoryWindow;
+import cn.lgs.orbisops.domain.memory.adapter.repository.IConversationMemoryRepository;
 
 import java.util.List;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
@@ -20,6 +26,7 @@ public class MemoryRetrievalApplicationService {
     private final ContextMemoryQueryPort contextMemoryQueryPort;
     private final Supplier<Executor> executorSupplier;
     private final MemoryRetrievalFailurePort failurePort;
+    private final IConversationMemoryRepository conversationRepository;
 
     public MemoryRetrievalApplicationService(ColdMemoryStoreApplicationService coldMemoryStore,
                                              HotMemoryQueryPort hotMemoryQueryPort,
@@ -27,16 +34,29 @@ public class MemoryRetrievalApplicationService {
                                              ContextMemoryQueryPort contextMemoryQueryPort,
                                              Supplier<Executor> executorSupplier,
                                              MemoryRetrievalFailurePort failurePort) {
+        this(coldMemoryStore, hotMemoryQueryPort, semanticMemoryQueryPort, contextMemoryQueryPort,
+                executorSupplier, failurePort, null);
+    }
+
+    public MemoryRetrievalApplicationService(ColdMemoryStoreApplicationService coldMemoryStore,
+                                             HotMemoryQueryPort hotMemoryQueryPort,
+                                             SemanticMemoryQueryPort semanticMemoryQueryPort,
+                                             ContextMemoryQueryPort contextMemoryQueryPort,
+                                             Supplier<Executor> executorSupplier,
+                                             MemoryRetrievalFailurePort failurePort,
+                                             IConversationMemoryRepository conversationRepository) {
         this.coldMemoryStore = coldMemoryStore;
         this.hotMemoryQueryPort = hotMemoryQueryPort;
         this.semanticMemoryQueryPort = semanticMemoryQueryPort;
         this.contextMemoryQueryPort = contextMemoryQueryPort;
         this.executorSupplier = executorSupplier == null ? () -> null : executorSupplier;
         this.failurePort = failurePort == null ? (slice, error) -> { } : failurePort;
+        this.conversationRepository = conversationRepository;
     }
 
     public MemoryRetrievalResult retrieve(MemoryRetrievalQuery query) {
         if (query == null || !query.valid()) return MemoryRetrievalResult.empty();
+        List<MemoryMessageView> recovered = conversationRepository == null ? null : recover(query);
 
         CompletableFuture<List<ColdMemoryItemSnapshot>> coldItems = load(
                 "cold-items",
@@ -49,7 +69,7 @@ public class MemoryRetrievalApplicationService {
                 query.timeoutMillis());
         CompletableFuture<List<MemoryMessageView>> hotMessages = load(
                 "hot-messages",
-                () -> hotMemoryQueryPort == null
+                () -> recovered != null ? recovered : hotMemoryQueryPort == null
                         ? List.of()
                         : hotMemoryQueryPort.recent(query.sessionId(), query.hotMessageLimit()),
                 query.timeoutMillis());
@@ -57,11 +77,11 @@ public class MemoryRetrievalApplicationService {
                 "semantic-messages",
                 () -> semanticMemoryQueryPort == null
                         ? List.of()
-                        : semanticMemoryQueryPort.search(
+                        : retainedSemantic(query, semanticMemoryQueryPort.search(
                                 query.sessionId(),
                                 query.userId(),
                                 query.query(),
-                                query.semanticMessageLimit()),
+                                query.semanticMessageLimit())),
                 query.timeoutMillis());
         CompletableFuture<List<ContextMemoryView>> contextMemories = load(
                 "context-memories",
@@ -79,6 +99,45 @@ public class MemoryRetrievalApplicationService {
                 join("hot-messages", hotMessages),
                 join("semantic-messages", semanticMessages),
                 join("context-memories", contextMemories));
+    }
+
+    private List<MemoryMessageView> recover(MemoryRetrievalQuery query) {
+        ConversationMemoryWindow window = conversationRepository.window(query.sessionId(), query.hotMessageLimit(), true).orElse(null);
+        if (window == null) return List.of();
+        if (!window.projectId().equals(query.projectId())
+                || (window.projectId().isBlank() && !window.userId().equals(query.userId()))) {
+            throw new IllegalArgumentException("MEMORY_SESSION_SCOPE_MISMATCH");
+        }
+        List<MemoryMessageView> result = new ArrayList<>();
+        for (ColdMemoryMessageSnapshot message : window.protectedMessages()) {
+            Map<String, Object> metadata = new LinkedHashMap<>(message.metadata());
+            metadata.put("memory_type", "protected_source");
+            result.add(new MemoryMessageView(message.sessionId(), message.userId(), message.role(), message.content(),
+                    message.createdAt(), metadata));
+        }
+        window.context().forEach(message -> {
+            Map<String, Object> metadata = new LinkedHashMap<>(message.metadata());
+            if (!"summary".equals(metadata.get("memory_type"))) metadata.put("memory_type", "conversation_tail");
+            result.add(new MemoryMessageView(message.sessionId(), message.userId(),
+                    message.role(), message.content(), message.createdAt(), metadata));
+        });
+        return List.copyOf(result);
+    }
+
+    private List<MemoryMessageView> retainedSemantic(MemoryRetrievalQuery query, List<MemoryMessageView> messages) {
+        if (conversationRepository == null || messages == null || messages.isEmpty()) return messages;
+        List<MemoryMessageView> scoped = messages.stream()
+                .filter(message -> query.sessionId().equals(message.sessionId()))
+                .filter(message -> query.projectId().equals(message.metadata().get("projectId")))
+                .filter(message -> sequence(message) > 0).toList();
+        List<Long> retained = conversationRepository.existingSequences(query.sessionId(), query.projectId(), query.userId(),
+                scoped.stream().map(this::sequence).distinct().toList());
+        return scoped.stream().filter(message -> retained.contains(sequence(message))).toList();
+    }
+
+    private long sequence(MemoryMessageView message) {
+        Object value = message.metadata().get("messageSeq");
+        return value instanceof Number number ? number.longValue() : 0L;
     }
 
     private <T> CompletableFuture<List<T>> load(String slice,

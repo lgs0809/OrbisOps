@@ -74,7 +74,8 @@ final class OpsAlertWebhookProtocolService {
                 fingerprint,
                 status,
                 labels,
-                annotations);
+                annotations,
+                value(alert.get("startsAt")));
     }
 
     boolean matches(OpsAlertTriggerRule rule, AlertView alert) {
@@ -237,7 +238,13 @@ final class OpsAlertWebhookProtocolService {
             String fingerprint,
             String status,
             Map<String, Object> labels,
-            Map<String, Object> annotations) {
+            Map<String, Object> annotations,
+            String startsAt) {
+
+        AlertView(String alertName, String severity, String service, String fingerprint,
+                  String status, Map<String,Object> labels, Map<String,Object> annotations) {
+            this(alertName,severity,service,fingerprint,status,labels,annotations,"");
+        }
 
         String annotation(String key) {
             return annotations == null

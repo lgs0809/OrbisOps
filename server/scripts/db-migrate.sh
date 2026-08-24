@@ -9,6 +9,8 @@ MYSQL_DATABASE="${MYSQL_DATABASE:-orbisops}"
 MYSQL_USERNAME="${MYSQL_USERNAME:-orbisops}"
 MYSQL_DEFAULTS_FILE="${MYSQL_DEFAULTS_FILE:-}"
 
+[[ "${MYSQL_DATABASE}" =~ ^[a-zA-Z0-9_]+$ ]] || { echo "invalid MYSQL_DATABASE identifier" >&2; exit 2; }
+
 command -v mysql >/dev/null 2>&1 || { echo "mysql client is required" >&2; exit 2; }
 [[ -f "${MANIFEST}" ]] || { echo "migration manifest not found: ${MANIFEST}" >&2; exit 2; }
 
@@ -44,8 +46,20 @@ while IFS=$'\t' read -r service version description sql_path expected_checksum c
     [[ "${applied_checksum}" == "${expected_checksum}" ]] || { echo "applied migration ${version} has a different checksum" >&2; exit 5; }
     continue
   fi
+  if [[ "${version}" == "001" ]]; then
+    table_count="$(mysql_exec "${MYSQL_DATABASE}" --batch --skip-column-names -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='${MYSQL_DATABASE}' AND table_name <> 'orbisops_schema_history'")"
+    [[ "${table_count}" == "0" ]] || { echo "refusing baseline migration on a non-empty database without migration 001 history" >&2; exit 6; }
+  fi
   echo "Applying ${version} ${description}"
-  mysql_exec "${MYSQL_DATABASE}" < "${sql_file}"
+  if [[ "${version}" == "001" ]]; then
+    # The checksummed historical dump names its original database. The caller
+    # already selected/created the target; omit only these two legacy directives.
+    # Do not rewrite the migration file or its recorded checksum.
+    sed -e '/^CREATE database if NOT EXISTS `orbisops` default character set utf8mb4 collate utf8mb4_0900_ai_ci;$/d' \
+        -e '/^use `orbisops`;$/d' "${sql_file}" | mysql_exec "${MYSQL_DATABASE}"
+  else
+    mysql_exec "${MYSQL_DATABASE}" < "${sql_file}"
+  fi
   mysql_exec "${MYSQL_DATABASE}" -e "INSERT INTO orbisops_schema_history(version,description,checksum) VALUES('${version}','${description}','${expected_checksum}')"
 done < "${MANIFEST}"
 

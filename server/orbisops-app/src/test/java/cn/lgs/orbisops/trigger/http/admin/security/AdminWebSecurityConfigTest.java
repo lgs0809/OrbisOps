@@ -18,6 +18,60 @@ import static org.mockito.Mockito.when;
 
 class AdminWebSecurityConfigTest {
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({
+        "POST,/api/v1/admin/admin-user/logout,true",
+        "POST,/api/v1/user/account/password,true",
+        "GET,/api/v1/user/account,true",
+        "GET,/api/v1/admin/admin-user/logout,false",
+        "POST,/api/v1/admin/admin-user/logout/extra,false",
+        "POST,/api/v1/admin/admin-user/create,false",
+        "GET,/api/v1/admin/admin-user/query-all,false"
+    })
+    void selfServiceDoesNotExpandAdministratorNamespace(String method, String path, boolean expected) throws Exception {
+        var authentication = mock(AdminAuthService.class);
+        var rateLimit = mock(OpsRateLimitService.class);
+        when(authentication.verifyAuthorization(anyString(), any(String[].class))).thenReturn(Optional.of(
+                new AdminAuthService.AuthPrincipal("member", "u-1", "j-1", "user", false)));
+        when(rateLimit.tryAcquire(anyString(), anyString())).thenReturn(true);
+        var request = new MockHttpServletRequest(method, path);
+        request.setServletPath(path); request.addHeader("Authorization", "Bearer existing-token");
+        var response = new MockHttpServletResponse();
+        assertEquals(expected, new AdminWebSecurityConfig.AdminAuthInterceptor(authentication, rateLimit).preHandle(request, response, new Object()));
+        assertEquals(expected ? 200 : 403, response.getStatus());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({
+        "user,POST,/api/v1/user/account/password,true",
+        "admin,POST,/api/v1/admin/admin-user/logout,true",
+        "user,GET,/api/v1/user/account,true",
+        "admin,POST,/api/v1/admin/admin-user/create,false",
+        "user,POST,/api/v1/user/chat,false",
+        "admin,GET,/api/v1/agent/trace,false"
+    })
+    void initialCredentialCannotAccessBusinessOrAdminBeforeChange(String scope, String method, String path, boolean expected) throws Exception {
+        var authentication = mock(AdminAuthService.class);
+        var rateLimit = mock(OpsRateLimitService.class);
+        when(authentication.verifyAuthorization(anyString(), any(String[].class))).thenReturn(Optional.of(
+                new AdminAuthService.AuthPrincipal("member", "u-1", "j-1", scope, false, true)));
+        when(rateLimit.tryAcquire(anyString(), anyString())).thenReturn(true);
+        var request = new MockHttpServletRequest(method, path);
+        request.setServletPath(path); request.addHeader("Authorization", "Bearer initial-session");
+        var response = new MockHttpServletResponse();
+        assertEquals(expected, new AdminWebSecurityConfig.AdminAuthInterceptor(authentication, rateLimit).preHandle(request, response, new Object()));
+        if (!expected) { assertEquals(403,response.getStatus()); assertTrue(response.getContentAsString().contains("PASSWORD_CHANGE_REQUIRED")); }
+    }
+
+    @Test
+    void anonymousLogoutCannotBypassAuthentication() throws Exception {
+        var request = new MockHttpServletRequest("POST","/api/v1/admin/admin-user/logout");
+        request.setServletPath("/api/v1/admin/admin-user/logout");
+        var response = new MockHttpServletResponse();
+        assertFalse(new AdminWebSecurityConfig.AdminAuthInterceptor(mock(AdminAuthService.class),mock(OpsRateLimitService.class)).preHandle(request,response,new Object()));
+        assertEquals(401,response.getStatus());
+    }
+
     @Test
     void shouldRejectAuthenticatedUserFromAdminApiWithForbidden() throws Exception {
         AdminAuthService authService = mock(AdminAuthService.class);

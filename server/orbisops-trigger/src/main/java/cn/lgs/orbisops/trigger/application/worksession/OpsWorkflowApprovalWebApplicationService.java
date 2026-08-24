@@ -54,13 +54,15 @@ public class OpsWorkflowApprovalWebApplicationService {
     public Map<String, Object> decide(String runId,
                                       String projectId,
                                       String actor,
-                                      String decision) {
+                                      String decision,
+                                      String expectedApprovalId) {
         String safeRunId = required(runId, "runId");
         String safeProjectId = required(projectId, "projectId");
         String safeActor = required(actor, "actor");
         WorkflowApprovalRecord.Decision requested = decision(decision);
         WorkflowApprovalRecord current = current(safeRunId, true);
         assertProject(current, safeProjectId);
+        assertReviewedApproval(current, expectedApprovalId);
 
         // Current run status + owner/editor authority are rechecked immediately before consuming the decision.
         WorkSessionRunSnapshot run = workSessions.resumeApproval(safeRunId, safeProjectId, safeActor);
@@ -78,12 +80,13 @@ public class OpsWorkflowApprovalWebApplicationService {
         return view(run, decided, safeActor);
     }
 
-    public Map<String, Object> retryResume(String runId, String projectId, String actor) {
+    public Map<String, Object> retryResume(String runId, String projectId, String actor, String expectedApprovalId) {
         String safeRunId = required(runId, "runId");
         String safeProjectId = required(projectId, "projectId");
         String safeActor = required(actor, "actor");
         WorkflowApprovalRecord current = current(safeRunId, true);
         assertProject(current, safeProjectId);
+        assertReviewedApproval(current, expectedApprovalId);
         WorkflowApprovalRecord.Decision decision = terminalDecision(current);
         WorkSessionRunSnapshot run = workSessions.resumeApproval(safeRunId, safeProjectId, safeActor);
         publish(current, safeActor, decision);
@@ -161,6 +164,14 @@ public class OpsWorkflowApprovalWebApplicationService {
     private void assertProject(WorkflowApprovalRecord approval, String projectId) {
         if (approval == null || !approval.projectId().equals(projectId)) {
             throw new SecurityException("WORKFLOW_APPROVAL_PROJECT_MISMATCH");
+        }
+    }
+
+    private void assertReviewedApproval(WorkflowApprovalRecord current, String expectedApprovalId) {
+        // An approval ID identifies an immutable run/node/wait issuance. A stale browser must
+        // never decide a newer node merely because it is now the current approval for the run.
+        if (!current.approvalId().equals(required(expectedApprovalId, "approvalId"))) {
+            throw new SecurityException("WORKFLOW_APPROVAL_REVIEWED_RECORD_MISMATCH");
         }
     }
 

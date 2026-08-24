@@ -263,6 +263,7 @@ class OpsMemoryRuntimeTest {
                 .build());
 
         verify(jdbcTemplate).update(startsWith("INSERT INTO orbisops_vector_store"),
+                org.mockito.ArgumentMatchers.anyString(),
                 eq("join_metric_5xx 在 /api/group/join 升高"),
                 contains("\"memory_kind\":\"message\""));
     }

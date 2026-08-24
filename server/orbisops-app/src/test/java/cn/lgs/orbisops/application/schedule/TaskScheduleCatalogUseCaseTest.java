@@ -41,7 +41,7 @@ class TaskScheduleCatalogUseCaseTest {
                 null, " payment ", " ops-agent ", null, null,
                 "支付巡检".repeat(80), "巡检".repeat(180),
                 2000, "invalid", false, 30, 0, 999, 0,
-                true, " channel-oncall ", " oncall-room ")));
+                true, " channel-oncall ", " oncall-room "), "creator-a"));
 
         ArgumentCaptor<TaskScheduleDefinition> saved = ArgumentCaptor.forClass(TaskScheduleDefinition.class);
         InOrder order = inOrder(catalog, audit);
@@ -49,6 +49,7 @@ class TaskScheduleCatalogUseCaseTest {
         order.verify(audit).created(saved.getValue());
         TaskScheduleDefinition schedule = saved.getValue();
         assertEquals("payment", schedule.projectId());
+        assertEquals("creator-a", schedule.createdBy());
         assertEquals("ops-agent", schedule.agentId());
         assertEquals(128, schedule.taskName().length());
         assertEquals(255, schedule.description().length());
@@ -80,7 +81,7 @@ class TaskScheduleCatalogUseCaseTest {
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
                 () -> useCase.create(command(null, "payment", "ops-agent", "PINNED_VERSION", null,
                         "支付巡检", null, null, null, null, null, null, null, null,
-                        null, null, null)));
+                        null, null, null), "creator-a"));
 
         assertEquals("PINNED_VERSION 巡检任务必须选择 Agent 版本", error.getMessage());
         verify(agents, never()).resolve(any(), any(), any());

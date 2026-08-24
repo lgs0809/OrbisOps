@@ -20,8 +20,13 @@ public class SkillCanarySelectionPolicy {
                             + text(agentId)
                             + ":"
                             + text(runId)).getBytes(StandardCharsets.UTF_8));
-            int bucket = Byte.toUnsignedInt(hash[0]) % 100;
-            return bucket < percent(enabled, canaryPercent);
+            // Scale the unsigned 32-bit space instead of reducing one byte modulo 100:
+            // 256 is not divisible by 100, so the old 10% bucket selected 30/256 identities.
+            long bucket = (Byte.toUnsignedLong(hash[0]) << 24)
+                    | (Byte.toUnsignedLong(hash[1]) << 16)
+                    | (Byte.toUnsignedLong(hash[2]) << 8)
+                    | Byte.toUnsignedLong(hash[3]);
+            return bucket * 100L < percent(enabled, canaryPercent) * (1L << 32);
         } catch (Exception error) {
             throw new IllegalStateException(
                     "Skill Canary hash 计算失败",

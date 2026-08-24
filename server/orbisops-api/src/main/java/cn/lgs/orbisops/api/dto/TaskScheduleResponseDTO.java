@@ -22,6 +22,7 @@ public class TaskScheduleResponseDTO implements Serializable {
 
     private Long id;
     private String projectId;
+    private String createdBy;
     private String executionType;
     private String agentId;
     private String agentBindingMode;

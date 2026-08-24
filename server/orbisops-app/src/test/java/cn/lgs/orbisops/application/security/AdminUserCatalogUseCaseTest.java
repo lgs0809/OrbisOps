@@ -47,6 +47,9 @@ class AdminUserCatalogUseCaseTest {
         assertEquals(AdminUserRole.ADMIN, saved.getValue().role());
         assertEquals(1, saved.getValue().status());
         assertEquals("encoded-value", saved.getValue().credential());
+        assertEquals("encoded-value", saved.getValue().initialCredential());
+        assertTrue(saved.getValue().passwordChangeRequired());
+        assertEquals(0, saved.getValue().credentialVersion());
         assertEquals(LocalDateTime.of(2026, 7, 30, 7, 30), saved.getValue().createTime());
         assertEquals(saved.getValue().createTime(), saved.getValue().updateTime());
     }
@@ -68,7 +71,7 @@ class AdminUserCatalogUseCaseTest {
         when(authentication.isEncoded("123456")).thenReturn(false);
         IllegalArgumentException weak = assertThrows(IllegalArgumentException.class,
                 () -> useCase.updateById(command(1L, "user", "123456", null)));
-        assertEquals("密码长度不能少于 8 位", weak.getMessage());
+        assertEquals("请使用重置初始密码功能；新密码由用户自己设置", weak.getMessage());
 
         when(authentication.isEncoded("encoded-input")).thenReturn(true);
         IllegalArgumentException encoded = assertThrows(IllegalArgumentException.class,
@@ -78,6 +81,28 @@ class AdminUserCatalogUseCaseTest {
         IllegalArgumentException status = assertThrows(IllegalArgumentException.class,
                 () -> useCase.create(command(null, "user", "StrongPass1", 9)));
         assertEquals("用户状态只允许 0、1、2", status.getMessage());
+        verify(catalog, never()).insert(any());
+    }
+
+    @Test
+    void rejectsIdentifiersThatWouldExceedAccountSchemaBounds() {
+        AdminUserCatalogPort catalog = mock(AdminUserCatalogPort.class);
+        AdminUserAuthenticationPort authentication = mock(AdminUserAuthenticationPort.class);
+        AdminUserCatalogUseCase useCase = new AdminUserCatalogUseCase(
+                catalog,
+                authentication,
+                new AdminCredentialRules(8, false),
+                CLOCK);
+
+        String longUserId = "u-" + "x".repeat(63);
+        IllegalArgumentException userId = assertThrows(IllegalArgumentException.class,
+                () -> useCase.create(new AdminUserCommand(null, longUserId, "ops-user", "StrongPass1", "user", 1)));
+        assertEquals("用户ID长度不能超过 64 个字符", userId.getMessage());
+
+        String longUsername = "u".repeat(51);
+        IllegalArgumentException username = assertThrows(IllegalArgumentException.class,
+                () -> useCase.create(new AdminUserCommand(null, "u-10001", longUsername, "StrongPass1", "user", 1)));
+        assertEquals("用户名长度不能超过 50 个字符", username.getMessage());
         verify(catalog, never()).insert(any());
     }
 

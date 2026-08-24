@@ -15,6 +15,27 @@ import java.util.List;
 
 class ScheduledTaskExecutionUseCaseTest {
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"WAITING_APPROVAL", "CANCELED", "FAILED", "UNKNOWN", ""})
+    void nonSuccessfulRuntimeMustNeverBecomeSuccessfulInspection(String status) {
+        var catalog = mock(ScheduledTaskExecutionCatalogPort.class);
+        @SuppressWarnings("unchecked")
+        ScheduledTaskAnalysisPort<String, String> analysis = mock(ScheduledTaskAnalysisPort.class);
+        var command = command("payload");
+        when(catalog.create(command)).thenReturn(42L);
+        when(analysis.prepare(command, 42L)).thenReturn("request");
+        when(analysis.execute("request")).thenReturn("response");
+        when(analysis.runtimeStatus("response")).thenReturn(status);
+        when(analysis.renderOutput("response")).thenReturn("evidence retained");
+        new ScheduledTaskExecutionUseCase<>(catalog, Runnable::run, analysis).submit(command);
+        verify(catalog, never()).markSucceeded(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        if (status.equals("WAITING_APPROVAL") || status.equals("CANCELED")) {
+            verify(catalog).markIncomplete(42L, status, "evidence retained");
+        } else {
+            verify(catalog).markFailed(42L, "SCHEDULED_ANALYSIS_NOT_SUCCEEDED", "evidence retained");
+        }
+    }
+
     @Test
     void submitCreatesRecordThenExecutesInputAnalysisAndSuccessLifecycle() {
         ScheduledTaskExecutionCatalogPort catalog = mock(ScheduledTaskExecutionCatalogPort.class);
@@ -28,6 +49,7 @@ class ScheduledTaskExecutionUseCaseTest {
         when(analysis.prepare(command, 42L)).thenReturn("request");
         when(analysis.serializeInput("request")).thenReturn("input-json");
         when(analysis.execute("request")).thenReturn("response");
+        when(analysis.runtimeStatus("response")).thenReturn("SUCCEEDED");
         when(analysis.renderOutput("response")).thenReturn("report");
 
         assertEquals(42L, useCase.submit(command));
@@ -125,6 +147,7 @@ class ScheduledTaskExecutionUseCaseTest {
         when(analysis.prepare(command, 42L)).thenReturn("request");
         when(analysis.serializeInput("request")).thenReturn("input-json");
         when(analysis.execute("request")).thenReturn("response");
+        when(analysis.runtimeStatus("response")).thenReturn("SUCCEEDED");
         when(analysis.renderOutput("response")).thenReturn("report");
 
         assertEquals(42L, useCase.submit(command));

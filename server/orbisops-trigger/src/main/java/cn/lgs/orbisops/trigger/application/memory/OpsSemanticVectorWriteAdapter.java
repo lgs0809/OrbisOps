@@ -27,6 +27,6 @@ public class OpsSemanticVectorWriteAdapter implements SemanticVectorWritePort {
         if (vectorStore == null) {
             throw new IllegalStateException("VectorStore 未初始化");
         }
-        vectorStore.add(List.of(new Document(document.content(), document.metadata())));
+        vectorStore.add(List.of(new Document(document.id(), document.content(), document.metadata())));
     }
 }

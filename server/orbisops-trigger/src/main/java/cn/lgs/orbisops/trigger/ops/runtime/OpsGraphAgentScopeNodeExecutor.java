@@ -58,6 +58,7 @@ final class OpsGraphAgentScopeNodeExecutor {
                         .agentId(context.node().getAgent())
                         .name(firstText(context.node().getAgent(), context.node().getNodeId()))
                         .instruction(context.node().getInstruction())
+                        .outputContract(OpsRuntimePromptAssembler.nodeOutputContract(context.node()))
                         .modelId(firstText(
                                 context.node().getModelId(), context.definition().getModelId()))
                         .outputKey(StringUtils.hasText(context.node().getOutputKey())
@@ -73,7 +74,8 @@ final class OpsGraphAgentScopeNodeExecutor {
                         .allowedToolNames(stringConfigList(context.node(), "allowedToolNames"))
                         .inheritProjectCapabilities(Boolean.parseBoolean(firstText(
                                 configText(context.node(), "inheritProjectCapabilities"), "false")))
-                        .repairEnabled(Boolean.TRUE.equals(context.node().getRepairEnabled()))
+                        .changePackageStatusEnabled(context.node().getConfig() != null && Boolean.TRUE.equals(context.node().getConfig().get("changePackageStatusEnabled")))
+                .repairEnabled(Boolean.TRUE.equals(context.node().getRepairEnabled()))
                         .changePackageEnabled(firstNonNull(
                                 context.node().getChangePackageEnabled(),
                                 context.definition().getChangePackageEnabled()))

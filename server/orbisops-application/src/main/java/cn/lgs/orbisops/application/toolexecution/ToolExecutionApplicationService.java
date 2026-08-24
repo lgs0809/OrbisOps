@@ -185,13 +185,15 @@ public final class ToolExecutionApplicationService {
         long startedNanos = nanoTimeSupplier.getAsLong();
         ToolExecutionResolution resolution = catalog.resolve(request);
         ToolExecutionTarget target = resolution.target();
-        ToolExecutionDecision decision = resolution.decision();
+        ToolExecutionDecision decision = policy.restrictToReadOnly(request, target, resolution.decision());
         String targetId = target.toolsetId() + "/" + target.toolName();
         String toolCallId = toolCallIdSupplier.get();
-        String idempotencyKey = effectiveIdempotencyKey(
+        // A previous receipt cannot override current authority or a read-only restriction.
+        // Denials receive their own audit record without altering the original execution ledger.
+        String idempotencyKey = decision.allowed() ? effectiveIdempotencyKey(
                 request,
                 target,
-                text(request.requestContext().get("idempotencyKey")));
+                text(request.requestContext().get("idempotencyKey"))) : "";
         String inputHash = CanonicalObjectHasher.sha256(request.arguments());
         String targetHash = CanonicalObjectHasher.sha256(Map.of(
                 "toolsetId", target.toolsetId(),
@@ -233,8 +235,8 @@ public final class ToolExecutionApplicationService {
                             toolCallId,
                             targetId,
                             "blocked",
-                            "",
-                            Map.of(),
+                            "TOOL_EXECUTION_BLOCKED",
+                            blockedCheckpoint(toolCallId, target, recorded, decision),
                             auditPayload(request, decision, recorded, null));
                     complete(idempotencyKey, toolCallId, reservation, response, projection);
                     return new AuthoritativeCompletion(response, projection);
@@ -293,7 +295,9 @@ public final class ToolExecutionApplicationService {
             if (!authorityCompleted) {
                 attemptFail(
                         idempotencyKey, toolCallId, reservation,
-                        error, dispatchStarted);
+                        error, dispatchStarted && !(error instanceof
+                                cn.lgs.orbisops.domain.toolexecution.model.ToolDispatchFailureEvidence evidence
+                                && !evidence.dispatched()));
             }
             try {
                 checkpoints.checkpoint(
@@ -341,15 +345,18 @@ public final class ToolExecutionApplicationService {
                     targetId,
                     "emergency_stop_blocked",
                     "TOOL_EXECUTION_BLOCKED",
-                    Map.of(
-                            "toolCallId", toolCallId,
-                            "reasonCode", decision.reasonCode(),
-                            "toolsetId", target.toolsetId(),
-                            "toolName", target.toolName()),
+                    blockedCheckpoint(toolCallId, target, recorded, decision),
                     auditPayload(request, decision, recorded, null)));
         });
         projectCompletion("", completion.projection());
         return completion.response();
+    }
+
+    private Map<String, Object> blockedCheckpoint(String toolCallId, ToolExecutionTarget target,
+            ToolExecutionRecordedResult recorded, ToolExecutionDecision decision) {
+        return Map.of("toolCallId", toolCallId, "reasonCode", decision.reasonCode(),
+                "toolsetId", target.toolsetId(), "toolName", target.toolName(),
+                "resultId", recorded.resultId(), "inputHash", recorded.inputHash(), "outputHash", recorded.outputHash());
     }
 
     private ToolExecutionIdempotencyPort.Reservation reserve(

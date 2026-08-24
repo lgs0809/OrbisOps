@@ -77,6 +77,13 @@ public final class SpringAiModelAvailabilityAdapter implements ModelAvailability
                 && localEndpointReadyIfRequired(embeddingBaseUrl, embeddingApiKey);
     }
 
+    @Override public boolean isEmbeddingConfigured() {
+        return modelCallsEnabled && isApiKeyUsable(embeddingApiKey)
+                && StringUtils.hasText(embeddingBaseUrl) && StringUtils.hasText(embeddingModel)
+                && !"unconfigured".equalsIgnoreCase(embeddingModel.trim())
+                && !embeddingBaseUrl.contains("provider.invalid");
+    }
+
     @Override
     public boolean isRerankAvailable(String apiKey) {
         return modelCallsEnabled

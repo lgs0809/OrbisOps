@@ -37,6 +37,15 @@ class SpringAiModelAvailabilityAdapterTest {
         assertFalse(availability.isChatAvailable());
     }
 
+    @Test void aConfiguredTemporaryLocalOutageIsNotAnIntentionalLexicalOnlyConfiguration() {
+        var availability=availability();ReflectionTestUtils.setField(availability,"embeddingBaseUrl","http://127.0.0.1:1");
+        ReflectionTestUtils.setField(availability,"embeddingModel","configured-embedding-model");
+        assertTrue(availability.isEmbeddingConfigured());assertFalse(availability.isEmbeddingAvailable());
+        ReflectionTestUtils.setField(availability,"modelCallsEnabled",false);assertFalse(availability.isEmbeddingConfigured());
+        ReflectionTestUtils.setField(availability,"modelCallsEnabled",true);ReflectionTestUtils.setField(availability,"embeddingApiKey","dev-placeholder-key");
+        assertFalse(availability.isEmbeddingConfigured());
+    }
+
     private SpringAiModelAvailabilityAdapter availability() {
         SpringAiModelAvailabilityAdapter availability = new SpringAiModelAvailabilityAdapter();
         ReflectionTestUtils.setField(availability, "modelCallsEnabled", true);

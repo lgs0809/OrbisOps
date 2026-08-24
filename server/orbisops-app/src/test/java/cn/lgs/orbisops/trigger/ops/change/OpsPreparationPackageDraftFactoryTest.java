@@ -14,11 +14,36 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class OpsPreparationPackageDraftFactoryTest {
 
     private final OpsPreparationPackageDraftFactory factory =
             new OpsPreparationPackageDraftFactory();
+
+    @Test
+    void testValidationDoesNotTurnProductionChangeIntoMultipleLandingEnvironments() {
+        var validation = Map.<String, Object>of("operationId", "validate", "targetEnvironment", "test",
+                "effectType", "VALIDATE_ONLY", "effectScope", "SANDBOX", "mutability", "READ_ONLY",
+                "prepareAllowed", true, "writesTargetResource", false);
+        var production = Map.<String, Object>of("operationId", "land", "targetEnvironment", "prod",
+                "effectType", "MUTATE_TARGET_RESOURCE", "writesTargetResource", true);
+        var decision = decision(ChangePackagePreparationAssessment.ACCEPTABLE,
+                ChangePackageType.MCP_OPERATION_PACKAGE, ChangePackageStatus.READY_FOR_REVIEW,
+                "HIGH", List.of(), "");
+        var operations = new OpsPreparationOperationBindingFactory.OperationBundle(List.of(validation, production), List.of());
+        var draft = factory.create(input(decision, Map.of(), operations));
+        assertEquals("prod", draft.get("targetEnvironment"));
+        assertEquals(operations.operations(), draft.get("mcpSteps"));
+        var anotherTarget = Map.<String, Object>of("operationId", "other", "targetEnvironment", "staging",
+                "writesTargetResource", true);
+        assertThrows(IllegalArgumentException.class, () -> factory.create(input(decision, Map.of(),
+                new OpsPreparationOperationBindingFactory.OperationBundle(List.of(validation, production, anotherTarget), List.of()))));
+        var disguisedWrite = new java.util.LinkedHashMap<>(validation);
+        disguisedWrite.put("effectScope", "TARGET_RESOURCE_WRITE");
+        assertThrows(IllegalArgumentException.class, () -> factory.create(input(decision, Map.of(),
+                new OpsPreparationOperationBindingFactory.OperationBundle(List.of(disguisedWrite, production), List.of()))));
+    }
 
     @Test
     void acceptableDecisionProducesCompleteReviewableDraft() {
@@ -122,6 +147,11 @@ class OpsPreparationPackageDraftFactoryTest {
     private OpsPreparationPackageDraftFactory.Input input(
             ChangePackagePreparationDecision decision,
             Map<String, Object> request) {
+        return input(decision, request, operationBundle());
+    }
+
+    private OpsPreparationPackageDraftFactory.Input input(ChangePackagePreparationDecision decision,
+            Map<String, Object> request, OpsPreparationOperationBindingFactory.OperationBundle operations) {
         return new OpsPreparationPackageDraftFactory.Input(
                 "project-1",
                 "alice",
@@ -130,7 +160,7 @@ class OpsPreparationPackageDraftFactoryTest {
                 request,
                 agent(),
                 decision,
-                operationBundle(),
+                operations,
                 evidenceBundle(),
                 proofBundle(),
                 planEnvelope(),

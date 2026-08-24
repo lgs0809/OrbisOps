@@ -50,6 +50,7 @@ public class OpsWorkSessionContextPreparationService {
                         Consumer<OpsRuntimeEvent> eventSink,
                         long requestStartedNanos) {
         if (request == null) return;
+        request.setTrustedSkillBindings(OpsExplicitSkillBindings.capture(definition));
         String originalQuery = request.getQuery();
         request.getMetadata().putIfAbsent(
                 ORIGINAL_USER_QUERY_KEY,

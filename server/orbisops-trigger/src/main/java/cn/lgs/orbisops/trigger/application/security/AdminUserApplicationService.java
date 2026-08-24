@@ -56,7 +56,7 @@ public class AdminUserApplicationService {
             throw new IllegalArgumentException("FIRST_TIME_SETUP_REQUEST_REQUIRED");
         }
         try {
-            AdminUserLoginResult result = firstTimeSetupUseCase.setup(request.getUsername(), request.getPassword());
+            AdminUserLoginResult result = firstTimeSetupUseCase.setup(request.getUsername(), request.getPassword(), request.getPhone());
             return toResponse(result.account(), result.token());
         } catch (AdminUserAuthenticationException error) {
             throw new LoginFailedException(error.getMessage());
@@ -142,7 +142,8 @@ public class AdminUserApplicationService {
                 request.getUsername(),
                 request.getPassword(),
                 request.getUserRole(),
-                request.getStatus());
+                request.getStatus(),
+                request.getPhone());
     }
 
     private AdminUserCatalogQuery toQuery(AdminUserQueryRequestDTO request) {
@@ -161,7 +162,7 @@ public class AdminUserApplicationService {
         if (request == null) {
             return null;
         }
-        return new AdminUserLoginCommand(request.getUsername(), request.getPassword());
+        return new AdminUserLoginCommand(request.getUsername(), request.getPassword(), request.getPhone());
     }
 
     private List<AdminUserResponseDTO> toResponses(List<AdminUserAccount> accounts) {
@@ -170,7 +171,7 @@ public class AdminUserApplicationService {
                 : accounts.stream().map(account -> toResponse(account, null)).toList();
     }
 
-    private AdminUserResponseDTO toResponse(AdminUserAccount account, String token) {
+    public static AdminUserResponseDTO toResponse(AdminUserAccount account, String token) {
         if (account == null) {
             return null;
         }
@@ -178,8 +179,10 @@ public class AdminUserApplicationService {
                 .id(account.id())
                 .userId(account.userId())
                 .username(account.username())
+                .phone(account.phone())
                 .userRole(account.role() == null ? AdminUserRole.ADMIN.value() : account.role().value())
                 .status(account.status())
+                .passwordChangeRequired(account.passwordChangeRequired())
                 .createTime(account.createTime())
                 .updateTime(account.updateTime())
                 .token(token)

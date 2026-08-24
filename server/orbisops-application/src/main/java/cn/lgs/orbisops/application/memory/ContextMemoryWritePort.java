@@ -8,4 +8,8 @@ import java.util.List;
 public interface ContextMemoryWritePort {
 
     void saveExtractedItems(List<ColdMemoryItemSnapshot> items);
+
+    default void saveExtractedItemsStrict(List<ColdMemoryItemSnapshot> items) {
+        saveExtractedItems(items);
+    }
 }

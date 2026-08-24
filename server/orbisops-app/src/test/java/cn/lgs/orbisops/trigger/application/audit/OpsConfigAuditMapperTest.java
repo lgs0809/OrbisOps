@@ -65,6 +65,19 @@ class OpsConfigAuditMapperTest {
     }
 
     @Test
+    void adminCommandPreservesBusinessFailureOutcome() {
+        ConfigAuditCommand landing = mapper.adminCommand(
+                "project-1", "change-package", "landing-failed", "cp-1", null,
+                Map.of("status", "LANDING_FAILED", "reasonCode", "UPSTREAM_UNAVAILABLE"));
+        ConfigAuditCommand ordinaryReject = mapper.adminCommand(
+                "project-1", "change-package", "reject", "cp-2", null,
+                Map.of("status", "REJECTED"));
+
+        assertEquals("FAILED", landing.resultStatus());
+        assertEquals("SUCCESS", ordinaryReject.resultStatus());
+    }
+
+    @Test
     void mapsTypedEntryAndPolicyToLegacySnakeCaseContract() {
         ConfigAuditEntry entry = new ConfigAuditEntry(
                 9L, "audit-1", "project-1", "agent-1", "skill", "update", "skill", "skill-1",

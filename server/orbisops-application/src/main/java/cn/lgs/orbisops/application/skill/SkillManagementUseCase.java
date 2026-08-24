@@ -264,6 +264,10 @@ public final class SkillManagementUseCase {
         return port.getProjectEntry(project, id).view();
     }
 
+    public SkillReleaseRecoveryOutcome recoverProjectRelease(cn.lgs.orbisops.domain.skill.model.SkillReleaseSnapshot release) {
+        return rollbackUseCase.recoverRelease(release);
+    }
+
     private int version(int value) {
         if (value <= 0) throw new IllegalArgumentException("SKILL_VERSION_INVALID");
         return value;

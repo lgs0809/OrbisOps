@@ -43,6 +43,8 @@ public final class SkillEvolutionPipelineMapper {
         input.put("eventSummaries", summary.eventSummaries());
         input.put("evidenceRefs", evidenceViews(summary.evidenceReferences()));
         input.put("contextBundleHash", summary.contextBundleHash());
+        input.put("acceptedTaskEpisode", summary.episodeJson());
+        input.put("evolutionSourceHash", summary.sourceHash());
         return input;
     }
 

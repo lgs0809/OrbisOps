@@ -1,5 +1,6 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
+import cn.lgs.orbisops.application.changepackage.LandingOperationExecutionBinding;
 import cn.lgs.orbisops.trigger.ops.toolset.OpsToolExecutionService;
 import org.junit.jupiter.api.Test;
 
@@ -17,6 +18,25 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class OpsMcpUnifiedToolExecutorTest {
+
+    @Test
+    void nativeDispatchKeepsRetryIdentityAndSeparatesIndependentCalls() {
+        OpsToolExecutionService service = mock(OpsToolExecutionService.class);
+        OpsMcpUnifiedToolExecutor executor = new OpsMcpUnifiedToolExecutor(() -> service);
+        var keys = new java.util.ArrayList<String>();
+        when(service.executeMcp(any(OpsMcpServerConfig.class), anyString(), anyString(), anyString()))
+                .thenAnswer(call -> { keys.add(call.getArgument(3)); return Map.of("status", "SUCCEEDED"); });
+        String input = "{\"toolName\":\"updateTestFixture\",\"arguments\":{\"value\":1}}";
+        for (String id : List.of("call-a", "call-a", "call-b")) {
+            var context = new org.springframework.ai.chat.model.ToolContext(Map.of(
+                    OpsMcpDisclosureInterceptor.NATIVE_INVOCATION,
+                    new OpsMcpDisclosureInterceptor.NativeInvocation("project_mcp_ops", input, id)));
+            executor.executeDispatcher(config("PREPARE", "PREPARE_CHANGE", "test"), input, context,
+                    List.of(Map.of("toolName", "updateTestFixture", "readOnly", false)), "project_mcp_ops");
+        }
+        assertEquals(keys.get(0), keys.get(1));
+        org.junit.jupiter.api.Assertions.assertNotEquals(keys.get(0), keys.get(2));
+    }
 
     @Test
     void prepareChangeDirectMutationReturnsProposalWithoutToolExecution() {
@@ -79,6 +99,44 @@ class OpsMcpUnifiedToolExecutorTest {
         assertFalse(Boolean.TRUE.equals(result.get("remoteCallExecuted")));
         assertTrue(result.containsKey("proposedAction"));
         verifyNoInteractions(service);
+    }
+
+    @Test
+    void landingUsesFrozenExecutionBindingForMutationAndReceiptWithoutDoubleProjectingReceipt() {
+        OpsToolExecutionService service = mock(OpsToolExecutionService.class);
+        OpsMcpUnifiedToolExecutor executor = new OpsMcpUnifiedToolExecutor(() -> service);
+        OpsMcpServerConfig config = config("LANDING", "PROD_FULL");
+        config.setLandingOperationBindings(List.of(new LandingOperationExecutionBinding(
+                "operation-1", "execution-1", "mcp.ops-mcp", "restart_service",
+                "service://demo")));
+        when(service.executeLandingMcp(
+                any(OpsMcpServerConfig.class), anyString(), anyString(),
+                anyString(), org.mockito.ArgumentMatchers.anyBoolean(), anyString()))
+                .thenReturn(Map.of("status", "SUCCEEDED"));
+
+        executor.executeDirect(
+                config,
+                "restart_service",
+                "{\"service\":\"demo\",\"expectedVersion\":1}",
+                null,
+                false);
+        executor.executeDirect(
+                config,
+                "get_operation_receipt",
+                "{}",
+                null,
+                true);
+
+        verify(service).executeLandingMcp(
+                any(OpsMcpServerConfig.class), anyString(), anyString(),
+                org.mockito.ArgumentMatchers.eq("execution-1"),
+                org.mockito.ArgumentMatchers.eq(false),
+                org.mockito.ArgumentMatchers.eq("operation-1"));
+        verify(service).executeLandingMcp(
+                any(OpsMcpServerConfig.class), anyString(), anyString(),
+                org.mockito.ArgumentMatchers.eq("execution-1"),
+                org.mockito.ArgumentMatchers.eq(true),
+                org.mockito.ArgumentMatchers.eq(""));
     }
 
     private OpsMcpServerConfig config(String stage, String authority) {

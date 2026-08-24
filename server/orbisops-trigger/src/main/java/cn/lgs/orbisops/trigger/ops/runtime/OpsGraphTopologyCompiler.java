@@ -121,7 +121,9 @@ final class OpsGraphTopologyCompiler {
                 defaultEdge,
                 terminalNodeId);
         OpsWorkflowNode fromNode = nodeById.get(entry.getKey());
-        if (routeSelector.useParallelConditionalEdges(fromNode)) {
+        // A single possible branch has no fan-out. The SDK's parallel-node wrapper
+        // returns that branch's first result and can omit its downstream chain.
+        if (conditional.size() > 1 && routeSelector.useParallelConditionalEdges(fromNode)) {
             graph.addParallelConditionalEdges(
                     entry.getKey(),
                     AsyncMultiCommandAction.of(state ->

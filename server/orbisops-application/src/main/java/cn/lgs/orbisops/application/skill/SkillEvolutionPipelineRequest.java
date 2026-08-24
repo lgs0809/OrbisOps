@@ -2,6 +2,7 @@ package cn.lgs.orbisops.application.skill;
 
 import cn.lgs.orbisops.domain.skill.model.SkillEvolutionInputSummary;
 import cn.lgs.orbisops.domain.skill.model.SkillEvolutionOpportunityInput;
+import cn.lgs.orbisops.domain.skill.model.SkillEvolutionJobSnapshot;
 
 public record SkillEvolutionPipelineRequest(
         String projectId,
@@ -10,7 +11,13 @@ public record SkillEvolutionPipelineRequest(
         String sessionId,
         String triggerReason,
         SkillEvolutionInputSummary summary,
-        SkillEvolutionOpportunityInput opportunity) {
+        SkillEvolutionOpportunityInput opportunity,
+        SkillEvolutionJobSnapshot jobClaim) {
+
+    public SkillEvolutionPipelineRequest(String projectId, String agentId, String runId, String sessionId,
+            String triggerReason, SkillEvolutionInputSummary summary, SkillEvolutionOpportunityInput opportunity) {
+        this(projectId, agentId, runId, sessionId, triggerReason, summary, opportunity, null);
+    }
 
     public SkillEvolutionPipelineRequest(
             String projectId,

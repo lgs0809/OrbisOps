@@ -26,6 +26,13 @@ public class GlobalResponseStatusAdvice implements ResponseBodyAdvice<Object> {
                                   Class<? extends HttpMessageConverter<?>> selectedConverterType,
                                   ServerHttpRequest request,
                                   ServerHttpResponse response) {
+        // An exception handler returning ResponseEntity owns its explicit error
+        // status. The legacy body-code mapper must not turn its 409 into 500.
+        if (returnType != null && org.springframework.http.ResponseEntity.class.isAssignableFrom(returnType.getParameterType())
+                && response instanceof org.springframework.http.server.ServletServerHttpResponse servlet
+                && servlet.getServletResponse().getStatus() >= 400) {
+            return body;
+        }
         if (body instanceof Response<?> apiResponse) {
             HttpStatus status = mapStatus(apiResponse.getCode(), apiResponse.getInfo());
             if (status != null) {

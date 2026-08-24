@@ -19,6 +19,13 @@ public final class OpsNodeDeadlineContext {
         }
         long requestedDeadline = System.nanoTime()
                 + TimeUnit.SECONDS.toNanos(Math.max(1, timeoutSeconds));
+        return withDeadline(requestedDeadline, supplier);
+    }
+
+    public static Long captureDeadline() { return DEADLINE_NANOS.get(); }
+
+    public static <T> T withDeadline(Long requestedDeadline, Supplier<T> supplier) {
+        if (requestedDeadline == null) return supplier.get();
         Long previous = DEADLINE_NANOS.get();
         long effectiveDeadline = previous == null
                 ? requestedDeadline : Math.min(previous, requestedDeadline);

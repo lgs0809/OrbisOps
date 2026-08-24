@@ -92,9 +92,11 @@ public final class OpsRuntimeResourceContextFactory {
                 .events(events)
                 .eventSink(eventSink)
                 .projectId(projectId)
+                // A published node's explicit model is part of its compiled resource identity.
+                // The chat selector supplies a default only for nodes without a model binding.
                 .modelId(firstText(
-                        request == null ? null : request.getModelId(),
                         node.getModelId(),
+                        request == null ? null : request.getModelId(),
                         definition.getModelId()))
                 .ragEnabled(firstNonNull(
                         node.getRagEnabled(),
@@ -142,8 +144,8 @@ public final class OpsRuntimeResourceContextFactory {
                 .eventSink(eventSink)
                 .projectId(projectId)
                 .modelId(firstText(
-                        request == null ? null : request.getModelId(),
                         config.getModelId(),
+                        request == null ? null : request.getModelId(),
                         definition.getModelId()))
                 .ragEnabled(firstNonNull(
                         config.getRagEnabled(),

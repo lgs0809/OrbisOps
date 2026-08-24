@@ -147,7 +147,7 @@ public final class JdbcAgentDefinitionSchemaInitializer {
                   from_node_id VARCHAR(80) NOT NULL COMMENT '起点节点',
                   to_node_id VARCHAR(80) NOT NULL COMMENT '终点节点',
                   condition_type VARCHAR(48) NOT NULL DEFAULT 'always' COMMENT '条件类型',
-                  condition_expr VARCHAR(512) NOT NULL DEFAULT 'always' COMMENT '条件表达式',
+                  condition_expr TEXT NOT NULL DEFAULT ('always') COMMENT '条件表达式或有界规则AST',
                   default_edge TINYINT NULL COMMENT '是否默认边',
                   feedback_edge TINYINT NULL COMMENT '是否回边',
                   priority_order INT NULL COMMENT '条件优先级',
@@ -169,6 +169,17 @@ public final class JdbcAgentDefinitionSchemaInitializer {
         ensureColumn("ai_ops_agent_edge", "feedback_edge", "TINYINT NULL COMMENT '是否回边'");
         ensureColumn("ai_ops_agent_edge", "priority_order", "INT NULL COMMENT '条件优先级'");
         ensureColumn("ai_ops_agent_edge", "data_mapping_json", "TEXT NULL COMMENT '数据映射JSON'");
+        String ruleType = jdbcTemplate.queryForObject("""
+                SELECT DATA_TYPE FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='ai_ops_agent_edge'
+                  AND COLUMN_NAME='condition_expr'
+                """, String.class);
+        if ("varchar".equalsIgnoreCase(ruleType) || "char".equalsIgnoreCase(ruleType)) {
+            jdbcTemplate.execute("""
+                    ALTER TABLE ai_ops_agent_edge MODIFY condition_expr
+                    TEXT NOT NULL DEFAULT ('always') COMMENT '条件表达式或有界规则AST'
+                    """);
+        }
 
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS ai_ops_agentscope_agent (

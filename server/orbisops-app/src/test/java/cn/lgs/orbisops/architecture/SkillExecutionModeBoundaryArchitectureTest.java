@@ -24,6 +24,7 @@ class SkillExecutionModeBoundaryArchitectureTest {
         String snapshot = read(APPLICATION + "SkillCatalogSnapshot.java");
         String assembler = read(APPLICATION + "SkillRuntimeCandidateAssembler.java");
         String selection = read(APPLICATION + "SelectRuntimeSkillsQuery.java");
+        String access = read(APPLICATION + "SkillRuntimeCatalogAccess.java");
 
         assertAll(
                 () -> assertTrue(state.contains("lifecycleStatus == SkillLifecycleStatus.ACTIVE")),
@@ -32,7 +33,9 @@ class SkillExecutionModeBoundaryArchitectureTest {
                 () -> assertFalse(candidate.contains("!\"FROZEN\".equals")),
                 () -> assertTrue(snapshot.contains("return runtimeCandidate.activeAtUse();")),
                 () -> assertTrue(assembler.contains("governancePolicy.governanceState(skill)")),
-                () -> assertTrue(selection.contains("skill.activeAtUse()")),
+                () -> assertTrue(access.contains("c.activeAtUse()")),
+                () -> assertTrue(access.contains("now.scope().equals(c.scope())")),
+                () -> assertTrue(selection.contains("access.retain(request.projectId()")),
                 () -> assertFalse(selection.contains("updateMode")),
                 () -> assertFalse(selection.contains("mutationMode")));
     }

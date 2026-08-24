@@ -32,6 +32,15 @@ class OpsRuntimeToolContributorSpringWiringTest {
     @MockitoBean(name = "mysqlJdbcTemplate")
     private JdbcTemplate mysqlJdbcTemplate;
 
+    @MockitoBean
+    private cn.lgs.orbisops.application.skill.SkillRuntimeBudgetPort skillRuntimeBudget;
+
+    @MockitoBean
+    private cn.lgs.orbisops.application.skill.SkillFileProjectionPort skillFileProjection;
+
+    @MockitoBean
+    private cn.lgs.orbisops.infrastructure.adapter.repository.JdbcSkillRoutePublicationRepository skillRoutePublication;
+
     @Autowired
     private OpsRuntimeToolContributorRegistry registry;
 

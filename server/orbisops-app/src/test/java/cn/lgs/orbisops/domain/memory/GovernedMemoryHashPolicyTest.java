@@ -16,7 +16,7 @@ class GovernedMemoryHashPolicyTest {
     private final GovernedMemoryHashPolicy hashPolicy = new GovernedMemoryHashPolicy();
 
     @Test
-    void preservesHistoricalIdempotencyInputOrderAndSha256() {
+    void idempotencySeparatesLogicalKeysAndRunIdentity() {
         GovernedMemoryDraft draft = memoryPolicy.draft(
                 "PROJECT",
                 "demo-project",
@@ -30,7 +30,7 @@ class GovernedMemoryHashPolicyTest {
                 "LOW");
 
         assertEquals(
-                "d4ec371cd5563ea7a2d9f37323bcb71b58662e909eff999e54a1bfbba26dc1fd",
+                "a4d166b8a3d530e5babe30129aab9b4e4d23dc3351ea602a5199745c8d18625e",
                 hashPolicy.idempotencyKey(draft, "run-1"));
     }
 

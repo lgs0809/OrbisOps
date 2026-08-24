@@ -1,6 +1,8 @@
 package cn.lgs.orbisops.trigger.application.security;
 
 import cn.lgs.orbisops.application.security.AdminUserAuthenticationPort;
+import cn.lgs.orbisops.application.security.AdminCredentialLifecyclePort;
+import cn.lgs.orbisops.application.security.AdminCredentialLifecycleUseCase;
 import cn.lgs.orbisops.application.security.AdminUserAuthenticationUseCase;
 import cn.lgs.orbisops.application.security.AdminUserCatalogPort;
 import cn.lgs.orbisops.application.security.AdminUserCatalogUseCase;
@@ -13,6 +15,12 @@ import org.springframework.core.env.Environment;
 /** Spring property and Application assembly boundary for account security. */
 @Configuration
 public class AdminSecurityConfiguration {
+
+    @Bean
+    public AdminCredentialLifecycleUseCase adminCredentialLifecycleUseCase(AdminUserCatalogPort catalog,
+            AdminCredentialLifecyclePort credentials, AdminUserAuthenticationPort authentication, AdminCredentialRules rules) {
+        return new AdminCredentialLifecycleUseCase(catalog, credentials, authentication, rules);
+    }
 
     @Bean
     public AdminUserSecuritySettings adminUserSecuritySettings(Environment environment) {

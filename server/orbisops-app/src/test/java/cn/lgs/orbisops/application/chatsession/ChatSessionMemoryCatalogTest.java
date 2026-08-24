@@ -28,6 +28,8 @@ class ChatSessionMemoryCatalogTest {
                 "owner", "agent-1", "慢 sql", true, 10)).size());
         assertTrue(catalog.search(new ChatSessionSearchCriteria(
                 "stranger", "", "", null, 10)).isEmpty());
+        assertEquals(1, catalog.search(new ChatSessionSearchCriteria("owner", "", "", null, 10, "project-1")).size());
+        assertTrue(catalog.search(new ChatSessionSearchCriteria("owner", "", "", null, 10, "project-2")).isEmpty());
     }
 
     @Test

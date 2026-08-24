@@ -46,7 +46,8 @@ public class OpsMcpExecutionMapper {
                 trustedLandingRuntime && Boolean.TRUE.equals(config.getLandingApproved()),
                 text(config.getChangePackageId()),
                 text(config.getApprovedPackageHash()),
-                config.getApprovedPackageVersion() == null ? 0 : config.getApprovedPackageVersion());
+                config.getApprovedPackageVersion() == null ? 0 : config.getApprovedPackageVersion(),
+                config.getAuthorityDeadline());
         return new McpExecutionRequest(
                 typed, text(actor), toolInput, parse(toolInput), trustedLandingRuntime);
     }
@@ -63,6 +64,7 @@ public class OpsMcpExecutionMapper {
                 .mcpId(config.mcpId())
                 .toolId(config.toolId())
                 .operationId(config.operationId())
+                .authorityDeadline(config.authorityDeadline())
                 .toolCallStage(stage)
                 .progressiveManaged(true)
                 .landingApproved(landing)
@@ -105,7 +107,7 @@ public class OpsMcpExecutionMapper {
     }
 
     private void structuredProviderResult(Map<String, Object> result) {
-        if (result == null || result.containsKey("providerResult")) return;
+        if (result == null || result.containsKey("providerResult") || result.containsKey("normalizedContent")) return;
         Object raw = result.get("rawPreview");
         if (!(raw instanceof String text) || text.isBlank()) return;
         try {

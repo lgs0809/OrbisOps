@@ -27,7 +27,7 @@ class OpsSemanticLexicalWriteAdapterTest {
                 provider,
                 () -> "unsafe table;drop");
         SemanticMemoryDocumentSnapshot snapshot = new SemanticMemoryDocumentSnapshot(
-                "",
+                "0305918d-a9af-4838-9328-7b7e451512ab",
                 "semantic memory",
                 Map.of(
                         "memory_type", "ops_chat",
@@ -36,9 +36,12 @@ class OpsSemanticLexicalWriteAdapterTest {
         adapter.writeLexical(snapshot);
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> idCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> metadataCaptor = ArgumentCaptor.forClass(String.class);
-        verify(jdbc).update(sqlCaptor.capture(), contentCaptor.capture(), metadataCaptor.capture());
+        verify(jdbc).update(sqlCaptor.capture(), idCaptor.capture(), contentCaptor.capture(), metadataCaptor.capture());
+        assertEquals(snapshot.id(), idCaptor.getValue());
+        assertTrue(sqlCaptor.getValue().contains("ON CONFLICT (id) DO UPDATE"));
         assertTrue(sqlCaptor.getValue().contains("INSERT INTO orbisops_vector_store"));
         assertTrue(sqlCaptor.getValue().contains("?::jsonb"));
         assertEquals("semantic memory", contentCaptor.getValue());

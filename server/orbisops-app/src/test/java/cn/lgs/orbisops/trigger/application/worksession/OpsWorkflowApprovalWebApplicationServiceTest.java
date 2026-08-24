@@ -41,6 +41,26 @@ class OpsWorkflowApprovalWebApplicationServiceTest {
     }
 
     @Test
+    void staleBrowserApprovalCannotApproveTheNextNodeOrPublishResume() {
+        when(approvals.findCurrent("run-1")).thenReturn(Optional.of(approval(WorkflowApprovalRecord.Status.WAITING, "")));
+        SecurityException failure = assertThrows(SecurityException.class,
+                () -> service.decide("run-1", "project-1", "user-1", "APPROVE", "obsolete-approval"));
+        assertEquals("WORKFLOW_APPROVAL_REVIEWED_RECORD_MISMATCH", failure.getMessage());
+        org.mockito.Mockito.verifyNoInteractions(workSessions, events);
+        verify(approvals, never()).decide(any(), any(), any());
+        assertThrows(IllegalArgumentException.class,
+                () -> service.decide("run-1", "project-1", "user-1", "APPROVE", ""));
+    }
+
+    @Test
+    void staleResumeCannotTargetANewerApproval() {
+        when(approvals.findCurrent("run-1")).thenReturn(Optional.of(approval(WorkflowApprovalRecord.Status.APPROVED, "user-1")));
+        assertThrows(SecurityException.class,
+                () -> service.retryResume("run-1", "project-1", "user-1", "obsolete-approval"));
+        org.mockito.Mockito.verifyNoInteractions(workSessions, events);
+    }
+
+    @Test
     void actorViewRequiresWorkSessionReadAndNeverExposesAuthorityHashes() {
         WorkSessionRunSnapshot run = run(WorkSessionRunStatus.WAITING_APPROVAL);
         WorkflowApprovalRecord waiting = approval(WorkflowApprovalRecord.Status.WAITING, "");
@@ -70,7 +90,7 @@ class OpsWorkflowApprovalWebApplicationServiceTest {
         when(workSessions.resumeApproval("run-1", "project-1", "user-1")).thenReturn(run);
         when(approvals.decide(waiting, WorkflowApprovalRecord.Decision.APPROVE, "user-1")).thenReturn(approved);
 
-        Map<String, Object> view = service.decide("run-1", "project-1", "user-1", "approve");
+        Map<String, Object> view = service.decide("run-1", "project-1", "user-1", "approve", "workflow-approval-1");
 
         assertEquals("APPROVED", view.get("status"));
         assertEquals(true, view.get("resumeRequired"));
@@ -87,7 +107,7 @@ class OpsWorkflowApprovalWebApplicationServiceTest {
         when(approvals.findCurrent("run-1")).thenReturn(Optional.of(approved));
         when(workSessions.resumeApproval("run-1", "project-1", "user-1")).thenReturn(run);
 
-        Map<String, Object> view = service.decide("run-1", "project-1", "user-1", "APPROVE");
+        Map<String, Object> view = service.decide("run-1", "project-1", "user-1", "APPROVE", "workflow-approval-1");
 
         assertEquals("APPROVED", view.get("status"));
         verify(approvals, never()).decide(any(), any(), any());
@@ -102,7 +122,7 @@ class OpsWorkflowApprovalWebApplicationServiceTest {
         when(workSessions.resumeApproval("run-1", "project-1", "user-1")).thenReturn(run);
 
         SecurityException failure = assertThrows(SecurityException.class,
-                () -> service.decide("run-1", "project-1", "user-1", "REJECT"));
+                () -> service.decide("run-1", "project-1", "user-1", "REJECT", "workflow-approval-1"));
 
         assertEquals("WORKFLOW_APPROVAL_OPPOSITE_DECISION_FORBIDDEN", failure.getMessage());
         verify(events, never()).publishEvent(any());
@@ -115,7 +135,7 @@ class OpsWorkflowApprovalWebApplicationServiceTest {
         when(approvals.findCurrent("run-1")).thenReturn(Optional.of(rejected));
         when(workSessions.resumeApproval("run-1", "project-1", "user-1")).thenReturn(run);
 
-        Map<String, Object> view = service.retryResume("run-1", "project-1", "user-1");
+        Map<String, Object> view = service.retryResume("run-1", "project-1", "user-1", "workflow-approval-1");
 
         assertEquals("REJECTED", view.get("status"));
         verify(events).publishEvent(any(WorkflowApprovalDecidedEvent.class));

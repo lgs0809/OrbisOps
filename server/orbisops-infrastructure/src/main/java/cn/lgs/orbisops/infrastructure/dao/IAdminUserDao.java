@@ -2,6 +2,7 @@ package cn.lgs.orbisops.infrastructure.dao;
 
 import cn.lgs.orbisops.infrastructure.dao.po.AdminUser;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
@@ -11,6 +12,10 @@ import java.util.List;
  */
 @Mapper
 public interface IAdminUserDao {
+
+    int changeCredential(@Param("userId") String userId, @Param("version") long version,
+                         @Param("credential") String credential);
+    int resetToInitialCredential(@Param("userId") String userId, @Param("version") long version);
 
     /**
      * 插入管理员用户
@@ -67,6 +72,8 @@ public interface IAdminUserDao {
      * @return 管理员用户对象
      */
     AdminUser queryByUsername(String username);
+
+    AdminUser queryByPhone(String phone);
 
     /**
      * 查询启用状态的管理员用户列表

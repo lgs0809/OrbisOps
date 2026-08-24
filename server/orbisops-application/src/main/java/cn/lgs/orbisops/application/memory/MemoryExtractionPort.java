@@ -8,4 +8,10 @@ import java.util.List;
 public interface MemoryExtractionPort {
 
     List<ColdMemoryItemSnapshot> extract(MemoryMessageView message);
+
+    default Outcome extractDurably(MemoryMessageView message) { return new Outcome(extract(message), false, "EXTRACTED"); }
+
+    record Outcome(List<ColdMemoryItemSnapshot> items, boolean modelPending, String kind) {
+        public Outcome { items = items == null ? List.of() : List.copyOf(items); }
+    }
 }

@@ -8,7 +8,6 @@ import cn.lgs.orbisops.application.model.ModelAvailabilityPort;
 import cn.lgs.orbisops.application.modelpolicy.ModelDefaultPolicyApplicationService;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
-import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.util.StringUtils;
@@ -64,6 +63,10 @@ public final class OpsRuntimeModelResolver {
     }
 
     public ChatModel resolve(OpsRuntimeResourceContext context) {
+        if (!OpsRuntimeModelRequirement.requiresChatModel(context)) {
+            context.getMetadata().put("modelResolution", "NOT_REQUIRED_BY_DETERMINISTIC_NODES");
+            return null;
+        }
         String modelId = context == null ? "" : value(context.getModelId());
         if (!StringUtils.hasText(modelId)) {
             modelId = defaultModelSelector.resolve(context);
@@ -77,36 +80,30 @@ public final class OpsRuntimeModelResolver {
         AiClientModelCatalogPort modelRepository = modelRepositorySupplier.get();
         AiClientApiCatalogPort apiRepository = apiRepositorySupplier.get();
         if (modelRepository == null || apiRepository == null) {
-            warn(context, "Model 配置库不可用，降级默认模型：" + modelId);
-            return defaultChatModel();
+            throw new IllegalStateException("MODEL_CATALOG_UNAVAILABLE");
         }
         AiClientModelDefinition model = modelRepository.findByModelId(modelId);
         if (model == null || !Integer.valueOf(1).equals(model.status())) {
-            warn(context, "Model 配置不存在或未启用，降级默认模型：" + context.getModelId());
-            return defaultChatModel();
+            throw new IllegalStateException("MODEL_BINDING_UNAVAILABLE");
         }
         AiClientApiDefinition api = apiRepository.findByApiId(model.apiId());
         if (api == null || !Integer.valueOf(1).equals(api.status())) {
-            warn(context, "Model 关联 API 不存在或未启用，降级默认模型：" + model.apiId());
-            return defaultChatModel();
+            throw new IllegalStateException("MODEL_PROVIDER_BINDING_UNAVAILABLE");
         }
-        OpenAiApi openAiApi = OpenAiApi.builder()
-                .baseUrl(api.baseUrl())
-                .apiKey(secretResolver.resolve(api.apiKey()))
-                .completionsPath(firstText(api.completionsPath(), "v1/chat/completions"))
-                .embeddingsPath(firstText(api.embeddingsPath(), "v1/embeddings"))
-                .restClientBuilder(OpsModelHttpClientFactory.restClientBuilder(
-                        settings.connectTimeoutSeconds(),
-                        settings.readTimeoutSeconds()))
-                .build();
+        OpenAiApi openAiApi = new OpsResilientOpenAiApi(api.baseUrl(), secretResolver.resolve(api.apiKey()),
+                firstText(api.completionsPath(), "/v1/chat/completions"),
+                firstText(api.embeddingsPath(), "/v1/embeddings"),
+                settings.connectTimeoutSeconds(), settings.readTimeoutSeconds(), settings.requestBudgetMillis(), context::record);
         context.getMetadata().put("modelName", model.modelName());
         context.getMetadata().put("apiId", api.apiId());
+        context.getMetadata().put("modelBindingHash", cn.lgs.orbisops.domain.shared.service.CanonicalObjectHasher.sha256(Map.of(
+                "modelId",model.modelId(),"modelName",model.modelName(),"apiId",api.apiId(),
+                "baseUrl",api.baseUrl(),"path",firstText(api.completionsPath(),"/v1/chat/completions"))));
         return OpenAiChatModel.builder()
                 .openAiApi(openAiApi)
-                // Platform runtime owns retries/time budgets explicitly. Hidden SDK retry/backoff
-                // makes one durable model attempt non-observable and can outlive the node budget.
+                // OpsResilientOpenAiApi owns the observable HTTP retry budget. Never multiply it in the SDK.
                 .retryTemplate(RetryTemplate.builder().maxAttempts(1).noBackoff().build())
-                .defaultOptions(OpenAiChatOptions.builder()
+                .defaultOptions(OpsAgentScopeConfigPolicy.toolCallingOptions()
                         .model(model.modelName())
                         .build())
                 .build();

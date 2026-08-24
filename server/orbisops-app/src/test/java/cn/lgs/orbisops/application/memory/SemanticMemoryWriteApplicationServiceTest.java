@@ -134,6 +134,31 @@ class SemanticMemoryWriteApplicationServiceTest {
         assertEquals("lexical", result.storage());
     }
 
+    @Test void configuredButTemporarilyUnavailableEmbeddingKeepsLexicalAndDurableModelIntent() {
+        var calls=new AtomicInteger();
+        var service=service(document->calls.incrementAndGet(),document->{},null);
+        var legacy=command(false);
+        var configured=new SemanticMemoryWriteCommand(legacy.sessionId(),legacy.userId(),legacy.role(),legacy.content(),legacy.createdAt(),legacy.metadata(),false,true);
+        var result=service.write(configured);
+        assertTrue(result.written());assertEquals("lexical",result.storage());assertTrue(result.modelPending());
+        assertEquals("EMBEDDING_TEMPORARILY_UNAVAILABLE",result.reason());assertEquals(0,calls.get());
+        var intentional=service.write(command(false));assertFalse(intentional.modelPending());assertEquals("INTENTIONAL_LEXICAL",intentional.reason());
+    }
+    @Test void transientVectorFailureDoesNotBecomeCompletedLexicalAndLateEpochsHaveDifferentPhysicalIds() {
+        var vectors=new ArrayList<SemanticMemoryDocumentSnapshot>();var lexical=new ArrayList<SemanticMemoryDocumentSnapshot>();
+        var service=service(document->{vectors.add(document);throw new IllegalStateException("temporary");},lexical::add,null);
+        var input=command(true);
+        for(int epoch=1;epoch<=10;epoch++) {
+            var metadata=new java.util.LinkedHashMap<>(input.metadata());metadata.put("semantic_job_id",42L);metadata.put("semantic_epoch",epoch);metadata.put("semantic_source_hash","frozen");
+            var result=service.write(new SemanticMemoryWriteCommand(input.sessionId(),input.userId(),input.role(),input.content(),input.createdAt(),metadata,true,true));
+            assertTrue(result.written());assertTrue(result.modelPending());assertEquals("lexical",result.storage());
+        }
+        assertEquals(10,vectors.stream().map(SemanticMemoryDocumentSnapshot::id).distinct().count());
+        assertEquals(1,lexical.stream().map(SemanticMemoryDocumentSnapshot::id).distinct().count());
+        assertTrue(vectors.stream().allMatch(document->"VECTOR".equals(document.metadata().get("semantic_projection"))));
+        assertTrue(lexical.stream().allMatch(document->"LEXICAL".equals(document.metadata().get("semantic_projection"))));
+    }
+
     @Test
     void nullBlankOrMissingPersistencePortsAreSkipped() {
         SemanticMemoryWriteApplicationService service = service(null, null, null);

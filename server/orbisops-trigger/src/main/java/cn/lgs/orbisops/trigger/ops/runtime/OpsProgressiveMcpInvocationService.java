@@ -73,11 +73,15 @@ public final class OpsProgressiveMcpInvocationService {
                     schema);
             callAuditMetadata.putAll(assessment.auditMetadata());
             remoteCallPolicy.assertAllowed(assessment, remoteArgs);
+            // A connection/config may serve concurrent tools with different reviewed effects.
+            // Never publish per-call authority into that shared configuration.
+            OpsMcpServerConfig verified = config.toBuilder().verifiedReadOnly(assessment.readOnly())
+                    .verifiedToolSchema(Map.copyOf(schema)).build();
             if (assessment.callbackPolicyRequired()) {
-                callbackPolicy.assertAllowed(config, runtimeInvoker.find(config, remoteToolName));
+                callbackPolicy.assertAllowed(verified, runtimeInvoker.find(verified, remoteToolName));
             }
             remoteCallStarted.set(true);
-            return remoteCall.invoke(config, remoteToolName, remoteArgs);
+            return remoteCall.invoke(verified, remoteToolName, remoteArgs);
         } catch (RuntimeException error) {
             recordPreRemoteFailure(
                     remoteCallStarted.get(), config, remoteToolName,

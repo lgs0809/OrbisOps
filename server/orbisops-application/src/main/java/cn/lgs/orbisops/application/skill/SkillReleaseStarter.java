@@ -87,6 +87,7 @@ public final class SkillReleaseStarter {
                 "",
                 Map.of(
                         "shadow", shadow.view(),
+                        "observationContract", releasePort.observationContract(candidate),
                         "minimumSampleSize", settings.minimumSampleSize()));
         releasePort.create(release);
         candidateService.updateStatus(

@@ -11,11 +11,13 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 
 class OpsRuntimeWorkflowBindingAdapterTest {
 
@@ -63,6 +65,23 @@ class OpsRuntimeWorkflowBindingAdapterTest {
         assertEquals(4, plan.nodes().get(0).resources().size());
         assertTrue(plan.nodes().get(0).resources().stream().anyMatch(resource ->
                 resource.kind() == BoundWorkflowResourceKind.MCP && "mcp-1".equals(resource.resourceId())));
+    }
+
+    @Test
+    void differentChatModelMustNotInvalidateThePublishedNodeBinding() {
+        var factory = new OpsRuntimeResourceContextFactory(
+                mock(OpsRuntimeSkillResolver.class), mock(OpsRuntimeMcpResolver.class));
+        var definition = OpsAgentDefinition.builder().modelId("definition-model").build();
+        var request = OpsAgentChatRequest.builder().modelId("other-model").build();
+        var node = OpsWorkflowNode.builder().nodeId("start").modelId("model-1").build();
+        var context = factory.node(definition, node, request, new ArrayList<>(), null);
+        var plan = new OpsRuntimeWorkflowBindingAdapter().bind(
+                compiled(), runtime(factory.agent(definition, request, new ArrayList<>(), null).getModelId()),
+                Map.of("start", runtime(context.getModelId())), contextBundle(),
+                "session-1", "run-1", Instant.now());
+        assertTrue(plan.nodes().get(0).resources().stream().anyMatch(resource ->
+                resource.kind() == BoundWorkflowResourceKind.MODEL && "model-1".equals(resource.resourceId())));
+        assertEquals("other-model", request.getModelId());
     }
 
     @Test

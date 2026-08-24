@@ -24,6 +24,28 @@ import static org.mockito.Mockito.when;
 
 class SkillEvolutionSourceDiversityTest {
 
+    @Test void completedAndLargeLegacyCountsCannotReachTheAuthoringOrReleasePipeline() {
+        var signals=mock(SkillEvolutionSignalApplicationService.class);
+        var experiences=mock(SkillExperienceApplicationService.class);
+        var candidates=mock(SkillPatchCandidateApplicationService.class);
+        var releases=mock(SkillReleaseApplicationService.class);
+        var authoring=mock(SkillEvolutionAuthoringPort.class);
+        var similarity=mock(SkillEvolutionSimilarityPort.class);
+        var observation=new SkillExperienceObservation("legacy-episode","observation","cluster","p1","a1","run","session",
+                "SUCCESSFUL_DIAGNOSTIC_PATTERN",new SkillExperienceTaskTemplate("OPS_INVESTIGATION","errors","SUCCESS",List.of("LOGS"),"SUCCEEDED"),
+                "hash",List.of("QUERY_LOGS"),"trajectory","SUCCEEDED",List.of(),"Legacy completed flag is not acceptance",100,1D);
+        when(experiences.recordObservation(any())).thenReturn(new SkillExperienceRecordResult(observation,
+                new SkillExperienceClusterSnapshot(100,100,100,"ACCUMULATING",100),false));
+        var service=new SkillEvolutionApplicationService(signals,experiences,candidates,releases,authoring,similarity,
+                mock(SkillEvolutionPipelineAuditPort.class),new SkillEvolutionPayloadCodec(),new SkillEvolutionOpportunityPolicy(),
+                new SkillEvolutionPromotionSettings(3,3));
+        var summary=new SkillEvolutionInputSummary(List.of("完成"),List.of("log query"),"排查接口错误","因为日志证据显示同类错误，先查询日志然后验证根因。".repeat(4),
+                true,true,true,List.of(new cn.lgs.orbisops.domain.skill.model.SkillEvolutionEvidenceReference("e1","r1","h1")),"context-hash");
+        var decision=service.decide(new SkillEvolutionPipelineRequest("p1","a1","run","session","RUN_COMPLETED",summary));
+        assertEquals("SKIP_TASK_OUTCOME_UNVERIFIED",decision.reasonCode());
+        org.mockito.Mockito.verifyNoInteractions(signals,candidates,releases,authoring,similarity);
+    }
+
     @Test
     void repeatedEventsFromOneSessionDoNotCreateCandidate() {
         SkillEvolutionSignalApplicationService signals =
@@ -57,7 +79,8 @@ class SkillEvolutionSourceDiversityTest {
                         List.of("LOGS"), "SUCCEEDED"),
                 "task-hash", List.of("QUERY_LOGS"), "trajectory-hash",
                 "SUCCEEDED", List.of(), "根因和证据已验证".repeat(10),
-                3, 1D);
+                3, 1D, new cn.lgs.orbisops.domain.skill.model.VerifiedTaskOutcome(
+                        "p1","run-3","synthetic-task",1,"synthetic-acceptance","synthetic-condition"));
         when(experiences.recordObservation(any())).thenReturn(
                 new SkillExperienceRecordResult(
                         observation,

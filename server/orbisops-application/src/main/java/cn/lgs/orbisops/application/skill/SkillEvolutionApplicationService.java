@@ -6,6 +6,7 @@ import cn.lgs.orbisops.domain.skill.model.SkillEvolutionSignalSnapshot;
 import cn.lgs.orbisops.domain.skill.model.SkillExperienceClusterEvidence;
 import cn.lgs.orbisops.domain.skill.model.SkillExperienceConsolidationSample;
 import cn.lgs.orbisops.domain.skill.service.SkillEvolutionOpportunityPolicy;
+import cn.lgs.orbisops.domain.skill.service.SkillEvolutionSourceSetPolicy;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -15,7 +16,12 @@ import java.util.Map;
 public class SkillEvolutionApplicationService implements SkillEvolutionPipelinePort {
 
     private static final int PENDING_HINT_LIMIT = 50;
-    private static final int AUTHORING_CANDIDATE_BUDGET = 3;
+    private static final int AUTHORING_CANDIDATE_BUDGET = 1;
+
+    private SkillExperienceGroupingService grouping;
+    public SkillEvolutionApplicationService withGrouping(SkillExperienceGroupingService grouping) {
+        this.grouping=java.util.Objects.requireNonNull(grouping);return this;
+    }
 
     private final SkillEvolutionSignalApplicationService signalService;
     private final SkillExperienceApplicationService experienceService;
@@ -26,7 +32,7 @@ public class SkillEvolutionApplicationService implements SkillEvolutionPipelineP
     private final SkillEvolutionPromotionSettings promotionSettings;
     private final SkillEvolutionPipelineMapper mapper;
     private final SkillEvolutionHintSelector hintSelector;
-    private final SkillEvolutionMultiCandidateAuthoringService multiCandidateAuthoringService;
+    private final SkillEvolutionProposalPort proposalPort;
     private final SkillEvolutionCandidateSetSelector candidateSetSelector;
     private final SkillCandidateTournamentRolloutCoordinator tournamentRolloutCoordinator;
     private final SkillEvolutionCandidateCoordinator candidateCoordinator;
@@ -71,6 +77,18 @@ public class SkillEvolutionApplicationService implements SkillEvolutionPipelineP
             SkillEvolutionPromotionSettings promotionSettings,
             SkillEvolutionCandidateSetSelector candidateSetSelector,
             SkillCandidateTournamentSettings tournamentSettings) {
+        this(signalService,experienceService,candidateService,releaseService,authoringPort,similarityPort,auditPort,
+                payloadCodecPort,opportunityPolicy,promotionSettings,candidateSetSelector,tournamentSettings,null);
+    }
+
+    public SkillEvolutionApplicationService(
+            SkillEvolutionSignalApplicationService signalService,SkillExperienceApplicationService experienceService,
+            SkillPatchCandidateApplicationService candidateService,SkillReleaseApplicationService releaseService,
+            SkillEvolutionAuthoringPort authoringPort,SkillEvolutionSimilarityPort similarityPort,
+            SkillEvolutionPipelineAuditPort auditPort,SkillEvolutionPayloadCodec payloadCodecPort,
+            SkillEvolutionOpportunityPolicy opportunityPolicy,SkillEvolutionPromotionSettings promotionSettings,
+            SkillEvolutionCandidateSetSelector candidateSetSelector,SkillCandidateTournamentSettings tournamentSettings,
+            SkillEvolutionProposalPort proposalPort) {
         if (signalService == null
                 || experienceService == null
                 || candidateService == null
@@ -96,8 +114,7 @@ public class SkillEvolutionApplicationService implements SkillEvolutionPipelineP
         this.promotionSettings = promotionSettings;
         this.mapper = new SkillEvolutionPipelineMapper(payloadCodecPort);
         this.hintSelector = new SkillEvolutionHintSelector(payloadCodecPort);
-        this.multiCandidateAuthoringService =
-                new SkillEvolutionMultiCandidateAuthoringService(authoringPort);
+        this.proposalPort = proposalPort;
         this.candidateSetSelector = candidateSetSelector;
         this.tournamentRolloutCoordinator = new SkillCandidateTournamentRolloutCoordinator(
                 candidateSetSelector,
@@ -134,6 +151,13 @@ public class SkillEvolutionApplicationService implements SkillEvolutionPipelineP
                     Map.of());
         }
 
+        SkillExperienceRecordResult observed = experienceService.recordObservation(mapper.experienceInput(request, opportunityType));
+        if (!"SUCCEEDED".equals(observed.observation().outcome())
+                || !observed.observation().verifiedTaskOutcome().matches(request.projectId(), request.runId())) {
+            return skipped(request, "SKIP_TASK_OUTCOME_UNVERIFIED", Map.of(
+                    "observationId", observed.observation().observationId(), "auditOnly", true));
+        }
+        SkillExperienceRecordResult experience=grouping==null?observed:grouping.group(request,observed);
         SkillEvolutionSignalSnapshot signal = signalService.record(
                 new SkillEvolutionSignalCommand(
                         opportunityType,
@@ -149,12 +173,9 @@ public class SkillEvolutionApplicationService implements SkillEvolutionPipelineP
                         request.runId(),
                         opportunityType,
                         mapper.encode(input)));
-        SkillExperienceRecordResult experience =
-                experienceService.recordObservation(
-                        mapper.experienceInput(request, opportunityType));
         int requiredObservations = promotionSettings.requiredObservations(
                 opportunityType);
-        int observationCount = experience.cluster().observationCount();
+        int observationCount = experience.cluster().successfulCount();
         if (observationCount < requiredObservations) {
             Map<String, Object> result = mapper.skippedResult(
                     "SKIP_INSUFFICIENT_REPEATED_OBSERVATIONS",
@@ -176,21 +197,17 @@ public class SkillEvolutionApplicationService implements SkillEvolutionPipelineP
                         request.projectId(),
                         request.agentId(),
                         experience.observation().clusterKey());
-        if (!promotionSettings.sourceDiversitySatisfied(
-                clusterEvidence.distinctRuns(),
-                clusterEvidence.distinctSessions())) {
+        if (clusterEvidence.distinctRuns() < 3 || clusterEvidence.distinctConditions() < 2) {
             Map<String, Object> result = mapper.skippedResult(
                     "SKIP_INSUFFICIENT_SOURCE_DIVERSITY",
                     Map.of(
                             "signalId", signal.signalId(),
                             "clusterKey", experience.observation().clusterKey(),
-                            "distinctRuns", clusterEvidence.distinctRuns(),
+                            "distinctTasks", clusterEvidence.distinctRuns(),
                             "requiredDistinctRuns",
-                            promotionSettings.minimumDistinctRuns(),
-                            "distinctSessions",
-                            clusterEvidence.distinctSessions(),
-                            "requiredDistinctSessions",
-                            promotionSettings.minimumDistinctSessions(),
+                            3,
+                            "distinctConditions", clusterEvidence.distinctConditions(),
+                            "requiredConditions", 2,
                             "hardCaseCount",
                             clusterEvidence.hardCaseCount()));
             result.put("signal", mapper.signalView(signal));
@@ -198,28 +215,31 @@ public class SkillEvolutionApplicationService implements SkillEvolutionPipelineP
             result.put("experience", mapper.experienceView(experience));
             return skipped(request, result);
         }
+        if (!authoringPort.available()) throw new IllegalStateException("SKILL_EVOLUTION_MODEL_UNAVAILABLE");
         List<SkillExperienceConsolidationSample> consolidationSamples =
                 experienceService.consolidationSamples(
                         request.projectId(),
                         request.agentId(),
                         experience.observation().clusterKey(),
-                        promotionSettings.consolidationSampleLimit());
+                        cn.lgs.orbisops.domain.skill.service.SkillSourceBatchPolicy.ARCHIVE_LIMIT,request.runId());
+        new SkillEvolutionSourceSetPolicy().requireUsable(consolidationSamples,request.projectId(),request.runId(),summary.sourceHash());
+        Map<String,String> acceptedHashes=consolidationSamples.stream().collect(java.util.stream.Collectors.toMap(
+                SkillExperienceConsolidationSample::runId,SkillExperienceConsolidationSample::sourceHash));
 
         List<SkillEvolutionSelectedHint> selectedHints = hintSelector.select(
                 signalService.pendingHints(
                         request.projectId(),
-                        PENDING_HINT_LIMIT),
+                        PENDING_HINT_LIMIT).stream().filter(h -> request.projectId().equals(h.projectId())
+                        && acceptedHashes.containsKey(h.runId())
+                        && acceptedHashes.get(h.runId()).equals(hintSourceHash(h.contentJson()))).toList(),
                 summary.normalizedUserGoal() + " " + summary.finalReport(),
                 signal.signalId(),
                 request.runId(),
                 opportunityType);
         Map<String, Object> authoringInput = new LinkedHashMap<>(input);
-        authoringInput.put(
-                "procedureHints",
-                selectedHints.stream()
-                        .map(SkillEvolutionSelectedHint::content)
-                        .filter(value -> !value.isBlank())
-                        .toList());
+        // The current whole task is in consolidatedExperiences; do not send its full text twice.
+        authoringInput.remove("acceptedTaskEpisode");
+        // Explicit procedures already appear in the verified task messages. Mutable hint text is never author input.
         authoringInput.put(
                 "consolidatedExperiences",
                 consolidationSamples.stream()
@@ -229,7 +249,7 @@ public class SkillEvolutionApplicationService implements SkillEvolutionPipelineP
                 "hardCases",
                 consolidationSamples.stream()
                         .filter(SkillExperienceConsolidationSample::hardCase)
-                        .map(this::consolidationView)
+                        .map(s->Map.of("sourceId",s.sourceId(),"sourceHash",s.sourceHash(),"runId",s.runId()))
                         .toList());
         authoringInput.putIfAbsent("defectDiagnoses", List.of());
         authoringInput.putIfAbsent("optimizationMemories", List.of());
@@ -244,15 +264,34 @@ public class SkillEvolutionApplicationService implements SkillEvolutionPipelineP
                 "agentId", request.agentId(),
                 "runId", request.runId(),
                 "contextBundleHash", summary.contextBundleHash()));
+        if(proposalPort==null) throw new IllegalStateException("SKILL_EVOLUTION_PROPOSAL_STORE_REQUIRED");
+        var frozenRelated=new java.util.concurrent.atomic.AtomicReference<List<Map<String,Object>>>();
+        SkillEvolutionAuthoringPort durableAuthor = finalInput -> {
+            var plan=new SkillEvolutionProposalResolver(proposalPort,similarityPort)
+                    .resolve(request.projectId(),request.jobClaim(),summary.sourceHash(),experience.observation().clusterKey(),finalInput);
+            frozenRelated.set(cn.lgs.orbisops.domain.skill.service.SkillEvolutionRelatedSkillPolicy.references(plan.input().get("relatedSkills"),request.projectId()));
+            similarityPort.validateRelatedSkills(request.projectId(),frozenRelated.get());
+            if(plan.authored().isEmpty()) {
+                var frozenPlan=plan;
+                var generated=authoringPort.author(plan.input(),new SkillAuthoringProgressPort() {
+                    public java.util.Optional<Map<String,Object>> read(int index,String inputHash) {
+                        return proposalPort.batchReview(request.jobClaim(),frozenPlan,index,inputHash);
+                    }
+                    public Map<String,Object> save(int index,String inputHash,Map<String,Object> review) {
+                        return proposalPort.saveBatchReview(request.jobClaim(),frozenPlan,index,inputHash,review);
+                    }
+                });
+                plan=proposalPort.authored(request.jobClaim(),plan,generated.payload());
+            }
+            var payload=new LinkedHashMap<>(plan.authored());
+            payload.put("authoringPlanId",plan.planId());payload.put("authoringPlanHash",plan.planHash());
+            return SkillEvolutionAuthoredCandidate.from(payload);
+        };
         List<SkillEvolutionAuthoredCandidateOption> authoredOptions =
-                multiCandidateAuthoringService.author(
+                new SkillEvolutionMultiCandidateAuthoringService(durableAuthor).author(
                         authoringInput, AUTHORING_CANDIDATE_BUDGET);
-        List<SkillEvolutionAuthoredCandidateOption> evaluatedOptions = authoredOptions.stream()
-                .map(option -> new SkillEvolutionAuthoredCandidateOption(
-                        SkillEvolutionAuthoredCandidate.from(evalCaseFactory.enrich(
-                                option.candidate().payload(), consolidationSamples)),
-                        option.audit()))
-                .toList();
+        // Author-supplied examples remain optional development artifacts, never release admission quotas.
+        List<SkillEvolutionAuthoredCandidateOption> evaluatedOptions = authoredOptions;
         SkillCandidateSetSelectionResult legacySelection = candidateSetSelector.select(
                 SkillCandidateSelectionMode.LEGACY_COMPATIBILITY,
                 evaluatedOptions,
@@ -277,8 +316,8 @@ public class SkillEvolutionApplicationService implements SkillEvolutionPipelineP
             return skipped(request, result);
         }
 
-        SkillEvolutionSimilarityMatch similar = similarityPort.bestMatch(
-                request.projectId(), legacyAuthored.payload());
+        SkillEvolutionSimilarityMatch similar = similarityPort.bestFrozenMatch(
+                request.projectId(), legacyAuthored.payload(), frozenRelated.get());
         if (similar == null) similar = SkillEvolutionSimilarityMatch.none();
         if (similar.frozen()) {
             String matchedSkillId = similar.skillId();
@@ -290,8 +329,8 @@ public class SkillEvolutionApplicationService implements SkillEvolutionPipelineP
             return skipped(request, result);
         }
         SkillCandidateTournamentRolloutCoordinator.Outcome rollout =
-                tournamentRolloutCoordinator.select(
-                        request, evaluatedOptions, legacySelection, similar);
+                new SkillCandidateTournamentRolloutCoordinator.Outcome(legacySelection, similar, "",
+                        Map.of("publicationPolicy", SkillAutomaticPublicationService.POLICY));
         if (!rollout.blockingReason().isBlank()) {
             Map<String, Object> result = mapper.skippedResult(
                     rollout.blockingReason(), rollout.details());
@@ -303,15 +342,18 @@ public class SkillEvolutionApplicationService implements SkillEvolutionPipelineP
         SkillEvolutionAuthoredCandidate authored = selectionMetadata(
                 selection, evaluatedOptions, rollout.details());
         SkillEvolutionSimilarityMatch effectiveSimilar = rollout.similar();
-        return candidateCoordinator.create(
-                request,
-                opportunityType,
-                signal,
-                hint,
-                experience,
-                selectedHints,
-                authored,
-                effectiveSimilar);
+        try {
+            return candidateCoordinator.create(request, opportunityType, signal, hint, experience,
+                    selectedHints, authored, effectiveSimilar);
+        } catch (IllegalStateException gate) {
+            if (java.util.Set.of("SKILL_EVOLUTION_INSUFFICIENT_NEW_SOURCES", "SKILL_EVOLUTION_INSUFFICIENT_NEW_CONDITIONS")
+                    .contains(String.valueOf(gate.getMessage()))) {
+                return skipped(request, "SKIP_INSUFFICIENT_NEW_SOURCE_DIVERSITY", Map.of(
+                        "gate", gate.getMessage(), "signalId", signal.signalId(),
+                        "requiredNewTasks", 3, "requiredNewConditions", 2));
+            }
+            throw gate;
+        }
     }
 
     private SkillEvolutionAuthoredCandidate selectionMetadata(
@@ -379,6 +421,11 @@ public class SkillEvolutionApplicationService implements SkillEvolutionPipelineP
         view.put("summary", sample.summary());
         view.put("qualityScore", sample.qualityScore());
         view.put("hardCase", sample.hardCase());
+        view.put("sourceId", sample.sourceId());
+        view.put("sourceHash", sample.sourceHash());
+        view.put("taskEpisodeId", sample.taskEpisodeId());
+        view.put("conditionKey", sample.conditionKey());
+        view.put("acceptedTaskEpisode", sample.episodeJson());
         view.put(
                 "evidenceRefs",
                 sample.evidenceReferences().stream()
@@ -393,5 +440,10 @@ public class SkillEvolutionApplicationService implements SkillEvolutionPipelineP
 
     private List<?> list(Object value) {
         return value instanceof List<?> items ? items : List.of();
+    }
+
+    private String hintSourceHash(String json) {
+        try { return mapper.text(cn.lgs.orbisops.domain.shared.json.CanonicalJson.parseObject(json).get("evolutionSourceHash")); }
+        catch (IllegalArgumentException invalidHint) { return ""; }
     }
 }

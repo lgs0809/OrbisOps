@@ -71,8 +71,21 @@ final class OpsGraphNodeLifecycle {
             OpsGraphNodeExecutionResult execution = nodeBody.apply(context);
             Map<String, Object> result = execution.result() == null
                     ? new LinkedHashMap<>()
-                    : execution.result();
+                    : new LinkedHashMap<>(execution.result());
             String output = execution.output();
+            if (java.util.Set.of("AGENT", "AGENTSCOPE", "LLM", "CHAT").contains(nodeType)) {
+                String normalized = OpsWorkflowNodeOutputContract.compile(node).normalize(output, node.getOutputKey());
+                if (!java.util.Objects.equals(output, normalized)) {
+                    reporter.runtimeEvent(events, eventSink, OpsRuntimeEvent.builder()
+                            .eventType("NODE_OUTPUT_NORMALIZED").nodeId(node.getNodeId()).nodeType(nodeType)
+                            .status("SUCCEEDED").summary("已移除与节点输出字段同名的单层包装；内部结果仍需通过原契约校验。")
+                            .payload(Map.of("outputKey", node.getOutputKey(),
+                                    "originalHash", cn.lgs.orbisops.domain.shared.service.CanonicalObjectHasher.sha256Text(output),
+                                    "normalizedHash", cn.lgs.orbisops.domain.shared.service.CanonicalObjectHasher.sha256Text(normalized)))
+                            .build());
+                    output = normalized;
+                }
+            }
             result.put("output", output);
             result.put(StringUtils.hasText(node.getOutputKey())
                     ? node.getOutputKey()

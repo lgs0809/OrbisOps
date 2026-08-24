@@ -4,10 +4,13 @@ import cn.lgs.orbisops.application.skill.SkillPatchCandidatePort;
 import cn.lgs.orbisops.domain.skill.model.SkillPatchCandidate;
 import cn.lgs.orbisops.domain.skill.model.SkillPatchCandidateStatus;
 import cn.lgs.orbisops.domain.skill.model.SkillPatchRiskLevel;
+import cn.lgs.orbisops.domain.skill.model.SkillEvolutionJobSnapshot;
 import com.alibaba.fastjson.JSON;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
@@ -25,6 +28,45 @@ public class JdbcSkillPatchCandidateAdapter
             @Qualifier("mysqlJdbcTemplate") JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
+
+    @Override
+    @Transactional(transactionManager="mysqlTransactionManager",isolation=Isolation.READ_COMMITTED)
+    public SkillPatchCandidate createEvolution(SkillPatchCandidate candidate,SkillEvolutionJobSnapshot claim,String sourceHash,String planId,String planHash) {
+        if (claim==null || candidate==null || !claim.projectId().equals(candidate.projectId())
+                || !claim.agentId().equals(candidate.agentId()) || !claim.runId().equals(candidate.sourceRunId()))
+            throw new IllegalArgumentException("SKILL_EVOLUTION_CANDIDATE_SCOPE_MISMATCH");
+        var proposals=new JdbcSkillEvolutionProposalAdapter(jdbcTemplate);
+        var plan=proposals.current(claim,planId,planHash,sourceHash);
+        if(plan.authored().isEmpty()) throw new IllegalStateException("SKILL_EVOLUTION_AUTHORED_RESULT_REQUIRED");
+        requireAuthoredPayload(candidate,plan.authored());
+        new JdbcSkillEvolutionRelatedSkillGuard(jdbcTemplate).requireTarget(plan,candidate);
+        new JdbcSkillNovelSourceGuard(jdbcTemplate).requireNovel(plan,candidate);
+        var source=new JdbcSkillEvolutionSourceReader(jdbcTemplate).load(claim);
+        if (source.sourceHash().isBlank() || !source.sourceHash().equals(sourceHash))
+            throw new IllegalStateException("SKILL_EVOLUTION_CANDIDATE_SOURCE_CHANGED");
+        String existing=jdbcTemplate.queryForObject("SELECT candidate_id FROM ai_ops_skill_evolution_source WHERE source_id=? FOR UPDATE",String.class,claim.sourceId());
+        if (existing!=null && !existing.isBlank()) return get(existing);
+        proposals.reserveAssets(plan,candidate);
+        var stored=create(candidate);
+        jdbcTemplate.update("UPDATE ai_ops_skill_evolution_source SET candidate_id=? WHERE source_id=?",stored.candidateId(),claim.sourceId());
+        return stored;
+    }
+
+    void requireAuthoredPayload(SkillPatchCandidate candidate,Map<String,Object> authored) {
+        if(!candidate.targetSkillId().equals(text(authored.get("targetSkillId"))))
+            throw new IllegalStateException("SKILL_EVOLUTION_AUTHORED_TARGET_CHANGED");
+        String risk=text(authored.get("riskLevel"));if(risk.isBlank()) risk="LOW";
+        if(!candidate.patchType().equals(text(authored.get("patchType"))) || !candidate.riskLevel().name().equals(risk)
+                || !canonical(candidate.changes()).equals(canonical(authored.getOrDefault("changes",List.of())))
+                || !canonical(behaviorArtifacts(candidate.artifacts())).equals(canonical(behaviorArtifacts(authored.get("artifacts")))))
+            throw new IllegalStateException("SKILL_EVOLUTION_AUTHORED_CONTENT_CHANGED");
+    }
+    private List<?> behaviorArtifacts(Object value) {
+        if(!(value instanceof List<?> list)) return List.of();
+        // This development-only artifact is generated deterministically after the author response.
+        return list.stream().filter(x->!(x instanceof Map<?,?> m) || !"evals/routing-boundary-cases.json".equals(m.get("path"))).toList();
+    }
+    private String canonical(Object value) { return cn.lgs.orbisops.domain.shared.json.CanonicalJson.stringify(value); }
 
     @Override
     public SkillPatchCandidate create(SkillPatchCandidate candidate) {

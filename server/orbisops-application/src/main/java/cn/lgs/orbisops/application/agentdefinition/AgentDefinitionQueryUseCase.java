@@ -32,6 +32,10 @@ public final class AgentDefinitionQueryUseCase<D, B> {
 
     public D find(String agentId) {
         String normalized = text(agentId);
+        if (normalized.isBlank()) return null;
+        // The admin editor must reopen an unpublished draft. Runtime resolution still uses its published pointer.
+        List<D> versions = queryPort.listVersions(normalized);
+        if (versions != null && !versions.isEmpty()) return versions.get(0);
         List<D> values = queryPort.listAll();
         if (values == null || values.isEmpty()) return null;
         return values.stream()

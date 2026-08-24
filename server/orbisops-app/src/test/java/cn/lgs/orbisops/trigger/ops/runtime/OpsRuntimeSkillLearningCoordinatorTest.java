@@ -25,6 +25,20 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 class OpsRuntimeSkillLearningCoordinatorTest {
+    @Test
+    void recoveredHttpAttemptDoesNotBecomeNegativeSkillFeedbackOrTaskFailure() {
+        var recorder=mock(OpsSkillRuntimeUsageRecorder.class);
+        var request=request("run-recovered");
+        request.getMetadata().put("usedSkillVersionRefs",List.of(Map.of("skillId","skill-1","version",1)));
+        var events=List.of(OpsRuntimeEvent.of("MODEL_REQUEST_FAILED","FAILED","本次请求未完成"),
+                OpsRuntimeEvent.of("MODEL_CALL_RETRYING","RUNNING","自动重试"),
+                OpsRuntimeEvent.of("MODEL_RESPONSE_VERIFIED","SUCCEEDED","响应身份一致"),evidenceEvent());
+        ArgumentCaptor<Map<String,Object>> outcome=ArgumentCaptor.forClass(Map.class);
+        coordinator(()->recorder).recordUsage(request,OpsAgentDefinition.builder().agentId("agent-1").build(),events,"SUCCEEDED");
+        verify(recorder).record(eq("project-1"),eq("agent-1"),eq("run-recovered"),any(),any(),outcome.capture());
+        assertEquals(true,outcome.getValue().get("success"));assertEquals(false,outcome.getValue().get("needsReplan"));
+        assertEquals(false,outcome.getValue().get("userNegativeFeedback"));assertEquals(0L,outcome.getValue().get("blockedToolCallCount"));
+    }
 
     @Test
     void usefulEvidenceRequiresResultIdAndOutputHash() {

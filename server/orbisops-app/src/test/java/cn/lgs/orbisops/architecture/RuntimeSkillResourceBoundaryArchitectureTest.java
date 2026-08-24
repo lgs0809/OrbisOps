@@ -39,7 +39,7 @@ class RuntimeSkillResourceBoundaryArchitectureTest {
         assertAll(
                 () -> assertTrue(resolver.contains("Supplier<SkillCatalogQueryService>")),
                 () -> assertTrue(resolver.contains("Supplier<OpsSkillReleaseService>")),
-                () -> assertTrue(resolver.contains("catalogQuery.getSkillVersion(")),
+                () -> assertTrue(resolver.contains("catalogQuery.getRuntimeSkillVersion(")),
                 () -> assertTrue(resolver.contains("renderFrozenCanaryContext(")),
                 () -> assertTrue(resolver.contains("usedSkillVersionRefs")),
                 () -> assertTrue(resolver.contains("skillCatalogRefs")),
@@ -61,8 +61,8 @@ class RuntimeSkillResourceBoundaryArchitectureTest {
                 () -> assertTrue(resolver.contains("Supplier<ProjectSkillAuthorizationApplicationService>")),
                 () -> assertTrue(resolver.contains("Supplier<OpsProjectSkillToolProvider>")),
                 () -> assertTrue(resolver.contains("OpsRuntimeFrozenSkillContextResolver")),
-                () -> assertTrue(resolver.contains("buildSkillToolCallback")),
-                () -> assertTrue(resolver.contains("projectSkillToolProvider.build(")),
+                () -> assertFalse(resolver.contains("buildSkillToolCallback")),
+                () -> assertTrue(resolver.contains("provider.build(")),
                 () -> assertTrue(resolver.contains("enabledProjectSkillIds")),
                 () -> assertTrue(resolver.contains("skillContextMode")),
                 () -> assertTrue(resolver.contains("OpsRuntimeGovernedToolCallback.wrap")),
@@ -73,6 +73,20 @@ class RuntimeSkillResourceBoundaryArchitectureTest {
                 () -> assertFalse(resolver.contains("@Autowired")),
                 () -> assertFalse(resolver.contains("@Value")),
                 () -> assertTrue(resolver.lines().count() < 190));
+    }
+
+    @Test
+    void legacyAnalysisSkillCallsMustUseFrozenGovernedContext() throws IOException {
+        String helper = read(RUNTIME.replace("ops/runtime/", "ops/") + "OpsLlmSkillContextService.java");
+        assertAll(
+                () -> assertTrue(helper.contains("Supplier<OpsRuntimeSkillResolver>")),
+                () -> assertTrue(helper.contains("trace.skillFrame()")),
+                () -> assertTrue(helper.contains("resolver().resolve(context)")),
+                () -> assertTrue(helper.contains("resolver().catalogTool(context)")),
+                () -> assertTrue(helper.contains("SKILL_RUNTIME_CONTEXT_REQUIRED")),
+                () -> assertFalse(helper.contains("SkillRuntimeToolProvider")),
+                () -> assertFalse(helper.contains("renderSkillContext")),
+                () -> assertFalse(helper.contains("buildSkillToolCallback")));
     }
 
     @Test

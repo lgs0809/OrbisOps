@@ -86,7 +86,8 @@ public final class ChangePackageLandingOperationSafetyPolicy {
                 approved.get("manualFallback"),
                 rollbackPlan.get("manualFallback")));
 
-        if (postCheck.isEmpty() || expectedValues(postCheck).isEmpty()) {
+        if (approved.containsKey("additionalChecks") || postCheck.isEmpty()
+                || expectedValues(postCheck).isEmpty() || !additionalChecksValid(postCheck)) {
             return ChangePackageLandingOperationSafetyDecision.rejected(
                     "POST_CHECK_REQUIRED",
                     "生产写 operation 缺少审批通过的 postCheck expectedValues，禁止落地。",
@@ -124,6 +125,14 @@ public final class ChangePackageLandingOperationSafetyPolicy {
     private String normalizeEffectType(Object value) {
         String effectType = text(value, "").toUpperCase(Locale.ROOT);
         return "MUTATE_TEMP_RESOURCE".equals(effectType) ? "MUTATE_EPHEMERAL" : effectType;
+    }
+
+    private boolean additionalChecksValid(Map<String, Object> contract) {
+        if (!contract.containsKey("additionalChecks")) return true;
+        if (!(contract.get("additionalChecks") instanceof java.util.List<?> checks) || checks.size() > 15) return false;
+        return checks.stream().allMatch(item -> item instanceof Map<?, ?>
+                && !objectValue(item).containsKey("additionalChecks")
+                && !expectedValues(objectValue(item)).isEmpty());
     }
 
     private Map<String, Object> expectedValues(Map<String, Object> source) {

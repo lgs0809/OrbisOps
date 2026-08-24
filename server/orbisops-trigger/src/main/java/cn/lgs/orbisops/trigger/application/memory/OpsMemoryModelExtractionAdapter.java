@@ -50,11 +50,9 @@ public class OpsMemoryModelExtractionAdapter implements MemoryModelExtractionPor
     @Override
     public List<MemoryExtractionDraft> extract(ColdMemoryMessageSnapshot message, int maxInputChars) {
         ChatModel chatModel = modelResolver.resolve();
-        if (message == null
-                || chatModel == null
-                || !modelResolver.chatAvailable()) {
-            return List.of();
-        }
+        if (message == null) return List.of();
+        if (chatModel == null || !modelResolver.chatAvailable())
+            throw new IllegalStateException("MEMORY_EXTRACTION_MODEL_UNAVAILABLE");
         String content = ChatClient.builder(chatModel)
                 .defaultSystem("""
                         你是运维 Agent 的上下文记忆抽取器。Memory 只保存用户或项目的长期语境，不保存一次性排障过程。
@@ -79,9 +77,8 @@ public class OpsMemoryModelExtractionAdapter implements MemoryModelExtractionPor
     List<MemoryExtractionDraft> decode(String content) {
         JSONObject parsed = parseJsonObject(content);
         JSONArray memories = parsed == null ? null : parsed.getJSONArray("memories");
-        if (memories == null || memories.isEmpty()) {
-            return List.of();
-        }
+        if (memories == null) throw new IllegalStateException("MEMORY_EXTRACTION_MODEL_OUTPUT_INVALID");
+        if (memories.isEmpty()) return List.of();
         List<MemoryExtractionDraft> drafts = new ArrayList<>();
         for (int i = 0; i < memories.size(); i++) {
             JSONObject memory = memories.getJSONObject(i);

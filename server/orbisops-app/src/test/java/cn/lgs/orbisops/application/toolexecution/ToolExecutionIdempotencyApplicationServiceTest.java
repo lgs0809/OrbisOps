@@ -53,6 +53,27 @@ class ToolExecutionIdempotencyApplicationServiceTest {
     }
 
     @Test
+    void cachedWriteReceiptCannotSatisfyReadOnlyVerification() {
+        InMemoryIdempotencyPort idempotency = new InMemoryIdempotencyPort();
+        AtomicInteger dispatches = new AtomicInteger();
+        var service = service(idempotency,
+                (target, request) -> { dispatches.incrementAndGet(); return Map.of("status", "SUCCEEDED"); },
+                command -> recorded("tool-result-1", command.durationMs()));
+        var original = request(Map.of("command", "pwd"));
+        assertTrue(service.execute(original).allowed());
+        var context = new java.util.LinkedHashMap<>(original.requestContext());
+        context.put("requireReadOnly", true);
+        var restricted = new ToolExecutionRequest(original.projectId(), original.userId(), original.actor(),
+                original.toolsetId(), original.toolName(), original.scope(), original.arguments(),
+                original.sessionId(), original.runId(), context, original.landingContext());
+        var denied = service.execute(restricted);
+        assertEquals(false, denied.allowed());
+        assertEquals("READ_ONLY_REQUIRED", denied.payload().get("reasonCode"));
+        assertEquals(1, dispatches.get());
+        assertEquals(1, idempotency.completions.get());
+    }
+
+    @Test
     void sameIdempotencyKeyWithDifferentInputMustFailClosed() {
         InMemoryIdempotencyPort idempotency = new InMemoryIdempotencyPort();
         AtomicInteger dispatches = new AtomicInteger();
@@ -136,6 +157,24 @@ class ToolExecutionIdempotencyApplicationServiceTest {
         assertEquals("TOOL_EXECUTION_REVIEW_REQUIRED", retry.getMessage());
         assertEquals(1, dispatches.get());
         assertEquals(1, idempotency.failures.get());
+    }
+
+    @Test
+    void onlyTypedPreDispatchEvidenceMayAvoidUnknownSideEffectQuarantine() {
+        class ProviderFailure extends IllegalStateException implements
+                cn.lgs.orbisops.domain.toolexecution.model.ToolDispatchFailureEvidence {
+            private final boolean sent;
+            ProviderFailure(boolean sent) { super("provider boundary failure"); this.sent = sent; }
+            public boolean dispatched() { return sent; }
+        }
+        for (boolean sent : new boolean[]{false, true}) {
+            var ledger = new InMemoryIdempotencyPort();
+            var service = service(ledger, (target, request) -> { throw new ProviderFailure(sent); },
+                    command -> recorded("unused", command.durationMs()));
+            assertThrows(ProviderFailure.class, () -> service.execute(request(Map.of("command", "apply"))));
+            assertEquals(sent, ledger.reviewRequired);
+            assertEquals(1, ledger.failures.get());
+        }
     }
 
     private ToolExecutionApplicationService service(

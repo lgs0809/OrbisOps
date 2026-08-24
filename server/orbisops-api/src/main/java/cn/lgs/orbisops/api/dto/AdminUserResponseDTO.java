@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -38,6 +39,10 @@ public class AdminUserResponseDTO implements Serializable {
      */
     private String username;
 
+    /** Nullable for accounts created before phone login was introduced. */
+    @ToString.Exclude
+    private String phone;
+
     /**
      * 用户角色：admin 管理员，user 普通用户
      */
@@ -47,6 +52,7 @@ public class AdminUserResponseDTO implements Serializable {
      * 状态(0:禁用,1:启用,2:锁定)
      */
     private Integer status;
+    private boolean passwordChangeRequired;
 
     /**
      * 创建时间
@@ -61,6 +67,7 @@ public class AdminUserResponseDTO implements Serializable {
     /**
      * 登录令牌
      */
+    @ToString.Exclude
     private String token;
 
 }

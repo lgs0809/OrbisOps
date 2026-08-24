@@ -1,6 +1,8 @@
 ---
 name: es-log-agent
 description: Generic Elasticsearch log evidence policy for project operations investigations.
+whenToUse: ["Investigate actual Elasticsearch application logs within the project and time window", "需要从真实日志核对错误、链路或请求证据"]
+whenNotToUse: ["Metrics-only health or throughput queries", "缺少日志数据源时编造日志或用 SOP 代替实时证据"]
 ---
 
 # es-log-agent Skill

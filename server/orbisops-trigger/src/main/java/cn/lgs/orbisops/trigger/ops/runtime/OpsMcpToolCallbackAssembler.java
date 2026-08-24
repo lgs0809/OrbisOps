@@ -21,6 +21,7 @@ public final class OpsMcpToolCallbackAssembler {
     private final OpsProgressiveMcpCallbackAdapter progressiveCallbacks;
     private final OpsMcpProgressiveRuntimeAdapter progressiveRuntime;
     private final OpsMcpRuntimeInvoker runtimeInvoker;
+    private final OpsLandingMcpModelProjection landingProjection = new OpsLandingMcpModelProjection();
 
     public OpsMcpToolCallbackAssembler(
             OpsMcpCallbackPolicyAdapter callbackPolicy,
@@ -52,6 +53,19 @@ public final class OpsMcpToolCallbackAssembler {
         return List.copyOf(callbacks);
     }
 
+    public List<Map<String,Object>> currentAuthorizedDefinitions(OpsMcpServerConfig config) {
+        var allowed = progressiveRuntime.currentlyAuthorizedNames(config);
+        if (allowed.isEmpty()) return List.of();
+        return runtimeInvoker.currentLocalDefinitions(config).stream()
+                .filter(tool -> allowed.contains(String.valueOf(tool.get("name"))))
+                .map(tool -> landingProjection.definition(config, tool)).toList();
+    }
+
+    public Map<String,Object> currentAuthorizedDefinition(OpsMcpServerConfig config,String name) {
+        if (!progressiveRuntime.authorizedForCurrentStage(config,name)) return Map.of();
+        return landingProjection.definition(config, runtimeInvoker.currentLocalDefinition(config,name));
+    }
+
     private void assembleServer(
             OpsMcpServerConfig config,
             List<ToolCallback> callbacks) {
@@ -69,7 +83,8 @@ public final class OpsMcpToolCallbackAssembler {
                                         AgentExecutionStage.PREPARE,
                                         AgentExecutionStage.LANDING),
                                 aliases(config))));
-                if (exposure.extensionAvailable()) {
+                // CORE also needs a way to inspect parameters before the model can call it.
+                if (!exposure.runtimeTools().isEmpty()) {
                     callbacks.add(governed(
                             progressiveCallbacks.enableCallback(config),
                             OpsRuntimeToolAuthorityDescriptor.delegated(

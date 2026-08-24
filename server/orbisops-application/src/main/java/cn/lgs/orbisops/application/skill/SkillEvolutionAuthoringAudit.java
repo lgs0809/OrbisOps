@@ -14,7 +14,7 @@ public record SkillEvolutionAuthoringAudit(
         modelId = required(modelId, "SKILL_AUTHORING_MODEL_REQUIRED");
         promptVersion = required(promptVersion, "SKILL_AUTHORING_PROMPT_VERSION_REQUIRED");
         inputHash = required(inputHash, "SKILL_AUTHORING_INPUT_HASH_REQUIRED");
-        if (candidateBudget < 2 || candidateBudget > 4) {
+        if (candidateBudget < 1 || candidateBudget > 4) {
             throw new IllegalArgumentException("SKILL_AUTHORING_CANDIDATE_BUDGET_INVALID");
         }
         if (candidateIndex < 0 || candidateIndex >= candidateBudget) {

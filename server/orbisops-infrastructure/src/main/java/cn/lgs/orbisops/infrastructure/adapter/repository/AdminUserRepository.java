@@ -1,11 +1,13 @@
 package cn.lgs.orbisops.infrastructure.adapter.repository;
 
 import cn.lgs.orbisops.application.security.AdminUserCatalogPort;
+import cn.lgs.orbisops.application.security.AdminCredentialLifecyclePort;
 import cn.lgs.orbisops.domain.security.AdminUserAccount;
 import cn.lgs.orbisops.domain.security.AdminUserRole;
 import cn.lgs.orbisops.infrastructure.dao.IAdminUserDao;
 import cn.lgs.orbisops.infrastructure.dao.po.AdminUser;
 import org.springframework.stereotype.Repository;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.util.List;
 
@@ -17,7 +19,7 @@ import java.util.List;
  * password when persistence is unavailable.</p>
  */
 @Repository
-public class AdminUserRepository implements AdminUserCatalogPort {
+public class AdminUserRepository implements AdminUserCatalogPort, AdminCredentialLifecyclePort {
 
     private final IAdminUserDao dao;
 
@@ -26,18 +28,40 @@ public class AdminUserRepository implements AdminUserCatalogPort {
     }
 
     @Override
+    public boolean changeCredential(String userId, long expectedVersion, String encodedCredential) {
+        return dao.changeCredential(userId, expectedVersion, encodedCredential) == 1;
+    }
+
+    @Override
+    public boolean resetToInitialCredential(String userId, long expectedVersion) {
+        return dao.resetToInitialCredential(userId, expectedVersion) == 1;
+    }
+
+    @Override
     public boolean insert(AdminUserAccount account) {
-        return dao.insert(toPo(account)) > 0;
+        try {
+            return dao.insert(toPo(account)) > 0;
+        } catch (DuplicateKeyException conflict) {
+            throw identityConflict();
+        }
     }
 
     @Override
     public boolean updateById(AdminUserAccount account) {
-        return dao.updateById(toPo(account)) > 0;
+        try {
+            return dao.updateById(toPo(account)) > 0;
+        } catch (DuplicateKeyException conflict) {
+            throw identityConflict();
+        }
     }
 
     @Override
     public boolean updateByUserId(AdminUserAccount account) {
-        return dao.updateByUserId(toPo(account)) > 0;
+        try {
+            return dao.updateByUserId(toPo(account)) > 0;
+        } catch (DuplicateKeyException conflict) {
+            throw identityConflict();
+        }
     }
 
     @Override
@@ -66,6 +90,11 @@ public class AdminUserRepository implements AdminUserCatalogPort {
     }
 
     @Override
+    public AdminUserAccount findByPhone(String phone) {
+        return toAccount(dao.queryByPhone(phone));
+    }
+
+    @Override
     public List<AdminUserAccount> listEnabled() {
         return toAccounts(dao.queryEnabledUsers());
     }
@@ -88,7 +117,11 @@ public class AdminUserRepository implements AdminUserCatalogPort {
                 .id(account.id())
                 .userId(account.userId())
                 .username(account.username())
+                .phone(account.phone())
                 .password(account.credential())
+                .initialPassword(account.initialCredential())
+                .passwordChangeRequired(account.passwordChangeRequired())
+                .credentialVersion(account.credentialVersion())
                 .userRole(account.role() == null ? null : account.role().value())
                 .status(account.status())
                 .createTime(account.createTime())
@@ -108,7 +141,16 @@ public class AdminUserRepository implements AdminUserCatalogPort {
                 AdminUserRole.parse(po.getUserRole(), AdminUserRole.ADMIN),
                 po.getStatus(),
                 po.getCreateTime(),
-                po.getUpdateTime());
+                po.getUpdateTime(),
+                po.getPhone(),
+                po.getInitialPassword(),
+                Boolean.TRUE.equals(po.getPasswordChangeRequired()),
+                po.getCredentialVersion() == null ? 0 : po.getCredentialVersion());
+    }
+
+    private IllegalArgumentException identityConflict() {
+        // Never propagate driver text: it may contain the submitted phone or credential.
+        return new IllegalArgumentException("账号标识或手机号已被使用");
     }
 
     private List<AdminUserAccount> toAccounts(List<AdminUser> rows) {

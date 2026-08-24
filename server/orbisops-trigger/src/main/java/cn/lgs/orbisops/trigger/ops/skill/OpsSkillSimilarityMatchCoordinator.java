@@ -104,4 +104,5 @@ final class OpsSkillSimilarityMatchCoordinator {
                 skill,
                 scorer.score(candidate, signatureFactory.skill(skill)));
     }
+
 }

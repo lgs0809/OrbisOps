@@ -209,6 +209,13 @@ public class OpsChangePackageAdminController {
         return success(landing.cleanup(new ChangePackageCommands.Cleanup(packageId, request, actor(servletRequest))));
     }
 
+    @PostMapping("/{packageId}/verify-landing")
+    public Response<Map<String, Object>> verifyLanding(@PathVariable("packageId") String packageId,
+                                                       HttpServletRequest servletRequest) {
+        permissionService.assertCanLandPackage(projectId(packageId), principal(servletRequest));
+        return success(landing.verifyLanding(packageId, actor(servletRequest)));
+    }
+
     private Map<String, Object> withCapabilities(Map<String, Object> source,
                                                  AdminAuthService.AuthPrincipal principal) {
         Map<String, Object> item = new LinkedHashMap<>(source == null ? Map.of() : source);

@@ -24,13 +24,14 @@ public final class SkillRollbackUseCase {
     private final SkillTransactionPort transactionPort;
     private final SkillPackageManifest.Limits packageLimits;
     private final SkillGovernancePolicy governancePolicy;
+    private final SkillRecoverySafetyPort recoverySafety;
 
     public SkillRollbackUseCase(ISkillCatalogRepository catalogRepository,
                                 ISkillPackageRepository packageRepository,
                                 SkillTransactionPort transactionPort,
                                 SkillPackageManifest.Limits packageLimits) {
         this(catalogRepository, packageRepository, transactionPort, packageLimits,
-                new SkillGovernancePolicy());
+                new SkillGovernancePolicy(), (release, baseline) -> false);
     }
 
     SkillRollbackUseCase(ISkillCatalogRepository catalogRepository,
@@ -38,6 +39,24 @@ public final class SkillRollbackUseCase {
                          SkillTransactionPort transactionPort,
                          SkillPackageManifest.Limits packageLimits,
                          SkillGovernancePolicy governancePolicy) {
+        this(catalogRepository, packageRepository, transactionPort, packageLimits, governancePolicy,
+                (release, baseline) -> false);
+    }
+
+    public SkillRollbackUseCase(ISkillCatalogRepository catalogRepository,
+                                ISkillPackageRepository packageRepository,
+                                SkillTransactionPort transactionPort,
+                                SkillPackageManifest.Limits packageLimits,
+                                SkillRecoverySafetyPort recoverySafety) {
+        this(catalogRepository, packageRepository, transactionPort, packageLimits, new SkillGovernancePolicy(), recoverySafety);
+    }
+
+    private SkillRollbackUseCase(ISkillCatalogRepository catalogRepository,
+                         ISkillPackageRepository packageRepository,
+                         SkillTransactionPort transactionPort,
+                         SkillPackageManifest.Limits packageLimits,
+                         SkillGovernancePolicy governancePolicy,
+                         SkillRecoverySafetyPort recoverySafety) {
         if (catalogRepository == null) throw new IllegalArgumentException("SKILL_CATALOG_REPOSITORY_REQUIRED");
         if (packageRepository == null) throw new IllegalArgumentException("SKILL_PACKAGE_REPOSITORY_REQUIRED");
         if (transactionPort == null) throw new IllegalArgumentException("SKILL_TRANSACTION_PORT_REQUIRED");
@@ -48,6 +67,39 @@ public final class SkillRollbackUseCase {
         this.transactionPort = transactionPort;
         this.packageLimits = packageLimits;
         this.governancePolicy = governancePolicy;
+        this.recoverySafety = java.util.Objects.requireNonNull(recoverySafety);
+    }
+
+    /** Internal release guard: never overwrite a newer user version or enable an unverified baseline. */
+    public SkillReleaseRecoveryOutcome recoverRelease(cn.lgs.orbisops.domain.skill.model.SkillReleaseSnapshot release) {
+        if (release == null || release.releasedVersion() <= 0 || release.releasedSkillHash().isBlank())
+            throw new IllegalArgumentException("SKILL_RELEASE_RECOVERY_IDENTITY_REQUIRED");
+        return transactionPort.required(() -> {
+            requireStores();
+            var current = catalogRepository.find(SCOPE_PROJECT, release.projectId(), release.targetSkillId(), true)
+                    .orElseThrow(() -> new IllegalStateException("SKILL_RELEASE_TARGET_MISSING"));
+            if (current.currentVersion() != release.releasedVersion()
+                    || !current.currentSkillHash().equals(release.releasedSkillHash()))
+                throw new IllegalStateException("SKILL_RELEASE_RECOVERY_CURRENT_VERSION_CHANGED");
+            var baseline = release.baselineVersion() > 0 ? packageRepository.findVersion(new SkillPackageKey(
+                    SCOPE_PROJECT, release.projectId(), release.targetSkillId(), release.baselineVersion())) : java.util.Optional.<SkillPackageVersion>empty();
+            if (current.governanceState().activeAtUse() && current.governanceState().ordinaryMutationAllowed()
+                    && baseline.isPresent() && baseline.get().skillHash().equals(release.baselineSkillHash())
+                    && recoverySafety.safeToRestore(release, baseline.get())) {
+                var restored = rollbackRequired(SCOPE_PROJECT, release.projectId(), release.targetSkillId(),
+                        release.baselineVersion(), "SYSTEM_SKILL_RELEASE_GUARD", current).publishedVersion();
+                return new SkillReleaseRecoveryOutcome(true, restored.key().version(), restored.skillHash(), "VERIFIED_BASELINE_RESTORED");
+            }
+            var before = current.governanceState();
+            var after = new cn.lgs.orbisops.domain.skill.model.SkillGovernanceState(before.lifecycleStatus(),
+                    before.mutationMode(), cn.lgs.orbisops.domain.skill.model.SkillExecutionMode.QUARANTINED,
+                    before.bindingMode(), before.lock(), before.legacyFrozenClassificationRequired());
+            if (!catalogRepository.compareAndSetGovernance(new cn.lgs.orbisops.domain.skill.model.SkillGovernanceUpdate(
+                    SCOPE_PROJECT, release.projectId(), release.targetSkillId(), release.releasedVersion(), release.releasedSkillHash(), before, after)))
+                throw new IllegalStateException("SKILL_RELEASE_QUARANTINE_CONFLICT");
+            return new SkillReleaseRecoveryOutcome(false, current.currentVersion(), current.currentSkillHash(),
+                    "METHOD_QUARANTINED_NO_VERIFIED_COMPATIBLE_BASELINE");
+        });
     }
 
     public SkillRollbackOutcome rollbackGlobal(String skillId, int sourceVersion, String actor) {
@@ -81,9 +133,18 @@ public final class SkillRollbackUseCase {
                                                    String skillId,
                                                    int sourceVersion,
                                                    String actor) {
+        return rollbackRequired(scope, projectId, skillId, sourceVersion, actor, null);
+    }
+
+    private SkillRollbackOutcome rollbackRequired(String scope, String projectId, String skillId,
+                                                   int sourceVersion, String actor, SkillCatalogEntry expected) {
         requireStores();
         SkillCatalogEntry current = catalogRepository.find(scope, projectId, skillId, true)
                 .orElseThrow(() -> new IllegalArgumentException("Skill 不存在：" + skillId));
+        if (expected != null && (current.currentVersion() != expected.currentVersion()
+                || !current.currentSkillHash().equals(expected.currentSkillHash())
+                || !current.governanceState().equals(expected.governanceState())))
+            throw new IllegalStateException("SKILL_RELEASE_RECOVERY_CURRENT_VERSION_CHANGED");
         governancePolicy.requireRollback(current, sourceVersion);
 
         SkillPackageKey sourceKey = new SkillPackageKey(scope, projectId, skillId, sourceVersion);

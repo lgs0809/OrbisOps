@@ -51,7 +51,7 @@ import static org.mockito.Mockito.when;
 class OpsRuntimeResourceAssemblerTest {
 
     @Test
-    void shouldFallbackToDefaultChatModelWhenConfiguredModelMissing() {
+    void shouldRejectMissingExplicitModelWithoutChangingTheSelectedModel() {
         ChatModel defaultChatModel = mock(ChatModel.class);
         AiClientModelCatalogPort modelDao = mock(AiClientModelCatalogPort.class);
         when(modelDao.findByModelId("missing-model")).thenReturn(null);
@@ -72,7 +72,7 @@ class OpsRuntimeResourceAssemblerTest {
                 new OpsRuntimeResourceSummaryAuditor());
         List<OpsRuntimeEvent> events = new ArrayList<>();
 
-        OpsRuntimeResourceBundle bundle = assembler.assembleAgent(
+        var error = assertThrows(IllegalStateException.class, () -> assembler.assembleAgent(
                 OpsAgentDefinition.builder()
                         .agentId("ops")
                         .engine("CHAT")
@@ -80,10 +80,10 @@ class OpsRuntimeResourceAssemblerTest {
                         .build(),
                 OpsAgentChatRequest.builder().query("hello").build(),
                 events,
-                null);
+                null));
 
-        assertSame(defaultChatModel, bundle.getChatModel());
-        assertTrue(events.stream().anyMatch(event -> event.getSummary() != null && event.getSummary().contains("Model 配置不存在或未启用")));
+        assertEquals("MODEL_BINDING_UNAVAILABLE", error.getMessage());
+        org.mockito.Mockito.verifyNoInteractions(defaultChatModel);
     }
 
     @Test
@@ -109,82 +109,36 @@ class OpsRuntimeResourceAssemblerTest {
     }
 
     @Test
-    void shouldExposeOnlyBoundSkillsWithLazyContext() {
-        ChatModel defaultChatModel = mock(ChatModel.class);
-        OpsSkillToolProvider skillProvider = mock(OpsSkillToolProvider.class);
-        ToolCallback skillTool = tool("Skill", "skill-body");
-        when(skillProvider.buildSkillToolCallback(anyCollection())).thenReturn(Optional.of(skillTool));
-        when(skillProvider.renderSkillSummaryContext(anyCollection(), anyInt())).thenReturn("- es-log-agent: 日志查询规程");
-        OpsRuntimeResourceAssembler assembler = assembler(defaultChatModel, skillProvider);
-        List<OpsRuntimeEvent> events = new ArrayList<>();
-
-        OpsRuntimeResourceBundle bundle = assembler.assembleAgent(
-                OpsAgentDefinition.builder()
-                        .agentId("ops")
-                        .engine("CHAT")
-                        .skills(List.of("es-log-agent"))
-                        .build(),
-                OpsAgentChatRequest.builder().query("traceId 错误").build(),
-                events,
-                null);
-
-        assertEquals(1, bundle.getTools().size());
-        assertTrue(bundle.getSkillContext().contains("es-log-agent"));
-        assertTrue(bundle.getSkillContext().contains("必须先调用 Skill 工具"));
-        assertEquals("skill-body", bundle.getTools().get(0).call("{\"skillName\":\"es-log-agent\"}"));
-        assertEquals("skill", events.stream()
-                .filter(event -> "TOOL_CALL_FINISHED".equals(event.getEventType()))
-                .map(OpsRuntimeEvent::getPayload)
-                .map(payload -> payload.get("toolKind"))
-                .findFirst()
-                .orElse(null));
+    void configuredNamesMustNotBypassFrozenCatalogWithLiveFileTools() {
+        ChatModel model=mock(ChatModel.class);
+        OpsSkillToolProvider files=mock(OpsSkillToolProvider.class);
+        var bundle=assembler(model,files).assembleAgent(
+                OpsAgentDefinition.builder().agentId("ops").engine("CHAT").skills(List.of("es-log-agent")).build(),
+                OpsAgentChatRequest.builder().query("traceId error").build(),new ArrayList<>(),null);
+        assertTrue(bundle.getTools().isEmpty());assertEquals(null,bundle.getSkillContext());
+        verify(files,never()).buildSkillToolCallback(anyCollection());
+        verify(files,never()).renderSkillContext(anyCollection(),anyInt());
     }
 
     @Test
-    void agentScopeMustExposeSkillAsOnDemandToolAndRecordOnlyActualActivation() {
-        ChatModel defaultChatModel = mock(ChatModel.class);
-        ProjectSkillAuthorizationApplicationService skillAuthorization =
-                mock(ProjectSkillAuthorizationApplicationService.class);
-        when(skillAuthorization.enabledIds("demo-project")).thenReturn(List.of("demo-ops", "prometheus-agent"));
-        OpsSkillToolProvider skillProvider = mock(OpsSkillToolProvider.class);
-        ToolCallback skillTool = tool("Skill", "selected-skill-body");
-        when(skillProvider.buildSkillToolCallback(anyCollection())).thenReturn(Optional.of(skillTool));
-        when(skillProvider.renderSkillSummaryContext(anyCollection(), anyInt()))
-                .thenReturn("- demo-ops: 示例运维 SOP\n- prometheus-agent: 指标查询规程");
-        OpsRuntimeResourceAssembler assembler = assembler(
-                modelResolver(defaultChatModel, null, null),
-                mcpResolver(mock(OpsMcpToolProvider.class)),
-                skillResolver(skillProvider, null, skillAuthorization, null, null),
-                knowledgeResolver(null),
-                builtInToolContributor(null),
-                new OpsRuntimeSubAgentToolBoundaryPolicy(),
-                toolTraceDecorator(null),
-                new OpsRuntimeResourceSummaryAuditor());
-        List<OpsRuntimeEvent> events = new ArrayList<>();
-
-        OpsRuntimeResourceBundle bundle = assembler.assembleAgentScope(
-                OpsAgentDefinition.builder().agentId("generic-ops-react-agent").build(),
-                OpsAgentScopeConfig.builder()
-                        .agentId("platform-ops-react")
-                        .inheritProjectCapabilities(true)
-                        .build(),
-                OpsAgentChatRequest.builder().projectId("demo-project").query("查示例 SOP").build(),
-                events,
-                null);
-
-        assertTrue(bundle.getTools().stream()
-                .map(ToolCallback::getToolDefinition)
-                .map(ToolDefinition::name)
-                .anyMatch("Skill"::equals));
-        assertTrue(events.stream().noneMatch(event -> "SKILL_CONTEXT_LOADED".equals(event.getEventType())));
-        ToolCallback callback = bundle.getTools().stream()
-                .filter(tool -> "Skill".equals(tool.getToolDefinition().name()))
-                .findFirst().orElseThrow();
-        assertEquals("selected-skill-body", callback.call("{\"skillName\":\"demo-ops\"}"));
-        assertEquals(List.of("demo-ops"), events.stream()
-                .filter(event -> "SKILL_CONTEXT_LOADED".equals(event.getEventType()))
-                .map(OpsRuntimeEvent::getAgent)
-                .toList());
+    void frozenCatalogStillExposesGovernedOnDemandSkillTool() {
+        ChatModel model=mock(ChatModel.class);
+        SkillCatalogQueryService catalog=mock(SkillCatalogQueryService.class);
+        OpsProjectSkillToolProvider tools=mock(OpsProjectSkillToolProvider.class);
+        List<Map<String,Object>> refs=List.of(Map.of("skillId","ops-fixture","scope","PROJECT","projectId","demo-project",
+                "version",1,"skillHash","hash","packageHash","package","description","read logs"));
+        when(catalog.retainRuntimeCatalogRefs(eq("demo-project"),eq(refs))).thenReturn(refs);
+        ToolCallback frozenTool=tool("UseProjectSkill","frozen-body");
+        when(tools.build(eq("demo-project"),eq("alice"),eq("run-1"),eq(refs))).thenReturn(frozenTool);
+        var assembler=assembler(modelResolver(model,null,null),mcpResolver(mock(OpsMcpToolProvider.class)),
+                skillResolver(null,catalog,null,null,tools),knowledgeResolver(null),builtInToolContributor(null),
+                new OpsRuntimeSubAgentToolBoundaryPolicy(),toolTraceDecorator(null),new OpsRuntimeResourceSummaryAuditor());
+        var bundle=assembler.assembleAgentScope(OpsAgentDefinition.builder().agentId("ops").build(),
+                OpsAgentScopeConfig.builder().agentId("platform-ops-react").inheritProjectCapabilities(true).build(),
+                OpsAgentChatRequest.builder().projectId("demo-project").userId("alice").runId("run-1").query("read logs")
+                        .metadata(new java.util.LinkedHashMap<>(Map.of("skillCatalogRefs",refs))).build(),new ArrayList<>(),null);
+        assertEquals(1,bundle.getTools().size());
+        assertEquals("frozen-body",bundle.getTools().get(0).call("{}"));
     }
 
     @Test
@@ -368,6 +322,9 @@ class OpsRuntimeResourceAssemblerTest {
                 knowledgeResolver(null),
                 builtInToolContributor(proposalProvider));
         ToolCallback proposalTool = tool("PrepareChangePackage", "{\"packageId\":\"cp_1\"}");
+        ToolCallback queryTool = tool("QueryChangePackageStatus", "{\"items\":[]}");
+        when(proposalProvider.buildStatusQuery(eq("demo-project"), eq("alice"), eq("run-1"), any(OpsAgentChatRequest.class)))
+                .thenReturn(queryTool);
         when(proposalProvider.available("demo-project", List.of("demo-project-local-runtime"))).thenReturn(true);
         List<OpsRuntimeEvent> events = new ArrayList<>();
         when(proposalProvider.build(
@@ -408,7 +365,7 @@ class OpsRuntimeResourceAssemblerTest {
         OpsRuntimeResourceBundle bundle = assembler.assembleNode(
                 definition, node, request, events, null);
 
-        assertEquals(1, bundle.getTools().size());
+        assertEquals(2, bundle.getTools().size());
         bundle.getTools().get(0).call("{}");
         assertEquals("change-package", events.stream()
                 .filter(event -> "TOOL_CALL_FINISHED".equals(event.getEventType()))
@@ -520,7 +477,7 @@ class OpsRuntimeResourceAssemblerTest {
                 new OpsRuntimeFrozenSkillContextResolver(
                         () -> catalogQueryService,
                         () -> releaseService,
-                        settings);
+                        settings, mock(cn.lgs.orbisops.application.skill.SkillRuntimeBudgetPort.class));
         return new OpsRuntimeSkillResolver(
                 () -> skillToolProvider,
                 () -> authorizationService,

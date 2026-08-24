@@ -2,6 +2,8 @@ package cn.lgs.orbisops.trigger.ops.runtime;
 
 import cn.lgs.orbisops.application.config.McpClientCatalogPort;
 import cn.lgs.orbisops.application.config.McpClientDefinition;
+import cn.lgs.orbisops.application.changepackage.LandingOperationExecutionBinding;
+import cn.lgs.orbisops.application.changepackage.LandingOperationJournalApplicationService;
 import cn.lgs.orbisops.application.project.ProjectMcpAuthorizationApplicationService;
 import cn.lgs.orbisops.domain.worksession.runtime.model.TriggerSource;
 import cn.lgs.orbisops.trigger.ops.source.OpsSourceRepositoryService;
@@ -196,6 +198,65 @@ class OpsRuntimeMcpResolverTest {
 
         assertEquals(1, context.getMcpServers().size());
         assertTrue(context.getTools().isEmpty());
+    }
+
+    @Test
+    void landingDecoratesRuntimeConfigWithFrozenOperationBindings() {
+        OpsMcpToolProvider toolProvider = emptyToolProvider();
+        LandingOperationJournalApplicationService journal = mock(LandingOperationJournalApplicationService.class);
+        when(journal.operationExecutionBindings("run-landing-1")).thenReturn(List.of(
+                new LandingOperationExecutionBinding(
+                        "operation-1", "execution-1", "mcp.deploy", "restart_service", "service://demo")));
+        OpsRuntimeMcpResolver resolver = new OpsRuntimeMcpResolver(
+                toolProvider,
+                new OpsMcpRuntimeConfigSourceChain(
+                        List.of(new OpsMcpRuntimeConfigSource() {
+                            @Override
+                            public String sourceId() { return "TEST"; }
+
+                            @Override
+                            public int order() { return 1; }
+
+                            @Override
+                            public OpsMcpRuntimeConfigSourceResult resolve(
+                                    OpsMcpRuntimeConfigRequest request) {
+                                return OpsMcpRuntimeConfigSourceResult.miss("TEST_NO_DYNAMIC_CONFIG");
+                            }
+                        }),
+                        OpsMcpRuntimeConfigResolutionObserver.noop()),
+                () -> null,
+                null,
+                () -> journal);
+        OpsAgentDefinition definition = OpsAgentDefinition.builder()
+                .agentId("agent-1")
+                .version(1)
+                .build();
+        var approved = new cn.lgs.orbisops.domain.worksession.runtime.model.ApprovedPackageSnapshot(
+                "pkg-1", 1, "package-hash", "project-1", "prod", "artifact-hash",
+                java.time.Instant.now().plusSeconds(60));
+        OpsAgentChatRequest request = OpsAgentChatRequest.builder()
+                .projectId("project-1")
+                .runId("run-landing-1")
+                .metadata(new LinkedHashMap<>(Map.of(
+                        OpsAgentRunExecutionContextFactory.TRUSTED_APPROVED_PACKAGE_KEY, approved)))
+                .build();
+        var executionContext = new OpsAgentRunExecutionContextFactory()
+                .bindServerContext(request, definition);
+        OpsMcpServerConfig server = governedServer("deploy", "prod", false, "LANDING");
+        OpsRuntimeResourceContext context = OpsRuntimeResourceContext.builder()
+                .definition(definition)
+                .request(request)
+                .executionContext(executionContext)
+                .projectId("project-1")
+                .mcpServers(new ArrayList<>(List.of(server)))
+                .events(new ArrayList<>())
+                .build();
+
+        resolver.resolve(context);
+
+        assertEquals(List.of(new LandingOperationExecutionBinding(
+                "operation-1", "execution-1", "mcp.deploy", "restart_service", "service://demo")),
+                server.getLandingOperationBindings());
     }
 
     @Test

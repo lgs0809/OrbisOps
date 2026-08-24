@@ -115,10 +115,11 @@ public class AdminUserAdminController {
 
     @PostMapping("/logout")
     public Response<Boolean> logout(HttpServletRequest request) {
+        boolean revoked = adminUserApplicationService.logout(request.getHeader("Authorization"));
         return Response.<Boolean>builder()
-                .code(ResponseCode.SUCCESS.getCode())
-                .info(ResponseCode.SUCCESS.getInfo())
-                .data(adminUserApplicationService.logout(request.getHeader("Authorization")))
+                .code(revoked ? ResponseCode.SUCCESS.getCode() : ResponseCode.UN_ERROR.getCode())
+                .info(revoked ? ResponseCode.SUCCESS.getInfo() : "注销未完成，请稍后重试")
+                .data(revoked)
                 .build();
     }
 

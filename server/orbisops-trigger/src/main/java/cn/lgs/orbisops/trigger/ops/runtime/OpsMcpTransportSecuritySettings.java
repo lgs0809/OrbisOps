@@ -18,7 +18,9 @@ public record OpsMcpTransportSecuritySettings(
     public static final String DEFAULT_TRANSPORTS = "stdio,sse,streamable-http";
     public static final String DEFAULT_STDIO_COMMANDS = "npx,node,python,python3,uvx,java";
     public static final String DEFAULT_REMOTE_HOSTS = "127.0.0.1,localhost";
-    public static final String DEFAULT_HEADER_KEYS = "Authorization,X-API-Key";
+    // Execution metadata is not authorization; reviewed tool policy and Landing authority still apply.
+    public static final String DEFAULT_HEADER_KEYS =
+            "Authorization,X-API-Key,X-Ops-Execution-Key,X-Ops-Fencing-Token,X-Ops-Deadline";
 
     public OpsMcpTransportSecuritySettings {
         allowedTransports = immutableSet(allowedTransports, true);

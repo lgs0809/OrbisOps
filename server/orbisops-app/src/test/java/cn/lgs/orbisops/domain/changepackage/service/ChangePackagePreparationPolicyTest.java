@@ -12,10 +12,23 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ChangePackagePreparationPolicyTest {
 
     private final ChangePackagePreparationPolicy policy = new ChangePackagePreparationPolicy();
+
+    @Test
+    void humanOnlyTypeCannotBecomeReviewReadyEvenWhenExecutionProofsPass() {
+        var original = context(new ChangePackagePreparationProof("PASSED", "TOOL_EXECUTED", false), true);
+        for (String type : List.of("MANUAL_REQUIRED", "NEEDS_HUMAN_DESIGN", "NO_ACTION_REQUIRED")) {
+            var decision = policy.decide(new ChangePackagePreparationContext(original.preflight(), original.dryRun(),
+                    original.operations(), original.toolBindingsComplete(), original.trustedEvidencePresent(),
+                    original.repairIntent(), type, original.requestedRiskLevel(), original.changedFiles()));
+            assertEquals(ChangePackageStatus.VALIDATION_FAILED, decision.status());
+            assertTrue(decision.limitations().stream().anyMatch(v -> v.startsWith("HUMAN_ONLY_PACKAGE_HAS_EXECUTABLE_OPERATIONS")));
+        }
+    }
 
     @Test
     void missingOnlyExplicitValidationProofKeepsExecutablePackageForValidation() {

@@ -12,6 +12,9 @@ final class OpsVisibleAnswerStreamProjector {
     private static final String VISIBLE_START = OpsAgentScopeOutcomeEnvelope.VISIBLE_START;
     private static final String VISIBLE_END = OpsAgentScopeOutcomeEnvelope.VISIBLE_END;
     private static final String OUTCOME_START = OpsAgentScopeOutcomeEnvelope.START;
+    private static final String OUTCOME_END = OpsAgentScopeOutcomeEnvelope.END;
+    private static final List<String> OUTCOME_KEY_PREFIXES = List.of(
+            "requiresAction=", "verificationStatus=", "abstained=", "evidenceCompleteness=");
 
     private final StringBuilder pending = new StringBuilder();
     private boolean visibleStarted;
@@ -36,15 +39,20 @@ final class OpsVisibleAnswerStreamProjector {
 
     private List<String> drainVisible() {
         int outcomeMarker = pending.indexOf(OUTCOME_START);
+        int outcomeEndMarker = pending.indexOf(OUTCOME_END);
         int visibleEndMarker = pending.indexOf(VISIBLE_END);
-        int marker = firstMarker(outcomeMarker, visibleEndMarker);
+        int marker = firstMarker(
+                firstMarker(outcomeMarker, outcomeEndMarker),
+                firstMarker(visibleEndMarker, firstOutcomeKeyMarker()));
         if (marker >= 0) {
             String visible = pending.substring(0, marker);
             pending.setLength(0);
             outcomeStarted = true;
             return visible.isEmpty() ? List.of() : List.of(visible);
         }
-        int keep = Math.max(markerSuffixLength(OUTCOME_START), markerSuffixLength(VISIBLE_END));
+        int keep = Math.max(
+                Math.max(markerSuffixLength(OUTCOME_START), markerSuffixLength(OUTCOME_END)),
+                Math.max(markerSuffixLength(VISIBLE_END), maxOutcomeKeyPrefixSuffixLength()));
         if (pending.length() <= keep) return List.of();
         int emitLength = pending.length() - keep;
         String visible = pending.substring(0, emitLength);
@@ -63,6 +71,25 @@ final class OpsVisibleAnswerStreamProjector {
         if (pending.length() > keep) {
             pending.delete(0, pending.length() - keep);
         }
+    }
+
+    private int firstOutcomeKeyMarker() {
+        int first = -1;
+        for (String prefix : OUTCOME_KEY_PREFIXES) {
+            int offset = pending.indexOf(prefix);
+            while (offset >= 0) {
+                if (offset == 0 || pending.charAt(offset - 1) == '\n' || pending.charAt(offset - 1) == '\r') {
+                    first = first < 0 ? offset : Math.min(first, offset);
+                    break;
+                }
+                offset = pending.indexOf(prefix, offset + 1);
+            }
+        }
+        return first;
+    }
+
+    private int maxOutcomeKeyPrefixSuffixLength() {
+        return OUTCOME_KEY_PREFIXES.stream().mapToInt(this::markerSuffixLength).max().orElse(0);
     }
 
     private int markerSuffixLength(String marker) {

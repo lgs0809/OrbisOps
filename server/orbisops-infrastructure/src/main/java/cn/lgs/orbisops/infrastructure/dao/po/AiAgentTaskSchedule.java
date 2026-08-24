@@ -27,6 +27,9 @@ public class AiAgentTaskSchedule {
      */
     private String projectId;
 
+    /** Immutable authenticated creator, inherited by scheduled Runs. */
+    private String createdBy;
+
     /**
      * 智能体ID
      */

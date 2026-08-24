@@ -189,6 +189,7 @@ class OpsGraphNodeExecutionCoordinatorTest {
                 conditionEvaluator,
                 null,
                 null,
+                null,
                 null);
     }
 

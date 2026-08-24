@@ -4,14 +4,12 @@ import cn.lgs.orbisops.domain.memory.model.CapturedMemoryMessage;
 import cn.lgs.orbisops.domain.memory.model.ColdMemoryMessageSnapshot;
 import cn.lgs.orbisops.domain.memory.model.MemoryCaptureDraft;
 import cn.lgs.orbisops.domain.memory.service.MemoryCapturePolicy;
+import cn.lgs.orbisops.domain.memory.adapter.repository.IConversationMemoryRepository;
 
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 /** Application use case for preparing and capturing one runtime conversation message. */
 public class MemoryCaptureApplicationService {
@@ -24,7 +22,7 @@ public class MemoryCaptureApplicationService {
     private final MemoryCapturePolicy capturePolicy;
     private final Clock clock;
     private final MemoryCaptureFailurePort failurePort;
-    private final ConcurrentMap<String, AtomicLong> sessionTurnCounters = new ConcurrentHashMap<>();
+    private final IConversationMemoryRepository conversationRepository;
 
     public MemoryCaptureApplicationService(HotMemoryWritePort hotMemoryWritePort,
                                            ColdMemoryStoreApplicationService coldMemoryStore,
@@ -32,20 +30,30 @@ public class MemoryCaptureApplicationService {
                                            MemoryCapturePolicy capturePolicy,
                                            Clock clock,
                                            MemoryCaptureFailurePort failurePort) {
+        this(hotMemoryWritePort, coldMemoryStore, postProcessingService, capturePolicy, clock, failurePort, null);
+    }
+
+    public MemoryCaptureApplicationService(HotMemoryWritePort hotMemoryWritePort,
+                                           ColdMemoryStoreApplicationService coldMemoryStore,
+                                           MemoryPostProcessingApplicationService postProcessingService,
+                                           MemoryCapturePolicy capturePolicy, Clock clock,
+                                           MemoryCaptureFailurePort failurePort,
+                                           IConversationMemoryRepository conversationRepository) {
         this.hotMemoryWritePort = hotMemoryWritePort;
         this.coldMemoryStore = coldMemoryStore;
         this.postProcessingService = postProcessingService;
         this.capturePolicy = capturePolicy == null ? new MemoryCapturePolicy() : capturePolicy;
         this.clock = clock == null ? Clock.systemDefaultZone() : clock;
         this.failurePort = failurePort == null ? (operation, error) -> { } : failurePort;
+        this.conversationRepository = conversationRepository;
     }
 
     public MemoryCaptureResult capture(MemoryCaptureCommand command) {
         if (command == null || !command.valid()) return MemoryCaptureResult.skipped();
-        long nextTurnIndex = sessionTurnCounters
-                .computeIfAbsent(command.sessionId().trim(), ignored -> new AtomicLong())
-                .incrementAndGet();
         try {
+            if (conversationRepository == null) {
+                throw new IllegalStateException("CONVERSATION_MEMORY_DATABASE_UNAVAILABLE");
+            }
             Instant createdAtInstant = clock.instant();
             long createdAtEpochMillis = createdAtInstant.toEpochMilli();
             String createdAt = FORMATTER.format(LocalDateTime.ofInstant(createdAtInstant, clock.getZone()));
@@ -56,22 +64,25 @@ public class MemoryCaptureApplicationService {
                             command.role(),
                             command.content(),
                             command.metadata()),
-                    nextTurnIndex,
+                    1L,
                     createdAtEpochMillis,
                     createdAt);
-            MemoryMessageView message = view(captured);
-            if (hotMemoryWritePort == null) {
-                throw new IllegalStateException("Hot memory write port is unavailable");
-            }
-            hotMemoryWritePort.append(message, command.bufferSize());
-            if (coldMemoryStore != null) {
-                coldMemoryStore.appendMessage(snapshot(captured));
+            // Allocate the sequence, append the source and enqueue replay facts atomically, before caches/dispatch.
+            ColdMemoryMessageSnapshot persisted = conversationRepository.capture(snapshot(captured), command.bufferSize());
+            MemoryMessageView message = new MemoryMessageView(persisted.sessionId(), persisted.userId(), persisted.role(),
+                    persisted.content(), persisted.createdAt(), persisted.metadata());
+            try {
+                if (hotMemoryWritePort != null) hotMemoryWritePort.append(message, command.bufferSize());
+            } catch (RuntimeException cacheFailure) {
+                observe("hot-projection", cacheFailure);
             }
             if (postProcessingService != null) {
-                postProcessingService.submit(new MemoryPostProcessingCommand(
-                        message,
-                        command.bufferSize(),
-                        command.extractionAsyncEnabled()));
+                try {
+                    postProcessingService.submit(new MemoryPostProcessingCommand(
+                            message, command.bufferSize(), command.extractionAsyncEnabled()));
+                } catch (RuntimeException dispatchFailure) {
+                    observe("post-processing-submit", dispatchFailure);
+                }
             }
             return MemoryCaptureResult.captured(message);
         } catch (RuntimeException error) {
@@ -81,8 +92,7 @@ public class MemoryCaptureApplicationService {
     }
 
     public void clearSessionState(String sessionId) {
-        if (sessionId == null || sessionId.trim().isBlank()) return;
-        sessionTurnCounters.remove(sessionId.trim());
+        // Sequence allocation is persistent and must never reset with an in-process cache.
     }
 
     private MemoryMessageView view(CapturedMemoryMessage message) {

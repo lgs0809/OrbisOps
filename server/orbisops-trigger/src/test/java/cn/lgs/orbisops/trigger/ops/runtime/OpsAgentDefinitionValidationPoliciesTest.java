@@ -79,6 +79,34 @@ class OpsAgentDefinitionValidationPoliciesTest {
     }
 
     @Test
+    void skillBindingUsesProjectCatalogAndRejectsForeignDisabledOrUnboundGlobalSkills() {
+        var catalog = mock(cn.lgs.orbisops.application.skill.SkillCatalogPort.class);
+        var validator = new OpsAgentProjectCapabilityReferenceValidator(() -> null, () -> catalog,
+                () -> null, () -> null, () -> null, () -> null, () -> null);
+        when(catalog.listRuntimeProjectEntries("project-a")).thenReturn(List.of(skill("local", "project-a", "ENABLED"),
+                skill("shadowed", "project-a", "DISABLED")));
+        when(catalog.listRuntimeProjectEntries("project-b")).thenReturn(List.of());
+        when(catalog.listRuntimeGlobalEntries()).thenReturn(List.of(skill("shadowed", "", "ENABLED"), skill("global", "", "ENABLED")));
+        when(catalog.configuredGlobalSkillIds("project-a")).thenReturn(List.of("shadowed"));
+        assertDoesNotThrow(() -> validator.validateSkills(List.of("local"), "Agent", "project-a"));
+        for (String id : List.of("missing", "shadowed", "global")) assertThrows(IllegalArgumentException.class,
+                () -> validator.validateSkills(List.of(id), "Agent", "project-a"));
+        assertThrows(IllegalArgumentException.class, () -> validator.validateSkills(List.of("local"), "Agent", "project-b"));
+        when(catalog.configuredGlobalSkillIds("project-a")).thenReturn(List.of("global"));
+        assertDoesNotThrow(() -> validator.validateSkills(List.of("global"), "Agent", "project-a"));
+        assertDoesNotThrow(() -> validator.validateSkills(List.of("global"), "Agent", ""));
+    }
+
+    private cn.lgs.orbisops.application.skill.SkillCatalogSnapshot skill(String id, String project, String status) {
+        java.util.Map<String,Object> view = new java.util.LinkedHashMap<>();
+        view.put("skillId", id); view.put("projectId", project); view.put("scope", project.isBlank() ? "GLOBAL" : "PROJECT");
+        view.put("version", 1); view.put("skillHash", "hash-" + id); view.put("name", id); view.put("status", status);
+        view.put("description", "synthetic method"); view.put("whenToUse", List.of("diagnosis"));
+        view.put("whenNotToUse", List.of("production writes"));
+        return cn.lgs.orbisops.application.skill.SkillCatalogSnapshot.fromView(view);
+    }
+
+    @Test
     void modelKnowledgeValidatorMustUseKnowledgeTagFallback() {
         AiClientModelCatalogPort modelRepository =
                 mock(AiClientModelCatalogPort.class);

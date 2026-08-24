@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -385,6 +386,10 @@ class ChangePackageLandingProcessManagerTest {
         when(journalPort.operationFacts("lr-1")).thenReturn(List.of(
                 fact("COMPLETED", "SUCCEEDED")));
         when(currentRepository.find("cp-1")).thenReturn(Optional.of(current));
+        when(versionRepository.find("cp-1", 1)).thenReturn(Optional.of(version()));
+        when(runPort.executionActor("lr-1")).thenReturn("original-operator");
+        when(runtimePort.verifyCompletedOperations(eq(current), any(), any(), eq("lr-1"), eq("original-operator"), any()))
+                .thenReturn(Map.of("passed", true, "verificationId", "lv-1"));
         when(pointerRepository.compareAndSetLandingResult(
                 eq(current.pointer()), any(ChangePackageLandingCompletion.class))).thenReturn(true);
 
@@ -412,6 +417,10 @@ class ChangePackageLandingProcessManagerTest {
         when(journalPort.operationFacts("lr-1")).thenReturn(List.of(
                 fact("COMPLETED", "SUCCEEDED")));
         when(currentRepository.find("cp-1")).thenReturn(Optional.of(current));
+        when(versionRepository.find("cp-1", 1)).thenReturn(Optional.of(version()));
+        when(runPort.executionActor("lr-1")).thenReturn("original-operator");
+        when(runtimePort.verifyCompletedOperations(eq(current), any(), any(), eq("lr-1"), eq("original-operator"), any()))
+                .thenReturn(Map.of("passed", true, "verificationId", "lv-1"));
         when(pointerRepository.compareAndSetLandingResult(
                 eq(current.pointer()), any(ChangePackageLandingCompletion.class))).thenReturn(true);
 
@@ -432,17 +441,218 @@ class ChangePackageLandingProcessManagerTest {
         verify(runPort, never()).start(any(), any(), any(), anyInt(), any(), any(), any());
     }
 
+    @Test
+    void successfulWriteCannotBypassFailedIndependentPostconditions() {
+        ChangePackageCurrent current = stubRecoveryVerification();
+        when(runtimePort.verifyCompletedOperations(any(), any(), any(), any(), any(), any()))
+                .thenReturn(Map.of("passed", false, "verificationId", "lv-failed"));
+        when(pointerRepository.compareAndSetLandingResult(any(), any())).thenReturn(true);
+        assertTrue(manager.reconcile("lr-1", "recovery"));
+        verify(runPort).complete(eq("lr-1"), eq(ChangePackageLandingRunStatus.FAILED),
+                org.mockito.ArgumentMatchers.argThat(value -> value instanceof Map<?, ?> m
+                    && "LANDING_INDEPENDENT_VERIFICATION_FAILED".equals(m.get("reasonCode"))
+                    && m.containsKey("independentVerification")));
+        verify(runtimePort, never()).execute(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void unavailableOrUnpersistedVerificationCannotPromoteSuccessfulWrite() {
+        stubRecoveryVerification();
+        when(runtimePort.verifyCompletedOperations(any(), any(), any(), any(), any(), any()))
+                .thenThrow(new IllegalStateException("proof store unavailable"));
+        assertFalse(manager.reconcile("lr-1", "recovery"));
+        verify(runPort, never()).complete(any(), any(), any());
+        verify(pointerRepository, never()).compareAndSetLandingResult(any(), any());
+    }
+
+    @Test
+    void emptyVerificationCannotPromoteSuccessfulWrite() {
+        stubRecoveryVerification();
+        when(runtimePort.verifyCompletedOperations(any(), any(), any(), any(), any(), any())).thenReturn(Map.of());
+        assertFalse(manager.reconcile("lr-1", "recovery"));
+        verify(runPort, never()).complete(any(), any(), any());
+    }
+
+    @Test
+    void terminalPackageCanBeObservedWithoutStartingAnotherLanding() {
+        ChangePackageCurrent current = current(ChangePackageStatus.LANDED);
+        when(currentRepository.find("cp-1")).thenReturn(Optional.of(current));
+        when(runPort.find("lr-1")).thenReturn(Optional.of(recoveryRun()));
+        when(versionRepository.find("cp-1", 1)).thenReturn(Optional.of(version()));
+        when(journalPort.operationFacts("lr-1")).thenReturn(List.of(fact("COMPLETED", "SUCCEEDED")));
+        when(runtimePort.verifyCompletedOperations(any(), any(), any(), eq("lr-1"), eq("alice"), any()))
+                .thenReturn(Map.of("passed", true, "verificationId", "lv-manual"));
+        assertEquals(true, manager.verifyLanding("cp-1", "alice").get("passed"));
+        verify(runtimePort, never()).execute(any(), any(), any(), any(), any(), any());
+        verify(runPort, never()).complete(any(), any(), any());
+        verify(pointerRepository, never()).compareAndSetLandingResult(any(), any());
+        verify(eventRepository).append(any(ChangePackageEvent.class));
+    }
+
+    @Test
+    void historicalMetadataPlanCanReobserveOnlyItsOriginalCompletedReceiptWithoutAWrite() {
+        var current = current(ChangePackageStatus.LANDED);
+        var historical = new LinkedHashMap<>(snapshot());
+        historical.put("landingPlan", Map.of("preferredPlan", Map.of("planId", "legacy", "summary", "old A2 plan")));
+        when(currentRepository.find("cp-1")).thenReturn(Optional.of(current));
+        when(runPort.find("lr-1")).thenReturn(Optional.of(recoveryRun()));
+        when(versionRepository.find("cp-1", 1)).thenReturn(Optional.of(new ChangePackageVersion(
+                1L, "cp-1", 1, "hash-1", "APPROVED", new ChangePackageSnapshot(historical, "hash-1"),
+                "original historical plan", "approver", null)));
+        when(journalPort.operationFacts("lr-1")).thenReturn(List.of(fact("COMPLETED", "SUCCEEDED")));
+        when(runtimePort.verifyCompletedOperations(eq(current), any(),
+                org.mockito.ArgumentMatchers.argThat(plan -> plan.operations().size() == 1
+                        && "op-1".equals(plan.operations().get(0).operationId())), eq("lr-1"), eq("alice"), any()))
+                .thenReturn(Map.of("passed", true, "verificationId", "lv-historical"));
+        assertEquals(true, manager.verifyLanding("cp-1", "alice").get("passed"));
+        verify(runtimePort, never()).execute(any(), any(), any(), any(), any(), any());
+        verify(runPort, never()).start(any(), any(), any(), anyInt(), any(), any(), any());
+        verify(runPort, never()).complete(any(), any(), any());
+    }
+
+    @Test
+    void metadataOnlyPackageWithoutACompletedAttemptCannotUseTheObservationPath() {
+        var current = current(ChangePackageStatus.LANDING_FAILED);
+        var historical = new LinkedHashMap<>(snapshot());
+        historical.put("landingPlan", Map.of("preferredPlan", Map.of("summary", "metadata only")));
+        var approved = new ChangePackageVersion(1L, "cp-1", 1, "hash-1", "APPROVED",
+                new ChangePackageSnapshot(historical, "hash-1"), "original", "approver", null);
+        var run = new ChangePackageLandingRun("lr-1", "cp-1", "project-1", 1, "hash-1", "key",
+                ChangePackageLandingRunStatus.FAILED, false, Map.of());
+        when(currentRepository.find("cp-1")).thenReturn(Optional.of(current));
+        when(versionRepository.find("cp-1", 1)).thenReturn(Optional.of(approved));
+        when(runPort.find("lr-1")).thenReturn(Optional.of(run));
+        when(journalPort.operationFacts("lr-1")).thenReturn(List.of());
+        var error = assertThrows(IllegalArgumentException.class, () -> manager.verifyLanding("cp-1", "alice"));
+        assertTrue(error.getMessage().contains("RECORDED_EXECUTION_REQUIRED"));
+        verify(runtimePort, never()).verifyCompletedOperations(any(), any(), any(), any(), any(), any());
+        verify(runtimePort, never()).execute(any(), any(), any(), any(), any(), any());
+        verify(journalPort).operationFacts("lr-1");
+    }
+
+    private ChangePackageCurrent stubRecoveryVerification() {
+        ChangePackageCurrent current = current(ChangePackageStatus.LANDING_FAILED);
+        when(runPort.find("lr-1")).thenReturn(Optional.of(recoveryRun()));
+        when(journalPort.operationFacts("lr-1")).thenReturn(List.of(fact("COMPLETED", "SUCCEEDED")));
+        when(currentRepository.find("cp-1")).thenReturn(Optional.of(current));
+        when(versionRepository.find("cp-1", 1)).thenReturn(Optional.of(version()));
+        when(runPort.executionActor("lr-1")).thenReturn("original-operator");
+        return current;
+    }
+
+    @Test
+    void explicitPassingReobservationReconcilesFailedRunUnderOriginalOwnerWithoutWriteReplay() {
+        ChangePackageCurrent before = stubFailedManualVerification();
+        ChangePackageCurrent after = current(ChangePackageStatus.LANDED);
+        when(currentRepository.find("cp-1")).thenReturn(Optional.of(before), Optional.of(before),
+                Optional.of(before), Optional.of(after));
+        when(runtimePort.verifyCompletedOperations(any(), any(), any(), eq("lr-1"), anyString(), any()))
+                .thenReturn(Map.of("passed", true, "verificationId", "new-observation"));
+        when(pointerRepository.compareAndSetLandingResult(any(), any())).thenReturn(true);
+
+        Map<String, Object> proof = manager.verifyLanding("cp-1", "alice");
+
+        assertEquals(true, proof.get("reconciled"));
+        assertEquals("LANDED", proof.get("landingStatus"));
+        verify(runtimePort).verifyCompletedOperations(any(), any(), any(), eq("lr-1"), eq("alice"), any());
+        verify(runtimePort).verifyCompletedOperations(any(), any(), any(), eq("lr-1"), eq("original-operator"), any());
+        verify(runPort).complete(eq("lr-1"), eq(ChangePackageLandingRunStatus.SUCCEEDED), any());
+        verify(runtimePort, never()).execute(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void failedExplicitObservationDoesNotReconcile() {
+        stubFailedManualVerification();
+        when(runtimePort.verifyCompletedOperations(any(), any(), any(), anyString(), anyString(), any()))
+                .thenReturn(Map.of("passed", false));
+        assertEquals(false, manager.verifyLanding("cp-1", "alice").get("passed"));
+        verify(runPort, never()).complete(any(), any(), any());
+        verify(pointerRepository, never()).compareAndSetLandingResult(any(), any());
+    }
+
+    @Test
+    void incompleteOrUnknownFactsNeverPromoteEvenIfObservationClaimsPass() {
+        for (LandingOperationFact fact : List.of(fact("UNKNOWN", "FAILED"), fact("NONE", "PENDING"))) {
+            stubFailedManualVerification();
+            when(journalPort.operationFacts("lr-1")).thenReturn(List.of(fact));
+            assertThrows(IllegalArgumentException.class, () -> manager.verifyLanding("cp-1", "alice"));
+        }
+        verify(runtimePort, never()).verifyCompletedOperations(any(), any(), any(), any(), any(), any());
+        verify(runPort, never()).complete(any(), any(), any());
+        verify(pointerRepository, never()).compareAndSetLandingResult(any(), any());
+    }
+
+    @Test
+    void secondIndependentFailureRemainsFailedAfterFirstObservationPasses() {
+        stubFailedManualVerification();
+        when(runtimePort.verifyCompletedOperations(any(), any(), any(), eq("lr-1"), eq("alice"), any()))
+                .thenReturn(Map.of("passed", true));
+        when(runtimePort.verifyCompletedOperations(any(), any(), any(), eq("lr-1"), eq("original-operator"), any()))
+                .thenReturn(Map.of("passed", false));
+        when(pointerRepository.compareAndSetLandingResult(any(), any())).thenReturn(true);
+        Map<String, Object> proof = manager.verifyLanding("cp-1", "alice");
+        assertEquals(false, proof.get("reconciled"));
+        assertEquals("LANDING_FAILED", proof.get("landingStatus"));
+        verify(runPort).complete(eq("lr-1"), eq(ChangePackageLandingRunStatus.FAILED), any());
+        verify(runtimePort, never()).execute(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void manualObservationWithUnresolvedSideEffectDoesNotReadOrClose() {
+        stubFailedManualVerification();
+        when(toolExecutionLedger.hasUnresolvedSideEffect("project-1", "lr-1")).thenReturn(true);
+        assertThrows(IllegalStateException.class, () -> manager.verifyLanding("cp-1", "alice"));
+        verify(runtimePort, never()).verifyCompletedOperations(any(), any(), any(), any(), any(), any());
+        verify(runPort, never()).complete(any(), any(), any());
+    }
+
+    @Test
+    void manualObservationRejectsApprovedTupleDrift() {
+        stubFailedManualVerification();
+        when(runPort.find("lr-1")).thenReturn(Optional.of(new ChangePackageLandingRun(
+                "lr-1", "cp-1", "project-1", 2, "other-hash", "key",
+                ChangePackageLandingRunStatus.FAILED, false, Map.of())));
+        assertThrows(IllegalStateException.class, () -> manager.verifyLanding("cp-1", "alice"));
+        verify(runPort, never()).complete(any(), any(), any());
+    }
+
+    @Test
+    void manualObservationRejectsDifferentRunEvenWithSameApprovedTuple() {
+        stubFailedManualVerification();
+        when(runPort.find("lr-1")).thenReturn(Optional.of(new ChangePackageLandingRun(
+                "lr-old", "cp-1", "project-1", 1, "hash-1", "key",
+                ChangePackageLandingRunStatus.FAILED, false, Map.of())));
+        assertThrows(IllegalStateException.class, () -> manager.verifyLanding("cp-1", "alice"));
+        verify(runPort, never()).complete(any(), any(), any());
+    }
+
+    private ChangePackageCurrent stubFailedManualVerification() {
+        ChangePackageCurrent current = stubRecoveryVerification();
+        when(runPort.find("lr-1")).thenReturn(Optional.of(new ChangePackageLandingRun(
+                "lr-1", "cp-1", "project-1", 1, "hash-1", "key",
+                ChangePackageLandingRunStatus.FAILED, false, Map.of("reasonCode", "LANDING_INDEPENDENT_VERIFICATION_FAILED"))));
+        return current;
+    }
+
     private LandingOperationFact fact(String factStatus, String executionStatus) {
-        Map<String, Object> payload = Map.of(
-                "fact_status", factStatus,
-                "status", executionStatus);
+        @SuppressWarnings("unchecked")
+        var operation = (Map<String, Object>) ((List<?>) snapshot().get("mcpSteps")).get(0);
+        var payload = new LinkedHashMap<String, Object>();
+        payload.put("fact_status", factStatus); payload.put("status", executionStatus);
+        payload.put("landing_run_id", "lr-1"); payload.put("package_id", "cp-1"); payload.put("project_id", "project-1");
+        payload.put("approved_version", 1); payload.put("approved_package_hash", "hash-1");
+        payload.put("operation_id", "op-1"); payload.put("operation_hash", operation.get("operationHash"));
+        payload.put("operation_snapshot_json", operation);
+        payload.put("execution_key", cn.lgs.orbisops.domain.changepackage.service.ChangePackageCanonicalHasher.landingExecutionKey(
+                "project-1", "cp-1", "1", "hash-1", "op-1", String.valueOf(operation.get("operationHash"))));
+        payload.put("result_id", "receipt-1"); payload.put("output_hash", "a".repeat(64));
         return new LandingOperationFact(
                 "op-1",
                 LandingOperationFact.FactStatus.from(factStatus),
                 LandingOperationFact.ExecutionStatus.from(executionStatus),
                 "",
-                "",
-                "",
+                "receipt-1",
+                "a".repeat(64),
                 payload);
     }
 
@@ -489,12 +699,12 @@ class ChangePackageLandingProcessManagerTest {
     private Map<String, Object> snapshot() {
         Map<String, Object> operation = new LinkedHashMap<>();
         operation.put("operationId", "op-1");
-        operation.put("operationHash", "op-hash-1");
         operation.put("adapterType", "MCP");
         operation.put("toolsetId", "mcp-1");
         operation.put("toolName", "apply_config");
         operation.put("resourceScope", "config:x");
         operation.put("effectType", "MUTATE_TARGET_RESOURCE");
+        cn.lgs.orbisops.domain.changepackage.service.ChangePackageCanonicalHasher.applyOperationHashes(operation);
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("packageId", "cp-1");
         snapshot.put("projectId", "project-1");

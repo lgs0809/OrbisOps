@@ -39,16 +39,18 @@ public class OpsChangePackageToolProvider {
 
     private final OpsChangePackageToolExecutionGateway executionGateway;
     private final OpsChangePackageActionPolicyBinder actionPolicyBinder;
+    private final OpsStoredMcpPreparationEvidence storedMcpEvidence;
 
     @Autowired
     public OpsChangePackageToolProvider(ObjectProvider<OpsToolExecutionService> toolExecutionServiceProvider,
                                         OpsOwningPrepareValidationService owningPrepareValidationService,
-                                        OpsChangePackageActionPolicyBinder actionPolicyBinder) {
+                                        OpsChangePackageActionPolicyBinder actionPolicyBinder,
+                                        OpsStoredMcpPreparationEvidence storedMcpEvidence) {
         this(toolExecutionServiceProvider == null
                         ? null
                         : toolExecutionServiceProvider.getIfAvailable(),
                 owningPrepareValidationService,
-                actionPolicyBinder);
+                actionPolicyBinder, storedMcpEvidence);
     }
 
     OpsChangePackageToolProvider(OpsToolExecutionService toolExecutionService) {
@@ -63,10 +65,30 @@ public class OpsChangePackageToolProvider {
     OpsChangePackageToolProvider(OpsToolExecutionService toolExecutionService,
                                  OpsOwningPrepareValidationService owningPrepareValidationService,
                                  OpsChangePackageActionPolicyBinder actionPolicyBinder) {
+        this(toolExecutionService, owningPrepareValidationService, actionPolicyBinder, null);
+    }
+
+    OpsChangePackageToolProvider(OpsToolExecutionService toolExecutionService,
+                                 OpsOwningPrepareValidationService owningPrepareValidationService,
+                                 OpsChangePackageActionPolicyBinder actionPolicyBinder,
+                                 OpsStoredMcpPreparationEvidence storedMcpEvidence) {
         this.executionGateway = new OpsChangePackageToolExecutionGateway(
                 toolExecutionService,
                 owningPrepareValidationService);
         this.actionPolicyBinder = actionPolicyBinder;
+        this.storedMcpEvidence = storedMcpEvidence;
+    }
+
+    public record StatusQuery(String reason) {}
+
+    public ToolCallback buildStatusQuery(String projectId, String actor, String runId, OpsAgentChatRequest request) {
+        Function<StatusQuery, String> query = input -> RESULT_RENDERER.statusQuery(
+                executionGateway.readStatus(executionContext(projectId, actor, runId, request)));
+        return FunctionToolCallback.builder("QueryChangePackageStatus", query)
+                .description("只读查询当前项目最近二十条真实变更记录。核对方案是否已保存、是否待审批时必须使用此工具；"
+                        + "按实际 packageId、标题和状态辨认对应方案，存在其他方案不代表本次已创建。"
+                        + "工具返回不完整或失败时不得声称已保存或已审批。此工具不创建、审批或执行变更。")
+                .inputType(StatusQuery.class).build();
     }
 
     public boolean available(String projectId, List<String> executionTargetIds) {
@@ -105,7 +127,8 @@ public class OpsChangePackageToolProvider {
                     ? (input == null || input.getActions() == null ? List.of() : List.copyOf(input.getActions()))
                     : actionPolicyBinder.bind(projectId, input == null ? List.of() : input.getActions());
             List<OpsChangePackageRunEvidenceCollector.Evidence> collectedEvidence =
-                    EVIDENCE_COLLECTOR.collect(runId, events);
+                    new java.util.ArrayList<>(EVIDENCE_COLLECTOR.collect(runId, evidenceEvents(runtimeRequest, events)));
+            if (storedMcpEvidence != null) collectedEvidence.addAll(storedMcpEvidence.collect(projectId, runId));
             List<OpsChangePackageRunEvidenceCollector.Evidence> evidence = governedEvidence(
                     governedActions, collectedEvidence, availableAuthoritativeSources);
             Map<String, Object> request = REQUEST_FACTORY.create(
@@ -126,7 +149,32 @@ public class OpsChangePackageToolProvider {
         return FunctionToolCallback.builder(TOOL_NAME, function)
                 .description(description(projectId, executionTargetIds))
                 .inputType(OpsChangePackageToolInput.class)
+                .inputSchema(OpsChangePackageToolSchema.inputSchema())
                 .build();
+    }
+
+    private List<OpsRuntimeEvent> evidenceEvents(
+            OpsAgentChatRequest runtimeRequest,
+            List<OpsRuntimeEvent> currentEvents) {
+        List<OpsRuntimeEvent> prior = priorSessionEvidence(runtimeRequest);
+        if (prior.isEmpty()) return currentEvents == null ? List.of() : currentEvents;
+        List<OpsRuntimeEvent> merged = new java.util.ArrayList<>(prior.size()
+                + (currentEvents == null ? 0 : currentEvents.size()));
+        merged.addAll(prior);
+        if (currentEvents != null) merged.addAll(currentEvents);
+        return merged;
+    }
+
+    private List<OpsRuntimeEvent> priorSessionEvidence(OpsAgentChatRequest runtimeRequest) {
+        if (runtimeRequest == null || runtimeRequest.getMetadata() == null) return List.of();
+        Object value = runtimeRequest.getMetadata().get(
+                OpsChangePackageRuntimeToolContributor.SESSION_EVIDENCE_KEY);
+        if (!(value instanceof Iterable<?> iterable)) return List.of();
+        List<OpsRuntimeEvent> result = new java.util.ArrayList<>();
+        for (Object item : iterable) {
+            if (item instanceof OpsRuntimeEvent event) result.add(event);
+        }
+        return List.copyOf(result);
     }
 
     private OpsChangePackageToolExecutionGateway.Context executionContext(
@@ -166,23 +214,86 @@ public class OpsChangePackageToolProvider {
         Set<String> actualSourceTypes = new LinkedHashSet<>();
         List<OpsChangePackageRunEvidenceCollector.Evidence> authoritative = safeEvidence.stream()
                 .filter(item -> item != null && Set.of(
-                        "PROMETHEUS", "ELASTICSEARCH", "MYSQL_SLOW_SQL", "MYSQL", "RABBITMQ", "REDIS")
+                        "PROMETHEUS", "ELASTICSEARCH", "MYSQL_SLOW_SQL", "MYSQL", "RABBITMQ", "REDIS",
+                        "SERVICE_CONTROL", "MCP_REMOTE")
                         .contains(text(item.sourceType()).toUpperCase()))
                 .peek(item -> actualSourceTypes.add(text(item.sourceType()).toUpperCase()))
                 .toList();
-        int requiredDistinct = availableAuthoritativeSources == null || availableAuthoritativeSources.isEmpty()
+        boolean serviceControlAuthorityAvailable = (availableAuthoritativeSources != null
+                && availableAuthoritativeSources.contains("SERVICE_CONTROL"))
+                || authoritative.stream().anyMatch(item ->
+                        "SERVICE_CONTROL".equalsIgnoreCase(text(item.sourceType())));
+        if (serviceControlAction(governedActions) && serviceControlAuthorityAvailable) {
+            List<OpsChangePackageRunEvidenceCollector.Evidence> serviceEvidence = authoritative.stream()
+                    .filter(item -> "SERVICE_CONTROL".equalsIgnoreCase(text(item.sourceType())))
+                    .toList();
+            if (serviceControlEvidenceComplete(serviceEvidence)) return serviceEvidence;
+            throw new IllegalArgumentException(
+                    "CHANGE_PACKAGE_SERVICE_CONTROL_EVIDENCE_REQUIRED: get_service_status + restart_service_dry_run");
+        }
+        Set<String> diagnosticAvailable = new LinkedHashSet<>(
+                availableAuthoritativeSources == null ? Set.of() : availableAuthoritativeSources);
+        diagnosticAvailable.remove("SERVICE_CONTROL");
+        int requiredDistinct = diagnosticAvailable.isEmpty()
                 ? 1
-                : Math.min(2, availableAuthoritativeSources.size());
+                : Math.min(2, diagnosticAvailable.size());
         if (actualSourceTypes.size() < requiredDistinct) {
             throw new IllegalArgumentException(
                     "CHANGE_PACKAGE_AUTHORITATIVE_EVIDENCE_REQUIRED: requiredDistinct="
                             + requiredDistinct
                             + ", actual=" + actualSourceTypes
-                            + ", available=" + (availableAuthoritativeSources == null
-                            ? Set.of()
-                            : availableAuthoritativeSources));
+                            + ", available=" + diagnosticAvailable);
         }
         return authoritative;
+    }
+
+    private boolean serviceControlAction(List<Map<String, Object>> governedActions) {
+        if (governedActions == null || governedActions.isEmpty()) return false;
+        return governedActions.stream().anyMatch(action -> {
+            String mcpId = text(action.get("mcpId")).toLowerCase();
+            String toolName = text(firstNonNull(action.get("remoteToolName"),
+                    action.get("toolName"), action.get("name"))).toLowerCase();
+            String resourceScope = text(action.get("resourceScope")).toLowerCase();
+            return mcpId.contains("service-control") || mcpId.contains("service_control")
+                    || resourceScope.startsWith("service-control://")
+                    || "get_service_status".equals(toolName)
+                    || "restart_service_dry_run".equals(toolName)
+                    || "restart_service".equals(toolName)
+                    || "get_operation_receipt".equals(toolName);
+        });
+    }
+
+    private boolean serviceControlEvidenceComplete(
+            List<OpsChangePackageRunEvidenceCollector.Evidence> evidence) {
+        Set<String> toolNames = new LinkedHashSet<>();
+        for (OpsChangePackageRunEvidenceCollector.Evidence item : evidence == null ? List.<OpsChangePackageRunEvidenceCollector.Evidence>of() : evidence) {
+            if (item == null || !"SERVICE_CONTROL".equalsIgnoreCase(text(item.sourceType()))) continue;
+            Map<String, Object> metadata = item.metadata();
+            String toolName = text(metadata.get("remoteToolName"));
+            if (toolName.isBlank()) toolName = text(metadata.get("toolName"));
+            if (!toolName.isBlank()) toolNames.add(toolName.toLowerCase());
+            if ("restart_service_dry_run".equalsIgnoreCase(toolName)
+                    && trustedDryRunObservation(item.summary())) {
+                toolNames.add("get_service_status");
+            }
+        }
+        return toolNames.contains("get_service_status")
+                && toolNames.contains("restart_service_dry_run");
+    }
+
+    private boolean trustedDryRunObservation(String summary) {
+        String compact = text(summary).replace("\\", "").replaceAll("\\s+", "");
+        return compact.contains("\"validationType\":\"SERVICE_RESTART_DRY_RUN\"")
+                && compact.contains("\"status\":\"PASSED\"")
+                && compact.contains("\"trustedProviderObservation\":true")
+                && compact.contains("\"writesTargetResource\":false")
+                && compact.contains("\"expectedVersion\":");
+    }
+
+    private Object firstNonNull(Object... values) {
+        if (values == null) return null;
+        for (Object value : values) if (value != null) return value;
+        return null;
     }
 
     private boolean requiresAuthoritativeRuntimeEvidence(List<Map<String, Object>> governedActions) {
@@ -207,7 +318,8 @@ public class OpsChangePackageToolProvider {
         Set<String> result = new LinkedHashSet<>();
         for (Object item : iterable) {
             String sourceType = text(item).toUpperCase();
-            if (Set.of("PROMETHEUS", "ELASTICSEARCH", "MYSQL_SLOW_SQL", "MYSQL", "RABBITMQ", "REDIS")
+            if (Set.of("PROMETHEUS", "ELASTICSEARCH", "MYSQL_SLOW_SQL", "MYSQL", "RABBITMQ", "REDIS",
+                    "SERVICE_CONTROL")
                     .contains(sourceType)) {
                 result.add(sourceType);
             }
@@ -233,8 +345,39 @@ public class OpsChangePackageToolProvider {
                 服务端会忽略这些由模型声称的治理属性，并按权威 MCP Policy 重新绑定。
                 若目标动作 requiresDryRun=true，且目录存在同一 MCP 的 purpose=PRE_APPROVAL_VALIDATION 动作，
                 actions 中应先包含 validation，再包含审批后 Landing 动作；PREPARE 只会实际执行策略允许的 validation。
+                测试环境已经达到目标状态时优先选择只读 VALIDATE_ONLY 验证，不能重复写入相同版本制造测试。
+                必须先通过 Tool Router 获取所选工具的完整 schema，业务参数按真实观测值填写。
 
-                actions/mcpSteps 必须描述 operationId、mcpId/toolName、arguments、rollback 和 verification；
+
+                actions 包含可执行 MCP 操作时 packageType 使用 MCP_OPERATION_PACKAGE，或省略以由服务端分类。
+                需要人工审批、提供 manualFallback 不等于 MANUAL_REQUIRED 类型；后者以及 NEEDS_HUMAN_DESIGN、NO_ACTION_REQUIRED
+                只能用于没有可执行操作的人工处理记录。不要沿用失败方案的人工类型。
+                actions 每项必须描述 operationId、mcpId、toolName、arguments。
+                Landing 写操作还必须提供 preconditions、postCheck、rollbackPlan、rollbackPrecondition 和 manualFallback（字段名不可替换成 verification/rollback）。
+                postCheck 包含 toolsetId（mcp. 加真实 MCP ID）、toolName（只读工具）、arguments、
+                resourceIdentityField（默认 resourceKey）、expectedValues（真实预期结果，含与动作 resourceScope 相同的资源身份）。
+                expectedValues 可用点号表示嵌套字段，值必须保留原始类型，不得虚构观测结果。
+                若成功标准包含配置版本及真实业务请求等多个观测，postCheck 必须用 additionalChecks 数组补充其他只读检查，
+                每项同样包含 toolsetId、toolName、arguments、resourceIdentityField、expectedValues；最多 15 项，不允许嵌套。
+                每项都必须核对同一目标资源身份，所有检查通过才能完成 Landing，不能用一项成功代替其他成功标准。
+                不要把发布后检查另列为 purpose=POST_APPROVAL_VALIDATION 的 actions；它没有业务成功判定。
+                所有发布后必需检查都放入写操作的 postCheck / additionalChecks，并填写 expectedValues。
+                preconditions 应包含执行前实际资源版本及可核对条件；rollbackPrecondition 描述允许回退的资源状态与版本条件。
+                rollbackPlan 描述失败时的受控恢复方案；manualFallback 描述自动恢复无法安全执行时的处置，不代表取消 Landing 自动执行。
+                上述五个字段均为 JSON 对象，不能直接填字符串或数组；自然语言说明放在对象的 summary 字段中。
+                对象不得为空，不要把恢复描述声称为已执行。additionalChecks 只能放在 postCheck 对象内部。
+                approvalBoundary、preferredPlan、adjustmentPolicy 应说明被审批的任务目标、资源范围和调整边界。
+                preferredPlan 的正常执行序列必须明确放在 steps 数组中，步骤以 operationId 引用 actions 中同一操作，或提供一致的完整操作。
+                summary、normalSequence、forwardOperationId 等说明不能代替 steps，系统不会默默把所有 actions 当作前向操作。
+                声明 recoveryOperationId 时它不能混入正常 steps；仅失败时允许的恢复保存到前向动作 rollbackPlan 和 rollbackPrecondition，不能发布完就执行恢复。
+                preferredPlan 的控制字段只支持 steps（兼容 operations/mcpSteps）、forwardOperationId/recoveryOperationId；recommendedOrder 只能为 as_planned。
+                展示说明放 summary/description/title，已有 planId/selectedCandidateId/sourcePackageId/expectedBeforeState/expectedAfterState 仅用于说明；不添加其他控制指令或未识别的步骤覆盖字段。
+                若需 Workflow C 的业务验收，必须在本次准备中传 serviceId 和 verificationCriteria；审批后不能补填或放宽标准。
+                verificationCriteria 中只放一个 kind=OBSERVABILITY_SLO_V1 的观测标准，包含真实服务、环境、前后版本、资源身份、路由与采集定义。
+                changeKind 区分 RELEASE 和 RECOVERY；恢复性变更必须预先约定 maxErrorRate、maxP95Seconds，以及可比负载 minQps/maxQps。
+                错误率上限不得超过 0.01、P95 上限不得超过 1 秒；前后各十五分钟至少一百请求的要求由服务端固定，不能改小。
+                缺少实际采集定义或用户目标时先查询或自然语言澄清，禁止编造标准以取得通过。
+
                 effectType/effectScope/mutability/riskLevel 仅可按目录原值表达，最终仍以服务端绑定为准。
                 不要传 Shell、原始任意 SQL 或凭据。LAND 阶段只能在审批的 approvalBoundary 内执行。
                 """.formatted(

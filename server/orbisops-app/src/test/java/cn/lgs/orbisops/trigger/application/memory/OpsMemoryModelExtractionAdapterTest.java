@@ -10,6 +10,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class OpsMemoryModelExtractionAdapterTest {
 
@@ -38,22 +39,14 @@ class OpsMemoryModelExtractionAdapterTest {
     }
 
     @Test
-    void malformedOrEmptyModelContentProducesNoDrafts() {
-        assertEquals(List.of(), adapter.decode(null));
-        assertEquals(List.of(), adapter.decode("plain text"));
+    void invalidOutputDefersButVerifiedEmptyIsACompletedNoFactsResult() {
+        assertThrows(IllegalStateException.class, () -> adapter.decode(null));
+        assertThrows(IllegalStateException.class, () -> adapter.decode("plain text"));
         assertEquals(List.of(), adapter.decode("{\"memories\":[]}"));
     }
 
-    @Test
-    void unavailableModelReturnsEmptyWithoutInvocation() {
-        List<MemoryExtractionDraft> drafts = adapter.extract(new ColdMemoryMessageSnapshot(
-                "session-1",
-                "user-1",
-                "user",
-                "以后优先给结论",
-                "",
-                Map.of()), 4000);
-
-        assertTrue(drafts.isEmpty());
+    @Test void unavailableModelSignalsDeferredWorkInsteadOfVerifiedEmpty() {
+        assertEquals("MEMORY_EXTRACTION_MODEL_UNAVAILABLE",assertThrows(IllegalStateException.class,()->adapter.extract(
+                new ColdMemoryMessageSnapshot("session-1","user-1","user","later preference","",Map.of()),4000)).getMessage());
     }
 }

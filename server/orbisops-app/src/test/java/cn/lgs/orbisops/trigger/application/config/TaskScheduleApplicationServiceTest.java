@@ -24,11 +24,27 @@ import static org.mockito.Mockito.when;
 class TaskScheduleApplicationServiceTest {
 
     @Test
+    void creationWithoutAuthenticatedHumanCannotPersistOrUsePromptAsOwner() {
+        var catalog = mock(TaskScheduleCatalogUseCase.class);
+        var service = new TaskScheduleApplicationService(catalog, mock(TaskScheduleExecutionUseCase.class));
+        var request = TaskScheduleRequestDTO.builder().taskParam("{\"createdBy\":\"victim\"}").build();
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> service.create(request));
+        var http = new org.springframework.mock.web.MockHttpServletRequest();
+        http.setAttribute(cn.lgs.orbisops.trigger.http.admin.security.AdminWebSecurityConfig.AUTH_PRINCIPAL_ATTRIBUTE,
+                new cn.lgs.orbisops.trigger.application.security.AdminAuthService.AuthPrincipal("robot", "robot", "", "ADMIN", true));
+        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
+                new org.springframework.web.context.request.ServletRequestAttributes(http));
+        try { org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> service.create(request)); }
+        finally { org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes(); }
+        org.mockito.Mockito.verifyNoInteractions(catalog);
+    }
+
+    @Test
     void createProjectsDtoToTypedCommand() {
         TaskScheduleCatalogUseCase catalog = mock(TaskScheduleCatalogUseCase.class);
         TaskScheduleExecutionUseCase execution = mock(TaskScheduleExecutionUseCase.class);
         TaskScheduleApplicationService service = new TaskScheduleApplicationService(catalog, execution);
-        when(catalog.create(org.mockito.ArgumentMatchers.any())).thenReturn(true);
+        when(catalog.create(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq("creator-a"))).thenReturn(true);
         TaskScheduleRequestDTO request = TaskScheduleRequestDTO.builder()
                 .id(7L)
                 .projectId(" payment ")
@@ -52,10 +68,16 @@ class TaskScheduleApplicationServiceTest {
                 .notificationTarget("room")
                 .build();
 
-        assertTrue(service.create(request));
+        var http = new org.springframework.mock.web.MockHttpServletRequest();
+        http.setAttribute(cn.lgs.orbisops.trigger.http.admin.security.AdminWebSecurityConfig.AUTH_PRINCIPAL_ATTRIBUTE,
+                new cn.lgs.orbisops.trigger.application.security.AdminAuthService.AuthPrincipal("alice", "creator-a", "jwt", "ADMIN", false));
+        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
+                new org.springframework.web.context.request.ServletRequestAttributes(http));
+        try { assertTrue(service.create(request)); }
+        finally { org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes(); }
 
         ArgumentCaptor<TaskScheduleCommand> command = ArgumentCaptor.forClass(TaskScheduleCommand.class);
-        verify(catalog).create(command.capture());
+        verify(catalog).create(command.capture(), org.mockito.ArgumentMatchers.eq("creator-a"));
         assertEquals(7L, command.getValue().id());
         assertEquals(" payment ", command.getValue().projectId());
         assertEquals("检查错误率和延迟", command.getValue().prompt());

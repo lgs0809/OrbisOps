@@ -17,6 +17,44 @@ class AnalysisTaskPresentationPolicyTest {
     private final AnalysisTaskPresentationPolicy policy = new AnalysisTaskPresentationPolicy();
 
     @Test
+    void presentsRevocationAndNeverInfersNoPriorWritesFromAnErrorAlone() {
+        var revoked = policy.present(snapshot(Map.of(), Map.of(), "FAILED", "SKILL_RUNTIME_ACCESS_REVOKED"));
+        assertTrue(revoked.errorMessage().contains("Skill 已停用或项目授权已撤回"));
+        assertEquals(revoked.errorMessage(), policy.responseSummary(revoked));
+        for (String reason : List.of("AGENT_RUN_FAILED", "timeout", "401 unauthorized", "422")) {
+            String summary = policy.failureSummary(reason);
+            assertTrue(summary.contains("回执"));
+            org.junit.jupiter.api.Assertions.assertFalse(summary.contains("没有执行生产变更"));
+            org.junit.jupiter.api.Assertions.assertFalse(summary.contains("没有执行工具"));
+        }
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"MCP_TOOL_NOT_ENABLED", "MCP_POLICY_PENDING_REVIEW",
+            "MCP_POLICY_DISABLED", "MCP_TOOL_NOT_AUTHORIZED", "READ_ONLY_REQUIRED"})
+    void storedToolGovernanceReasonHasTheSameSafeToolMessage(String code) {
+        String summary = policy.failureSummary(code);
+        assertTrue(summary.contains("工具") && summary.contains("回执"));
+        String expectedAction = switch (code) {
+            case "MCP_TOOL_NOT_ENABLED" -> "启用";
+            case "MCP_POLICY_PENDING_REVIEW" -> "审核";
+            case "MCP_POLICY_DISABLED" -> "停用";
+            case "MCP_TOOL_NOT_AUTHORIZED" -> "授权";
+            default -> "只读";
+        };
+        assertTrue(summary.contains(expectedAction), "The stored code must tell the user which tool constraint to check");
+        org.junit.jupiter.api.Assertions.assertFalse(summary.contains("模型"));
+        assertEquals(summary, policy.present(snapshot(Map.of(),Map.of(),"FAILED",code)).errorMessage());
+    }
+
+    @Test
+    void capabilityFilteringIsNotAnAttemptedUnauthorizedAction() {
+        assertEquals(List.of("调用被拒绝"), policy.statusSummaries(List.of(
+                event(1, "RUNTIME_TOOL_AUTHORITY_BLOCKED", "BLOCKED", "工具超出当前 Agent Authority：hidden"),
+                event(2, "TOOL_CALL_BLOCKED", "BLOCKED", "调用被拒绝")), "BLOCKED"));
+    }
+
+    @Test
     void normalizesAlertSourceAndPresentsLegacyErrorEnvelopeAsFailed() {
         AnalysisTaskSnapshot alert = snapshot(
                 Map.of("query", "分析告警", "metadata", Map.of("triggerSource", "ALERTMANAGER")),
@@ -54,6 +92,52 @@ class AnalysisTaskPresentationPolicyTest {
                 policy.statusSummaries(events, "UNKNOWN", "INSUFFICIENT", "BLOCKED"));
         assertEquals(List.of("建议调整连接池上限"),
                 policy.summaries(events, "RECOMMEND", "REPLAN", "CHANGE_PACKAGE"));
+    }
+
+    @Test
+    void hidesPlatformLandingInstructionBehindAUserSafeGoal() {
+        String internal = "You are the platform Landing ReAct runtime.\n"
+                + "Return exactly one final status: LANDED, LANDING_FAILED, or NEEDS_REPLAN.";
+        AnalysisTaskSnapshot snapshot = snapshot(
+                Map.of("query", internal, "metadata", Map.of(
+                        "changePackageId", "cp-123",
+                        "_trustedTriggerSource", "LANDING")),
+                Map.of(),
+                "FAILED",
+                "Landing runtime failed");
+
+        AnalysisTaskView view = policy.present(snapshot);
+
+        assertEquals("受控变更包 cp-123 的落地运行", view.goal());
+        assertEquals("LANDING", view.source());
+        assertEquals("LANDING", view.taskType());
+        assertEquals("受控变更包 cp-123 的落地运行",
+                AnalysisTaskPresentationPolicy.publicGoal(snapshot.request(), "运行详情"));
+        assertTrue(AnalysisTaskPresentationPolicy.isInternalRuntimePrompt(internal));
+    }
+
+    @Test
+    void prefersExplicitPublicGoalOverRuntimeQuery() {
+        AnalysisTaskSnapshot snapshot = snapshot(
+                Map.of("query", "You are the platform Landing ReAct runtime.",
+                        "metadata", Map.of("publicRunGoal", "受控变更包 cp-456 的落地运行")),
+                Map.of(),
+                "FAILED",
+                "");
+
+        assertEquals("受控变更包 cp-456 的落地运行", policy.present(snapshot).goal());
+    }
+
+    @Test
+    void keepsAuthorityDetailsOutOfUserFacingUnknowns() {
+        List<GraphEvent> events = List.of(event(
+                1,
+                "AUTHORITY_BLOCKED",
+                "UNKNOWN",
+                "工具超出当前 Agent Authority：UseProjectSkill"));
+
+        assertEquals(List.of("当前运行权限不足，未执行未授权的操作。"),
+                policy.statusSummaries(events, "UNKNOWN"));
     }
 
     private AnalysisTaskSnapshot snapshot(

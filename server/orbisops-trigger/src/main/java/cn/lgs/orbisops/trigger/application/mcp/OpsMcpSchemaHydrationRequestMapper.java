@@ -54,6 +54,7 @@ public final class OpsMcpSchemaHydrationRequestMapper {
         return new McpAuthoritativeToolDefinition(
                 text(safe.get("description")),
                 first(safe, "inputSchema", "input_schema", "schema", "parameters"),
+                first(safe, "outputSchema", "output_schema"),
                 text(safe.get("schemaSource")));
     }
 

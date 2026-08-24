@@ -28,9 +28,15 @@ public class OpsRuntimeContextCanarySkillAdapter implements RuntimeContextCanary
             String projectId,
             String agentId,
             String runId) {
+        return resolve(projectId, agentId, runId, "");
+    }
+
+    @Override
+    public List<RuntimeContextCanarySkillSnapshot> resolve(
+            String projectId, String agentId, String runId, String query) {
         SkillCanaryContextApplicationService service = serviceProvider.getIfAvailable();
         if (service == null) return List.of();
-        return service.resolveCandidates(projectId, agentId, runId).stream()
+        return service.resolveCandidates(projectId, agentId, runId, query).stream()
                 .map(this::snapshot)
                 .toList();
     }

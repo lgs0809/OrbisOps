@@ -1,10 +1,14 @@
 package cn.lgs.orbisops.application.memory;
 
 import cn.lgs.orbisops.domain.memory.model.ColdMemoryItemSnapshot;
+import cn.lgs.orbisops.domain.memory.model.MemoryProcessingJob;
+import cn.lgs.orbisops.domain.memory.adapter.repository.IConversationMemoryRepository;
 
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
+import java.util.UUID;
+import java.time.Clock;
 
 /**
  * Application orchestrator for semantic indexing, durable extraction and conversation compression.
@@ -18,6 +22,8 @@ public class MemoryPostProcessingApplicationService {
     private final MemoryCompressionPort memoryCompressionPort;
     private final Supplier<Executor> executorSupplier;
     private final MemoryPostProcessingFailurePort failurePort;
+    private final IConversationMemoryRepository conversationRepository;
+    private final Clock clock;
 
     public MemoryPostProcessingApplicationService(SemanticMemoryWritePort semanticMemoryWritePort,
                                                   MemoryExtractionPort memoryExtractionPort,
@@ -26,6 +32,18 @@ public class MemoryPostProcessingApplicationService {
                                                   MemoryCompressionPort memoryCompressionPort,
                                                   Supplier<Executor> executorSupplier,
                                                   MemoryPostProcessingFailurePort failurePort) {
+        this(semanticMemoryWritePort, memoryExtractionPort, coldMemoryStore, contextMemoryWritePort,
+                memoryCompressionPort, executorSupplier, failurePort, null, Clock.systemUTC());
+    }
+
+    public MemoryPostProcessingApplicationService(SemanticMemoryWritePort semanticMemoryWritePort,
+                                                  MemoryExtractionPort memoryExtractionPort,
+                                                  ColdMemoryStoreApplicationService coldMemoryStore,
+                                                  ContextMemoryWritePort contextMemoryWritePort,
+                                                  MemoryCompressionPort memoryCompressionPort,
+                                                  Supplier<Executor> executorSupplier,
+                                                  MemoryPostProcessingFailurePort failurePort,
+                                                  IConversationMemoryRepository conversationRepository, Clock clock) {
         this.semanticMemoryWritePort = semanticMemoryWritePort;
         this.memoryExtractionPort = memoryExtractionPort;
         this.coldMemoryStore = coldMemoryStore;
@@ -33,10 +51,16 @@ public class MemoryPostProcessingApplicationService {
         this.memoryCompressionPort = memoryCompressionPort;
         this.executorSupplier = executorSupplier == null ? () -> null : executorSupplier;
         this.failurePort = failurePort == null ? (operation, error) -> { } : failurePort;
+        this.conversationRepository = conversationRepository;
+        this.clock = clock == null ? Clock.systemUTC() : clock;
     }
 
     public void submit(MemoryPostProcessingCommand command) {
         if (command == null || !command.valid()) return;
+        if (conversationRepository != null) {
+            dispatchPending(command.message().sessionId(), 12);
+            return;
+        }
         Runnable task = () -> process(command);
         Executor executor = resolveExecutor("post-processing-executor");
         if (executor == null) {
@@ -48,6 +72,74 @@ public class MemoryPostProcessingApplicationService {
             executor.execute(task);
         } catch (RuntimeException error) {
             observe("post-processing-submit", error);
+        }
+    }
+
+    /** Reuse the memory executor; the database outbox survives unavailable/rejected dispatch and process exit. */
+    public void replayPending(int limit) {
+        if (conversationRepository != null) dispatchPending("", limit);
+    }
+
+    private void dispatchPending(String sessionId, int limit) {
+        Executor executor = resolveExecutor("post-processing-executor");
+        if (executor == null) return;
+        for (Long id : conversationRepository.pending(sessionId, limit, clock.millis())) {
+            try {
+                executor.execute(() -> conversationRepository.claim(id, UUID.randomUUID().toString(), clock.millis(), 300_000L)
+                        .ifPresent(this::processDurable));
+            } catch (RuntimeException error) {
+                observe("post-processing-submit", error);
+                return;
+            }
+        }
+    }
+
+    private void processDurable(MemoryProcessingJob job) {
+        var source = job.message();
+        MemoryMessageView message = new MemoryMessageView(source.sessionId(), source.userId(), source.role(), source.content(),
+                source.createdAt(), source.metadata());
+        try {
+            switch (job.taskType()) {
+                case "SEMANTIC" -> {
+                    if(semanticMemoryWritePort!=null && !conversationRepository.validSemanticSource(job,clock.millis())) {
+                        conversationRepository.block(job,"MEMORY_SEMANTIC_SOURCE_OR_OWNER_CHANGED",clock.millis());break;
+                    }
+                    var outcome=semanticMemoryWritePort==null ? new SemanticMemoryWritePort.Outcome("DISABLED",false,"") : semanticMemoryWritePort.appendDurably(job);
+                    if(outcome.modelPending())conversationRepository.defer(job,"LEXICAL_MODEL_PENDING",outcome.reason(),clock.millis(),null);
+                    else conversationRepository.complete(job,outcome.storage(),clock.millis(),null);
+                }
+                case "EXTRACTION" -> {
+                    var outcome = memoryExtractionPort == null ? new MemoryExtractionPort.Outcome(List.of(), false, "DISABLED")
+                            : memoryExtractionPort.extractDurably(message);
+                    if ("RULE_FALLBACK_MODEL_PENDING".equals(job.resultKind())
+                            && ("RULES_ONLY".equals(outcome.kind()) || "DISABLED".equals(outcome.kind()))) {
+                        conversationRepository.retry(job,"MEMORY_EXTRACTION_MODEL_DISABLED",clock.millis());
+                        break;
+                    }
+                    Runnable writes = () -> {
+                        if (coldMemoryStore != null) coldMemoryStore.saveItemsStrict(outcome.items());
+                        if (contextMemoryWritePort != null) contextMemoryWritePort.saveExtractedItemsStrict(outcome.items());
+                    };
+                    if (outcome.modelPending()) conversationRepository.defer(job, outcome.kind(), "MEMORY_EXTRACTION_MODEL_DEFERRED", clock.millis(), writes);
+                    else conversationRepository.complete(job, outcome.items().isEmpty() ? "NO_FACTS" : outcome.kind(), clock.millis(), writes);
+                }
+                case "COMPRESSION" -> {
+                    Runnable writes=memoryCompressionPort==null ? null : memoryCompressionPort.prepareCompression(job);
+                    conversationRepository.complete(job, "CHECKED", clock.millis(), writes);
+                }
+                case "COMPRESSION_MODEL" -> {
+                    Runnable writes = memoryCompressionPort.prepareModelRetry(job);
+                    conversationRepository.complete(job, "MODEL_SUMMARY_RECHECKED", clock.millis(), writes);
+                }
+                default -> throw new IllegalArgumentException("MEMORY_POST_PROCESSING_TASK_TYPE_INVALID");
+            }
+        } catch (cn.lgs.orbisops.domain.memory.model.MemoryModelInputInvalidException invalid) {
+            conversationRepository.block(job,invalid.getMessage(),clock.millis());
+            observe("durable-source-"+job.taskType(),invalid);
+        } catch (RuntimeException error) {
+            // Store a safe diagnostic category, never provider bodies/credentials or message content.
+            conversationRepository.retry(job, error.getClass().getSimpleName(), clock.millis());
+            observe("durable-" + job.taskType(), error);
         }
     }
 

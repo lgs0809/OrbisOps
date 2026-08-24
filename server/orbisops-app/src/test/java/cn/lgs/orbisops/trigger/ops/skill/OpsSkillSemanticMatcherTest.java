@@ -1,15 +1,14 @@
 package cn.lgs.orbisops.trigger.ops.skill;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.ai.embedding.EmbeddingModel;
-import org.springframework.beans.factory.ObjectProvider;
+import cn.lgs.orbisops.trigger.application.skill.OpsSkillRetrievalHttpClient;
 
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -19,14 +18,11 @@ class OpsSkillSemanticMatcherTest {
 
     @Test
     void semanticScoresRankMeaningEquivalentSkillAhead() {
-        EmbeddingModel embeddingModel = mock(EmbeddingModel.class);
-        when(embeddingModel.embed(anyList())).thenReturn(List.of(
-                new float[]{1F, 0F},
-                new float[]{0.98F, 0.02F},
-                new float[]{0F, 1F}));
-        @SuppressWarnings("unchecked") ObjectProvider<EmbeddingModel> provider = mock(ObjectProvider.class);
-        when(provider.getIfAvailable()).thenReturn(embeddingModel);
-        OpsSkillSemanticMatcher matcher = new OpsSkillSemanticMatcher(provider);
+        OpsSkillRetrievalHttpClient embeddingModel = mock(OpsSkillRetrievalHttpClient.class);
+        when(embeddingModel.configured()).thenReturn(true);
+        when(embeddingModel.embed(anyString(),anyBoolean())).thenReturn(
+                new float[]{1F, 0F}, new float[]{0.98F, 0.02F}, new float[]{0F, 1F});
+        OpsSkillSemanticMatcher matcher = new OpsSkillSemanticMatcher(embeddingModel);
 
         Map<String, Double> scores = matcher.scores("下单异常诊断", List.of(
                 new OpsSkillSemanticMatcher.SkillDocument("order", "hash-order", "订单失败排查"),
@@ -38,11 +34,10 @@ class OpsSkillSemanticMatcherTest {
 
     @Test
     void embeddingFailureFallsBackWithoutInventingScores() {
-        EmbeddingModel embeddingModel = mock(EmbeddingModel.class);
-        when(embeddingModel.embed(anyList())).thenThrow(new IllegalStateException("embedding unavailable"));
-        @SuppressWarnings("unchecked") ObjectProvider<EmbeddingModel> provider = mock(ObjectProvider.class);
-        when(provider.getIfAvailable()).thenReturn(embeddingModel);
-        OpsSkillSemanticMatcher matcher = new OpsSkillSemanticMatcher(provider);
+        OpsSkillRetrievalHttpClient embeddingModel = mock(OpsSkillRetrievalHttpClient.class);
+        when(embeddingModel.configured()).thenReturn(true);
+        when(embeddingModel.embed(anyString(),anyBoolean())).thenThrow(new IllegalStateException("embedding unavailable"));
+        OpsSkillSemanticMatcher matcher = new OpsSkillSemanticMatcher(embeddingModel);
 
         assertTrue(matcher.scores("订单失败", List.of(
                 new OpsSkillSemanticMatcher.SkillDocument("order", "hash-order", "订单排查"))).isEmpty());
@@ -50,13 +45,13 @@ class OpsSkillSemanticMatcherTest {
 
     @Test
     void disabledSemanticRankingDoesNotResolveEmbeddingModel() {
-        @SuppressWarnings("unchecked") ObjectProvider<EmbeddingModel> provider = mock(ObjectProvider.class);
+        OpsSkillRetrievalHttpClient provider = mock(OpsSkillRetrievalHttpClient.class);
         OpsSkillSemanticMatcher matcher = new OpsSkillSemanticMatcher(
                 provider,
                 new OpsSkillSemanticSettings(false, 64, 2_048));
 
         assertTrue(matcher.scores("订单失败", List.of(
                 new OpsSkillSemanticMatcher.SkillDocument("order", "hash-order", "订单排查"))).isEmpty());
-        verify(provider, never()).getIfAvailable();
+        verify(provider, never()).configured();
     }
 }

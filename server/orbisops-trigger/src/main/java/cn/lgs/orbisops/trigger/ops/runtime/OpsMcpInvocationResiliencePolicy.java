@@ -106,6 +106,13 @@ public final class OpsMcpInvocationResiliencePolicy {
         return opened;
     }
 
+    public void neutral(Permit permit) {
+        CircuitState state = state(permit);
+        synchronized (state) {
+            if (state.generation == permit.generation() && permit.halfOpenProbe()) state.halfOpenInFlight = false;
+        }
+    }
+
     public Map<String, Object> snapshot() {
         long open = circuits.values().stream().filter(state -> {
             synchronized (state) {
@@ -138,7 +145,8 @@ public final class OpsMcpInvocationResiliencePolicy {
         if (server.isBlank()) server = value(config.getName());
         if (server.isBlank()) throw new IllegalArgumentException("MCP_SERVER_ID_REQUIRED");
         String tool = value(toolName);
-        return tool.isBlank() ? server : server + "/" + tool;
+        String project = value(config.getProjectId());
+        return project + "/" + (tool.isBlank() ? server : server + "/" + tool);
     }
 
     private String value(Object value) {

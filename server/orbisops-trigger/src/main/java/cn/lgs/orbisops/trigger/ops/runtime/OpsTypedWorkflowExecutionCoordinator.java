@@ -85,6 +85,24 @@ final class OpsTypedWorkflowExecutionCoordinator {
             handleFailure(request, events, eventSink, "TYPED_WORKFLOW_BEGIN_INPUT_REQUIRED", null);
             return;
         }
+        if ("PLATFORM_LANDING_RUNTIME".equals(definition.getDefinitionKind())) {
+            var authority = new OpsAgentRunExecutionContextFactory().resolve(request);
+            var fixed = new OpsPlatformLandingRuntimeDefinitionFactory().create(request.getProjectId());
+            if (authority == null
+                    || authority.stage() != cn.lgs.orbisops.domain.worksession.runtime.model.AgentExecutionStage.LANDING
+                    || !fixed.getAgentId().equals(definition.getAgentId())
+                    || !fixed.getDefinitionHash().equals(definition.getDefinitionHash())) {
+                throw new SecurityException("PLATFORM_LANDING_RUNTIME_AUTHORITY_REQUIRED");
+            }
+            // Landing has its own Work Session lease, operation journal and independent verifier.
+            // It is not a user-authored Durable Workflow and must not acquire a second lifecycle.
+            record(events, eventSink, OpsRuntimeEvent.builder()
+                    .eventType("TYPED_WORKFLOW_SKIPPED").status("SKIPPED")
+                    .summary("平台 Landing 由已审批的 ReAct Work Session 执行，不进入用户 Workflow 生命周期。")
+                    .payload(Map.of("reasonCode", "PLATFORM_LANDING_WORK_SESSION"))
+                    .build());
+            return;
+        }
         if (!settings.shouldActivate(request)) {
             record(events, eventSink, OpsRuntimeEvent.builder()
                     .eventType("TYPED_WORKFLOW_SKIPPED")
@@ -135,7 +153,8 @@ final class OpsTypedWorkflowExecutionCoordinator {
                     settings.mode(),
                     recovered,
                     new ConcurrentHashMap<>(),
-                    nodeAttemptLimits(definition)));
+                    nodeAttemptLimits(definition),
+                    new OpsWorkflowNodeOutputBoundary(plan, definition, definitionValidator, workflowApprovals)));
             request.getMetadata().put("typedWorkflowMode", settings.mode().name());
             request.getMetadata().put("typedWorkflowPlanHash", plan.planHash());
             request.getMetadata().put("typedWorkflowDefinitionHash", plan.definitionHash());
@@ -203,23 +222,40 @@ final class OpsTypedWorkflowExecutionCoordinator {
         try {
             String nodeId = requiredNodeId(node);
             DurableWorkflowRunState state = durableRuntime.state(request);
-            int attempt = run.replayCursors().merge(nodeId, 1, Integer::sum);
-            Object storedOutput = state.variables().get(nodeAttemptOutputKey(nodeId, attempt));
-            String expectedHash = value(state.variables().get(nodeAttemptOutputHashKey(nodeId, attempt)));
-            if (storedOutput == null
-                    && attempt == state.node(nodeId).attempt()
+            int cursor = run.replayCursors().getOrDefault(nodeId, 0);
+            int lastAttempt = state.node(nodeId).attempt();
+            int attempt = cursor + 1;
+            Object storedOutput = null;
+            String expectedHash = "";
+            // Waiting/retried attempts have no completed output. A graph traversal
+            // must consume the next completed attempt, not equate the two counters.
+            for (; attempt <= lastAttempt; attempt++) {
+                storedOutput = state.variables().get(nodeAttemptOutputKey(nodeId, attempt));
+                expectedHash = value(state.variables().get(nodeAttemptOutputHashKey(nodeId, attempt)));
+                if (storedOutput != null) break;
+                if (!expectedHash.isBlank()) {
+                    throw new IllegalStateException("TYPED_WORKFLOW_RECOVERED_OUTPUT_MISSING:" + nodeId + ":" + attempt);
+                }
+            }
+            if (storedOutput == null && cursor < lastAttempt
                     && state.node(nodeId).status() == DurableWorkflowNodeStatus.SUCCEEDED) {
                 // Backward-compatible recovery for checkpoints written before attempt-scoped outputs.
+                attempt = lastAttempt;
                 storedOutput = state.variables().get(nodeOutputKey(nodeId));
                 expectedHash = state.node(nodeId).outputHash();
             }
-            if (storedOutput == null) return Optional.empty();
+            if (storedOutput == null) {
+                run.replayCursors().put(nodeId, lastAttempt);
+                return Optional.empty();
+            }
             Map<String, Object> output = outputMap(storedOutput);
             String outputHash = CanonicalObjectHasher.sha256(output);
             if (expectedHash.isBlank() || !outputHash.equals(expectedHash)) {
                 throw new IllegalStateException(
                         "TYPED_WORKFLOW_RECOVERED_OUTPUT_HASH_MISMATCH:" + nodeId + ":" + attempt);
             }
+            run.outputBoundary().validate(request, node, output);
+            run.replayCursors().put(nodeId, attempt);
             record(events, eventSink, OpsRuntimeEvent.builder()
                     .eventType("TYPED_WORKFLOW_NODE_REPLAYED")
                     .status("SUCCEEDED")
@@ -252,6 +288,7 @@ final class OpsTypedWorkflowExecutionCoordinator {
         if (run == null || node == null || !"HUMAN_APPROVAL".equalsIgnoreCase(value(node.getType()))) {
             return Optional.empty();
         }
+        run.outputBoundary().validateNode(request, node);
         String nodeId = requiredNodeId(node);
         WorkflowApprovalRecord approval = workflowApprovals.find(request.getRunId(), nodeId).orElse(null);
         if (approval == null) {
@@ -335,6 +372,7 @@ final class OpsTypedWorkflowExecutionCoordinator {
         if (run == null) return;
         try {
             String nodeId = requiredNodeId(node);
+            run.outputBoundary().validateNode(request, node);
             durableRuntime.beforeNode(request, nodeId, maxAttempts(run, nodeId));
         } catch (RuntimeException error) {
             deactivateOnFailure(request, events, eventSink, "TYPED_WORKFLOW_NODE_BEFORE_FAILED", error);
@@ -354,6 +392,7 @@ final class OpsTypedWorkflowExecutionCoordinator {
             Map<String, Object> durableOutput = output == null
                     ? Map.of()
                     : Collections.unmodifiableMap(new LinkedHashMap<>(output));
+            run.outputBoundary().validate(request, node, durableOutput);
             String outputHash = CanonicalObjectHasher.sha256(durableOutput);
             int attempt = durableRuntime.state(request).node(nodeId).attempt();
             Map<String, Object> variableUpdates = new LinkedHashMap<>();
@@ -362,11 +401,17 @@ final class OpsTypedWorkflowExecutionCoordinator {
             variableUpdates.put(nodeOutputKey(nodeId), durableOutput);
             variableUpdates.put(nodeAttemptOutputKey(nodeId, attempt), durableOutput);
             variableUpdates.put(nodeAttemptOutputHashKey(nodeId, attempt), outputHash);
+            variableUpdates.put("nodeValidation:" + nodeId + ":" + attempt, Map.of(
+                    "contractVersion", 1, "planHash", run.plan().planHash(),
+                    "definitionHash", run.plan().definitionHash(), "outputHash", outputHash));
             durableRuntime.afterNode(
                     request,
                     nodeId,
                     outputHash,
                     variableUpdates);
+            // Fresh output was already consumed by this traversal. Do not replay
+            // it again if a recovered graph later traverses a feedback edge.
+            run.replayCursors().put(nodeId, attempt);
         } catch (RuntimeException error) {
             deactivateOnFailure(request, events, eventSink, "TYPED_WORKFLOW_NODE_AFTER_FAILED", error);
         }
@@ -603,6 +648,7 @@ final class OpsTypedWorkflowExecutionCoordinator {
             OpsTypedWorkflowSettings.Mode mode,
             boolean recovered,
             Map<String, Integer> replayCursors,
-            Map<String, Integer> nodeAttemptLimits) {
+            Map<String, Integer> nodeAttemptLimits,
+            OpsWorkflowNodeOutputBoundary outputBoundary) {
     }
 }

@@ -7,5 +7,17 @@ public record AdminUserCommand(
         String username,
         String credential,
         String userRole,
-        Integer status) {
+        Integer status,
+        String phone) {
+
+    public AdminUserCommand(Long id, String userId, String username, String credential,
+                            String userRole, Integer status) {
+        this(id, userId, username, credential, userRole, status, null);
+    }
+
+    @Override
+    public String toString() {
+        return "AdminUserCommand[id=" + id + ", userId=" + userId + ", role=" + userRole
+                + ", status=" + status + "]";
+    }
 }

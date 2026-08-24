@@ -24,6 +24,8 @@ class SkillCatalogTypedBoundaryArchitectureTest {
                 + "cn/lgs/orbisops/application/skill/SelectRuntimeSkillsQuery.java");
         String candidate = read("orbisops-domain/src/main/java/"
                 + "cn/lgs/orbisops/domain/skill/model/SkillRuntimeCandidate.java");
+        String access = read("orbisops-application/src/main/java/"
+                + "cn/lgs/orbisops/application/skill/SkillRuntimeCatalogAccess.java");
 
         assertAll(
                 () -> assertTrue(port.contains("List<SkillCatalogSnapshot> listGlobalEntries()")),
@@ -37,7 +39,8 @@ class SkillCatalogTypedBoundaryArchitectureTest {
                 () -> assertTrue(assembler.contains("routingProfilePolicy.profile(")),
                 () -> assertFalse(assembler.contains("requireCanonicalProfile(")),
                 () -> assertTrue(candidate.contains("boolean routingReady()")),
-                () -> assertTrue(selection.contains("skill.runtimeCandidate().routingReady()")),
+                () -> assertTrue(access.contains("c.routingReady()")),
+                () -> assertTrue(selection.contains("access.active(request.projectId())")),
                 () -> assertTrue(selection.contains("SKILL_ROUTING_PROFILE_REQUIRED_AT_RUNTIME")),
                 () -> assertFalse(selection.contains("skill.get(\"status\")")),
                 () -> assertFalse(selection.contains("skill.get(\"updateMode\")")));

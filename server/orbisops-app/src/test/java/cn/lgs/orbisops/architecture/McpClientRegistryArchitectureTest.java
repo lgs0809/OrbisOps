@@ -45,7 +45,7 @@ class McpClientRegistryArchitectureTest {
                 () -> assertTrue(cacheState.contains("client.close()")),
                 () -> assertTrue(cacheState.contains("int cleanupExpired()")),
                 () -> assertFalse(cacheState.contains("@Service")),
-                () -> assertTrue(handleService.contains("SyncMcpToolCallbackProvider")),
+                () -> assertTrue(handleService.contains("OpsMcpFullResultToolCallback")),
                 () -> assertTrue(handleService.contains("void initialize(")),
                 () -> assertFalse(handleService.contains("@Service")),
                 () -> assertTrue(configuration.contains("orbisops.mcp.cache.ttl-seconds")),

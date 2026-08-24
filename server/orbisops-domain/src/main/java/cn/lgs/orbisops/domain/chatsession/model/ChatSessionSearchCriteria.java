@@ -6,12 +6,18 @@ public record ChatSessionSearchCriteria(
         String agentId,
         String keyword,
         Boolean favorite,
-        int limit) {
+        int limit,
+        String projectId) {
+
+    public ChatSessionSearchCriteria(String userId, String agentId, String keyword, Boolean favorite, int limit) {
+        this(userId, agentId, keyword, favorite, limit, "");
+    }
 
     public ChatSessionSearchCriteria {
         userId = value(userId);
         agentId = value(agentId);
         keyword = value(keyword).toLowerCase();
+        projectId = value(projectId);
         limit = Math.max(1, Math.min(limit, 200));
     }
 

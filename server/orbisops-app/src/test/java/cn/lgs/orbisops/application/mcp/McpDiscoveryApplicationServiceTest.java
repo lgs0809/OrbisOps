@@ -295,6 +295,33 @@ class McpDiscoveryApplicationServiceTest {
     }
 
     @Test
+    void outputContractChangeAloneMustInvalidateReviewedPolicy() {
+        useTool(Map.of(
+                "query_slow_log", Map.of(
+                        "remoteToolName", "query_slow_log",
+                        "readOnly", true,
+                        "riskLevel", "LOW",
+                        "allowedActions", List.of("READ"))));
+        McpDiscoveryApplicationService service = service();
+
+        service.hydrateSchema(hydration("query_slow_log", new McpAuthoritativeToolDefinition(
+                "authoritative definition", Map.of("type", "object"), Map.of("type", "object", "required", List.of("count")),
+                "REMOTE_MCP_TOOL_DEFINITION")));
+        service.hydrateSchema(hydration("query_slow_log", new McpAuthoritativeToolDefinition(
+                "authoritative definition", Map.of("type", "object"), Map.of("type", "object", "required", List.of("count", "version")),
+                "REMOTE_MCP_TOOL_DEFINITION")));
+
+        ArgumentCaptor<McpToolPolicy> saved = ArgumentCaptor.forClass(McpToolPolicy.class);
+        verify(policies, times(2)).saveSuggestionIfAbsent(saved.capture());
+        McpToolPolicy first = saved.getAllValues().get(0);
+        McpToolPolicy second = saved.getAllValues().get(1);
+        assertNotEquals(first.schemaHash(), second.schemaHash());
+        assertNotEquals(first.policyId(), second.policyId());
+        verify(policies).markActivePoliciesStale(
+                "project-1", "mcp-1", "query_slow_log", second.schemaHash());
+    }
+
+    @Test
     void persistedAuthoritativeSchemaCanBeReused() {
         useTool(Map.of(
                 "query_slow_log", Map.of(

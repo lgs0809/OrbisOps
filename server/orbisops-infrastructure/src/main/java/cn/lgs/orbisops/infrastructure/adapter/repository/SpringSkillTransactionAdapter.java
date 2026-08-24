@@ -27,8 +27,10 @@ public class SpringSkillTransactionAdapter implements SkillTransactionPort {
         if (transactionTemplate == null) {
             throw new IllegalStateException("SKILL_TRANSACTION_MANAGER_UNAVAILABLE");
         }
-        T result = transactionTemplate.execute(status -> action.get());
-        if (result == null) throw new IllegalStateException("SKILL_TRANSACTION_RETURNED_NULL");
-        return result;
+        return transactionTemplate.execute(status -> {
+            T result=action.get();
+            if (result == null) throw new IllegalStateException("SKILL_TRANSACTION_RETURNED_NULL");
+            return result;
+        });
     }
 }

@@ -29,11 +29,14 @@ public final class OpsTaskScheduleExecutionAdapter implements TaskScheduleExecut
         if (schedule == null) {
             throw new IllegalArgumentException("TASK_SCHEDULE_DEFINITION_REQUIRED");
         }
+        if (schedule.createdBy() == null || schedule.createdBy().isBlank()) {
+            throw new IllegalArgumentException("TASK_SCHEDULE_CREATOR_MISSING");
+        }
         return executionService.submitExecution(new ScheduledTaskExecutionCommand(
                 schedule.id(),
                 schedule.taskName(),
                 schedule.agentId(),
                 triggerType,
-                codec.encode(schedule.runtimeConfiguration())));
+                codec.encode(schedule.runtimeConfiguration()), schedule.createdBy()));
     }
 }

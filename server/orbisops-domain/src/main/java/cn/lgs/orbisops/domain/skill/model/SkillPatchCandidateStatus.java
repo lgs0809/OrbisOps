@@ -5,6 +5,7 @@ import java.util.Locale;
 /** Authoritative lifecycle status for one Skill patch candidate. */
 public enum SkillPatchCandidateStatus {
     CANDIDATE,
+    PENDING_INDEX,
     PASSED,
     POLICY_REJECTED,
     VALIDATION_FAILED,

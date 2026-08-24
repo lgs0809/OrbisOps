@@ -19,6 +19,16 @@ class OpsMcpExecutionMapperTest {
     private final OpsMcpExecutionMapper mapper = new OpsMcpExecutionMapper();
 
     @Test
+    void taskDeadlineMustSurviveTypedAndRuntimeConfigBoundaries() {
+        var config = config();
+        var deadline = java.time.Instant.now().plusSeconds(3);
+        config.setAuthorityDeadline(deadline);
+        var request = mapper.request(config, "{\"toolName\":\"query_metrics\"}", "alice", false);
+        assertEquals(deadline, request.config().authorityDeadline());
+        assertEquals(deadline, mapper.legacy(request.config(), "PREPARE").getAuthorityDeadline());
+    }
+
+    @Test
     void ordinaryEntryMustIgnoreForgedLandingFlags() {
         OpsMcpServerConfig config = config();
         config.setLandingApproved(true);

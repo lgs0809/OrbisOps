@@ -24,6 +24,16 @@ final class OpsChangePackageToolExecutionGateway {
         this.owningPrepareValidationService = owningPrepareValidationService;
     }
 
+    Map<String, Object> readStatus(Context context) {
+        if (toolExecutionService == null) throw new IllegalStateException("CHANGE_PACKAGE_QUERY_EXECUTOR_UNAVAILABLE");
+        // Project scope and action are server-owned; the model cannot query another project or approve a package.
+        return toolExecutionService.executeReadOnly(Map.of(
+                "projectId", context.projectId(), "userId", context.actor(), "runId", context.runId(),
+                "sessionId", context.sessionId(), "executionScope", "PRE_APPROVAL_WORKFLOW",
+                "toolsetId", "change_package", "toolName", "change_package_list",
+                "arguments", Map.of("projectId", context.projectId(), "limit", 20)), context.actor());
+    }
+
     Map<String, Object> execute(Map<String, Object> request, Context context) {
         if (toolExecutionService == null) {
             throw new SecurityException(
@@ -34,6 +44,7 @@ final class OpsChangePackageToolExecutionGateway {
         if (owningPrepareValidationService != null) {
             arguments = owningPrepareValidationService.enrich(arguments, context.actor());
         }
+        requireCompleteSafety(arguments);
         Map<String, Object> execution = new LinkedHashMap<>();
         execution.put("projectId", context.projectId());
         execution.put("userId", context.actor());
@@ -51,6 +62,21 @@ final class OpsChangePackageToolExecutionGateway {
             execution.put("metadata", context.metadata());
         }
         return toolExecutionService.execute(execution, context.actor());
+    }
+
+    private void requireCompleteSafety(Map<String, Object> request) {
+        if (!(request.get("mcpSteps") instanceof Iterable<?> steps)) return;
+        var policy = new cn.lgs.orbisops.domain.changepackage.service.ChangePackageLandingOperationSafetyPolicy();
+        for (var step : steps) {
+            if (!(step instanceof Map<?, ?> raw) || !Boolean.TRUE.equals(raw.get("policyBound"))) continue;
+            Map<String, Object> operation = new LinkedHashMap<>();
+            raw.forEach((key, value) -> operation.put(String.valueOf(key), value));
+            var safety = policy.verifyTargetWriteSafety(operation);
+            if (!safety.allowedOperation()) {
+                throw new IllegalArgumentException("CHANGE_PACKAGE_PREPARE_SAFETY_INCOMPLETE:"
+                        + safety.reasonCode() + ":" + safety.summary());
+            }
+        }
     }
 
     record Context(String projectId,

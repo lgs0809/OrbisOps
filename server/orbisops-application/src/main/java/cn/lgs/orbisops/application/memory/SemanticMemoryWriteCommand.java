@@ -12,7 +12,12 @@ public record SemanticMemoryWriteCommand(
         String content,
         String createdAt,
         Map<String, Object> metadata,
-        boolean embeddingAvailable) {
+        boolean embeddingAvailable,boolean embeddingConfigured) {
+
+    public SemanticMemoryWriteCommand(String sessionId,String userId,String role,String content,String createdAt,
+            Map<String,Object> metadata,boolean embeddingAvailable) {
+        this(sessionId,userId,role,content,createdAt,metadata,embeddingAvailable,embeddingAvailable);
+    }
 
     public SemanticMemoryWriteCommand {
         sessionId = value(sessionId);

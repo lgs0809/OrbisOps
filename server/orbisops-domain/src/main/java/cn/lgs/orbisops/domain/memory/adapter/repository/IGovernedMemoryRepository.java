@@ -10,9 +10,16 @@ import cn.lgs.orbisops.domain.memory.model.MemoryType;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 /** Persistence port for governed explicit memories, versions, conflicts and audit rows. */
 public interface IGovernedMemoryRepository {
+
+    /** Execute local transactional persistence only; an owned transaction may retry lock contention. */
+    <T> T withLogicalLock(String lockKey, Supplier<T> action);
+
+    void appendSource(String memoryId, String idempotencyKey, String sourceRunId,
+                      List<Map<String, Object>> proofRefs, String actor);
 
     boolean available();
 

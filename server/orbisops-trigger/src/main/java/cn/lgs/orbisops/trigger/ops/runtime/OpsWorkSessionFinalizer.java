@@ -38,15 +38,8 @@ public class OpsWorkSessionFinalizer {
         String safeNodeId = value(nodeId);
         String safeApprovalId = value(approvalId);
         String message = "Workflow is waiting for human approval at node " + safeNodeId + ".";
-        hooks.record(OpsRuntimeEvent.builder()
-                .eventType("WORKFLOW_APPROVAL_WAITING")
-                .status("WAITING_APPROVAL")
-                .nodeId(safeNodeId)
-                .summary(message)
-                .payload(Map.of(
-                        "runId", value(context.request().getRunId()),
-                        "approvalId", safeApprovalId))
-                .build());
+        // The typed workflow persisted its waiting event before releasing the lease.
+        // Returning its response must not heartbeat or append a second durable event.
         if (!context.analysisRequest()) {
             hooks.appendAssistant(message, Map.of(
                     "agentId", context.definition().getAgentId(),
@@ -111,12 +104,38 @@ public class OpsWorkSessionFinalizer {
     }
 
     private FailureView failureView(RuntimeException error) {
+        Throwable cause = error;
+        var seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Throwable, Boolean>());
+        while (cause != null && seen.add(cause)) {
+            if (cause instanceof cn.lgs.orbisops.application.skill.SkillRuntimeAccessRevokedException) {
+                return new FailureView("SKILL_RUNTIME_ACCESS_REVOKED",
+                        "本轮使用的 Skill 已停用或项目授权已撤回，后续执行已停止。请检查项目 Skill 权限后发起新任务。");
+            }
+            cause = cause.getCause();
+        }
+        var governanceCode = OpsMcpFailureClassifier.findGovernanceCode(error).orElse(null);
+        if (governanceCode != null) {
+            return new FailureView(governanceCode,
+                    cn.lgs.orbisops.domain.analysis.service.AnalysisTaskPresentationPolicy.toolFailureSummary(governanceCode));
+        }
+        var mcpFailure = OpsMcpFailureClassifier.findTyped(error).orElse(null);
+        if (mcpFailure != null) {
+            String message = switch (mcpFailure.kind()) {
+                case PROTOCOL_ERROR -> "工具协议响应异常";
+                case TOOL_ERROR -> "工具报告业务错误";
+                case CONTRACT_INVALID -> "工具回包不符合已审核契约";
+                case TRANSPORT_ERROR -> "工具连接异常或回执等待超时";
+                case AUTHORITY_DENIED -> "工具授权、任务期限或调用预算校验未通过";
+            };
+            return new FailureView("MCP_" + mcpFailure.kind().name(),
+                    message + "。本轮未完成，请在运行详情查看工具记录和执行回执。");
+        }
         OpsModelProviderFailureClassifier.Failure providerFailure =
                 OpsModelProviderFailureClassifier.classify(error).orElse(null);
         if (providerFailure != null) {
             return new FailureView(
                     providerFailure.code(),
-                    providerFailure.userMessage() + " 本轮未完成，系统未执行任何生产变更。"
+                    providerFailure.userMessage() + " 本轮未完成，请在运行详情核对已有工具回执与实际资源状态。"
             );
         }
         return new FailureView(

@@ -50,6 +50,8 @@ public final class SkillEvolutionCandidateCoordinator {
             List<SkillEvolutionSelectedHint> selectedHints,
             SkillEvolutionAuthoredCandidate authored,
             SkillEvolutionSimilarityMatch similar) {
+        if(cn.lgs.orbisops.domain.skill.model.SkillAtomicPublicationPlan.supports(authored.patchType()))
+            similar=SkillEvolutionSimilarityMatch.none();
         Map<String, Object> candidateRequest = new LinkedHashMap<>(authored.payload());
         candidateRequest.put("sourceRunId", request.runId());
         candidateRequest.put("sourceType", opportunityType);
@@ -65,8 +67,10 @@ public final class SkillEvolutionCandidateCoordinator {
         candidateRequest.put(
                 "evidenceRefs",
                 mapper.evidenceViews(request.summary().evidenceReferences()));
-        Map<String, Object> candidate = candidateService.create(candidateRequest);
+        Map<String, Object> candidate = candidateService.createEvolution(candidateRequest,request.jobClaim(),request.summary().sourceHash());
         String candidateId = mapper.text(candidate.get("candidate_id"));
+        SkillReleaseStartOutcome releaseOutcome = releaseService.startOutcome(candidateId);
+        var currentCandidate=candidateService.getCandidate(candidateId);
         experienceService.markPromoted(
                 request.projectId(),
                 request.agentId(),
@@ -77,7 +81,6 @@ public final class SkillEvolutionCandidateCoordinator {
                         .map(item -> item.hint().hintId())
                         .toList(),
                 candidateId);
-        SkillReleaseStartOutcome releaseOutcome = releaseService.startOutcome(candidateId);
         Map<String, Object> release = releaseOutcome.view();
         auditPort.recordCandidateCreated(
                 request.projectId(),
@@ -98,9 +101,9 @@ public final class SkillEvolutionCandidateCoordinator {
         result.put("candidateId", candidateId);
         result.put("targetSkillId", similar.skillId());
         result.put("patchType", authored.patchType());
-        result.put("changes", authored.changes());
-        result.put("artifacts", authored.artifacts());
-        result.put("evalCases", authored.evalCases());
+        result.put("changes", currentCandidate.changes());
+        result.put("artifacts", currentCandidate.artifacts());
+        result.put("evalCases", currentCandidate.evalCases());
         result.put("authoringReason", authored.reason());
         result.put("authoringSource", authored.source());
         result.put("similarity", similar.similarity());

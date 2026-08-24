@@ -2,18 +2,28 @@ package cn.lgs.orbisops.application.skill;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import cn.lgs.orbisops.domain.skill.model.SkillRuntimeCandidate;
 
 public final class SkillCatalogQueryService implements SkillAuthorizationCatalogPort {
 
     private final SkillCatalogPort port;
     private final SkillPackageQueryService packageQueryService;
+    private final SkillRuntimePublishedVersionPort runtimePublication;
 
     public SkillCatalogQueryService(SkillCatalogPort port,
                                     SkillPackageQueryService packageQueryService) {
+        this(port,packageQueryService,(project,current)->current);
+    }
+    public SkillCatalogQueryService(SkillCatalogPort port,SkillPackageQueryService packageQueryService,
+                                    SkillRuntimePublishedVersionPort runtimePublication) {
         if (port == null) throw new IllegalArgumentException("SKILL_CATALOG_PORT_REQUIRED");
         if (packageQueryService == null) throw new IllegalArgumentException("SKILL_PACKAGE_QUERY_REQUIRED");
         this.port = port;
         this.packageQueryService = packageQueryService;
+        this.runtimePublication=java.util.Objects.requireNonNull(runtimePublication);
     }
 
     public List<Map<String, Object>> listGlobalSkills() {
@@ -67,6 +77,43 @@ public final class SkillCatalogQueryService implements SkillAuthorizationCatalog
 
     public List<Map<String, Object>> listGlobalVersions(String skillId) {
         return packageQueryService.listGlobalVersions(skillId);
+    }
+
+    public Map<String,Object> getRuntimeSkillVersion(String projectId,String skillId,int version,
+            String skillHash,String packageHash,String scope) {
+        SkillRuntimeCatalogAccess access=new SkillRuntimeCatalogAccess(port);
+        requireUsable(access,projectId,skillId,scope);
+        var result=getSkillVersion(projectId,skillId,version,skillHash,packageHash,scope);
+        requireUsable(access,projectId,skillId,scope);
+        return result;
+    }
+
+    public Map<String,Object> getRuntimeSkillArtifact(String projectId,String skillId,int version,
+            String skillHash,String packageHash,String scope,String path) {
+        SkillRuntimeCatalogAccess access=new SkillRuntimeCatalogAccess(port);
+        requireUsable(access,projectId,skillId,scope);
+        var result=getSkillArtifact(projectId,skillId,version,skillHash,packageHash,scope,path);
+        requireUsable(access,projectId,skillId,scope);
+        return result;
+    }
+
+    public List<Map<String,Object>> retainRuntimeCatalogRefs(String projectId, List<Map<String,Object>> refs) {
+        SkillRuntimeCatalogAccess access = new SkillRuntimeCatalogAccess(port);
+        var ids = refs.stream().map(ref -> ref.get("skillId"))
+                .filter(String.class::isInstance).map(String.class::cast).collect(Collectors.toUnmodifiableSet());
+        var current = runtimePublication.usableFrozen(projectId, access.active(projectId, ids)).stream()
+                .collect(Collectors.toMap(SkillRuntimeCandidate::skillId, SkillRuntimeCandidate::scope));
+        return refs.stream().filter(ref -> {
+            var scope = current.get(ref.get("skillId"));
+            return scope != null && scope.equals(ref.get("scope"))
+                    && ("GLOBAL".equals(scope) || projectId.equals(ref.get("projectId")));
+        }).toList();
+    }
+
+    private void requireUsable(SkillRuntimeCatalogAccess access,String project,String id,String scope) {
+        if(runtimePublication.usableFrozen(project,access.active(project, Set.of(id))).stream()
+                .noneMatch(c->id.equals(c.skillId()) && scope.equals(c.scope())))
+            throw new SkillRuntimeAccessRevokedException();
     }
 
     public List<Map<String, Object>> listProjectVersions(String projectId, String skillId) {

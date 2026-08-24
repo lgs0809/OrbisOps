@@ -1,7 +1,7 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
 import cn.lgs.orbisops.trigger.ops.toolset.OpsToolExecutionService;
-import com.alibaba.fastjson.JSON;
+import cn.lgs.orbisops.domain.shared.json.CanonicalJson;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.definition.ToolDefinition;
@@ -17,6 +17,7 @@ public final class OpsProgressiveMcpCallbackAdapter {
 
     private final Supplier<OpsToolExecutionService> toolExecutionServiceSupplier;
     private final OpsMcpUnifiedToolExecutor unifiedExecutor;
+    private final OpsLandingMcpModelProjection landingProjection = new OpsLandingMcpModelProjection();
 
     public OpsProgressiveMcpCallbackAdapter(
             Supplier<OpsToolExecutionService> toolExecutionServiceSupplier) {
@@ -60,6 +61,7 @@ public final class OpsProgressiveMcpCallbackAdapter {
         }
         String finalDescription = description + "\n"
                 + "这是渐进式 MCP 调度入口，只暴露项目工具摘要，不预加载完整远端 schema。"
+                + "尚未拿到目标工具的参数定义时，先调用同一 MCP 的 enable_mcp_tool_* 读取完整 schema，再根据用户自然语言和项目上下文填写 arguments；不要猜字段或让用户编写 JSON。"
                 + "调用时必须提供 toolName 和 arguments，运行时会校验项目授权、按需 hydrate schema、再执行远端 MCP 工具。"
                 + allowedTools
                 + toolPolicySummary;
@@ -101,11 +103,13 @@ public final class OpsProgressiveMcpCallbackAdapter {
         return callback(
                 safeToolCallbackName("enable_mcp_tool_"
                         + value(config.getToolId(), value(config.getMcpId(), config.getName()))),
-                "按需激活当前 MCP 自己目录中的一个 EXTENSION 工具。toolName 必须来自同一 MCP 的 mcp_tool_catalog_*；激活后返回审核策略和完整 schema，下一次推理再通过同一 MCP 的 project_mcp_* 调用。",
+                "按需读取当前 MCP 中一个已授权工具的完整参数 schema 和说明，支持 CORE 与 EXTENSION。toolName 必须来自同一 MCP 的 mcp_tool_catalog_*；审核前允许执行的 EXTENSION 同时完成运行内激活；需要审批的生产写工具只返回 SCHEMA_ONLY，activated=false，不授予执行权限，参数说明用于准备 ChangePackage。这不会执行远端业务操作或扩大权限。取得 schema 后根据自然语言构造参数；下一轮如出现带完整 schema 的已加载 MCP 业务工具，优先直接调用；兼容入口为同一 MCP 的 project_mcp_*。",
                 """
                         {"type":"object","properties":{"toolName":{"type":"string"},"reason":{"type":"string"}},"required":["toolName"]}
                         """,
-                (input, toolContext) -> service().enableMcpTool(config, input, "ops-agent"));
+                (input, toolContext) -> landingProjection.activation(config,
+                        new OpsMcpToolInputSupport().requestedToolName(input),
+                        service().enableMcpTool(config, input, "ops-agent")));
     }
 
     /**
@@ -124,7 +128,9 @@ public final class OpsProgressiveMcpCallbackAdapter {
         return new ToolCallback() {
             @Override
             public ToolDefinition getToolDefinition() {
-                return discovered.getToolDefinition();
+                ToolDefinition definition = discovered.getToolDefinition();
+                return ToolDefinition.builder().name(definition.name()).description(definition.description())
+                        .inputSchema(landingProjection.schema(config, callbackName, definition.inputSchema())).build();
             }
 
             @Override
@@ -134,14 +140,14 @@ public final class OpsProgressiveMcpCallbackAdapter {
 
             @Override
             public String call(String toolInput) {
-                return JSON.toJSONString(unifiedExecutor.executeDirect(
+                return CanonicalJson.stringifyPreservingOrder(unifiedExecutor.executeDirect(
                         config, callbackName, toolInput, null, readOnly));
             }
 
             @Override
             public String call(String toolInput, ToolContext toolContext) {
-                return JSON.toJSONString(unifiedExecutor.executeDirect(
-                        config, callbackName, toolInput, toolContext, readOnly));
+                return OpsDirectMcpEvidenceProjection.serialize(unifiedExecutor.executeDirect(
+                        config, callbackName, toolInput, toolContext, readOnly), toolContext);
             }
         };
     }
@@ -167,12 +173,12 @@ public final class OpsProgressiveMcpCallbackAdapter {
 
             @Override
             public String call(String toolInput) {
-                return JSON.toJSONString(action.apply(toolInput, null));
+                return CanonicalJson.stringifyPreservingOrder(action.apply(toolInput, null));
             }
 
             @Override
             public String call(String toolInput, ToolContext toolContext) {
-                return JSON.toJSONString(action.apply(toolInput, toolContext));
+                return OpsDirectMcpEvidenceProjection.serialize(action.apply(toolInput, toolContext), toolContext);
             }
         };
     }
@@ -191,17 +197,7 @@ public final class OpsProgressiveMcpCallbackAdapter {
     }
 
     static String safeToolCallbackName(String rawValue) {
-        String normalized = StringUtils.hasText(rawValue)
-                ? rawValue.trim().toLowerCase().replaceAll("[^a-z0-9_]+", "_")
-                : "project_mcp_tool";
-        normalized = normalized.replaceAll("_+", "_");
-        if (normalized.startsWith("_")) {
-            normalized = normalized.substring(1);
-        }
-        if (normalized.endsWith("_")) {
-            normalized = normalized.substring(0, normalized.length() - 1);
-        }
-        return StringUtils.hasText(normalized) ? normalized : "project_mcp_tool";
+        return OpsMcpToolInputSupport.safeToolCallbackName(rawValue);
     }
 
     private String value(Object value) {

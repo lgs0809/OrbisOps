@@ -92,7 +92,10 @@ public final class SkillEvolutionEvalCaseFactory {
             List<Map<String, Object>> source) {
         Map<String, Map<String, Object>> unique = new LinkedHashMap<>();
         for (Map<String, Object> item : source) {
-            unique.putIfAbsent(text(item.get("caseId")), item);
+            Map<String,Object> development=new LinkedHashMap<>(item);
+            development.put("caseOrigin","AUTHORING_OR_DEVELOPMENT_SOURCE");
+            development.put("usage","DEVELOPMENT_ONLY");
+            unique.putIfAbsent(text(item.get("caseId")), Map.copyOf(development));
         }
         return List.copyOf(unique.values());
     }

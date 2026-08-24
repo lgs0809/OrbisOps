@@ -127,7 +127,9 @@ class OpsSkillExperienceServiceTest {
                         port,
                         audit,
                         directTransactionPort(),
-                        new SkillExperienceObservationPolicy()));
+                        new SkillExperienceObservationPolicy(),
+                        (project,run) -> new cn.lgs.orbisops.domain.skill.model.VerifiedTaskOutcome(
+                                project,run,"synthetic-task",1,"synthetic-acceptance","synthetic-condition")));
     }
 
     private SkillTransactionPort directTransactionPort() {

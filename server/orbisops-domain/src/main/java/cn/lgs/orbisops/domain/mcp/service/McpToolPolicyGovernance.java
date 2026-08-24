@@ -30,8 +30,11 @@ public class McpToolPolicyGovernance {
         boolean targetWrite = TARGET_WRITE_EFFECTS.contains(policy.effectType())
                 || TARGET_WRITE_SCOPES.contains(policy.effectScope())
                 || TARGET_WRITE_MUTABILITY.contains(policy.mutability());
+        boolean readOnlyValidation = Set.of("VALIDATE_ONLY", "DRY_RUN").contains(policy.effectType())
+                && "READ_ONLY".equals(policy.mutability()) && !targetWrite;
         if (policy.readOnly()
-                && !("NO_EFFECT".equals(policy.effectType()) || "READ_EXTERNAL_STATE".equals(policy.effectType()))) {
+                && !("NO_EFFECT".equals(policy.effectType()) || "READ_EXTERNAL_STATE".equals(policy.effectType())
+                || readOnlyValidation)) {
             throw new IllegalArgumentException("MCP_POLICY_READ_ONLY_CONFLICT：只读策略不能声明写入效果");
         }
         if (targetWrite && (!policy.requiresApprovedPackage() || !policy.requiresHumanApproval())) {

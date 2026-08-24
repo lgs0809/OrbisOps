@@ -29,6 +29,9 @@ public interface LandingOperationJournalPort {
             String toolsetId,
             String toolName);
 
+    /** Returns the frozen execution identities currently projected onto one Landing attempt. */
+    List<LandingOperationExecutionBinding> operationExecutionBindings(String landingRunId);
+
     boolean completeFromToolExecution(
             String landingRunId,
             String operationId,

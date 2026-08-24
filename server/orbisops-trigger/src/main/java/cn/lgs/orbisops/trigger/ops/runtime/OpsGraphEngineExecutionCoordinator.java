@@ -130,6 +130,7 @@ final class OpsGraphEngineExecutionCoordinator {
             StateGraph graph = new StateGraph(
                     graphName,
                     graphRuntimeStateManager.keyStrategyFactory());
+            java.util.Set<String> completedNodeIds = java.util.concurrent.ConcurrentHashMap.newKeySet();
             for (OpsWorkflowNode node : nodes) {
                 graph.addNode(node.getNodeId(), node_async(state -> {
                     try {
@@ -137,13 +138,17 @@ final class OpsGraphEngineExecutionCoordinator {
                             Optional<Map<String, Object>> replayed =
                                     typedWorkflowCoordinator.replayCompletedNode(
                                             request, node, events, eventSink);
-                            if (replayed.isPresent()) return replayed.get();
+                            if (replayed.isPresent()) {
+                                completedNodeIds.add(node.getNodeId());
+                                return replayed.get();
+                            }
                             Optional<Map<String, Object>> approval =
                                     typedWorkflowCoordinator.handleHumanApproval(
                                             request, node, events, eventSink);
                             if (approval.isPresent()) {
                                 typedWorkflowCoordinator.afterNode(
                                         request, node, approval.get(), events, eventSink);
+                                completedNodeIds.add(node.getNodeId());
                                 return approval.get();
                             }
                             typedWorkflowCoordinator.beforeNode(
@@ -161,6 +166,7 @@ final class OpsGraphEngineExecutionCoordinator {
                             typedWorkflowCoordinator.afterNode(
                                     request, node, output, events, eventSink);
                         }
+                        completedNodeIds.add(node.getNodeId());
                         return output;
                     } catch (OpsWorkflowApprovalPendingException pending) {
                         throw pending;
@@ -203,6 +209,10 @@ final class OpsGraphEngineExecutionCoordinator {
                             .defaultParallelExecutor(subAgentExecutor)
                             .defaultParallelAggregationStrategy(NodeAggregationStrategy.ALL_OF)
                             .build());
+            if (!domainGraph.terminalNodeIds().isEmpty()
+                    && domainGraph.terminalNodeIds().stream().noneMatch(completedNodeIds::contains)) {
+                throw new IllegalStateException("WORKFLOW_TERMINAL_NODE_NOT_REACHED");
+            }
             if (typedWorkflowCoordinator != null) {
                 typedWorkflowCoordinator.complete(request, events, eventSink);
             }
@@ -274,6 +284,7 @@ final class OpsGraphEngineExecutionCoordinator {
             if (scope.getMaxDepth() != null) config.put("maxDepth", scope.getMaxDepth());
             if (scope.getMaxIterations() != null) config.put("maxIterations", scope.getMaxIterations());
             config.put("inheritProjectCapabilities", Boolean.TRUE.equals(scope.getInheritProjectCapabilities()));
+            config.put("changePackageStatusEnabled", Boolean.TRUE.equals(scope.getChangePackageStatusEnabled()));
             config.put("allowedToolNames", Optional.ofNullable(scope.getAllowedToolNames()).orElse(List.of()));
             return List.of(OpsWorkflowNode.builder()
                     .nodeId(nodeExecutionPolicy.firstText(scope.getAgentId(), "main-assistant"))

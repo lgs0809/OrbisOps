@@ -153,6 +153,26 @@ class OpsToolExecutionCheckpointAdapterTest {
                 any());
     }
 
+    @Test
+    void trustedPreDispatchDenialUsesItsNativeClaimInsteadOfRequestMetadata() {
+        var workSessions = mock(OpsWorkSessionRunAdapter.class);
+        var adapter = new OpsToolExecutionCheckpointAdapter(provider(workSessions));
+        var metadata = Map.of(
+                cn.lgs.orbisops.trigger.ops.runtime.OpsWorkSessionClaimMetadata.ATTEMPT_ID, "native-attempt",
+                cn.lgs.orbisops.trigger.ops.runtime.OpsWorkSessionClaimMetadata.FENCING_TOKEN, 7);
+        var claim = Map.<String, Object>of("metadata", metadata, "projectId", "project-1", "runId", "run-1",
+                "sessionId", "session-1", "userId", "alice");
+        try (var ignored = cn.lgs.orbisops.trigger.ops.OpsRunControlContext.open(
+                new cn.lgs.orbisops.trigger.ops.OpsRunControlContext.Binding("run-1", "project-1", claim,
+                        new cn.lgs.orbisops.trigger.ops.OpsRunCancellationRegistry()))) {
+            adapter.checkpoint(request(Map.of("metadata", Map.of("_workSessionAttemptId", "forged-attempt"))),
+                    "TOOL_EXECUTION_BLOCKED", Map.of("resultId", "result-1"));
+        }
+        verify(workSessions).checkpointToolExecution(eq(claim), eq("TOOL_EXECUTION_BLOCKED"), eq(Map.of(
+                "resultId", "result-1", "dispatchBoundary", "PRE_DISPATCH_DENIED", "projectId", "project-1",
+                "runId", "run-1", "attemptId", "native-attempt", "fencingToken", 7)));
+    }
+
     private ToolExecutionRequest landingRequest() {
         return new ToolExecutionRequest(
                 "project-1", "alice", "alice", "mcp.service-control", "restart_service",

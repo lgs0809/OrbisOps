@@ -37,6 +37,14 @@ public final class OpsMcpRuntimeInvoker {
         return remoteClients.find(requireConfig(config), remoteToolName);
     }
 
+    public java.util.List<Map<String,Object>> currentLocalDefinitions(OpsMcpServerConfig config) {
+        return remoteClients.currentLocalDefinitions(requireConfig(config));
+    }
+
+    public Map<String,Object> currentLocalDefinition(OpsMcpServerConfig config,String name) {
+        return remoteClients.currentLocalDefinition(requireConfig(config),name);
+    }
+
     public ToolCallback serialized(
             OpsMcpRemoteClientAdapter.Session session,
             ToolCallback callback) {

@@ -20,6 +20,8 @@ class OpsLlmModelCallExecutionBoundaryArchitectureTest {
         String client = read(OPS + "OpsAgentLlmClient.java");
         String contentCall = read(OPS + "OpsLlmContentCallService.java");
         String executor = read(OPS + "OpsLlmModelCallExecutor.java");
+        String awaiter = read(OPS + "OpsModelCallAwaiter.java");
+        String control = read(OPS + "OpsRunControlContext.java");
 
         assertAll(
                 () -> assertTrue(client.contains("OpsLlmContentCallService contentCallService")),
@@ -40,7 +42,8 @@ class OpsLlmModelCallExecutionBoundaryArchitectureTest {
                 () -> assertTrue(executor.contains("ChatClient.builder(")),
                 () -> assertTrue(executor.contains("OpsNodeDeadlineContext.remainingMillis(")),
                 () -> assertTrue(executor.contains("Future<T>")),
-                () -> assertTrue(executor.contains("submitted.future().get(executionTimeoutMillis, TimeUnit.MILLISECONDS)")),
+                () -> assertTrue(executor.contains("OpsModelCallAwaiter.get(submitted.future(), executionTimeoutMillis)")),
+                () -> assertTrue(executor.contains("OpsModelCallAwaiter.started(submitted.started(), submitted.future(), queueWaitBudgetMillis)")),
                 () -> assertTrue(executor.contains("submitted.future().cancel(true)")),
                 () -> assertTrue(executor.contains("OpsLlmTraceContext.withTrace(")),
                 () -> assertTrue(executor.contains("Thread.currentThread().interrupt()")),
@@ -51,7 +54,25 @@ class OpsLlmModelCallExecutionBoundaryArchitectureTest {
                 () -> assertFalse(executor.contains("@Value")),
                 () -> assertFalse(executor.contains("org.springframework.beans")),
                 () -> assertFalse(executor.contains("org.springframework.context")),
-                () -> assertTrue(executor.lines().count() <= 155));
+                () -> assertTrue(executor.lines().count() <= 155),
+                () -> assertTrue(awaiter.contains("Future<T>")),
+                () -> assertTrue(awaiter.matches("(?s).*\\.get\\([^,]+,\\s*TimeUnit\\.MILLISECONDS\\).*")),
+                () -> assertTrue(awaiter.matches("(?s).*\\.await\\([^,]+,\\s*TimeUnit\\.MILLISECONDS\\).*")),
+                () -> assertTrue(awaiter.contains("try (Registration")),
+                () -> assertTrue(awaiter.contains("binding.cancelWhileAwaiting(future)")),
+                () -> assertTrue(awaiter.contains("listener.close()")),
+                () -> assertTrue(awaiter.contains("cancellationRequested(binding.runId())")),
+                () -> assertTrue(awaiter.contains("throw new OpsRunCanceledException(binding.runId())")),
+                () -> assertTrue(awaiter.contains("InterruptedException | CancellationException")),
+                () -> assertFalse(awaiter.contains("Thread.interrupted()")),
+                () -> assertTrue(awaiter.contains("started.countDown()")),
+                () -> assertFalse(awaiter.contains("@Service")),
+                () -> assertFalse(awaiter.contains("@Value")),
+                () -> assertTrue(awaiter.lines().count() <= 100),
+                () -> assertTrue(control.contains("registry.onCancel(runId")),
+                () -> assertTrue(control.contains("future.cancel(true)")),
+                () -> assertFalse(control.contains("waiter.interrupt()")),
+                () -> assertTrue(control.contains("sink.onDispose(registration::close)")));
     }
 
     private String read(String relativePath) throws IOException {

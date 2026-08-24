@@ -137,6 +137,19 @@ public final class AgentDefinitionMutationService<D> {
         memoryCatalog.register(definition, current);
     }
 
+    /** Loading a published database snapshot must not silently create a new in-memory version. */
+    public void registerStoredSnapshot(D definition, boolean current) {
+        if (definition == null || !hasText(modelPort.agentId(definition))) return;
+        if (hasText(modelPort.definitionHash(definition))
+                && modelPort.version(definition) != null && modelPort.version(definition) > 0
+                && modelPort.hasLifecycle(definition)) {
+            memoryCatalog.register(definition, current);
+            return;
+        }
+        // Legacy snapshots without a persisted identity retain the compatibility load path.
+        registerLoaded(definition, current);
+    }
+
     public Optional<D> findVersion(String agentId, Integer version) {
         if (!hasText(agentId) || version == null || version <= 0) {
             return Optional.empty();

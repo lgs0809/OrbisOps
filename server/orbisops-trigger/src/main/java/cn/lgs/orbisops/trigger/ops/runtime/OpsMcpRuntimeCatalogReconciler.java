@@ -63,6 +63,7 @@ public final class OpsMcpRuntimeCatalogReconciler {
                     new McpAuthoritativeToolDefinition(
                             text(definition.get("description")),
                             inputSchema,
+                            definition.get("outputSchema"),
                             firstText(text(definition.get("schemaSource")), "REMOTE_MCP_TOOL_DEFINITION"))));
         }
     }

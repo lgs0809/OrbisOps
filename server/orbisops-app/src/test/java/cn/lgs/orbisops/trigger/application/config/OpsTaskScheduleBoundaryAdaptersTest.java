@@ -64,6 +64,7 @@ class OpsTaskScheduleBoundaryAdaptersTest {
         verify(executionService).submitExecution(command.capture());
         assertEquals(7L, command.getValue().scheduleId());
         assertEquals("MANUAL", command.getValue().triggerType());
+        assertEquals("creator-a", command.getValue().createdBy());
         assertEquals(schedule.runtimeConfiguration(), codec.decode(command.getValue().runtimePayload()));
     }
 
@@ -88,6 +89,6 @@ class OpsTaskScheduleBoundaryAdaptersTest {
                         15, "5m", true, 3, 3, 120, 12, false, null, null),
                 1,
                 LocalDateTime.of(2026, 7, 30, 6, 0),
-                LocalDateTime.of(2026, 7, 30, 6, 30));
+                LocalDateTime.of(2026, 7, 30, 6, 30), "creator-a");
     }
 }

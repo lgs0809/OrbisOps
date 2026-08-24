@@ -16,10 +16,62 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class OpsChangePackageActionPolicyBinderTest {
+
+    @Test
+    void futureChecksUseReviewedPolicyAndEveryNestedCheckIsValidatedBeforeFreezing() {
+        var policies = mock(McpPolicyQueryService.class);
+        var write = policy("w", "dual", "apply", "hash", "MUTATE_TARGET_RESOURCE", "TARGET_RESOURCE_WRITE", "PROD_MUTATING", McpRiskLevel.HIGH, false, false, true, true, true, true);
+        when(write.argumentPolicyJson()).thenReturn("{\"resourceBinding\":{\"resourceScope\":\"resource\",\"targetEnvironment\":\"prod\"}}");
+        var read = policy("r", "dual", "read", "read-hash", "READ_EXTERNAL_STATE", "TARGET_RESOURCE_READ", "READ_ONLY", McpRiskLevel.LOW, true, true, true, false, false, false);
+        when(policies.policyModels("p1", 1000)).thenReturn(List.of(write, read));
+        var validator = mock(OpsPreparePostCheckValidator.class);
+        var beans = new org.springframework.beans.factory.support.DefaultListableBeanFactory();
+        beans.registerSingleton("postChecks", validator);
+        var binder = new OpsChangePackageActionPolicyBinder(policies, mock(ProjectMcpRuntimeDescriptorApplicationService.class), beans.getBeanProvider(OpsPreparePostCheckValidator.class));
+        var extra = Map.<String, Object>of("toolsetId", "mcp.dual", "toolName", "read", "arguments", Map.of(), "expectedValues", Map.of("resourceKey", "resource", "errorCount", 0));
+        var primary = Map.<String, Object>of("toolsetId", "mcp.dual", "toolName", "read", "arguments", Map.of(), "expectedValues", Map.of("resourceKey", "resource", "version", "v2"), "additionalChecks", List.of(extra));
+        binder.bind("p1", List.of(Map.of("mcpId", "dual", "toolName", "apply", "postCheck", primary)));
+        org.mockito.Mockito.verify(validator).validate("p1", primary, read, "resource");
+        org.mockito.Mockito.verify(validator).validate("p1", extra, read, "resource");
+        assertTrue(assertThrows(IllegalArgumentException.class, () -> binder.bind("p1", List.of(Map.of("mcpId", "dual", "toolName", "read", "purpose", "POST_APPROVAL_VALIDATION"))))
+                .getMessage().contains("POST_CHECK_MUST_BE_ATTACHED"));
+    }
+
+    @Test
+    void siblingChecksAreFrozenInsideTheExecutablePostCheckWithoutMutatingInput() {
+        var policies = mock(McpPolicyQueryService.class);
+        when(policies.policyModels("p1", 1000)).thenReturn(List.of());
+        var extra = Map.of("toolName", "orders", "expectedValues", Map.of("errorCount", 0));
+        var input = Map.<String, Object>of("postCheck", Map.of("expectedValues", Map.of("version", "v2")),
+                "additionalChecks", List.of(extra));
+        var bound = binder(policies).bind("p1", List.of(input)).get(0);
+        assertFalse(bound.containsKey("additionalChecks"));
+        assertEquals(List.of(extra), ((Map<?, ?>) bound.get("postCheck")).get("additionalChecks"));
+        assertTrue(input.containsKey("additionalChecks"));
+        var hash = cn.lgs.orbisops.domain.changepackage.service.ChangePackageCanonicalHasher.calculateOperationHashes(bound);
+        var altered = new java.util.LinkedHashMap<>(bound);
+        altered.put("postCheck", input.get("postCheck"));
+        assertFalse(hash.postCheckHash().equals(
+                cn.lgs.orbisops.domain.changepackage.service.ChangePackageCanonicalHasher.calculateOperationHashes(altered).postCheckHash()));
+    }
+
+    @Test
+    void malformedOrExcessiveSiblingChecksCannotBeSilentlyIgnored() {
+        var policies = mock(McpPolicyQueryService.class);
+        when(policies.policyModels("p1", 1000)).thenReturn(List.of());
+        var binder = binder(policies);
+        for (Object extra : List.of("orders must pass", List.of(Map.of("toolName", "orders")),
+                java.util.Collections.nCopies(16, Map.of("expectedValues", Map.of("count", 0))))) {
+            assertThrows(IllegalArgumentException.class, () -> binder.bind("p1", List.of(Map.of(
+                    "postCheck", Map.of("expectedValues", Map.of("version", "v2")), "additionalChecks", extra))));
+        }
+        assertThrows(IllegalArgumentException.class, () -> binder.bind("p1", List.of(Map.of("additionalChecks", List.of()))));
+    }
 
     @Test
     void reviewedPolicyOverridesModelClaimedGovernanceMetadata() {
@@ -120,6 +172,23 @@ class OpsChangePackageActionPolicyBinderTest {
     }
 
     @Test
+    void readOnlyValidationIsProposableButOrdinaryReadsAndNonPrepareToolsAreNot() {
+        McpPolicyQueryService policies = mock(McpPolicyQueryService.class);
+        McpToolPolicy validate = policy("v", "dual", "verify_configuration", "hash",
+                "VALIDATE_ONLY", "SANDBOX", "READ_ONLY", McpRiskLevel.LOW,
+                true, true, false, false, false, false);
+        McpToolPolicy unavailable = policy("x", "dual", "land_verify", "hash2",
+                "VALIDATE_ONLY", "SANDBOX", "READ_ONLY", McpRiskLevel.LOW,
+                true, false, true, false, false, false);
+        when(policies.policyModels("p1", 1000)).thenReturn(List.of(validate, unavailable));
+        var catalog = binder(policies).proposalCatalog("p1");
+        assertEquals(1, catalog.size());
+        assertEquals("verify_configuration", catalog.get(0).get("toolName"));
+        assertEquals("PRE_APPROVAL_VALIDATION", catalog.get(0).get("purpose"));
+        assertEquals(false, catalog.get(0).get("writesTargetResource"));
+    }
+
+    @Test
     void serviceControlArgumentsUseAuthoritativeResourceIdentityAndObservedVersionFlow() {
         McpPolicyQueryService policies = mock(McpPolicyQueryService.class);
         McpToolPolicy dryRun = policy(
@@ -174,6 +243,44 @@ class OpsChangePackageActionPolicyBinderTest {
         assertEquals(true, catalog.get(1).get("writesTargetResource"));
         assertEquals("OBSERVE_FROM_DRY_RUN", catalog.get(0).get("expectedVersionSource"));
         assertEquals("FREEZE_FROM_PRE_APPROVAL_DRY_RUN", catalog.get(1).get("expectedVersionSource"));
+    }
+
+    @Test
+    void reviewedPerToolBindingReplacesModelIdentityAndRejectsPartialBinding() {
+        McpPolicyQueryService policies = mock(McpPolicyQueryService.class);
+        McpToolPolicy tool = policy("p", "dual", "apply", "hash", "MUTATE_TARGET_RESOURCE",
+                "TARGET_RESOURCE_WRITE", "PROD_MUTATING", McpRiskLevel.HIGH,
+                false, false, true, true, true, true);
+        when(policies.policyModels("p1", 1000)).thenReturn(List.of(tool));
+        when(tool.argumentPolicyJson()).thenReturn("{\"resourceBinding\":{\"resourceScope\":\"service://orders/prod\",\"targetEnvironment\":\"prod\"}}");
+        var binder = binder(policies);
+        var input = List.of(Map.of("mcpId", "dual", "toolName", "apply",
+                "resourceScope", "forged", "targetEnvironment", "test"));
+        var bound = binder.bind("p1", input).get(0);
+        assertEquals("service://orders/prod", bound.get("resourceScope"));
+        assertEquals("prod", bound.get("targetEnvironment"));
+        assertEquals("prod", binder.proposalCatalog("p1").get(0).get("targetEnvironment"));
+        when(tool.argumentPolicyJson()).thenReturn("{\"resourceBinding\":{\"targetEnvironment\":\"prod\"}}");
+        assertThrows(IllegalArgumentException.class, () -> binder.bind("p1", input));
+    }
+
+    @Test
+    void reviewedToolCannotOverrideProjectResource() {
+        McpPolicyQueryService policies = mock(McpPolicyQueryService.class);
+        McpToolPolicy tool = policy("p", "dual", "apply", "hash", "MUTATE_TARGET_RESOURCE",
+                "TARGET_RESOURCE_WRITE", "PROD_MUTATING", McpRiskLevel.HIGH,
+                false, false, true, true, true, true);
+        when(policies.policyModels("p1", 1000)).thenReturn(List.of(tool));
+        when(tool.argumentPolicyJson()).thenReturn("{\"resourceBinding\":{\"resourceScope\":\"service://other/prod\",\"targetEnvironment\":\"prod\"}}");
+        var descriptors = mock(ProjectMcpRuntimeDescriptorApplicationService.class);
+        var descriptor = mock(ProjectMcpRuntimeDescriptor.class);
+        var resource = mock(ProjectResourceDefinition.class);
+        when(resource.endpoint()).thenReturn("service://orders/prod");
+        when(resource.environment()).thenReturn("prod");
+        when(descriptor.resource()).thenReturn(resource);
+        when(descriptors.resolveEnabled("p1", "dual")).thenReturn(Optional.of(descriptor));
+        var binder = new OpsChangePackageActionPolicyBinder(policies, descriptors);
+        assertThrows(IllegalArgumentException.class, () -> binder.proposalCatalog("p1"));
     }
 
     private OpsChangePackageActionPolicyBinder binder(McpPolicyQueryService policies) {

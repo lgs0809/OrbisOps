@@ -53,6 +53,7 @@ public final class OpsWorkflowBoundToolExecutionAdapter
                         "boundResourceSnapshot", snapshot,
                         "boundResourceSnapshotHash", CanonicalObjectHasher.sha256(snapshot),
                         "readOnly", invocation.readOnly(),
+                        "requireReadOnly", invocation.readOnly(),
                         "changePackageProposal", invocation.changePackageProposal()),
                 Map.of()));
         return new WorkflowBoundToolResult(

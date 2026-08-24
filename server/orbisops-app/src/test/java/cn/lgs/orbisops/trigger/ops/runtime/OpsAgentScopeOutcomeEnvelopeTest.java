@@ -3,6 +3,7 @@ package cn.lgs.orbisops.trigger.ops.runtime;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class OpsAgentScopeOutcomeEnvelopeTest {
 
@@ -63,6 +64,22 @@ class OpsAgentScopeOutcomeEnvelopeTest {
     }
 
     @Test
+    void shouldParseTrailingFieldsWhenModelEmitsOnlyClosingOutcomeMarkers() {
+        String output = "我是 OrbisOps 的智能运维助手，负责协助你分析系统运行状态、定位问题并提供安全的运维建议。"
+                + "</ops_outcome>\nrequiresAction=false\nverificationStatus=NOT_APPLICABLE\n"
+                + "abstained=false\nevidenceCompleteness=NOT_APPLICABLE\n</ops_outcome>";
+
+        OpsAgentScopeOutcomeEnvelope.Parsed parsed = envelope.parse(output);
+
+        assertThat(parsed.present()).isTrue();
+        assertThat(parsed.visibleOutput()).isEqualTo("我是 OrbisOps 的智能运维助手，负责协助你分析系统运行状态、定位问题并提供安全的运维建议。");
+        assertThat(parsed.outcome()).containsEntry("requiresAction", false)
+                .containsEntry("verificationStatus", "NOT_APPLICABLE")
+                .containsEntry("abstained", false)
+                .containsEntry("evidenceCompleteness", "NOT_APPLICABLE");
+    }
+
+    @Test
     void incompleteTrailingBlockMustRemainVisibleAndUntrusted() {
         String output = "正文\nrequiresAction=false";
 
@@ -105,4 +122,33 @@ class OpsAgentScopeOutcomeEnvelopeTest {
         assertThat(parsed.outcome()).isEmpty();
         assertThat(parsed.visibleOutput()).isEqualTo(output);
     }
+    @Test
+    void startedFinalAnswerWithoutCompletionCannotBecomeASuccessfulReport() {
+        assertThatThrownBy(() -> envelope.parse(
+                "<ops_answer>目录已读取。\n\n订单计划证据：`evidence-unfinished"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("MODEL_RESPONSE_INCOMPLETE");
+    }
+
+    @Test
+    void truncatedOrInvalidTypedCompletionCannotCloseAStartedFinalAnswer() {
+        for (String suffix : new String[] {
+                "<ops_outcome>requiresAction=false",
+                "<ops_outcome>{\"requiresAction\":false}</ops_outcome>",
+                "requiresAction=false\nverificationStatus=SUCCEEDED"}) {
+            assertThatThrownBy(() -> envelope.parse("<ops_answer>已有实际读取依据。\n" + suffix))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("MODEL_RESPONSE_INCOMPLETE");
+        }
+    }
+
+    @Test
+    void completeTypedTrailingFieldsCanCloseAStartedAnswerWithoutChangingEvidenceFacts() {
+        var parsed = envelope.parse("<ops_answer>证据不足，不能确认恢复。\n"
+                + "requiresAction=false\nverificationStatus=INSUFFICIENT\nabstained=false\nevidenceCompleteness=INSUFFICIENT");
+        assertThat(parsed.present()).isTrue();
+        assertThat(parsed.visibleOutput()).isEqualTo("证据不足，不能确认恢复。");
+        assertThat(parsed.outcome()).containsEntry("verificationStatus", "INSUFFICIENT");
+    }
+
 }

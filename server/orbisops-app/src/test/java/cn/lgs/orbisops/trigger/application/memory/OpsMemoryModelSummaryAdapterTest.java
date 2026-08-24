@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class OpsMemoryModelSummaryAdapterTest {
 
@@ -29,10 +30,9 @@ class OpsMemoryModelSummaryAdapterTest {
     }
 
     @Test
-    void unavailableModelReturnsEmptySummary() {
-        assertEquals("", adapter.summarize(
-                List.of(message("user", "问题", "time")),
-                6000));
+    void unavailableModelSignalsDurableSupplementInsteadOfCompletedEmpty() {
+        assertEquals("MEMORY_SUMMARY_MODEL_UNAVAILABLE",assertThrows(IllegalStateException.class,()->adapter.summarize(
+                List.of(message("user", "question", "time")),6000)).getMessage());
     }
 
     private ColdMemoryMessageSnapshot message(String role, String content, String createdAt) {

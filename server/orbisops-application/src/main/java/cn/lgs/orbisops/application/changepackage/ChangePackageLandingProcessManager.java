@@ -188,6 +188,25 @@ public final class ChangePackageLandingProcessManager {
 
         boolean succeeded = !operationFacts.isEmpty()
                 && operationFacts.stream().allMatch(LandingOperationFact::succeeded);
+        Map<String, Object> verification = Map.of();
+        boolean verificationFailed = false;
+        if (succeeded) {
+            ChangePackageCurrent current = current(run.packageId());
+            if (!sameLandingScope(current, run) || !run.runId().equals(current.landingRunId())) {
+                throw new IllegalStateException("LANDING_RECOVERY_APPROVED_POINTER_DRIFT");
+            }
+            try {
+                verification = verifyCompleted(current, run, operationFacts,
+                        requiredText(runPort.executionActor(landingRunId), "LANDING_VERIFICATION_OWNER_REQUIRED"));
+            } catch (RuntimeException unavailable) {
+                // Keep the recovery open. A write acknowledgement is not proof of postconditions,
+                // and an unavailable verifier must never promote the durable package pointer.
+                return false;
+            }
+            if (verification == null || verification.isEmpty()) return false;
+            succeeded = Boolean.TRUE.equals(verification.get("passed"));
+            verificationFailed = !succeeded;
+        }
         boolean provenUnexecuted = operationFacts.stream().allMatch(fact ->
                 fact.factStatus() == LandingOperationFact.FactStatus.NONE
                         && fact.executionStatus() == LandingOperationFact.ExecutionStatus.PENDING);
@@ -199,6 +218,7 @@ public final class ChangePackageLandingProcessManager {
                 : ChangePackageStatus.LANDING_FAILED;
         String reasonCode = succeeded
                 ? "LANDING_RECONCILED_SUCCEEDED"
+                : verificationFailed ? "LANDING_INDEPENDENT_VERIFICATION_FAILED"
                 : provenUnexecuted
                         ? "LANDING_RECONCILED_UNEXECUTED"
                         : "LANDING_RECONCILED_FAILED";
@@ -210,6 +230,7 @@ public final class ChangePackageLandingProcessManager {
         result.put("executedProductionAction", succeeded
                 || operationFacts.stream().anyMatch(LandingOperationFact::completed));
         result.put("operations", operationFacts.stream().map(LandingOperationFact::payload).toList());
+        if (!verification.isEmpty()) result.put("independentVerification", verification);
         ChangePackageLandingRunStatus runStatus = succeeded
                 ? ChangePackageLandingRunStatus.SUCCEEDED
                 : ChangePackageLandingRunStatus.FAILED;
@@ -221,6 +242,48 @@ public final class ChangePackageLandingProcessManager {
                                 ? "权威对账确认旧 LandingRun 未派发 operation；按执行失败收口，允许新 LandingRun 安全重试。"
                                 : "Landing recovery 已按已知失败事实收口，方案本身未被自动判定失效。");
         return true;
+    }
+
+    /** Explicit re-observation; a newly passing failed run may reconcile without replaying a write. */
+    public Map<String, Object> verifyLanding(String packageId, String actor) {
+        ChangePackageCurrent current = current(packageId);
+        if (!Set.of(ChangePackageStatus.LANDED, ChangePackageStatus.LANDING_FAILED).contains(current.status())) {
+            throw new IllegalStateException("LANDING_VERIFICATION_REQUIRES_TERMINAL_RUN");
+        }
+        ChangePackageLandingRun run = runPort.find(current.landingRunId())
+                .orElseThrow(() -> new IllegalStateException("LANDING_RUN_NOT_FOUND"));
+        if (!sameLandingScope(current, run) || !run.runId().equals(current.landingRunId())
+                || toolExecutionLedger.hasUnresolvedSideEffect(current.projectId(), run.runId())) {
+            throw new IllegalStateException("LANDING_VERIFICATION_UNRESOLVED_IDENTITY");
+        }
+        List<LandingOperationFact> facts = journalPort.operationFacts(run.runId());
+        Map<String, Object> proof = verifyCompleted(current, run, facts, actor);
+        appendEvent(packageId, "LANDING_POSTCHECK_OBSERVED", actor,
+                Boolean.TRUE.equals(proof.get("passed")) ? "已重新读取目标并通过已批准的后置检查。"
+                        : "目标未通过已批准的后置检查；保留失败证据，不重放写操作。", proof);
+        if (current.status() == ChangePackageStatus.LANDING_FAILED
+                && run.status() == ChangePackageLandingRunStatus.FAILED
+                && Boolean.TRUE.equals(proof.get("passed"))
+                && !facts.isEmpty() && facts.stream().allMatch(LandingOperationFact::succeeded)) {
+            // Re-read under the original execution owner and existing tuple/fact/side-effect fences.
+            // The explicit observation above and every previous failure remain separate audit events.
+            reconcile(run.runId(), actor);
+            Map<String, Object> observed = new LinkedHashMap<>(proof);
+            ChangePackageCurrent after = current(packageId);
+            observed.put("reconciled", after.status() == ChangePackageStatus.LANDED
+                    && sameLandingScope(after, run) && run.runId().equals(after.landingRunId()));
+            observed.put("landingStatus", after.status().name());
+            return observed;
+        }
+        return proof;
+    }
+
+    private Map<String, Object> verifyCompleted(ChangePackageCurrent current, ChangePackageLandingRun run,
+                                                List<LandingOperationFact> facts, String actor) {
+        ChangePackageVersion approved = version(current.packageId(), current.pointer().approvedVersion());
+        ChangePackageLandingPlan plan = PLAN_FACTORY.createForVerification(current, approved, run.runId(),
+                facts.stream().map(LandingOperationFact::payload).toList());
+        return runtimePort.verifyCompletedOperations(current, approved, plan, run.runId(), actor, facts);
     }
 
     /**
@@ -279,7 +342,7 @@ public final class ChangePackageLandingProcessManager {
             throw new IllegalStateException("LANDING_RECOVERY_PACKAGE_STATE_DRIFT：packageId="
                     + current.packageId() + " status=" + current.status());
         }
-        if (!sameLandingScope(current, run)) {
+        if (!sameLandingScope(current, run) || !run.runId().equals(current.landingRunId())) {
             throw new IllegalStateException("LANDING_RECOVERY_APPROVED_POINTER_DRIFT：packageId=" + current.packageId());
         }
         ChangePackagePointer next = ChangePackageAggregate.rehydrate(current.pointer())

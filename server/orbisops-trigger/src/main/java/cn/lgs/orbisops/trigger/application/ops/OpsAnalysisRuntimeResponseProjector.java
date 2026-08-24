@@ -15,6 +15,9 @@ final class OpsAnalysisRuntimeResponseProjector {
             OpsAgentRunRequestDTO request,
             OpsAnalysisResponseDTO response,
             OpsAgentChatResponse runtimeResponse) {
+        String status = runtimeResponse.getMetadata() == null ? ""
+                : text(runtimeResponse.getMetadata().get("status"));
+        response.setRuntimeStatus(status.isBlank() ? "SUCCEEDED" : status);
         response.setAgentDefinitionId(runtimeResponse.getAgentId());
         response.setAgentVersion(runtimeResponse.getAgentVersion());
         response.setAgentRuntime(runtimeResponse.getEngine());

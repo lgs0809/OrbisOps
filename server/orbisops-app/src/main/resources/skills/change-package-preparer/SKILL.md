@@ -1,6 +1,8 @@
 ---
 name: change-package-preparer
 description: Turn verified investigation, worktree, artifact, and TEST-environment evidence into a reviewable production ChangePackage task book.
+whenToUse: ["Verified investigation and TEST/worktree evidence are ready for a production ChangePackage task book", "已有真实排查和测试环境证据，需要整理变更方案提交审批"]
+whenNotToUse: ["Evidence is insufficient or contradictory", "直接执行生产变更、跳过审批或改变 Landing 权限"]
 ---
 
 # ChangePackage Preparer

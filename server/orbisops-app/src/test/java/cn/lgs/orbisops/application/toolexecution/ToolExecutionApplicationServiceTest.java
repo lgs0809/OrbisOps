@@ -89,6 +89,26 @@ class ToolExecutionApplicationServiceTest {
         assertEquals(List.of("TOOL_EXECUTION_STARTED", "TOOL_EXECUTION_FAILED", "audit-failed"), events);
     }
 
+    @Test
+    void readOnlyVerificationRestrictionBlocksOtherwiseAllowedWriteBeforeDispatch() {
+        AtomicBoolean dispatched = new AtomicBoolean();
+        List<ToolExecutionRecordPort.ToolExecutionRecordCommand> records = new ArrayList<>();
+        var service = service(ToolExecutionDecision.allowed("MEDIUM", Map.of()),
+                (target, request) -> { dispatched.set(true); return Map.of(); },
+                command -> { records.add(command); return recorded(0); },
+                (request, type, payload) -> {}, event -> {});
+        var request = request();
+        var restricted = new ToolExecutionRequest(request.projectId(), request.userId(), request.actor(),
+                request.toolsetId(), request.toolName(), request.scope(), request.arguments(),
+                request.sessionId(), request.runId(), Map.of("requireReadOnly", true), request.landingContext());
+        var response = service.execute(restricted);
+        assertFalse(response.allowed());
+        assertFalse(dispatched.get());
+        assertEquals("READ_ONLY_REQUIRED", response.payload().get("reasonCode"));
+        assertEquals(1, records.size());
+        assertFalse(records.get(0).verifiedEvidence());
+    }
+
     private ToolExecutionApplicationService service(
             ToolExecutionDecision decision,
             ToolExecutionDispatchPort dispatch,

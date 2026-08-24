@@ -11,4 +11,8 @@ public interface RuntimeContextCanarySkillPort {
             String projectId,
             String agentId,
             String runId);
+    default List<RuntimeContextCanarySkillSnapshot> resolve(
+            String projectId, String agentId, String runId, String query) {
+        return resolve(projectId, agentId, runId);
+    }
 }

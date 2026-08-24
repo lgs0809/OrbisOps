@@ -45,13 +45,16 @@ class OpsWorkSessionLeaseHeartbeatTest {
 
         OpsWorkSessionLeaseHeartbeat.Scope scope = heartbeat.start(request());
         assertTrue(periodic.await(1, TimeUnit.SECONDS));
-        int beforeClose = calls.get();
         scope.assertHealthy();
         scope.close();
+        // cancel(false) permits an already running callback to finish; drain that actual executor
+        // before observing its stable count. The production lease fence remains authoritative.
+        scheduler.submit(() -> { }).get(1, TimeUnit.SECONDS);
+        int afterClose = calls.get();
         Thread.sleep(80);
 
-        assertEquals(beforeClose, calls.get());
-        assertTrue(beforeClose >= 3, "initial ownership heartbeat plus periodic heartbeats are required");
+        assertEquals(afterClose, calls.get());
+        assertTrue(afterClose >= 3, "initial ownership heartbeat plus periodic heartbeats are required");
     }
 
     @Test
@@ -68,13 +71,10 @@ class OpsWorkSessionLeaseHeartbeatTest {
                 runService, Duration.ofMillis(10), scheduler);
 
         try (OpsWorkSessionLeaseHeartbeat.Scope scope = heartbeat.start(request())) {
-            for (int i = 0; i < 100 && calls.get() < 2; i++) {
-                try {
-                    Thread.sleep(5);
-                } catch (InterruptedException ignored) {
-                    break;
-                }
-            }
+            // The callback publishes failure before interrupting its owner. Counting entry into
+            // the mock alone does not establish that publication boundary.
+            assertThrows(InterruptedException.class,
+                    () -> new CountDownLatch(1).await(500, TimeUnit.MILLISECONDS));
             IllegalStateException failure = assertThrows(IllegalStateException.class, scope::assertHealthy);
             assertEquals("WORK_SESSION_LEASE_LOST", failure.getMessage());
         }
@@ -120,6 +120,7 @@ class OpsWorkSessionLeaseHeartbeatTest {
 
         OpsWorkSessionLeaseHeartbeat.Scope scope = heartbeat.start(request());
         scope.suspendForApproval();
+        scheduler.submit(() -> { }).get(1, TimeUnit.SECONDS);
         int afterSuspend = calls.get();
         Thread.sleep(60);
 

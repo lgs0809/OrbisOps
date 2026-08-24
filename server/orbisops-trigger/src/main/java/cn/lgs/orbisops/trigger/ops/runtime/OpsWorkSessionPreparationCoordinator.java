@@ -14,6 +14,7 @@ import java.util.function.Supplier;
 @Slf4j
 final class OpsWorkSessionPreparationCoordinator {
 
+    private final OpsWorkSessionLeaseHeartbeat leaseHeartbeat;
     private final OpsAgentRuntimeRuleRouter ruleRouter;
     private final OpsTelemetryService telemetryService;
     private final OpsWorkSessionRunAdapter workSessionRunService;
@@ -26,6 +27,12 @@ final class OpsWorkSessionPreparationCoordinator {
             new OpsAgentRunExecutionContextFactory();
 
     OpsWorkSessionPreparationCoordinator(OpsWorkSessionRuntimeAssembly assembly) {
+        this(assembly, new OpsWorkSessionLeaseHeartbeat(assembly.workSessionRunService()));
+    }
+
+    OpsWorkSessionPreparationCoordinator(OpsWorkSessionRuntimeAssembly assembly,
+                                         OpsWorkSessionLeaseHeartbeat leaseHeartbeat) {
+        this.leaseHeartbeat = leaseHeartbeat;
         this.ruleRouter = assembly.ruleRouter();
         this.telemetryService = assembly.telemetryService();
         this.workSessionRunService = assembly.workSessionRunService();
@@ -84,81 +91,91 @@ final class OpsWorkSessionPreparationCoordinator {
                     value(error.getMessage()));
             throw error;
         }
-        OpsTaskContextAdapter taskContextService = taskContextServiceSupplier.get();
-        if (taskContextService != null) {
-            taskContextService.startRun(safeRequest, definition);
-        }
-        telemetryService.recordRuntimeStarted(
-                definition.getAgentId(),
-                context.engine());
-        runtimeEventJournal.record(events, persistentEventSink, OpsRuntimeEvent.builder()
-                .eventType("RUNTIME_PLANNED")
-                .status("SUCCEEDED")
-                .summary("运行计划已生成，adapter=" + plan.getAdapterKey())
-                .payload(runtimeEventJournal.payloadWithElapsed(
-                        plan.getMetadata(),
-                        startedNanos))
-                .build());
-        if (taskContextService != null) {
-            taskContextService.updateFromEvents(
-                    safeRequest,
-                    definition,
-                    "RUNNING",
-                    events,
-                    "运行计划已生成。");
-        }
-        try {
-            conversationContextCoordinator.prepareMainQuestion(
-                    definition,
-                    safeRequest,
-                    plan,
-                    events,
-                    persistentEventSink,
-                    startedNanos);
-            workSessionRunService.bindContextBundle(safeRequest);
+        // The durable claim already exists here. Question rewriting and memory retrieval can
+        // block as long as engine calls, so event-driven renewal alone is insufficient.
+        try (var control = requestControl.runControl(safeRequest);
+             OpsWorkSessionLeaseHeartbeat.Scope heartbeat = leaseHeartbeat.start(safeRequest)) {
+            try {
+                OpsTaskContextAdapter taskContextService = taskContextServiceSupplier.get();
+                if (taskContextService != null) {
+                    taskContextService.startRun(safeRequest, definition);
+                }
+                telemetryService.recordRuntimeStarted(
+                        definition.getAgentId(),
+                        context.engine());
+                runtimeEventJournal.record(events, persistentEventSink, OpsRuntimeEvent.builder()
+                        .eventType("RUNTIME_PLANNED")
+                        .status("SUCCEEDED")
+                        .summary("运行计划已生成，adapter=" + plan.getAdapterKey())
+                        .payload(runtimeEventJournal.payloadWithElapsed(
+                                plan.getMetadata(),
+                                startedNanos))
+                        .build());
+                if (taskContextService != null) {
+                    taskContextService.updateFromEvents(
+                            safeRequest,
+                            definition,
+                            "RUNNING",
+                            events,
+                            "运行计划已生成。");
+                }
+                conversationContextCoordinator.prepareMainQuestion(
+                        definition,
+                        safeRequest,
+                        plan,
+                        events,
+                        persistentEventSink,
+                        startedNanos);
+                heartbeat.assertHealthy();
+                workSessionRunService.bindContextBundle(safeRequest);
+
+                runtimeEventJournal.record(events, persistentEventSink, OpsRuntimeEvent.builder()
+                        .eventType("RUN_STARTED")
+                        .status("RUNNING")
+                        .summary("Agent 任务开始执行，mode="
+                                + context.mode()
+                                + ", engine="
+                                + context.engine()
+                                + ", adapter="
+                                + plan.getAdapterKey())
+                        .payload(runtimeEventJournal.payloadWithElapsed(
+                                plan.getMetadata(),
+                                startedNanos))
+                        .build());
+                if (taskContextService != null) {
+                    taskContextService.updateFromEvents(
+                            safeRequest,
+                            definition,
+                            "RUNNING",
+                            events,
+                            "Agent 任务已开始执行。");
+                }
+                if (!analysisStateManager.isAnalysisRequest(safeRequest) && plan.isMemoryEnabled()) {
+                    conversationContextCoordinator.appendMessage(
+                            safeRequest,
+                            definition,
+                            events,
+                            persistentEventSink,
+                            startedNanos,
+                            "user",
+                            conversationContextCoordinator.userMemoryContent(safeRequest),
+                            Map.of(
+                                    "agentId",
+                                    definition.getAgentId(),
+                                    "originalQuestion",
+                                    conversationContextCoordinator.originalUserQuery(safeRequest),
+                                    "rewrittenQuestion",
+                                    safeRequest.getQuery()));
+                }
+                heartbeat.assertHealthy();
+            } catch (RuntimeException error) {
+                heartbeat.assertHealthy();
+                throw error;
+            }
         } catch (RuntimeException error) {
             requestControl.finish(safeRequest, "FAILED", error.getMessage());
             requestControl.markFinished(safeRequest);
             throw error;
-        }
-
-        runtimeEventJournal.record(events, persistentEventSink, OpsRuntimeEvent.builder()
-                .eventType("RUN_STARTED")
-                .status("RUNNING")
-                .summary("Agent 任务开始执行，mode="
-                        + context.mode()
-                        + ", engine="
-                        + context.engine()
-                        + ", adapter="
-                        + plan.getAdapterKey())
-                .payload(runtimeEventJournal.payloadWithElapsed(
-                        plan.getMetadata(),
-                        startedNanos))
-                .build());
-        if (taskContextService != null) {
-            taskContextService.updateFromEvents(
-                    safeRequest,
-                    definition,
-                    "RUNNING",
-                    events,
-                    "Agent 任务已开始执行。");
-        }
-        if (!analysisStateManager.isAnalysisRequest(safeRequest) && plan.isMemoryEnabled()) {
-            conversationContextCoordinator.appendMessage(
-                    safeRequest,
-                    definition,
-                    events,
-                    persistentEventSink,
-                    startedNanos,
-                    "user",
-                    conversationContextCoordinator.userMemoryContent(safeRequest),
-                    Map.of(
-                            "agentId",
-                            definition.getAgentId(),
-                            "originalQuestion",
-                            conversationContextCoordinator.originalUserQuery(safeRequest),
-                            "rewrittenQuestion",
-                            safeRequest.getQuery()));
         }
         return context;
     }

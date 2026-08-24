@@ -20,11 +20,33 @@ import java.util.Optional;
 @Repository
 public class JdbcSkillReleaseAdapter implements SkillReleasePort {
 
+    // A frozen candidate keeps its version, but never keeps authority after its target is withdrawn.
+    // CREATE has no catalog entry until publication; its eventual ID is deterministic.
+    private static final String CURRENT_TARGET_JOIN = """
+            LEFT JOIN ai_ops_skill s ON s.scope='PROJECT' AND s.project_id=r.project_id
+              AND s.skill_id=CASE WHEN r.target_skill_id='' THEN CONCAT('evolved-',LEFT(c.candidate_hash,16))
+                                 ELSE r.target_skill_id END
+            """;
+    private static final String CURRENT_TARGET_ALLOWED = """
+            AND ((s.id IS NULL AND c.patch_type='CREATE' AND r.status='CANARY')
+                 OR (s.lifecycle_status='ACTIVE' AND s.execution_mode='ENABLED'))
+            """;
+
     private final JdbcTemplate jdbcTemplate;
 
     public JdbcSkillReleaseAdapter(
             @Qualifier("mysqlJdbcTemplate") JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+    }
+
+    @Override
+    public Map<String,Object> observationContract(cn.lgs.orbisops.domain.skill.model.SkillPatchCandidate candidate) {
+        return new JdbcSkillCanaryContractReader(jdbcTemplate).freeze(candidate);
+    }
+
+    @Override
+    public cn.lgs.orbisops.domain.skill.model.SkillCanaryEvidence canaryEvidence(SkillReleaseSnapshot release) {
+        return new JdbcSkillCanaryEvidenceReader(jdbcTemplate).read(release);
     }
 
     @Override
@@ -70,11 +92,15 @@ public class JdbcSkillReleaseAdapter implements SkillReleasePort {
                 SELECT r.*,c.candidate_hash,c.base_skill_version,c.base_skill_hash,
                        c.patch_type,c.changes_json,c.artifacts_json
                 FROM ai_ops_skill_release r
-                JOIN ai_ops_skill_patch_candidate c ON c.candidate_id=r.candidate_id
+                JOIN ai_ops_skill_patch_candidate c ON c.candidate_id=r.candidate_id AND c.project_id=r.project_id
+                """ + CURRENT_TARGET_JOIN + """
                 WHERE r.project_id=? AND (r.agent_id='' OR r.agent_id=?) AND r.status='CANARY'
+                  AND c.scope='PROJECT' AND (c.agent_id='' OR c.agent_id=?)
+                """ + CURRENT_TARGET_ALLOWED + """
                 ORDER BY r.id DESC LIMIT ?
                 """,
                 projectId,
+                agentId,
                 agentId,
                 Math.max(1, Math.min(limit, 20))).stream()
                 .map(this::canaryCandidate)
@@ -93,26 +119,38 @@ public class JdbcSkillReleaseAdapter implements SkillReleasePort {
                        c.base_skill_version,c.changes_json
                 FROM ai_ops_skill_patch_candidate c
                 JOIN ai_ops_skill_release r ON r.candidate_id=c.candidate_id
+                """ + CURRENT_TARGET_JOIN + """
                 WHERE c.candidate_id=? AND c.project_id=? AND c.candidate_hash=?
-                  AND r.release_id=? AND (c.agent_id='' OR c.agent_id=?)
+                  AND r.release_id=? AND r.project_id=c.project_id AND r.status IN ('CANARY','ACTIVE')
+                  AND c.scope='PROJECT' AND (c.agent_id='' OR c.agent_id=?) AND (r.agent_id='' OR r.agent_id=?)
+                """ + CURRENT_TARGET_ALLOWED + """
                 LIMIT 1
                 """,
                 candidateId,
                 projectId,
                 skillHash,
                 releaseId,
+                agentId,
                 agentId).stream().findFirst().map(this::frozenCandidate);
     }
 
     @Override
     public List<SkillReleaseSnapshot> listEvaluable(int limit) {
+        var reasons=new cn.lgs.orbisops.domain.skill.service.SkillPublicationAdmissionPolicy().retainedStaleReasons();
+        var parameters=new java.util.ArrayList<Object>(reasons);
+        parameters.add(Math.max(1, Math.min(limit, 100)));
         return jdbcTemplate.queryForList("""
                 SELECT *
                 FROM ai_ops_skill_release
-                WHERE status IN ('CANARY','ACTIVE')
-                ORDER BY id ASC LIMIT ?
-                """,
-                Math.max(1, Math.min(limit, 100))).stream()
+                WHERE (status IN ('READY','PENDING_INDEX','CANARY')
+                   OR (status='ACTIVE' AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(metadata_json,'$.publicationPolicy')),'') <> 'source-qualified-auto-v1'))
+                  AND (COALESCE(JSON_EXTRACT(metadata_json,'$.retryAfterMs'),0) <= UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3))*1000
+                    OR (status='READY'
+                      AND JSON_UNQUOTE(JSON_EXTRACT(metadata_json,'$.publicationPolicy'))='source-qualified-auto-v1'
+                      AND reason_code IN (%s)))
+                ORDER BY update_time ASC,id ASC LIMIT ?
+                """.formatted(String.join(",",java.util.Collections.nCopies(reasons.size(),"?"))),
+                parameters.toArray()).stream()
                 .map(this::release)
                 .filter(item -> item.status().evaluable())
                 .toList();
@@ -170,10 +208,16 @@ public class JdbcSkillReleaseAdapter implements SkillReleasePort {
                       WHEN status='ROLLING_BACK' THEN 'ROLLBACK_UNKNOWN'
                       ELSE status
                     END,
+                    metadata_json=CASE WHEN status IN ('READY','PENDING_INDEX') THEN
+                      JSON_SET(COALESCE(metadata_json,'{}'),
+                        '$.retryAfterMs',UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3))*1000 +
+                          LEAST(3600000,60000*POW(2,LEAST(6,COALESCE(JSON_EXTRACT(metadata_json,'$.retryAttempts'),0)))),
+                        '$.retryAttempts',COALESCE(JSON_EXTRACT(metadata_json,'$.retryAttempts'),0)+1)
+                      ELSE metadata_json END,
                     reason_code=?,update_time=CURRENT_TIMESTAMP
                 WHERE release_id=?
                 """,
-                reasonCode,
+                reasonCode == null ? "" : reasonCode.substring(0, Math.min(128, reasonCode.length())),
                 releaseId);
     }
 

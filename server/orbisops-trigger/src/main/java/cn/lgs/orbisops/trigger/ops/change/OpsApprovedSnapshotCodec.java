@@ -63,49 +63,7 @@ public class OpsApprovedSnapshotCodec {
     }
 
     private List<Map<String, Object>> operations(Map<String, Object> snapshot) {
-        Map<String, Object> landingPlan = map(firstNonNull(snapshot.get("landingPlan"), snapshot.get("landingPlanJson")));
-        Map<String, Object> preferred = map(landingPlan.get("preferredPlan"));
-        List<Map<String, Object>> operations = list(firstNonNull(preferred.get("steps"), preferred.get("operations"), preferred.get("mcpSteps")));
-        if (!operations.isEmpty()) return operations;
-        operations = list(firstNonNull(landingPlan.get("steps"), landingPlan.get("operations"), landingPlan.get("mcpSteps")));
-        if (!operations.isEmpty()) return operations;
-        return list(firstNonNull(snapshot.get("mcpSteps"), snapshot.get("mcpStepsJson")));
-    }
-
-    private Map<String, Object> map(Object value) {
-        if (value instanceof Map<?, ?> map) {
-            Map<String, Object> result = new LinkedHashMap<>();
-            map.forEach((key, item) -> result.put(String.valueOf(key), item));
-            return result;
-        }
-        if (value != null && StringUtils.hasText(String.valueOf(value))) {
-            try {
-                return new LinkedHashMap<>(JSON.parseObject(String.valueOf(value)));
-            } catch (RuntimeException ignored) {
-                return Map.of();
-            }
-        }
-        return Map.of();
-    }
-
-    private List<Map<String, Object>> list(Object value) {
-        if (value instanceof List<?> list) {
-            List<Map<String, Object>> result = new ArrayList<>();
-            for (Object item : list) {
-                Map<String, Object> mapped = map(item);
-                if (!mapped.isEmpty()) result.add(mapped);
-            }
-            return result;
-        }
-        if (value != null && StringUtils.hasText(String.valueOf(value))) {
-            try {
-                return JSON.parseArray(String.valueOf(value), Map.class).stream()
-                        .<Map<String, Object>>map(item -> new LinkedHashMap<>((Map<String, Object>) item)).toList();
-            } catch (RuntimeException ignored) {
-                return List.of();
-            }
-        }
-        return List.of();
+        return new cn.lgs.orbisops.domain.changepackage.service.ChangePackageExecutablePlanPolicy().resolve(snapshot);
     }
 
     private Object firstNonNull(Object... values) {

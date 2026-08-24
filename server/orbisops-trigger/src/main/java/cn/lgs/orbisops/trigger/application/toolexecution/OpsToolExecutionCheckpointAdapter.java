@@ -36,12 +36,19 @@ public class OpsToolExecutionCheckpointAdapter implements ToolExecutionCheckpoin
             String checkpointType,
             Map<String, Object> payload) {
         Map<String, Object> safePayload = payload == null ? Map.of() : payload;
+        if ("TOOL_EXECUTION_BLOCKED".equals(checkpointType)) {
+            safePayload = cn.lgs.orbisops.trigger.ops.runtime.OpsPreDispatchCheckpoint.bind(
+                    request.projectId(), request.runId(), safePayload);
+        }
         projectLandingCompletion(request, checkpointType, safePayload);
-        Map<String, Object> metadata = objectMap(request.requestContext().get("metadata"));
+        var control = cn.lgs.orbisops.trigger.ops.OpsRunControlContext.current();
+        Map<String, Object> context = "TOOL_EXECUTION_BLOCKED".equals(checkpointType) && control != null
+                ? control.checkpointRequest() : request.requestContext();
+        Map<String, Object> metadata = objectMap(context.get("metadata"));
         if (text(metadata.get("_workSessionAttemptId")).isBlank()) return;
         OpsWorkSessionRunAdapter adapter = workSessions.getIfAvailable();
         if (adapter == null) throw new IllegalStateException("WORK_SESSION_CHECKPOINT_SERVICE_UNAVAILABLE");
-        Map<String, Object> envelope = new LinkedHashMap<>(request.requestContext());
+        Map<String, Object> envelope = new LinkedHashMap<>(context);
         envelope.put("projectId", request.projectId());
         envelope.put("runId", request.runId());
         envelope.put("sessionId", request.sessionId());

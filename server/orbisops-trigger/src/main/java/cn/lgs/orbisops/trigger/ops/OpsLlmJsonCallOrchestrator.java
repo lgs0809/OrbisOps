@@ -1,6 +1,5 @@
 package cn.lgs.orbisops.trigger.ops;
 
-import cn.lgs.orbisops.trigger.ops.runtime.OpsRuntimeEvent;
 import com.alibaba.fastjson.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -8,7 +7,6 @@ import org.springframework.ai.chat.model.ChatModel;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 
 /** Plain protocol orchestrator for initial JSON call, Skill retry and repair retry. */
 final class OpsLlmJsonCallOrchestrator {
@@ -38,7 +36,6 @@ final class OpsLlmJsonCallOrchestrator {
     }
 
     private Result executeInternal(Input input, ContentCaller caller, boolean eagerInitialSkillContext) {
-        recordEagerSkillContext(input, eagerInitialSkillContext);
         String initialContent = caller.call(
                 input.agentName(),
                 input.chatModel(),
@@ -120,33 +117,6 @@ final class OpsLlmJsonCallOrchestrator {
                     retryContent);
         }
         return Result.failed(result.reason(), result.exception());
-    }
-
-    private void recordEagerSkillContext(Input input, boolean eagerInitialSkillContext) {
-        if (!eagerInitialSkillContext || input.skillNames() == null || input.skillNames().isEmpty()) {
-            return;
-        }
-        OpsLlmTraceContext.Trace trace = OpsLlmTraceContext.current();
-        if (trace == null) {
-            return;
-        }
-        input.skillNames().stream()
-                .filter(skillName -> skillName != null && !skillName.isBlank())
-                .map(String::trim)
-                .distinct()
-                .forEach(skillName -> trace.record(OpsRuntimeEvent.builder()
-                        .eventType("SKILL_CONTEXT_LOADED")
-                        .nodeId(trace.nodeId())
-                        .nodeType("SKILL_CONTEXT")
-                        .agent(skillName)
-                        .source(trace.source())
-                        .status("SUCCEEDED")
-                        .summary("Eager Skill 上下文已注入：" + skillName)
-                        .payload(Map.of(
-                                "skillId", skillName,
-                                "mode", "EAGER",
-                                "owner", trace.owner()))
-                        .build()));
     }
 
     private void recordInvalid(

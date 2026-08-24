@@ -38,7 +38,7 @@ class SkillEvolutionJobApplicationArchitectureTest {
                 () -> assertTrue(application.contains("repository.claimPending(")),
                 () -> assertTrue(application.contains("inputPolicy.summarize(input)")),
                 () -> assertTrue(application.contains("pipelinePort.decide(")),
-                () -> assertTrue(application.contains("repository.savePatch(")),
+                () -> assertTrue(application.contains("repository.complete(job, patch, terminalStatus)")),
                 () -> assertTrue(application.contains("repository.complete(")),
                 () -> assertTrue(application.contains("repository.rescheduleOrFail(")),
                 () -> assertTrue(configuration.contains("skillEvolutionJobApplicationService(")),

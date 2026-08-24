@@ -11,6 +11,7 @@ import cn.lgs.orbisops.domain.mcp.model.McpToolPolicyStatus;
 import cn.lgs.orbisops.domain.mcp.model.McpToolPolicySuggestion;
 import cn.lgs.orbisops.domain.mcp.service.McpToolPolicyGovernance;
 import cn.lgs.orbisops.domain.project.model.ProjectMcpStatus;
+import cn.lgs.orbisops.domain.shared.service.CanonicalObjectHasher;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -161,6 +162,7 @@ public final class McpDiscoveryApplicationService implements McpDiscoveryPort {
         hashSchema.put("transportType", tool.transportType());
         hashSchema.put("description", description);
         if (definition.hydrated()) hashSchema.put("schema", definition.inputSchema());
+        if (definition.outputSchema() != null) hashSchema.put("outputSchema", definition.outputSchema());
         String schemaHash = mapper.schemaHash(
                 projectId, tool.mcpId(), tool.mcpId(), effectiveToolName,
                 hashSchema, remote.rawMetadata());
@@ -184,7 +186,7 @@ public final class McpDiscoveryApplicationService implements McpDiscoveryPort {
                 description,
                 schemaSource,
                 schemaHash,
-                McpToolPolicyProjection.missing());
+                McpToolPolicyProjection.missing(), definition.outputSchema());
 
         snapshotStore().save(new McpToolSchemaSnapshot(
                 "mcp-snapshot-" + UUID.randomUUID(),
@@ -199,8 +201,7 @@ public final class McpDiscoveryApplicationService implements McpDiscoveryPort {
 
         McpToolPolicyProjection policy = resolvePolicy(base, remote.rawMetadata());
         McpHydratedToolSchema hydrated = base.withPolicy(policy);
-        String cacheId = "tool-schema-" + projectId + "-" + hydrated.toolId() + "-"
-                + hydrated.effectiveToolName() + "-" + hydrated.schemaHash();
+        String cacheId = schemaCacheId(projectId, hydrated);
         runtimeStore().saveSchemaCache(new McpSchemaCacheEntry(
                 cacheId, projectId, hydrated.toolId(), mapper.encode(hydrated.view()), "ACTIVE"));
         Map<String, Object> auditPayload = Map.of(
@@ -214,13 +215,26 @@ public final class McpDiscoveryApplicationService implements McpDiscoveryPort {
         return hydrated;
     }
 
+    /**
+     * Keep the human-readable cache key for ordinary tool ids, but fall back to
+     * a deterministic bounded key when a project/MCP/tool combination would
+     * overflow the VARCHAR(160) storage column.  Hydration must not fail just
+     * because a valid remote tool has a long name or belongs to a long MCP id.
+     */
+    private String schemaCacheId(String projectId, McpHydratedToolSchema hydrated) {
+        String readable = "tool-schema-" + projectId + "-" + hydrated.toolId() + "-"
+                + hydrated.effectiveToolName() + "-" + hydrated.schemaHash();
+        if (readable.length() <= 160) return readable;
+        return "tool-schema-" + CanonicalObjectHasher.sha256Text(readable);
+    }
+
     private McpAuthoritativeToolDefinition authoritativeDefinition(
             McpSchemaHydrationRequest request,
             McpProjectToolDescriptor tool) {
         if (request.authoritativeDefinition().hydrated()) {
             McpAuthoritativeToolDefinition supplied = request.authoritativeDefinition();
             return new McpAuthoritativeToolDefinition(
-                    supplied.description(), supplied.inputSchema(),
+                    supplied.description(), supplied.inputSchema(), supplied.outputSchema(),
                     text(supplied.schemaSource(), "REMOTE_MCP_TOOL_DEFINITION"));
         }
         if (!request.remoteToolRequested()) return request.authoritativeDefinition();

@@ -25,21 +25,44 @@ final class OpsAgentScopeOutcomeEnvelope {
             "requiresAction", "verificationStatus", "abstained", "evidenceCompleteness");
 
     Parsed parse(String output) {
+        Parsed parsed = parseEnvelope(output);
+        // New runtime instructions start a one-way answer and finish it with a typed
+        // outcome. A provider STOP alone cannot close a visibly truncated protocol.
+        // Keep unmarked and former two-way answers compatible with stored workflows.
+        int start = output == null ? -1 : output.lastIndexOf(VISIBLE_START);
+        if (start >= 0 && !parsed.present()
+                && output.indexOf(VISIBLE_END, start + VISIBLE_START.length()) < 0) {
+            throw new IllegalStateException("MODEL_RESPONSE_INCOMPLETE");
+        }
+        return parsed;
+    }
+
+    private Parsed parseEnvelope(String output) {
         if (!StringUtils.hasText(output)) return new Parsed(output == null ? "" : output, Map.of(), false);
         int start = output.lastIndexOf(START);
         if (start < 0) return parseTrailingKeyValueBlock(output);
         int end = output.indexOf(END, start + START.length());
-        if (end < 0) return new Parsed(stripVisibleMarkers(output), Map.of(), false);
+        if (end < 0) {
+            Parsed trailing = parseTrailingKeyValueBlock(output);
+            return trailing.present()
+                    ? trailing
+                    : new Parsed(stripVisibleMarkers(output), Map.of(), false);
+        }
         String json = output.substring(start + START.length(), end).trim();
         Map<String, Object> normalized = normalize(json);
-        if (normalized.isEmpty()) return new Parsed(stripVisibleMarkers(output), Map.of(), false);
+        if (normalized.isEmpty()) {
+            Parsed trailing = parseTrailingKeyValueBlock(output);
+            return trailing.present()
+                    ? trailing
+                    : new Parsed(stripVisibleMarkers(output), Map.of(), false);
+        }
         String visible = stripVisibleMarkers(
                 (output.substring(0, start) + output.substring(end + END.length())).trim());
         return new Parsed(visible, normalized, true);
     }
 
     private Parsed parseTrailingKeyValueBlock(String output) {
-        String[] lines = output.split("\\R", -1);
+        String[] lines = stripOutcomeMarkers(output).split("\\R", -1);
         Map<String, Object> values = new LinkedHashMap<>();
         int blockStart = lines.length;
         for (int index = lines.length - 1; index >= 0; index--) {
@@ -63,6 +86,11 @@ final class OpsAgentScopeOutcomeEnvelope {
             visible.append(lines[index]);
         }
         return new Parsed(stripVisibleMarkers(visible.toString().trim()), normalized, true);
+    }
+
+    private String stripOutcomeMarkers(String output) {
+        if (output == null || output.isEmpty()) return output == null ? "" : output;
+        return output.replace(START, "").replace(END, "");
     }
 
     private String stripVisibleMarkers(String output) {

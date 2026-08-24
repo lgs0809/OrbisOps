@@ -20,6 +20,9 @@ public record MemoryMessageCandidate(
     }
 
     public String dedupKey() {
+        if (metadata.get("messageSeq") instanceof Number sequence && sequence.longValue() > 0) {
+            return sessionId + ":seq:" + sequence.longValue();
+        }
         return value(role) + ":" + value(content);
     }
 

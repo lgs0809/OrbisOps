@@ -20,15 +20,15 @@ public record SkillEvolutionPromotionSettings(
     }
 
     public SkillEvolutionPromotionSettings {
-        minimumObservations = Math.max(2, minimumObservations);
+        minimumObservations = Math.max(3, minimumObservations);
         explicitProcedureMinimumObservations = Math.max(
-                2,
+                3,
                 explicitProcedureMinimumObservations);
-        minimumDistinctRuns = Math.max(2, minimumDistinctRuns);
+        minimumDistinctRuns = Math.max(3, minimumDistinctRuns);
         minimumDistinctSessions = Math.max(2, minimumDistinctSessions);
         consolidationSampleLimit = Math.max(
                 3,
-                Math.min(32, consolidationSampleLimit));
+                Math.min(20, consolidationSampleLimit));
     }
 
     public int requiredObservations(String opportunityType) {

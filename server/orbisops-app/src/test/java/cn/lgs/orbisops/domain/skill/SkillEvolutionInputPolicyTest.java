@@ -57,6 +57,22 @@ class SkillEvolutionInputPolicyTest {
     }
 
     @Test
+    void prefersFinalOutputContentOverGenericRuntimeSummary() {
+        String report = "根因是采集目标不可达。先核对 Prometheus 自身健康，再检查 up 指标和错误日志，最后验证恢复状态并记录证据。";
+
+        SkillEvolutionInputSummary summary = policy.summarize(new SkillEvolutionInput(
+                List.of(
+                        new SkillEvolutionTraceEvent(
+                                "TOOL_FINISHED", "SUCCEEDED", "prometheus ok", "", Map.of(
+                                        "evidenceId", "e1", "resultId", "r1", "outputHash", "h1")),
+                        new SkillEvolutionTraceEvent(
+                                "FINAL_OUTPUT", "SUCCEEDED", "Agent 输出完成。", report, Map.of())),
+                List.of(new SkillEvolutionMessage("user", "帮我查线上异常"))));
+
+        assertEquals(report, summary.finalReport());
+    }
+
+    @Test
     void appliesHistoricalLimitsAndUserGoalAbbreviation() {
         List<SkillEvolutionTraceEvent> trace = new ArrayList<>();
         for (int index = 0; index < 85; index++) {

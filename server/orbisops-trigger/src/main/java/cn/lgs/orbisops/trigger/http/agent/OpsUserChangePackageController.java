@@ -241,6 +241,15 @@ public class OpsUserChangePackageController {
         return success(landing.cleanup(new ChangePackageCommands.Cleanup(packageId, request, actor(principal))));
     }
 
+    @PostMapping("/ops/change-packages/{packageId}/verify-landing")
+    public Response<Map<String, Object>> verifyLanding(@PathVariable("packageId") String packageId,
+                                                       HttpServletRequest servletRequest) {
+        AdminAuthService.AuthPrincipal principal = principal(servletRequest);
+        Map<String, Object> detail = authorizedDetail(packageId, servletRequest);
+        permissionService.assertCanLandPackage(text(detail.get("projectId"), ""), principal);
+        return success(landing.verifyLanding(packageId, actor(principal)));
+    }
+
     private Map<String, Object> authorizedDetail(String packageId, HttpServletRequest servletRequest) {
         Map<String, Object> detail = queries.detail(packageId);
         AdminAuthService.AuthPrincipal principal = principal(servletRequest);

@@ -22,6 +22,14 @@ import static org.mockito.Mockito.when;
 
 class OpsScheduledTaskExecutionAdaptersTest {
 
+    @Test void missingCreatorFailsBeforeRuntimeEvenWhenPayloadClaimsAnOwner() {
+        var service = mock(OpsAnalysisApplicationService.class);
+        var adapter = new OpsScheduledTaskAnalysisAdapter(service, new OpsTaskScheduleRuntimeConfigurationCodec());
+        assertThrows(IllegalArgumentException.class, () -> adapter.prepare(
+                new ScheduledTaskExecutionCommand(7L, "test", "agent", "MANUAL", "{\"createdBy\":\"victim\"}"), 1L));
+        org.mockito.Mockito.verifyNoInteractions(service);
+    }
+
     @Test
     void analysisAdapterDecodesUnifiedRuntimeAndBuildsNormalizedAgentRequest() {
         OpsAnalysisApplicationService analysisService = mock(OpsAnalysisApplicationService.class);
@@ -41,7 +49,7 @@ class OpsScheduledTaskExecutionAdaptersTest {
         OpsAgentRunRequestDTO request = adapter.prepare(command, 42L);
 
         assertEquals("task_7_42", request.getRunId());
-        assertEquals("scheduler:7", request.getRequestedBy());
+        assertEquals("creator-a", request.getRequestedBy());
         assertEquals("payment", request.getProjectId());
         assertEquals("ops-agent", request.getAgentDefinitionId());
         assertEquals(5, request.getAgentVersion());
@@ -98,6 +106,38 @@ class OpsScheduledTaskExecutionAdaptersTest {
     }
 
     @Test
+    void structuredWorkflowInputReachesRuntimeWithoutTaskNamePrefixAndRejectsMalformedJson() {
+        var service = mock(OpsAnalysisApplicationService.class);
+        when(service.normalizeRequest(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        var adapter = new OpsScheduledTaskAnalysisAdapter(service, new OpsTaskScheduleRuntimeConfigurationCodec());
+        var input = java.util.Map.of("projectId", "payment", "serviceId", "orders", "environment", "acceptance");
+        String payload = com.alibaba.fastjson.JSON.toJSONString(java.util.Map.of(
+                "projectId", "payment", "prompt", com.alibaba.fastjson.JSON.toJSONString(input)));
+
+        var request = adapter.prepare(command(payload), 45L);
+
+        assertEquals(input, new cn.lgs.orbisops.domain.agentdefinition.service.DirectActionDataPolicy()
+                .parseObject(request.getQuestion()));
+        assertEquals("task_7_45", request.getRunId());
+        assertEquals("WORKFLOW", request.getExecutionStyle());
+        String malformed = com.alibaba.fastjson.JSON.toJSONString(java.util.Map.of(
+                "projectId", "payment", "prompt", "{broken"));
+        assertThrows(IllegalArgumentException.class, () -> adapter.prepare(command(malformed), 46L));
+    }
+
+    @Test
+    void defaultReactAgentKeepsJsonLookingUserPromptAsText() {
+        var service = mock(OpsAnalysisApplicationService.class);
+        var projects = mock(ProjectDefinitionApplicationService.class);
+        when(projects.defaultAgentId("payment")).thenReturn("ops-agent");
+        when(service.normalizeRequest(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        var adapter = new OpsScheduledTaskAnalysisAdapter(service, new OpsTaskScheduleRuntimeConfigurationCodec(), projects);
+        var request = adapter.prepare(command("{\"projectId\":\"payment\",\"prompt\":\"{broken\"}"), 47L);
+        assertEquals("REACT", request.getExecutionStyle());
+        assertEquals("定时任务：支付巡检\n执行要求：{broken", request.getQuestion());
+    }
+
+    @Test
     void analysisAdapterKeepsLegacyTextConfigurationFailClosed() {
         OpsScheduledTaskAnalysisAdapter adapter = new OpsScheduledTaskAnalysisAdapter(
                 mock(OpsAnalysisApplicationService.class),
@@ -145,6 +185,6 @@ class OpsScheduledTaskExecutionAdaptersTest {
                 "支付巡检",
                 "ops-agent",
                 "SCHEDULED",
-                payload);
+                payload, "creator-a");
     }
 }

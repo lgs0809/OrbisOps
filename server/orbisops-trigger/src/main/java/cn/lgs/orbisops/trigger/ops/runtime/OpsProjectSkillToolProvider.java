@@ -38,7 +38,8 @@ public class OpsProjectSkillToolProvider {
                 .description("""
                         按需检索或读取本次 Work Session 启动时已固定的 Skill 版本。
                         action=search 时提供 query，可先查看少量 Skill 摘要；action=load 时提供 skillId，先读取入口正文和文件清单。
-                        需要资源、脚本模板或评测文件时，再传 artifactPath 按路径读取单个文本文件。脚本内容仅供审核前方法参考，不获得执行权限。
+                        入口引用了方法资源时，使用前必须传 artifactPath 按路径读取完整步骤与验收条件；只读入口不等于已使用完整方法。
+                        其他资源和脚本模板按需读取；评测用例不能当成本次真实证据。脚本内容仅供审核前方法参考，不获得执行权限。
                         不允许读取本次 Run 启动后新建或新发布的 Skill，也不能用 Skill 绕过 Tool Policy、ChangePackage 或 LandingRuntime。
                         """)
                 .inputType(SkillCatalogInput.class)

@@ -148,6 +148,7 @@ class JdbcToolCompletionProjectionMySqlTest {
                   project_id VARCHAR(80) NOT NULL,
                   current_attempt_id VARCHAR(80) NOT NULL,
                   lease_token VARCHAR(80) NOT NULL,
+                  lease_expires_at DATETIME(6) NOT NULL,
                   fencing_token BIGINT NOT NULL,
                   status VARCHAR(32) NOT NULL,
                   cancel_requested TINYINT NOT NULL,
@@ -177,8 +178,8 @@ class JdbcToolCompletionProjectionMySqlTest {
         jdbc.update("""
                 INSERT INTO ai_ops_agent_run
                   (run_id,project_id,current_attempt_id,lease_token,fencing_token,status,
-                   cancel_requested,next_checkpoint_seq,updated_at)
-                VALUES ('run-1','project-1','attempt-1','lease-1',1,'RUNNING',0,0,?)
+                   cancel_requested,next_checkpoint_seq,lease_expires_at,updated_at)
+                VALUES ('run-1','project-1','attempt-1','lease-1',1,'RUNNING',0,0,CURRENT_TIMESTAMP(6) + INTERVAL 1 MINUTE,?)
                 """, Timestamp.from(NOW));
         JdbcWorkSessionRunRepository repository = new JdbcWorkSessionRunRepository(jdbc);
         WorkSessionRunClaim claim = new WorkSessionRunClaim(

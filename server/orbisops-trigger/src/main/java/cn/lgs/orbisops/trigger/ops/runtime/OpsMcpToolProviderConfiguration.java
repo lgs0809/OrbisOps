@@ -18,8 +18,10 @@ public class OpsMcpToolProviderConfiguration {
     @Bean
     public OpsMcpRemoteClientAdapter opsMcpRemoteClientAdapter(
             OpsMcpClientRegistry clientRegistry,
-            OpsMcpClientFactory clientFactory) {
-        return new OpsMcpRemoteClientAdapter(clientRegistry, clientFactory);
+            OpsMcpClientFactory clientFactory,
+            cn.lgs.orbisops.application.mcp.McpToolCatalogStore catalogs) {
+        var service=new cn.lgs.orbisops.application.mcp.McpToolCatalogService(catalogs,java.time.Clock.systemUTC());
+        return new OpsMcpRemoteClientAdapter(clientRegistry, clientFactory,new OpsMcpRemoteCatalog(service,catalogs,clientFactory));
     }
 
     @Bean

@@ -57,13 +57,6 @@ class OpsRuntimeContextBundleTest {
         bundle.put("approvalBoundaryHash", "approval-boundary-hash");
         when(bundleService.createBundle(any(), eq(""), any())).thenReturn(bundle);
         OpsMainQuestionRewriteService rewriteService = mock(OpsMainQuestionRewriteService.class);
-        when(rewriteService.rewrite(eq("check order errors"), eq("")))
-                .thenReturn(new OpsMainQuestionRewriteService.RewriteResult(
-                        "check order errors",
-                        "check order errors",
-                        false,
-                        "already standalone",
-                        List.of()));
         OpsWorkSessionContextPreparationService preparationService = preparationService(
                 rewriteService, bundleService);
         OpsAgentChatRequest request = request();
@@ -72,17 +65,21 @@ class OpsRuntimeContextBundleTest {
                 .metadata(new LinkedHashMap<>())
                 .build();
 
+        List<OpsRuntimeEvent> events = new ArrayList<>();
         preparationService.prepare(
                 OpsAgentDefinition.builder().agentId("agent-1").build(),
                 request,
                 plan,
-                new ArrayList<OpsRuntimeEvent>(),
+                events,
                 null,
                 System.nanoTime());
 
         assertEquals("rcb-1", request.getMetadata().get("contextBundleId"));
         assertEquals("hash-1", request.getMetadata().get("contextBundleHash"));
-        verify(rewriteService).rewrite(eq("check order errors"), eq(""));
+        verify(rewriteService, never()).rewrite(any(), any());
+        assertTrue(events.stream().anyMatch(event ->
+                "QUERY_REWRITE_SKIPPED".equals(event.getEventType())
+                        && String.valueOf(event.getPayload()).contains("NO_CONVERSATION_CONTEXT")));
         verify(bundleService).createBundle(any(), eq(""), any());
     }
 

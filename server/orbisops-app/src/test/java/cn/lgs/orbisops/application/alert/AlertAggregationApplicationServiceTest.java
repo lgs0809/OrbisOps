@@ -37,7 +37,20 @@ class AlertAggregationApplicationServiceTest {
         assertTrue(decision.dispatchNow());
         assertEquals(1, transactions.count);
         assertEquals(1, repository.applyCount);
-        assertEquals(2, repository.lockCount);
+        assertEquals(3, repository.lockCount);
+        assertEquals(1, repository.insertCount);
+    }
+
+    @Test
+    void existingAggregateDoesNotAcquireInsertDuplicateKeyLockBeforeItsExclusiveLock() {
+        FakeRepository repository = new FakeRepository();
+        AlertAggregationApplicationService service = new AlertAggregationApplicationService(
+                repository, () -> "claim-1", new CountingTransactions());
+        service.record("project-a", 7L, "fingerprint-1", "firing", "warning", "mysql", Map.of(), 120, 900);
+        AlertAggregationDecision second = service.record(
+                "project-a", 7L, "fingerprint-1", "firing", "warning", "mysql", Map.of(), 120, 900);
+        assertEquals(AlertAggregateEventType.DUPLICATE, second.eventType());
+        assertEquals(1, repository.insertCount);
     }
 
     @Test
@@ -120,6 +133,7 @@ class AlertAggregationApplicationServiceTest {
         private boolean applyResult = true;
         private boolean ackResult = true;
         private int applyCount;
+        private int insertCount;
         private int lockCount;
         private int lastLimit;
         private int lastStaleSeconds;
@@ -127,6 +141,7 @@ class AlertAggregationApplicationServiceTest {
 
         @Override
         public boolean insertIfAbsent(AlertAggregateSeed seed) {
+            insertCount++;
             if (current == null) {
                 current = new AlertAggregateSnapshot(
                         seed.aggregateKey(), seed.projectId(), seed.ruleId(), seed.fingerprint(),

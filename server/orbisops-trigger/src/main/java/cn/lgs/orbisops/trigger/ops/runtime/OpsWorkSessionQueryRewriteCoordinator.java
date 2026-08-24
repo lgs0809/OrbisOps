@@ -68,7 +68,7 @@ final class OpsWorkSessionQueryRewriteCoordinator {
                 "main-query-rewrite",
                 "QUERY_REWRITE",
                 "main-agent",
-                "memory");
+                "memory", request.getTrustedSkillFrame());
         OpsMainQuestionRewriteService.RewriteResult result;
         try {
             result = OpsLlmTraceContext.withTrace(
@@ -180,6 +180,12 @@ final class OpsWorkSessionQueryRewriteCoordinator {
             skip(request, originalQuery, events, eventSink, requestStartedNanos,
                     "当前 Agent 编排已关闭主 Agent 问题重写。",
                     Map.of("queryRewriteEnabled", false));
+            return true;
+        }
+        if (!StringUtils.hasText(memoryContext)) {
+            skip(request, originalQuery, events, eventSink, requestStartedNanos,
+                    "没有需要消解的会话上下文，保留用户原问题直接执行。",
+                    Map.of("reason", "NO_CONVERSATION_CONTEXT"));
             return true;
         }
         return false;

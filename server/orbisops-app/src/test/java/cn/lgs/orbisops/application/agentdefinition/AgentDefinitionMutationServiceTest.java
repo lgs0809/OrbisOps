@@ -22,6 +22,32 @@ import static org.mockito.Mockito.when;
 class AgentDefinitionMutationServiceTest {
 
     @Test
+    void storedSnapshotMustRetainIdentityAndShapeAcrossApplicationUpdates() {
+        TestModel model = new TestModel();
+        AgentDefinitionMutationStorePort<TestDefinition> store = mock(AgentDefinitionMutationStorePort.class);
+        var catalog = new AgentDefinitionMemoryCatalog<TestDefinition>(model);
+        var service = new AgentDefinitionMutationService<TestDefinition>(model, store, catalog);
+        var definition = new TestDefinition("stored", 2, AgentDefinitionLifecycle.PUBLISHED);
+        definition.definitionHash = "persisted-before-new-default-fields";
+        service.registerStoredSnapshot(definition, true);
+        assertEquals("persisted-before-new-default-fields", catalog.current("stored").definitionHash);
+        assertFalse(catalog.current("stored").normalized);
+        assertEquals("persisted-before-new-default-fields", catalog.version("stored", 2).definitionHash);
+    }
+
+    @Test
+    void unversionedLegacyAndPlatformDefinitionsStillReceiveIdentity() {
+        TestModel model = new TestModel();
+        AgentDefinitionMutationStorePort<TestDefinition> store = mock(AgentDefinitionMutationStorePort.class);
+        var catalog = new AgentDefinitionMemoryCatalog<TestDefinition>(model);
+        var service = new AgentDefinitionMutationService<TestDefinition>(model, store, catalog);
+        var definition = new TestDefinition("legacy", null, null);
+        service.registerStoredSnapshot(definition, true);
+        assertEquals("hash-legacy-1", catalog.current("legacy").definitionHash);
+        assertTrue(catalog.current("legacy").normalized);
+    }
+
+    @Test
     void draftUsesMaximumStoreVersionAndCommitsCatalogAfterPersistence() {
         TestModel model = new TestModel();
         @SuppressWarnings("unchecked")

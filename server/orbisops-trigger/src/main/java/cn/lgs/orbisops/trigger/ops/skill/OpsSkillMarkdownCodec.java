@@ -1,6 +1,7 @@
 package cn.lgs.orbisops.trigger.ops.skill;
 
 import cn.lgs.orbisops.application.skill.SkillEditableWorkspacePort;
+import cn.lgs.orbisops.domain.shared.json.CanonicalJson;
 import org.springaicommunity.agent.tools.SkillsTool;
 import org.springframework.util.StringUtils;
 
@@ -108,21 +109,21 @@ final class OpsSkillMarkdownCodec {
         if (!StringUtils.hasText(key) || value == null) {
             return;
         }
-        markdown.append(key)
+        markdown.append(key.matches("[A-Za-z_][A-Za-z0-9_-]*") ? key : CanonicalJson.stringify(key))
                 .append(": ")
                 .append(yamlScalar(value))
                 .append('\n');
     }
 
     private String yamlScalar(Object value) {
+        // JSON flow collections are valid YAML. Quoting their Java toString() loses the schema.
+        if (value instanceof Map<?, ?> || value instanceof Iterable<?>) {
+            return CanonicalJson.stringify(value);
+        }
         if (value instanceof Number || value instanceof Boolean) {
             return String.valueOf(value);
         }
-        String text = String.valueOf(value)
-                .replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n");
-        return "\"" + text + "\"";
+        return CanonicalJson.stringify(String.valueOf(value));
     }
 
     private String stringValue(Object value) {

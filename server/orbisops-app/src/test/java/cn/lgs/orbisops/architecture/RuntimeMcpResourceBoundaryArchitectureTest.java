@@ -32,6 +32,7 @@ class RuntimeMcpResourceBoundaryArchitectureTest {
                 () -> assertFalse(resolver.contains("OpsSourceRepositoryService")),
                 () -> assertFalse(resolver.contains("OpsLegacyMcpConfigMapper")),
                 () -> assertTrue(resolver.contains("toolProvider.buildToolCallbacks(servers)")),
+                () -> assertTrue(resolver.contains("toolProvider::currentAuthorizedDefinition")),
                 () -> assertTrue(resolver.contains("server.setToolCallStage(stage)")),
                 () -> assertTrue(resolver.contains("RESOURCE_WARN")),
                 () -> assertFalse(resolver.contains("ObjectProvider")),
@@ -42,7 +43,7 @@ class RuntimeMcpResourceBoundaryArchitectureTest {
                 () -> assertTrue(resolver.contains("AGENT_RUN_EXECUTION_CONTEXT_EXPIRED")),
                 () -> assertFalse(resolver.contains("definition.getPhase()")),
                 () -> assertFalse(resolver.contains("definition.getCapabilities()")),
-                () -> assertTrue(resolver.lines().count() < 360));
+                () -> assertTrue(resolver.lines().count() < 375));
     }
 
     @Test

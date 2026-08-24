@@ -43,6 +43,25 @@ import static org.mockito.Mockito.when;
 class OpsChangePackageToolProviderTest {
 
     @Test
+    void shouldDiscloseRecoveryObjectTypesAndNestedPostChecksToTheActualModelTool() {
+        var provider = new OpsChangePackageToolProvider((OpsToolExecutionService) null);
+        var callback = provider.build("project", "alice", "run", "bundle", "hash", List.of(), List.of());
+        var schema = JSON.parseObject(callback.getToolDefinition().inputSchema());
+        var action = schema.getJSONObject("properties").getJSONObject("actions").getJSONObject("items");
+        var fields = action.getJSONObject("properties");
+        for (var key : List.of("preconditions", "postCheck", "rollbackPlan", "rollbackPrecondition", "manualFallback")) {
+            assertEquals("object", fields.getJSONObject(key).getString("type"), key);
+        }
+        assertFalse(action.getJSONArray("required").contains("manualFallback"), "validation actions remain valid");
+        assertFalse(fields.containsKey("additionalChecks"));
+        var checks = fields.getJSONObject("postCheck").getJSONObject("properties").getJSONObject("additionalChecks");
+        assertEquals(15, checks.getIntValue("maxItems"));
+        assertFalse(checks.getJSONObject("items").getJSONObject("properties").containsKey("additionalChecks"));
+        assertFalse(checks.getJSONObject("items").getBooleanValue("additionalProperties"));
+        assertTrue(fields.getJSONObject("arguments").getBooleanValue("additionalProperties"), "dynamic MCP arguments retain their own contract");
+    }
+
+    @Test
     void shouldCreateEvidenceBoundChangePackage() {
         OpsChangePackagePreparationService preparationService = mock(OpsChangePackagePreparationService.class);
         when(preparationService.prepare(any(), eq("alice"))).thenReturn(
@@ -285,6 +304,72 @@ class OpsChangePackageToolProviderTest {
                 """);
 
         assertTrue(output.contains("cp-rabbit"));
+        verify(toolExecutionService).execute(any(), eq("alice"));
+    }
+
+    @Test
+    void shouldUsePriorSessionEvidenceForHighRiskPackage() {
+        OpsChangePackageActionPolicyBinder binder = mock(OpsChangePackageActionPolicyBinder.class);
+        when(binder.proposalCatalog("demo-project")).thenReturn(List.of());
+        when(binder.bind(eq("demo-project"), any())).thenReturn(List.of(Map.of(
+                "operationId", "restart_service",
+                "mcpId", "order-service-control-mcp",
+                "toolName", "restart_service",
+                "effectType", "EXECUTE_EXTERNAL_ACTION",
+                "effectScope", "PRODUCTION",
+                "mutability", "PROD_MUTATING",
+                "riskLevel", "HIGH",
+                "requiresDryRun", false,
+                "arguments", Map.of("service", "order-service"))));
+        OpsToolExecutionService toolExecutionService = mock(OpsToolExecutionService.class);
+        when(toolExecutionService.execute(any(), eq("alice"))).thenReturn(Map.of(
+                "projectId", "demo-project",
+                "packageId", "cp-prior-session",
+                "status", "DRAFT",
+                "version", 1,
+                "packageHash", "hash-prior-session",
+                "riskLevel", "HIGH"));
+        OpsChangePackageToolProvider provider =
+                new OpsChangePackageToolProvider(toolExecutionService, null, binder);
+        OpsRuntimeEvent priorEvidence = OpsRuntimeEvent.builder()
+                .eventType("TOOL_CALL_FINISHED")
+                .status("SUCCEEDED")
+                .summary("RabbitMQ health completed in a previous turn")
+                .payload(Map.of(
+                        "toolName", "project_mcp_demo_rabbitmq_readonly_mcp",
+                        "toolKind", "mcp",
+                        "output", "{\"status\":\"ok\"}",
+                        "remoteCallExecuted", true,
+                        "allowed", true,
+                        "resultId", "tool-result-prior-rabbit",
+                        "mcpId", "demo-rabbitmq-readonly-mcp",
+                        "remoteToolName", "rabbitmq_health"))
+                .build();
+        OpsAgentChatRequest runtimeRequest = OpsAgentChatRequest.builder()
+                .metadata(new java.util.LinkedHashMap<>(Map.of(
+                        OpsChangePackageRuntimeToolContributor.AVAILABLE_AUTHORITATIVE_SOURCE_TYPES_KEY,
+                        List.of("RABBITMQ"),
+                        OpsChangePackageRuntimeToolContributor.SESSION_EVIDENCE_KEY,
+                        List.of(priorEvidence))))
+                .build();
+        ToolCallback tool = provider.build(
+                "demo-project", "alice", "run-prior-session", "bundle-1", "bundle-hash-1",
+                List.of(), List.of("demo-project-local-runtime"), runtimeRequest);
+
+        String output = tool.call("""
+                {
+                  "title":"restart after prior RabbitMQ evidence",
+                  "summary":"test",
+                  "actions":[{
+                    "operationId":"restart_service",
+                    "mcpId":"order-service-control-mcp",
+                    "toolName":"restart_service",
+                    "arguments":{"service":"order-service"}
+                  }]
+                }
+                """);
+
+        assertTrue(output.contains("cp-prior-session"));
         verify(toolExecutionService).execute(any(), eq("alice"));
     }
 

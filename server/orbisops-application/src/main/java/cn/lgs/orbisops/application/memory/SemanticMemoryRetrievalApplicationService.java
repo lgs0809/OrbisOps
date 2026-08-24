@@ -16,12 +16,20 @@ public class SemanticMemoryRetrievalApplicationService {
     private final SemanticLexicalRecallPort lexicalRecallPort;
     private final SemanticMemoryRetrievalFailurePort failurePort;
     private final SemanticMemoryFusionPolicy fusionPolicy;
+    private final cn.lgs.orbisops.domain.memory.adapter.repository.IConversationMemoryRepository sources;
 
     public SemanticMemoryRetrievalApplicationService(
             SemanticVectorRecallPort vectorRecallPort,
             SemanticLexicalRecallPort lexicalRecallPort,
             SemanticMemoryRetrievalFailurePort failurePort,
             SemanticMemoryFusionPolicy fusionPolicy) {
+        this(vectorRecallPort,lexicalRecallPort,failurePort,fusionPolicy,null);
+    }
+
+    public SemanticMemoryRetrievalApplicationService(SemanticVectorRecallPort vectorRecallPort,SemanticLexicalRecallPort lexicalRecallPort,
+            SemanticMemoryRetrievalFailurePort failurePort,SemanticMemoryFusionPolicy fusionPolicy,
+            cn.lgs.orbisops.domain.memory.adapter.repository.IConversationMemoryRepository sources) {
+        this.sources=sources;
         this.vectorRecallPort = vectorRecallPort;
         this.lexicalRecallPort = lexicalRecallPort;
         this.failurePort = failurePort;
@@ -59,6 +67,13 @@ public class SemanticMemoryRetrievalApplicationService {
             return List.of();
         }
         try {
+            if(sources!=null) {
+                var references=candidates.stream().map(candidate->projection(candidate.document())).filter(java.util.Objects::nonNull).toList();
+                String project=references.isEmpty()?"":sources.window(query.sessionId(),2,false)
+                        .map(cn.lgs.orbisops.domain.memory.model.ConversationMemoryWindow::projectId).orElse("");
+                var visible=references.isEmpty()?java.util.Set.<String>of():sources.visibleSemanticProjections(query.sessionId(),project,query.userId(),references);
+                candidates.removeIf(candidate->projection(candidate.document())!=null && !visible.contains(candidate.document().id()));
+            }
             return fusionPolicy.fuseAndRank(
                     candidates,
                     query.limit(),
@@ -72,6 +87,14 @@ public class SemanticMemoryRetrievalApplicationService {
 
     int recallLimit(int limit, int semanticTopK) {
         return Math.max(1, Math.min(Math.max(limit, semanticTopK) * 4, 40));
+    }
+
+    private cn.lgs.orbisops.domain.memory.model.SemanticProjectionReference projection(SemanticMemoryDocumentSnapshot document) {
+        var metadata=document.metadata();Object id=metadata.get("semantic_job_id");
+        if(!(id instanceof Number job))return null;
+        long epoch=metadata.get("semantic_epoch") instanceof Number value?value.longValue():-1;
+        return new cn.lgs.orbisops.domain.memory.model.SemanticProjectionReference(document.id(),job.longValue(),epoch,
+                java.util.Objects.toString(metadata.get("semantic_source_hash"),""),java.util.Objects.toString(metadata.get("semantic_projection"),""));
     }
 
     private List<SemanticMemoryRankedCandidate> recallVector(

@@ -8,7 +8,12 @@ public record SkillExperienceClusterEvidence(
         int distinctSessions,
         int hardCaseCount,
         int successfulCount,
-        List<String> observationTypes) {
+        List<String> observationTypes,
+        int distinctConditions) {
+
+    public SkillExperienceClusterEvidence(int distinctRuns,int distinctSessions,int hardCaseCount,int successfulCount,List<String> observationTypes) {
+        this(distinctRuns,distinctSessions,hardCaseCount,successfulCount,observationTypes,0);
+    }
 
     public SkillExperienceClusterEvidence {
         observationTypes = observationTypes == null

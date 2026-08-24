@@ -1,5 +1,9 @@
 package cn.lgs.orbisops.trigger.ops.runtime;
 
+import cn.lgs.orbisops.trigger.ops.OpsModelCallAwaiter;
+import cn.lgs.orbisops.trigger.ops.OpsRunControlContext;
+import cn.lgs.orbisops.trigger.ops.OpsRunCanceledException;
+
 import com.alibaba.cloud.ai.graph.agent.interceptor.ModelCallHandler;
 import com.alibaba.cloud.ai.graph.agent.interceptor.ModelInterceptor;
 import com.alibaba.cloud.ai.graph.agent.interceptor.ModelRequest;
@@ -74,18 +78,23 @@ final class OpsAgentScopeModelCallInterceptor extends ModelInterceptor {
         long queuedNanos = System.nanoTime();
         CountDownLatch started = new CountDownLatch(1);
         AtomicLong startedNanos = new AtomicLong();
+        Long nodeDeadline = OpsNodeDeadlineContext.captureDeadline();
+        var control = OpsRunControlContext.current();
         record(event("MODEL_CALL_QUEUED", "RUNNING", "AgentScope 模型调用等待执行槽。", request, 0L, 0L, null));
         Future<ModelResponse> future = modelCallExecutor.submit(() -> {
             startedNanos.set(System.nanoTime());
             started.countDown();
             long queueWaitMs = elapsedMs(queuedNanos);
             record(event("MODEL_CALL_STARTED", "RUNNING", "AgentScope 模型调用已开始。", request, 0L, queueWaitMs, null));
-            return handler.call(request);
+            return OpsRunControlContext.withBinding(control, () -> {
+                if (control != null) control.assertNotCanceled();
+                return OpsNodeDeadlineContext.withDeadline(nodeDeadline, () -> handler.call(request));
+            });
         });
         long timeoutMillis = TimeUnit.SECONDS.toMillis(timeoutSeconds);
         long queueWaitBudgetMillis = OpsNodeDeadlineContext.remainingMillis(timeoutMillis * 2L);
         try {
-            if (!started.await(queueWaitBudgetMillis, TimeUnit.MILLISECONDS)) {
+            if (!OpsModelCallAwaiter.started(started, future, queueWaitBudgetMillis)) {
                 future.cancel(true);
                 IllegalStateException error = new IllegalStateException(
                         "MODEL_CALL_QUEUE_TIMEOUT: exceeded " + queueWaitBudgetMillis + "ms");
@@ -101,7 +110,7 @@ final class OpsAgentScopeModelCallInterceptor extends ModelInterceptor {
                         request, 0L, elapsedMs(queuedNanos), error.getMessage()));
                 throw error;
             }
-            ModelResponse response = future.get(executionTimeoutMillis, TimeUnit.MILLISECONDS);
+            ModelResponse response = OpsModelCallAwaiter.get(future, executionTimeoutMillis);
             long executionMs = elapsedMs(startedNanos.get());
             long queueWaitMs = nanosToMillis(startedNanos.get() - queuedNanos);
             if (isStreaming(response)) {
@@ -111,6 +120,12 @@ final class OpsAgentScopeModelCallInterceptor extends ModelInterceptor {
             record(event("MODEL_CALL_FINISHED", "SUCCEEDED", "AgentScope 模型调用完成。",
                     request, executionMs, queueWaitMs, null));
             return response;
+        } catch (OpsRunCanceledException error) {
+            future.cancel(true);
+            record(event("MODEL_CALL_CANCELLED", "CANCELED", "用户取消了模型调用。", request,
+                    startedNanos.get() == 0L ? 0L : elapsedMs(startedNanos.get()),
+                    elapsedMs(queuedNanos), "RUN_CANCELED"));
+            throw error;
         } catch (TimeoutException error) {
             future.cancel(true);
             IllegalStateException wrapped = new IllegalStateException(
@@ -150,8 +165,10 @@ final class OpsAgentScopeModelCallInterceptor extends ModelInterceptor {
             long streamTimeoutMillis) {
         Flux<?> source = (Flux<?>) response.getMessage();
         AtomicBoolean terminalRecorded = new AtomicBoolean();
-        Flux<?> guarded = source
-                .timeout(Duration.ofMillis(Math.max(1L, streamTimeoutMillis)))
+        Flux<?> cancellable = OpsModelCallAwaiter.cancellable(source);
+        Flux<?> guarded = cancellable
+                .takeUntilOther(reactor.core.publisher.Mono.delay(Duration.ofMillis(Math.max(1L, streamTimeoutMillis)))
+                        .flatMap(ignored -> reactor.core.publisher.Mono.error(new TimeoutException("MODEL_CALL_TIMEOUT"))))
                 .doOnComplete(() -> {
                     if (terminalRecorded.compareAndSet(false, true)) {
                         record(event("MODEL_CALL_FINISHED", "SUCCEEDED", "AgentScope 模型调用完成。",
@@ -161,7 +178,10 @@ final class OpsAgentScopeModelCallInterceptor extends ModelInterceptor {
                 .onErrorMap(error -> {
                     RuntimeException propagated = classifiedException(error);
                     if (terminalRecorded.compareAndSet(false, true)) {
-                        recordFailureEvent(request, startedNanos, queueWaitMs, propagated);
+                        if (propagated instanceof OpsRunCanceledException) {
+                            record(event("MODEL_CALL_CANCELLED", "CANCELED", "用户取消了模型调用。",
+                                    request, elapsedMs(startedNanos), queueWaitMs, "RUN_CANCELED"));
+                        } else recordFailureEvent(request, startedNanos, queueWaitMs, propagated);
                     }
                     return propagated;
                 });
@@ -183,6 +203,11 @@ final class OpsAgentScopeModelCallInterceptor extends ModelInterceptor {
             long startedNanos,
             long queueWaitMs,
             RuntimeException error) {
+        if (error instanceof OpsRunCanceledException) {
+            record(event("MODEL_CALL_CANCELLED", "CANCELED", "用户取消了模型调用。", request,
+                    elapsedMs(startedNanos), queueWaitMs, "RUN_CANCELED"));
+            return;
+        }
         OpsModelProviderFailureClassifier.Failure failure =
                 OpsModelProviderFailureClassifier.classify(error).orElse(null);
         String summary = failure == null

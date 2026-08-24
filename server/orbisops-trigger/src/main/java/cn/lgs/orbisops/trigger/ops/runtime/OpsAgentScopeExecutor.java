@@ -19,22 +19,20 @@ import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
-
 /** Orchestrates one AgentScope/ReAct execution across bounded runtime components. */
 @Slf4j
 final class OpsAgentScopeExecutor {
-
     private final OpsAgentScopeConfigPolicy configPolicy;
     private final OpsAgentScopeContextPreparer contextPreparer;
     private final OpsAgentScopePipelineFactory pipelineFactory;
     private final OpsAgentScopeOutputReader outputReader;
     private final OpsAgentScopeOutcomeEnvelope outcomeEnvelope;
-
+    private final OpsAgentScopeChangePackageFallback changePackageFallback;
     OpsAgentScopeExecutor(OpsRuntimeResourceAssembler resourceAssembler,
                           OpsNodeRagService nodeRagService,
                           OpsRuntimePromptAssembler promptAssembler,
                           Executor executor) {
-        this(resourceAssembler, nodeRagService, promptAssembler, executor, null, 240);
+        this(resourceAssembler, nodeRagService, promptAssembler, executor, null, 240, OpsMcpDiscoveryPolicy.defaults());
     }
 
     OpsAgentScopeExecutor(OpsRuntimeResourceAssembler resourceAssembler,
@@ -42,22 +40,17 @@ final class OpsAgentScopeExecutor {
                           OpsRuntimePromptAssembler promptAssembler,
                           Executor executor,
                           ExecutorService modelCallExecutor,
-                          int modelCallTimeoutSeconds) {
+                          int modelCallTimeoutSeconds, OpsMcpDiscoveryPolicy discoveryPolicy) {
         this.configPolicy = new OpsAgentScopeConfigPolicy();
         OpsAgentScopeFlowPolicy flowPolicy = new OpsAgentScopeFlowPolicy();
         this.contextPreparer = new OpsAgentScopeContextPreparer(
                 resourceAssembler, nodeRagService);
-        this.pipelineFactory = new OpsAgentScopePipelineFactory(
-                promptAssembler,
-                executor,
-                configPolicy,
-                flowPolicy,
-                modelCallExecutor,
-                modelCallTimeoutSeconds);
+        this.pipelineFactory = new OpsAgentScopePipelineFactory(promptAssembler, executor,
+                configPolicy, flowPolicy, modelCallExecutor, modelCallTimeoutSeconds, discoveryPolicy);
         this.outputReader = new OpsAgentScopeOutputReader();
         this.outcomeEnvelope = new OpsAgentScopeOutcomeEnvelope();
+        this.changePackageFallback = new OpsAgentScopeChangePackageFallback(outputReader);
     }
-
     String execute(OpsAgentDefinition definition,
                    OpsAgentChatRequest request,
                    String input,
@@ -100,14 +93,28 @@ final class OpsAgentScopeExecutor {
             int eventOffset = eventSize(events);
             int toolCallsBefore = toolCallStartedCount(events);
             boolean streamVisibleAnswer = pipeline.agents().size() == 1;
-            Optional<OverAllState> state = invokeFlow(
-                    flow,
-                    prepared.content(),
-                    request.getSessionId(),
-                    events,
-                    eventSink,
-                    streamVisibleAnswer);
+            Optional<OverAllState> state;
+            try {
+                state = invokeFlow(
+                        flow,
+                        prepared.content(),
+                        request.getSessionId(),
+                        events,
+                        eventSink,
+                        streamVisibleAnswer);
+            } catch (RuntimeException error) {
+                Optional<String> fallback = changePackageFallback.recoverFinalAnswerFailure(
+                        error, events, eventOffset, eventSink, pipeline.name());
+                if (fallback.isEmpty()) throw error;
+                record(events, eventSink, OpsRuntimeEvent.of(
+                        "REACT_FINISHED",
+                        "SUCCEEDED",
+                        "ReAct 工具流 " + pipeline.mode() + " 执行完成。"));
+                return fallback.get();
+            }
             String rawOutput = rawOutput(state, pipeline.outputKey());
+            rawOutput = changePackageFallback.recoverEmptyOutput(
+                    rawOutput, events, eventOffset, eventSink, pipeline.name()).orElse(rawOutput);
             if (OpsAgentOutputGuard.isTransportErrorEnvelope(rawOutput)
                     && toolCallStartedCount(events) == toolCallsBefore) {
                 record(events, eventSink, OpsRuntimeEvent.builder()
@@ -145,7 +152,8 @@ final class OpsAgentScopeExecutor {
                         .summary("ReAct 最终结构化 outcome 已解析。")
                         .payload(outcome)
                         .build());
-            } else if (outputReader.isMeaningfulText(rawOutput) && !evidenceBackedDegradation) {
+            } else if (outputReader.isMeaningfulText(rawOutput) && !evidenceBackedDegradation
+                    && !(configs.size() == 1 && OpsRuntimePromptAssembler.hasJsonOutputContract(configs.get(0).getOutputContract()))) {
                 record(events, eventSink, OpsRuntimeEvent.builder()
                         .eventType("REACT_OUTCOME_MISSING")
                         .nodeType("AGENTSCOPE_OUTCOME")

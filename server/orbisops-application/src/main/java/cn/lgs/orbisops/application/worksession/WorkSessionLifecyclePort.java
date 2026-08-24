@@ -15,6 +15,10 @@ public interface WorkSessionLifecyclePort<I, C, O, E> {
 
     O succeed(C context, Consumer<E> eventSink);
 
+    default boolean isSuspension(RuntimeException error) { return false; }
+
+    default O suspend(C context, RuntimeException error, Consumer<E> eventSink) { throw error; }
+
     boolean isCancellation(RuntimeException error);
 
     O cancel(C context, RuntimeException error, Consumer<E> eventSink);

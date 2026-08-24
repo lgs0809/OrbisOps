@@ -34,6 +34,7 @@ public class OpsSkillEvolutionInputAdapter implements SkillEvolutionTraceInputPo
                         event.eventType(),
                         event.status(),
                         event.summary(),
+                        contentOf(event.payload()),
                         event.payload()))
                 .toList();
     }
@@ -50,5 +51,11 @@ public class OpsSkillEvolutionInputAdapter implements SkillEvolutionTraceInputPo
 
     private String value(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private String contentOf(java.util.Map<String, Object> payload) {
+        if (payload == null) return "";
+        Object content = payload.get("content");
+        return content == null ? "" : String.valueOf(content);
     }
 }

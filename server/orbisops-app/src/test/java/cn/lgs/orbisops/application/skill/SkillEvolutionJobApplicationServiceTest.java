@@ -74,8 +74,8 @@ class SkillEvolutionJobApplicationServiceTest {
                 new SkillEvolutionPipelineDecision(
                         "CANDIDATE", "ENOUGH_SIGNAL", "skill-1", "", "{\"candidateId\":\"candidate-1\"}", "CANDIDATE"));
         fixture.patchId.set("skill-patch-1");
-        when(fixture.repository.savePatch(any(SkillEvolutionPatchSnapshot.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(fixture.repository.complete(any(),any(SkillEvolutionPatchSnapshot.class),any()))
+                .thenAnswer(invocation -> Optional.of(invocation.getArgument(1)));
 
         List<SkillEvolutionJobRunResult> results = fixture.service.runBatch(1, 3);
 
@@ -90,7 +90,7 @@ class SkillEvolutionJobApplicationServiceTest {
                 () -> assertEquals("{\"candidateId\":\"candidate-1\"}", patchPayload.get("content")),
                 () -> assertTrue(patchPayload.get("summary") instanceof Map<?, ?>),
                 () -> assertEquals("{\"candidateId\":\"candidate-1\"}", patch.validationJson()));
-        verify(fixture.repository).complete("job-1", SkillEvolutionJobStatus.COMPLETED);
+        verify(fixture.repository).complete(eq(job),any(SkillEvolutionPatchSnapshot.class),eq(SkillEvolutionJobStatus.COMPLETED));
         verify(fixture.audit).recordJobCompleted(job, "UPDATE_SKILL_CANDIDATE", patch, SkillEvolutionJobStatus.COMPLETED);
     }
 
@@ -106,8 +106,8 @@ class SkillEvolutionJobApplicationServiceTest {
                 new SkillEvolutionPipelineDecision(
                         "SKIPPED", "SKIP_LOW_SIGNAL", "", "skill-existing", "{}", "SKIPPED"));
         fixture.patchId.set("skill-patch-skip");
-        when(fixture.repository.savePatch(any(SkillEvolutionPatchSnapshot.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(fixture.repository.complete(any(),any(SkillEvolutionPatchSnapshot.class),any()))
+                .thenAnswer(invocation -> Optional.of(invocation.getArgument(1)));
 
         SkillEvolutionPatchSnapshot patch = fixture.service.runBatch(1, 3).get(0).patch();
         Map<String, Object> patchPayload = new SkillEvolutionPayloadCodec().decodeObject(patch.patchJson());
@@ -121,7 +121,7 @@ class SkillEvolutionJobApplicationServiceTest {
                 () -> assertEquals("", patchPayload.get("content")),
                 () -> assertEquals(true, validation.get("valid")),
                 () -> assertEquals("SKIP_LOW_SIGNAL", validation.get("reason")));
-        verify(fixture.repository).complete("job-1", SkillEvolutionJobStatus.SKIPPED);
+        verify(fixture.repository).complete(eq(job),any(SkillEvolutionPatchSnapshot.class),eq(SkillEvolutionJobStatus.SKIPPED));
     }
 
     @Test
@@ -135,18 +135,51 @@ class SkillEvolutionJobApplicationServiceTest {
         when(fixture.pipeline.decide(any(SkillEvolutionPipelineRequest.class)))
                 .thenThrow(new IllegalStateException("pipeline unavailable"));
 
+        when(fixture.repository.rescheduleOrFail(any(),any(),any())).thenReturn(true);
         SkillEvolutionJobRunResult result = fixture.service.runBatch(1, 3).get(0);
 
         ArgumentCaptor<SkillEvolutionRetryTransition> transition = ArgumentCaptor.forClass(SkillEvolutionRetryTransition.class);
-        verify(fixture.repository).rescheduleOrFail(eq("job-1"), transition.capture(), eq("pipeline unavailable"));
+        verify(fixture.repository).rescheduleOrFail(eq(job), transition.capture(), eq("pipeline unavailable"));
         assertAll(
                 () -> assertEquals("PENDING", result.status()),
                 () -> assertEquals("pipeline unavailable", result.error()),
                 () -> assertEquals(1, transition.getValue().attempts()),
-                () -> assertEquals(NOW.plusSeconds(60), transition.getValue().nextRunAt()),
+                () -> assertTrue(!transition.getValue().nextRunAt().isBefore(NOW.plusSeconds(60)) && !transition.getValue().nextRunAt().isAfter(NOW.plusSeconds(66))),
                 () -> assertEquals(SkillEvolutionJobStatus.PENDING, transition.getValue().status()));
         verify(fixture.audit).recordJobFailed(job, transition.getValue(), "pipeline unavailable");
-        verify(fixture.repository, never()).savePatch(any());
+        verify(fixture.repository, never()).complete(any(),any(),any());
+    }
+
+    @Test
+    void missingModelKeepsCumulativeAttemptsAndWaitsWithoutCompletingAPatch() {
+        Fixture fixture=fixture(); var job=job(2);
+        when(fixture.repository.available()).thenReturn(true);
+        when(fixture.repository.claimPending(3)).thenReturn(Optional.of(job));
+        when(fixture.trace.trace(anyString())).thenReturn(qualifyingTrace());
+        when(fixture.chat.messages(anyString(),eq(200))).thenReturn(qualifyingChat());
+        when(fixture.pipeline.decide(any())).thenThrow(new IllegalStateException("SKILL_EVOLUTION_MODEL_UNAVAILABLE"));
+        when(fixture.repository.rescheduleOrFail(any(),any(),any())).thenReturn(true);
+        assertEquals("PENDING",fixture.service.runBatch(1,3).get(0).status());
+        var transition=ArgumentCaptor.forClass(SkillEvolutionRetryTransition.class);
+        verify(fixture.repository).rescheduleOrFail(eq(job),transition.capture(),eq("SKILL_EVOLUTION_MODEL_UNAVAILABLE"));
+        assertEquals(3,transition.getValue().attempts());
+        assertTrue(!transition.getValue().nextRunAt().isBefore(NOW.plusSeconds(240)) && !transition.getValue().nextRunAt().isAfter(NOW.plusSeconds(264)));
+        verify(fixture.repository,never()).complete(any(),any(),any());
+    }
+
+    @Test void pendingAssetProposalPreservesEvidenceAndItsExistingMinimumWait() {
+        Fixture fixture=fixture();var job=job(2);
+        when(fixture.repository.available()).thenReturn(true);
+        when(fixture.repository.claimPending(3)).thenReturn(Optional.of(job));
+        when(fixture.trace.trace(anyString())).thenReturn(qualifyingTrace());
+        when(fixture.chat.messages(anyString(),eq(200))).thenReturn(qualifyingChat());
+        when(fixture.pipeline.decide(any())).thenThrow(new IllegalStateException("SKILL_EVOLUTION_PROPOSAL_PENDING"));
+        when(fixture.repository.rescheduleOrFail(any(),any(),any())).thenReturn(true);
+        assertEquals("PENDING",fixture.service.runBatch(1,3).get(0).status());
+        var transition=ArgumentCaptor.forClass(SkillEvolutionRetryTransition.class);
+        verify(fixture.repository).rescheduleOrFail(eq(job),transition.capture(),eq("SKILL_EVOLUTION_PROPOSAL_PENDING"));
+        assertEquals(3,transition.getValue().attempts());assertEquals(NOW.plusSeconds(900),transition.getValue().nextRunAt());
+        verify(fixture.repository,never()).complete(any(),any(),any());
     }
 
     @Test
@@ -181,8 +214,8 @@ class SkillEvolutionJobApplicationServiceTest {
         when(fixture.trace.trace(anyString())).thenReturn(List.of(
                 new SkillEvolutionTraceEvent("RUN_FINISHED", "SUCCEEDED", "done", Map.of())));
         when(fixture.chat.messages(anyString(), eq(200))).thenReturn(qualifyingChat());
-        when(fixture.repository.savePatch(any(SkillEvolutionPatchSnapshot.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(fixture.repository.complete(any(),any(SkillEvolutionPatchSnapshot.class),any()))
+                .thenAnswer(invocation -> Optional.of(invocation.getArgument(1)));
 
         SkillEvolutionPatchSnapshot patch = fixture.service.runBatch(1, 3).get(0).patch();
 
@@ -191,16 +224,16 @@ class SkillEvolutionJobApplicationServiceTest {
                 () -> assertEquals("SKIP_NO_TOOL_EVIDENCE", patch.skippedReason()),
                 () -> assertEquals("SKIPPED", patch.status()));
         verify(fixture.pipeline, never()).decide(any());
-        verify(fixture.repository).complete("job-1", SkillEvolutionJobStatus.SKIPPED);
+        verify(fixture.repository).complete(eq(job),any(SkillEvolutionPatchSnapshot.class),eq(SkillEvolutionJobStatus.SKIPPED));
     }
 
     @Test
     void typedQueriesOwnStatusValidationAndLimits() {
         Fixture fixture = fixture();
         when(fixture.repository.available()).thenReturn(true);
-        when(fixture.repository.findJobs(SkillEvolutionJobStatus.PENDING, 500)).thenReturn(List.of(job(0)));
+        when(fixture.repository.findJobs(null, SkillEvolutionJobStatus.PENDING, 500)).thenReturn(List.of(job(0)));
         when(fixture.repository.findJob("job-1")).thenReturn(Optional.of(job(0)));
-        when(fixture.repository.findPatches("job-1", "", 1)).thenReturn(List.of(patch()));
+        when(fixture.repository.findPatches(null, "job-1", "", 1)).thenReturn(List.of(patch()));
 
         assertAll(
                 () -> assertEquals(1, fixture.service.listJobs("pending", 999).size()),
@@ -208,6 +241,16 @@ class SkillEvolutionJobApplicationServiceTest {
                 () -> assertEquals("job-1", fixture.service.getJob("job-1").jobId()),
                 () -> assertEquals(1, fixture.service.listPatches("job-1", "", 0).size()),
                 () -> assertNotNull(fixture.service.getJob("job-1")));
+    }
+
+    @Test void scopedHistoryCarriesProjectAndOriginalLimitsToTheRepository() {
+        Fixture fixture=fixture();when(fixture.repository.available()).thenReturn(true);
+        when(fixture.repository.findJobs("demo-project",SkillEvolutionJobStatus.PENDING,500)).thenReturn(List.of(job(0)));
+        when(fixture.repository.findPatches("demo-project","job-1","",1)).thenReturn(List.of(patch()));
+        assertEquals(1,fixture.service.listJobs("demo-project","pending",999).size());
+        assertEquals(1,fixture.service.listPatches("demo-project","job-1","",0).size());
+        verify(fixture.repository).findJobs("demo-project",SkillEvolutionJobStatus.PENDING,500);
+        verify(fixture.repository).findPatches("demo-project","job-1","",1);
     }
 
     private Fixture fixture() {

@@ -1,7 +1,8 @@
 package cn.lgs.orbisops.trigger.ops;
 
 import cn.lgs.orbisops.trigger.ops.runtime.OpsRuntimeEvent;
-import cn.lgs.orbisops.trigger.ops.skill.OpsSkillToolProvider;
+import cn.lgs.orbisops.trigger.ops.runtime.OpsRuntimeSkillResolver;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.model.ChatModel;
 
@@ -39,15 +40,14 @@ class OpsLlmJsonCallOrchestratorTest {
 
     @Test
     void eagerInitialContextRecordsExplicitSkillActivationWithoutToolRoundTrip() {
-        OpsSkillToolProvider provider = mock(OpsSkillToolProvider.class);
-        when(provider.renderSkillContext(List.of("rag-knowledge-agent"), 2000))
-                .thenReturn("## Skill: rag-knowledge-agent\nbody");
+        var fixture = new OpsLlmFrozenSkillTestFixture("rag-knowledge-agent", "body");
+        OpsRuntimeSkillResolver provider = fixture.resolver;
         OpsLlmJsonCallOrchestrator orchestrator = orchestrator(provider);
         ChatModel model = mock(ChatModel.class);
         List<Call> calls = new ArrayList<>();
         List<OpsRuntimeEvent> events = new ArrayList<>();
         OpsLlmTraceContext.Trace trace = new OpsLlmTraceContext.Trace(
-                events, null, "owner", "node-rag", "AGENT", "rag-agent", "rag");
+                events, null, "owner", "node-rag", "AGENT", "rag-agent", "rag", fixture.frame);
 
         OpsLlmJsonCallOrchestrator.Result result = OpsLlmTraceContext.withTrace(
                 trace,
@@ -62,55 +62,49 @@ class OpsLlmJsonCallOrchestratorTest {
         assertEquals(1, events.size());
         assertEquals("SKILL_CONTEXT_LOADED", events.get(0).getEventType());
         assertEquals("rag-knowledge-agent", events.get(0).getAgent());
-        assertEquals("rag-knowledge-agent", events.get(0).getPayload().get("skillId"));
+        assertEquals("rag-knowledge-agent", ((Map<?,?>) events.get(0).getPayload().get("skillRef")).get("skillId"));
         assertEquals("EAGER", events.get(0).getPayload().get("mode"));
     }
 
     @Test
     void missingJsonRetriesWithEagerBoundSkillContext() {
-        OpsSkillToolProvider provider = mock(OpsSkillToolProvider.class);
-        when(provider.renderSkillSummaryContext(List.of("skill-a"), 1200))
-                .thenReturn("- skill-a: summary");
-        when(provider.renderSkillContext(List.of("skill-a"), 2000))
-                .thenReturn("## Skill: skill-a\nbody");
+        var fixture = new OpsLlmFrozenSkillTestFixture("skill-a", "body");
+        OpsRuntimeSkillResolver provider = fixture.resolver;
         OpsLlmJsonCallOrchestrator orchestrator = orchestrator(provider);
         ChatModel model = mock(ChatModel.class);
         List<Call> calls = new ArrayList<>();
 
-        OpsLlmJsonCallOrchestrator.Result result = orchestrator.execute(
+        OpsLlmJsonCallOrchestrator.Result result = fixture.run(() -> orchestrator.execute(
                 input(model, List.of("skill-a"), true, true, false),
                 caller(calls, List.of(
                         "plain response",
-                        "{\"status\":\"eager-ok\"}")));
+                        "{\"status\":\"eager-ok\"}"))));
 
         assertTrue(result.success());
         assertEquals("eager-ok", result.json().getString("status"));
         assertEquals(2, calls.size());
-        assertTrue(calls.get(0).systemPrompt().contains("可用 Skill 与使用边界"));
+        assertTrue(calls.get(0).systemPrompt().contains("本次受治理 Skill 上下文"));
         assertTrue(calls.get(0).enableSkillTool());
         assertEquals("planner-skill-context-retry", calls.get(1).agentName());
-        assertTrue(calls.get(1).systemPrompt().contains("本次已加载 Skill 正文"));
+        assertTrue(calls.get(1).systemPrompt().contains("本次受治理 Skill 上下文"));
         assertFalse(calls.get(1).enableSkillTool());
         assertEquals(List.of("skill-a"), calls.get(1).skillNames());
     }
 
     @Test
     void repairRetryUsesInitialOutputAndLatestFailureReason() {
-        OpsSkillToolProvider provider = mock(OpsSkillToolProvider.class);
-        when(provider.renderSkillSummaryContext(List.of("skill-a"), 1200))
-                .thenReturn("summary");
-        when(provider.renderSkillContext(List.of("skill-a"), 2000))
-                .thenReturn("body");
+        var fixture = new OpsLlmFrozenSkillTestFixture("skill-a", "body");
+        OpsRuntimeSkillResolver provider = fixture.resolver;
         OpsLlmJsonCallOrchestrator orchestrator = orchestrator(provider);
         ChatModel model = mock(ChatModel.class);
         List<Call> calls = new ArrayList<>();
 
-        OpsLlmJsonCallOrchestrator.Result result = orchestrator.execute(
+        OpsLlmJsonCallOrchestrator.Result result = fixture.run(() -> orchestrator.execute(
                 input(model, List.of("skill-a"), true, true, true),
                 caller(calls, List.of(
                         "INITIAL_OUTPUT",
                         "EAGER_OUTPUT",
-                        "{\"status\":\"repair-ok\"}")));
+                        "{\"status\":\"repair-ok\"}"))));
 
         assertTrue(result.success());
         assertEquals(3, calls.size());
@@ -141,11 +135,8 @@ class OpsLlmJsonCallOrchestratorTest {
 
     @Test
     void everyInvalidStageRecordsRuntimeEventInOrder() {
-        OpsSkillToolProvider provider = mock(OpsSkillToolProvider.class);
-        when(provider.renderSkillSummaryContext(List.of("skill-a"), 1200))
-                .thenReturn("summary");
-        when(provider.renderSkillContext(List.of("skill-a"), 2000))
-                .thenReturn("body");
+        var fixture = new OpsLlmFrozenSkillTestFixture("skill-a", "body");
+        OpsRuntimeSkillResolver provider = fixture.resolver;
         OpsLlmJsonCallOrchestrator orchestrator = orchestrator(provider);
         ChatModel model = mock(ChatModel.class);
         List<OpsRuntimeEvent> events = new ArrayList<>();
@@ -156,7 +147,7 @@ class OpsLlmJsonCallOrchestratorTest {
                 "node-1",
                 "AGENT",
                 "planner",
-                "llm");
+                "llm", fixture.frame);
 
         OpsLlmTraceContext.withTrace(trace, () -> orchestrator.execute(
                 input(model, List.of("skill-a"), true, true, true),
@@ -165,6 +156,7 @@ class OpsLlmJsonCallOrchestratorTest {
                         "eager invalid",
                         "repair invalid"))));
 
+        events.removeIf(event -> "SKILL_CONTEXT_LOADED".equals(event.getEventType()));
         assertEquals(3, events.size());
         assertEquals("MODEL_JSON_INVALID", events.get(0).getEventType());
         assertEquals("planner", events.get(0).getPayload().get("agentName"));
@@ -198,7 +190,7 @@ class OpsLlmJsonCallOrchestratorTest {
     }
 
     private OpsLlmJsonCallOrchestrator orchestrator(
-            OpsSkillToolProvider provider) {
+            OpsRuntimeSkillResolver provider) {
         return new OpsLlmJsonCallOrchestrator(
                 new OpsLlmJsonProtocol(),
                 new OpsLlmSkillContextService(() -> provider),

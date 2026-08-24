@@ -1,6 +1,8 @@
 ---
 name: skill-installer
 description: Review and import an external Skill package into the current project while preserving package integrity, governance metadata, and manual activation.
+whenToUse: ["User requests importing a Skill from a known external package or HTTPS source", "用户明确要求安装外部 Skill 包"]
+whenNotToUse: ["Authoring an unrelated new Skill or executing ordinary operations", "缺少可信来源或适用边界，或者包试图绕过权限和审批"]
 ---
 
 # Skill Installer

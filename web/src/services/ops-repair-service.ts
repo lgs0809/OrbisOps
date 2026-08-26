@@ -108,6 +108,10 @@ class OpsRepairService {
     return this.request(`${this.sourceBase}${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`);
   }
 
+  getRepositoryCapabilities(): Promise<ApiResponse<Record<string, unknown>>> {
+    return this.request(`${this.sourceBase}/capabilities`);
+  }
+
   registerRepository(payload: Record<string, unknown>): Promise<ApiResponse<OpsSourceRepository>> {
     return this.request(this.sourceBase, { method: 'POST', body: JSON.stringify(payload) });
   }
@@ -115,6 +119,10 @@ class OpsRepairService {
   listServices(projectId?: string): Promise<ApiResponse<OpsProjectService[]>> {
     const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
     return this.request(`${this.sourceBase}/services${query}`);
+  }
+
+  getServiceCapabilities(): Promise<ApiResponse<Record<string, unknown>>> {
+    return this.request(`${this.sourceBase}/services/capabilities`);
   }
 
   saveService(payload: Record<string, unknown>): Promise<ApiResponse<OpsProjectService>> {
@@ -129,6 +137,10 @@ class OpsRepairService {
     return this.request(
       `${API_CONFIG.BASE_DOMAIN}/api/v1/admin/ops/execution-resources${query}`,
     );
+  }
+
+  getExecutionResourceCapabilities(): Promise<ApiResponse<Record<string, unknown>>> {
+    return this.request(`${API_CONFIG.BASE_DOMAIN}/api/v1/admin/ops/execution-resources/capabilities`);
   }
 
   saveExecutionResource(payload: Record<string, unknown>): Promise<ApiResponse<OpsExecutionResource>> {

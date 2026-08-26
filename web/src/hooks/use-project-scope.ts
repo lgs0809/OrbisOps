@@ -35,14 +35,8 @@ interface AccessibleProjectSnapshot {
 }
 
 const loadAccessibleProjects = async (): Promise<AccessibleProjectSnapshot> => {
-  if (isAdminUser()) {
-    const response = await opsProjectService.snapshot();
-    return {
-      projects: response.data?.projects || [],
-      templates: response.data?.templates || [],
-    };
-  }
-  const response = await opsAdminService.listChatProjects();
+  // Scope selection needs permission-filtered identities, not every resource's readiness projection.
+  const response = await opsAdminService.listChatProjects(isAdminUser() ? 'admin' : 'user');
   return {
     projects: Array.isArray(response.data) ? response.data : [],
     templates: [],
@@ -63,19 +57,26 @@ export const ProjectScopeProvider: React.FC<PropsWithChildren> = ({ children }) 
     queryFn: loadAccessibleProjects,
     enabled: authenticated,
   });
+  const templateQuery = useQuery({
+    queryKey: ['project-scope-templates', roleScope, principalKey],
+    queryFn: async () => (await opsProjectService.templates()).data || [],
+    enabled: authenticated && roleScope === 'admin',
+  });
   const projects = authenticated ? (projectQuery.data?.projects || []) : [];
-  const templates = authenticated ? (projectQuery.data?.templates || []) : [];
+  const templates = authenticated && roleScope === 'admin' ? (templateQuery.data || []) : [];
 
   const fromUrl = requestedProjectId(location.search);
   const rememberedProjectId = readProjectContextId();
   const projectId = useMemo(() => {
-    if (!authenticated || projectQuery.isPending || projectQuery.isError || projects.length === 0) return '';
+    // A failed refetch preserves this principal's last validated identity for existing work.
+    // An initial failure has no catalog; a successful revocation removes the identity normally.
+    if (!authenticated || projectQuery.isPending || projects.length === 0) return '';
     if (fromUrl && projects.some((project) => project.projectId === fromUrl)) return fromUrl;
     if (rememberedProjectId && projects.some((project) => project.projectId === rememberedProjectId)) {
       return rememberedProjectId;
     }
     return projects[0]?.projectId || '';
-  }, [authenticated, fromUrl, projectQuery.isError, projectQuery.isPending, projects, rememberedProjectId]);
+  }, [authenticated, fromUrl, projectQuery.isPending, projects, rememberedProjectId]);
 
   const selectProject = useCallback((nextProjectId: string) => {
     writeProjectContextId(nextProjectId);

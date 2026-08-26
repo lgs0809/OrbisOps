@@ -1,27 +1,30 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Button, Modal, Select, Space, Spin, TabPane, Tabs, Tag, Toast, Typography } from '@douyinfe/semi-ui';
-import { IconBranch, IconFolder, IconRefresh, IconSetting } from '@douyinfe/semi-icons';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Button, Input, Modal, Select, Space, Spin, TabPane, Tabs, Tag, Toast, Typography } from '@douyinfe/semi-ui';
+import { IconBranch, IconFolder, IconPlus, IconRefresh, IconSetting } from '@douyinfe/semi-icons';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import styled from 'styled-components';
 
-import { OpsPageShell } from '../components/ops-layout';
+import { OpsPageShell, OpsWorkspaceFrame } from '../components/ops-layout';
 import {
+  type ProjectWorkspaceCapabilityData,
   useProjectWorkspaceCapabilitiesQuery,
+  useProjectWorkspaceSnapshotQuery,
   useProjectWorkspaceRuntimeQuery,
 } from '../features/projects/api/project-workspace-queries';
 import { useProjectScope } from '../hooks/use-project-scope';
 import { opsAdminService, type OpsAgentDefinition } from '../services/ops-admin-service';
-import { opsProjectService } from '../services/ops-project-service';
+import { opsProjectService, type OpsProjectWorkspace } from '../services/ops-project-service';
 import { theme } from '../styles/theme';
 import { userFacingError } from '../utils/user-facing-error';
+import { getStoredUserInfo, isAdminUser } from '../services/auth-session';
+import { ProjectSkillGovernancePanel } from '../features/projects/components/ProjectSkillGovernancePanel';
 
 const { Text } = Typography;
 const { Option } = Select;
 
-type ProjectView = 'overview' | 'resources' | 'capabilities' | 'members' | 'runtime';
+import { projectProductViewFor } from '../features/projects/model/project-product-navigation';
 
-const Workspace = styled.div`
-  height: 100dvh;
+const Workspace = styled(OpsWorkspaceFrame)`
   min-height: 0;
   display: grid;
   grid-template-columns: 238px minmax(0, 1fr);
@@ -34,9 +37,6 @@ const Workspace = styled.div`
     grid-template-columns: 1fr;
   }
 
-  @media (max-width: ${theme.breakpoints.md}) {
-    height: calc(100dvh - 52px);
-  }
 `;
 
 const ProjectRail = styled.aside`
@@ -47,7 +47,7 @@ const ProjectRail = styled.aside`
   border-right: 1px solid ${theme.colors.border.secondary};
 
   @media (max-width: 900px) {
-    max-height: 260px;
+    max-height: 176px;
     border-right: 0;
     border-bottom: 1px solid ${theme.colors.border.secondary};
   }
@@ -115,11 +115,11 @@ const ProjectButton = styled.button<{ $active: boolean }>`
     display: block;
     margin-top: 2px;
     color: ${theme.colors.text.tertiary};
-    font-size: 10px;
+    font-size: 12px;
   }
 `;
 
-const ProjectMain = styled.main`
+const ProjectMain = styled.section`
   min-width: 0;
   min-height: 0;
   overflow: auto;
@@ -146,7 +146,7 @@ const ProjectIdentity = styled.div`
     display: block;
     margin-bottom: 5px;
     color: ${theme.colors.text.tertiary};
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 650;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -198,7 +198,7 @@ const StatGrid = styled.div`
   gap: 10px;
 
   @media (max-width: ${theme.breakpoints.lg}) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  @media (max-width: ${theme.breakpoints.sm}) { grid-template-columns: 1fr; }
+  @media (max-width: ${theme.breakpoints.sm}) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 `;
 
 const Stat = styled.div`
@@ -208,9 +208,9 @@ const Stat = styled.div`
   border-radius: 11px;
   background: #fff;
 
-  .label { color: ${theme.colors.text.tertiary}; font-size: 10px; font-weight: 600; }
+  .label { color: ${theme.colors.text.tertiary}; font-size: 12px; font-weight: 600; }
   .value { display: block; margin-top: 7px; font-size: 24px; font-weight: 650; line-height: 1; }
-  .hint { display: block; margin-top: 7px; color: ${theme.colors.text.tertiary}; font-size: 10px; line-height: 1.5; }
+  .hint { display: block; margin-top: 7px; color: ${theme.colors.text.tertiary}; font-size: 12px; line-height: 1.5; }
 `;
 
 const OverviewLead = styled.section`
@@ -220,7 +220,7 @@ const OverviewLead = styled.section`
   background: #f7f8fa;
 
   strong { font-size: 13px; font-weight: 650; }
-  p { margin: 5px 0 0; color: ${theme.colors.text.tertiary}; font-size: 11px; line-height: 1.6; }
+  p { margin: 5px 0 0; color: ${theme.colors.text.tertiary}; font-size: 12px; line-height: 1.6; }
 `;
 
 const CapabilityGrid = styled.div`
@@ -295,23 +295,62 @@ const normalizedMember = (member: any) => ({
   memberRole: member.memberRole || member.member_role || 'MEMBER',
 });
 
-const roleLabel = (role: string) => role === 'OWNER' ? '负责人' : role === 'ADMIN' ? '项目管理员' : role === 'VIEWER' ? '只读成员' : '成员';
+const capabilityId = (item: any) => String(item?.skillId || item?.id || item?.name || '').trim();
+
+const effectiveProjectSkills = (
+  project: OpsProjectWorkspace,
+  capabilityData?: ProjectWorkspaceCapabilityData,
+) => {
+  const projected = [...(project.projectSkills || []), ...(project.enabledGlobalSkills || [])];
+  if (projected.length > 0) return projected;
+  return capabilityData?.projectSkills || [];
+};
+
+const projectRoleOptions = [
+  { value: 'OWNER', label: '负责人' },
+  { value: 'APPROVER', label: '审批人' },
+  { value: 'REVIEWER', label: '审核人' },
+  { value: 'OPERATOR', label: '操作员' },
+  { value: 'MAINTAINER', label: '维护者' },
+  { value: 'OPS_LEAD', label: '运维负责人' },
+  { value: 'ADMIN', label: '项目管理员' },
+  { value: 'BREAK_GLASS_ADMIN', label: '紧急管理员' },
+  { value: 'MEMBER', label: '成员' },
+  { value: 'VIEWER', label: '只读成员' },
+] as const;
+
+const roleLabel = (role: string) => projectRoleOptions.find((item) => item.value === role)?.label || '成员';
+
+const runtimeCount = (enabled: boolean | undefined, count: number) => {
+  if (enabled === false) return '未启用';
+  if (enabled === undefined) return '-';
+  return String(count);
+};
 
 export const ProjectProductWorkspacePage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const scope = useProjectScope();
-  const project = scope.selectedProject;
-  const projectId = project?.projectId || '';
+  const location = useLocation();
+  const snapshotQuery = useProjectWorkspaceSnapshotQuery();
+  const projectId = scope.projectId;
+  const project = snapshotQuery.data?.projects.find((item) => item.projectId === projectId);
+  const reloadProjects = async () => {
+    await scope.reloadProjects();
+    await snapshotQuery.refetch();
+  };
   const capabilitiesQuery = useProjectWorkspaceCapabilitiesQuery(projectId);
   const runtimeQuery = useProjectWorkspaceRuntimeQuery(projectId);
   const [workflows, setWorkflows] = useState<OpsAgentDefinition[]>([]);
   const [memberModalVisible, setMemberModalVisible] = useState(false);
   const [memberDrafts, setMemberDrafts] = useState<Array<{ userId: string; username: string; memberRole: string }>>([]);
   const [memberSaving, setMemberSaving] = useState(false);
+  const [createVisible, setCreateVisible] = useState(false);
+  const [createSaving, setCreateSaving] = useState(false);
+  const [projectName, setProjectName] = useState('');
+  const [projectKey, setProjectKey] = useState('');
 
-  const requestedView = searchParams.get('view') as ProjectView | null;
-  const view: ProjectView = ['overview', 'resources', 'capabilities', 'members', 'runtime'].includes(requestedView || '') ? requestedView as ProjectView : 'overview';
+  const view = projectProductViewFor(searchParams.get('view'), location.pathname);
 
   useEffect(() => {
     if (!projectId) { setWorkflows([]); return; }
@@ -324,6 +363,14 @@ export const ProjectProductWorkspacePage: React.FC = () => {
 
   const capabilityData = capabilitiesQuery.data;
   const runtimeData = runtimeQuery.data;
+  const projectSkills = useMemo(
+    () => effectiveProjectSkills(project || ({} as OpsProjectWorkspace), capabilityData),
+    [capabilityData, project],
+  );
+  const projectSkillCount = useMemo(
+    () => new Set(projectSkills.map(capabilityId).filter(Boolean)).size,
+    [projectSkills],
+  );
   const members = useMemo(() => (capabilityData?.members || []).map(normalizedMember), [capabilityData?.members]);
   const accounts = capabilityData?.accounts || [];
   const projectQuery = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
@@ -337,6 +384,33 @@ export const ProjectProductWorkspacePage: React.FC = () => {
   };
 
   const openMembers = () => { setMemberDrafts(members); setMemberModalVisible(true); };
+  const createProject = async () => {
+    if (!projectName.trim() || !/^[a-z][a-z0-9-]{2,63}$/.test(projectKey.trim())) {
+      Toast.error('请填写项目名称，以及 3–64 位小写字母、数字或连字符组成的项目标识（以字母开头）。');
+      return;
+    }
+    if (scope.projects.some((item) => item.projectId === projectKey.trim())) {
+      Toast.error('项目标识已存在，请使用其他标识。');
+      return;
+    }
+    setCreateSaving(true);
+    try {
+      const response = await opsProjectService.createProject({
+        name: projectName.trim(), projectId: projectKey.trim(), owner: getStoredUserInfo().username,
+        environments: ['dev', 'test'],
+      });
+      await reloadProjects();
+      if (response.data?.projectId) scope.selectProject(response.data.projectId);
+      setCreateVisible(false);
+      setProjectName('');
+      setProjectKey('');
+      Toast.success('项目已创建，可以配置资源和成员。');
+    } catch (error) {
+      Toast.error(userFacingError(error, '创建项目失败，请稍后重试。'));
+    } finally {
+      setCreateSaving(false);
+    }
+  };
   const addMember = (userId: string) => {
     const account = accounts.find((item) => item.userId === userId);
     if (!account || memberDrafts.some((member) => member.userId === userId)) return;
@@ -363,7 +437,10 @@ export const ProjectProductWorkspacePage: React.FC = () => {
         <ProjectRail>
           <RailHeader>
             <h1>项目</h1>
-            <Button theme="borderless" size="small" icon={<IconRefresh />} aria-label="刷新项目" onClick={() => void scope.reloadProjects()} />
+            <Space spacing={2}>
+              {isAdminUser() && <Button theme="borderless" size="small" icon={<IconPlus />} aria-label="创建项目" onClick={() => setCreateVisible(true)} />}
+              <Button theme="borderless" size="small" icon={<IconRefresh />} aria-label="刷新项目" onClick={() => void reloadProjects()} />
+            </Space>
           </RailHeader>
           <ProjectList>
             {scope.projects.map((item) => (
@@ -371,7 +448,7 @@ export const ProjectProductWorkspacePage: React.FC = () => {
                 <span className="icon"><IconFolder /></span>
                 <span>
                   <strong>{item.name}</strong>
-                  <span>{item.readyForInvestigation ? '可进行排查' : '配置未完成'}</span>
+                  <span>{snapshotQuery.isError ? '详情暂时不可用' : !snapshotQuery.data ? '正在读取详情…' : snapshotQuery.data.projects.find((entry) => entry.projectId === item.projectId)?.readyForInvestigation ? '可进行排查' : '配置未完成'}</span>
                 </span>
               </ProjectButton>
             ))}
@@ -380,9 +457,12 @@ export const ProjectProductWorkspacePage: React.FC = () => {
         </ProjectRail>
 
         <ProjectMain>
-          <Spin spinning={scope.loading || capabilitiesQuery.isFetching || runtimeQuery.isFetching}>
+          <Spin spinning={scope.loading || snapshotQuery.isFetching || capabilitiesQuery.isFetching || runtimeQuery.isFetching}>
             {!project ? (
-              <div style={{ padding: 32 }}><Text type="tertiary">选择一个项目查看资源与运行配置。</Text></div>
+              <div role={snapshotQuery.isError ? 'alert' : 'status'} style={{ padding: 32 }}>
+                <Text type="tertiary">{snapshotQuery.isError ? '项目详情暂时无法读取，请重试。' : snapshotQuery.isPending ? '正在读取项目详情…' : '选择一个项目查看资源与运行配置。'}</Text>
+                {snapshotQuery.isError && <Button onClick={() => void snapshotQuery.refetch()}>重新加载项目</Button>}
+              </div>
             ) : (
               <>
                 <ProjectHeader>
@@ -409,7 +489,7 @@ export const ProjectProductWorkspacePage: React.FC = () => {
                           {metric('资源', project.resourceCount || 0, '数据与服务资源')}
                           {metric('MCP 工具', project.generatedMcpCount || 0, '生成或接入的工具能力')}
                           {metric('成员', members.length, '项目内平台用户')}
-                          {metric('技能', project.skillIds?.length || 0, '智能执行可用技能')}
+                          {metric('技能', projectSkillCount, '智能执行可用技能')}
                           {metric('知识库', project.knowledgeBaseIds?.length || (project.knowledgeBaseId ? 1 : 0), '项目已授权知识库')}
                           {metric('已发布工作流', workflows.length, '可复用执行流程')}
                         </StatGrid>
@@ -433,7 +513,9 @@ export const ProjectProductWorkspacePage: React.FC = () => {
                           <CapabilityPanel><h3>默认助手</h3><Stack><Tag color={project.defaultAgentPublished ? 'green' : 'orange'}>{project.defaultAgentPublished ? '已就绪' : '未就绪'}</Tag><Text type="tertiary">{project.defaultAgentId ? 'Chat 默认使用它处理开放式问题和排查任务。' : '尚未配置默认助手。'}</Text></Stack></CapabilityPanel>
                           <CapabilityPanel><h3>工具 / MCP · {project.generatedMcpCount || 0}</h3><Text type="tertiary">Chat 和工作流在当前项目中可以调用的工具。</Text></CapabilityPanel>
                           <CapabilityPanel><h3>知识库 · {capabilityData?.knowledgeBases?.length || 0}</h3><Text type="tertiary" style={{ display: 'block', marginBottom: 8 }}>当前项目可检索的知识库。</Text><Space wrap>{(capabilityData?.knowledgeBases || []).map((item: any) => <Tag key={item.kbId || item.knowledgeBaseId || item.name}>{item.kbName || item.name || item.kbId}</Tag>)}</Space></CapabilityPanel>
-                          <CapabilityPanel><h3>技能 · {capabilityData?.projectSkills?.length || 0}</h3><Text type="tertiary" style={{ display: 'block', marginBottom: 8 }}>默认助手和工作流可以按需加载的技能。</Text><Space wrap>{(capabilityData?.projectSkills || []).map((item: any) => <Tag key={item.skillId || item.name}>{item.name || item.skillId}</Tag>)}</Space></CapabilityPanel>
+                          <CapabilityPanel><h3>技能 · {projectSkillCount}</h3><Text type="tertiary" style={{ display: 'block', marginBottom: 8 }}>默认助手和工作流可以按需加载的技能。</Text><Space wrap>{projectSkills.map((item: any) => <Tag key={capabilityId(item)}>{item.name || item.skillName || item.skillId}</Tag>)}</Space>
+                            {isAdminUser() && <ProjectSkillGovernancePanel key={projectId} projectId={projectId} onChanged={scope.reloadProjects} />}
+                          </CapabilityPanel>
                           <CapabilityPanel><h3>可用工作流 · {workflows.length}</h3><Text type="tertiary" style={{ display: 'block', marginBottom: 8 }}>可以从 Chat 或自动化入口启动的已发布工作流。</Text><Space wrap>{workflows.map((workflow: any) => <Tag key={workflow.agentId || workflow.id}>{workflow.name || workflow.agentName || workflow.agentId}</Tag>)}</Space></CapabilityPanel>
                         </CapabilityGrid>
                       </Body>
@@ -452,9 +534,24 @@ export const ProjectProductWorkspacePage: React.FC = () => {
                     <TabPane tab="运行配置" itemKey="runtime">
                       <Body>
                         <CapabilityGrid>
-                          <CapabilityPanel><h3>代码仓库 · {runtimeData?.repositories?.length || 0}</h3><Space wrap>{(runtimeData?.repositories || []).map((item: any) => <Tag key={item.repositoryId || item.id || item.name}>{item.name || item.repositoryId || item.path}</Tag>)}</Space></CapabilityPanel>
-                          <CapabilityPanel><h3>服务 · {runtimeData?.services?.length || 0}</h3><Space wrap>{(runtimeData?.services || []).map((item: any) => <Tag key={item.serviceId || item.id || item.name}>{item.name || item.serviceId}</Tag>)}</Space></CapabilityPanel>
-                          <CapabilityPanel><h3>执行目标 · {runtimeData?.executionResources?.length || 0}</h3><Space wrap>{(runtimeData?.executionResources || []).map((item: any) => <Tag key={item.resourceId || item.id || item.name}>{item.name || item.resourceId}</Tag>)}</Space></CapabilityPanel>
+                          <CapabilityPanel>
+                            <h3>代码仓库 · {runtimeCount(runtimeData?.availability?.repositories, runtimeData?.repositories?.length || 0)}</h3>
+                            {runtimeData?.availability?.repositories === false
+                              ? <Text type="tertiary">代码仓库能力当前未启用，启用后才会展示项目仓库。</Text>
+                              : <Space wrap>{(runtimeData?.repositories || []).map((item: any) => <Tag key={item.repositoryId || item.id || item.name}>{item.name || item.repositoryId || item.path}</Tag>)}</Space>}
+                          </CapabilityPanel>
+                          <CapabilityPanel>
+                            <h3>服务 · {runtimeCount(runtimeData?.availability?.services, runtimeData?.services?.length || 0)}</h3>
+                            {runtimeData?.availability?.services === false
+                              ? <Text type="tertiary">服务目录能力当前未启用，启用后才会展示项目服务。</Text>
+                              : <Space wrap>{(runtimeData?.services || []).map((item: any) => <Tag key={item.serviceId || item.id || item.name}>{item.name || item.serviceId}</Tag>)}</Space>}
+                          </CapabilityPanel>
+                          <CapabilityPanel>
+                            <h3>执行目标 · {runtimeCount(runtimeData?.availability?.executionResources, runtimeData?.executionResources?.length || 0)}</h3>
+                            {runtimeData?.availability?.executionResources === false
+                              ? <Text type="tertiary">执行目标能力当前未启用，生产操作仍需通过受控变更流程。</Text>
+                              : <Space wrap>{(runtimeData?.executionResources || []).map((item: any) => <Tag key={item.resourceId || item.id || item.name}>{item.name || item.resourceId}</Tag>)}</Space>}
+                          </CapabilityPanel>
                         </CapabilityGrid>
                         <OverviewLead style={{ marginTop: 14, marginBottom: 0 }}><Space><IconSetting /><div><strong>生产操作继续走受控变更</strong><p>运行配置只是能力清单；生产变更仍必须经过受控变更包、审批、落地与验证。</p></div></Space></OverviewLead>
                       </Body>
@@ -466,6 +563,15 @@ export const ProjectProductWorkspacePage: React.FC = () => {
           </Spin>
         </ProjectMain>
       </Workspace>
+
+      <Modal title="创建项目" visible={createVisible} confirmLoading={createSaving} okText="创建项目" cancelText="取消"
+        onOk={() => void createProject()} onCancel={() => setCreateVisible(false)}>
+        <Stack>
+          <label>项目名称<Input aria-label="项目名称" value={projectName} onChange={setProjectName} maxLength={80} /></label>
+          <label>项目标识<Input aria-label="项目标识" value={projectKey} onChange={setProjectKey} maxLength={64} placeholder="例如 order-service" /></label>
+          <Text type="tertiary">项目标识用于资源关联；创建后请在项目中配置资源、能力和成员。</Text>
+        </Stack>
+      </Modal>
 
       <Modal
         title="管理项目成员"
@@ -486,7 +592,7 @@ export const ProjectProductWorkspacePage: React.FC = () => {
             <MemberRow key={member.userId}>
               <div><Text strong>{member.username}</Text><div><Text type="tertiary">{member.userId}</Text></div></div>
               <Select value={member.memberRole} onChange={(value) => setMemberDrafts((current) => current.map((item) => item.userId === member.userId ? { ...item, memberRole: String(value || 'MEMBER') } : item))}>
-                <Option value="OWNER">负责人</Option><Option value="ADMIN">项目管理员</Option><Option value="MEMBER">成员</Option><Option value="VIEWER">只读成员</Option>
+                {projectRoleOptions.map((option) => <Option key={option.value} value={option.value}>{option.label}</Option>)}
               </Select>
               <Button type="danger" onClick={() => setMemberDrafts((current) => current.filter((item) => item.userId !== member.userId))}>移除</Button>
             </MemberRow>

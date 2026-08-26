@@ -1,3 +1,4 @@
+import { fulfillAccessibleProjects } from './fixtures/project-catalog';
 import { expect, test } from '@playwright/test';
 
 const response = (data: unknown) => JSON.stringify({ code: '0000', info: 'success', data });
@@ -12,15 +13,16 @@ const authenticateAdmin = async (page: import('@playwright/test').Page) => {
   });
 };
 
-const routeCommonBackend = async (page: import('@playwright/test').Page) => {
+const routeCommonBackend = async (page: import('@playwright/test').Page, projectName = 'Mobile Project') => {
   await page.route('http://127.0.0.1:8099/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
+    if (await fulfillAccessibleProjects(route, [{ projectId: 'mobile-project', name: projectName, defaultAgentId: 'default-react' }])) return;
     if (path.endsWith('/api/v1/admin/ops-projects/snapshot')) {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: response({
-          projects: [{ projectId: 'mobile-project', name: 'Mobile Project', defaultAgentId: 'default-react' }],
+          projects: [{ projectId: 'mobile-project', name: projectName, defaultAgentId: 'default-react' }],
           templates: [],
         }),
       });
@@ -115,8 +117,14 @@ test('820px tablet layout keeps navigation, provider cards, and compatibility ma
   await page.goto('/platform/integrations?projectId=mobile-project');
   const navigation = page.getByRole('complementary', { name: '应用导航' });
   await expect(navigation).toBeVisible();
-  await expect(page.getByRole('button', { name: '打开导航菜单' })).toHaveCount(0);
-  await expect.poll(async () => navigation.evaluate((element) => Math.round(element.getBoundingClientRect().width))).toBe(84);
+  const navigationToggle = page.getByRole('button', { name: '打开导航菜单' });
+  await expect(navigationToggle).toHaveAttribute('aria-expanded', 'false');
+  await expect.poll(async () => navigation.evaluate((element) => Math.round(element.getBoundingClientRect().width))).toBe(76);
+  await navigationToggle.click();
+  await expect(page.getByRole('button', { name: '收起导航菜单' })).toHaveAttribute('aria-expanded', 'true');
+  await expect.poll(async () => navigation.evaluate((element) => Math.round(element.getBoundingClientRect().width))).toBe(216);
+  await page.getByRole('button', { name: '收起导航菜单' }).click();
+  await expect.poll(async () => navigation.evaluate((element) => Math.round(element.getBoundingClientRect().width))).toBe(76);
   await expect(page.getByTestId('channel-compatibility-matrix')).toBeVisible();
   await expectNoDocumentOverflow(page);
 
@@ -124,3 +132,23 @@ test('820px tablet layout keeps navigation, provider cards, and compatibility ma
   const gridColumns = await providerGrid.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(' ').filter(Boolean).length);
   expect(gridColumns).toBe(2);
 });
+
+for (const width of [390, 820, 1280]) {
+  test(`${width}px project workspace preserves a long unbroken project name without clipping`, async ({ page }) => {
+    const name = '跨团队发布与故障处理_' + 'UnbrokenProjectIdentifier'.repeat(12);
+    await page.setViewportSize({ width, height: 844 });
+    await authenticateAdmin(page);
+    await routeCommonBackend(page, name);
+    await page.goto('/projects?projectId=mobile-project');
+    const heading = page.getByRole('heading', { name, exact: true });
+    await expect(heading).toHaveText(name);
+    const geometry = await heading.evaluate(element => ({
+      width: element.clientWidth, scroll: element.scrollWidth,
+      right: element.getBoundingClientRect().right,
+    }));
+    expect(geometry.scroll).toBeLessThanOrEqual(geometry.width + 1);
+    expect(geometry.right).toBeLessThanOrEqual(width + 1);
+    await expectNoDocumentOverflow(page);
+    await expect(page.getByRole('tab', { name: '概览', exact: true })).toBeVisible();
+  });
+}

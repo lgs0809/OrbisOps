@@ -1,11 +1,12 @@
 import React from 'react';
-import { Typography } from '@douyinfe/semi-ui';
+import { Tag, Typography } from '@douyinfe/semi-ui';
 import styled from 'styled-components';
 
-import { OpsAuthorityBadge, OpsRiskBadge, OpsStatusBadge } from '../../../components/ops-layout';
+import { OpsRiskBadge } from '../../../components/ops-layout';
 import type { OpsChangePackage } from '../../../services/ops-change-package-types';
 import { theme } from '../../../styles/theme';
 import { approvalCockpitView } from '../model/approval-cockpit-model';
+import { changePackageStatusColor, changePackageStatusLabel } from '../model/change-package-display';
 
 const { Text } = Typography;
 
@@ -43,11 +44,7 @@ export const ApprovalCockpit: React.FC<{ record: OpsChangePackage }> = ({ record
   return (
     <div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-        <OpsStatusBadge
-          status={record.status === 'REVIEWING' ? 'AWAITING_APPROVAL' : record.status === 'APPROVED' ? 'APPROVED' : record.status === 'LANDING' ? 'LANDING' : record.status === 'LANDED' ? 'VERIFIED' : 'PROPOSED_CHANGE'}
-          label={record.status}
-        />
-        <OpsAuthorityBadge authority={record.status === 'APPROVED' || record.status === 'LANDING' || record.status === 'LANDED' ? 'APPROVAL' : 'PREPARE_CHANGE'} />
+        <Tag color={changePackageStatusColor(record.status)}>{changePackageStatusLabel(record.status)}</Tag>
         <OpsRiskBadge level={view.risk} />
       </div>
       <Grid data-testid="approval-cockpit">

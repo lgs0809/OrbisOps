@@ -80,6 +80,13 @@ export const APP_ROUTES: readonly AppRouteMetadata[] = [
     navigation: { section: 'primary', label: '工作台', order: 30, icon: 'workbench' },
   },
   {
+    id: 'workbench-events',
+    path: '/workbench/events',
+    title: '事件中心',
+    roles: everyone,
+    breadcrumbs: ['工作台', '事件中心'],
+  },
+  {
     id: 'workflows',
     path: '/workflows',
     title: '工作流',

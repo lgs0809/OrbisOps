@@ -16,6 +16,8 @@ import {
 import { ChangePackageSummaryCard } from '../features/changes/components/ChangePackageSummaryCard';
 import { toChangePackageSummary } from '../features/changes/model/change-package-summary';
 import { IncidentWorkspaceTabs, type IncidentWorkspaceTab } from '../features/incidents/components/IncidentWorkspaceTabs';
+import { AlertCorrelationPanel } from '../features/incidents/components/AlertCorrelationPanel';
+import { incidentEpoch, incidentLocalTime } from '../features/incidents/incident-time';
 import { isAdminUser } from '../services/auth-session';
 import type {
   OpsIncident,
@@ -111,10 +113,10 @@ const timelineStatus = (item: OpsIncidentTimelineItem) => {
 const durationLabel = (item: OpsIncident) => {
   const started = item.firstSeenAt || item.createTime;
   if (!started) return '-';
-  const start = new Date(String(started).replace(' ', 'T')).getTime();
+  const start = incidentEpoch(started);
   if (!Number.isFinite(start)) return '-';
   const endRaw = ['RESOLVED', 'CLOSED'].includes(String(item.status || '').toUpperCase()) ? item.resolvedAt || item.updateTime : undefined;
-  const end = endRaw ? new Date(String(endRaw).replace(' ', 'T')).getTime() : Date.now();
+  const end = endRaw ? incidentEpoch(endRaw) : Date.now();
   if (!Number.isFinite(end) || end < start) return '-';
   const minutes = Math.floor((end - start) / 60000);
   if (minutes < 60) return `${minutes} 分钟`;
@@ -397,18 +399,19 @@ export const IncidentCenterPage: React.FC = () => {
     { title: '需要动作', width: 110, render: (_: unknown, item: OpsIncident) => String(item.status).toUpperCase() === 'ACTION_REQUIRED' ? <Tag color="orange">需要人工</Tag> : <Text type="tertiary">无需</Text> },
     { title: '来源', dataIndex: 'sourceType', width: 110, render: (value: string) => sourceLabel(value) },
     { title: '级别', dataIndex: 'severity', width: 100, render: (value: string) => value || '-' },
-    { title: '最近更新', dataIndex: 'updateTime', width: 180, render: (value: string) => value || '-' },
+    { title: '最近更新（本地时间）', dataIndex: 'updateTime', width: 180, render: (value: string) => incidentLocalTime(value) },
     { title: '', width: 90, render: (_: unknown, item: OpsIncident) => <Button theme="borderless" onClick={() => void openDetail(item.incidentId)}>查看</Button> },
   ];
 
   return (
-    <OpsPageShell selectedKey="incidents">
+    <OpsPageShell selectedKey="workbench">
       <OpsPageHeader
         title="事件中心"
         description="以 Incident → Diagnosis → Remediation 为主线查看真实证据、诊断结论、安全处置与恢复证明。"
-        extra={<Button onClick={() => { void projectScope.reloadProjects(); void incidentsQuery.refetch(); }}>刷新</Button>}
+        extra={<Space><Button onClick={() => navigate(`/workbench?projectId=${encodeURIComponent(projectId)}`)}>运行记录</Button><Button onClick={() => { void projectScope.reloadProjects(); void incidentsQuery.refetch(); }}>刷新</Button></Space>}
       />
 
+      {projectId && <AlertCorrelationPanel projectId={projectId} scope={incidentScope} onOpen={(id) => void openDetail(id)} />}
       <OpsSectionCard title="事件视图">
         <Paragraph type="tertiary">状态由后端事实聚合计算，页面不维护第二套事件状态机。</Paragraph>
         <Space wrap>
@@ -558,7 +561,7 @@ export const IncidentCenterPage: React.FC = () => {
                       status: timelineStatus(item),
                       title: timelineLabel(item),
                       description: item.detail || (item.refType && item.refId ? `${sourceLabel(item.refType)} ${item.refId}` : undefined),
-                      timestamp: item.createTime,
+                      timestamp: incidentLocalTime(item.createTime),
                     }))} /> : <Text type="tertiary">还没有 Timeline 事件。</Text>}
                   </OpsSectionCard>
                 )}
@@ -665,7 +668,7 @@ export const IncidentCenterPage: React.FC = () => {
                         </Space>
                       </FactCard>
                     ))}
-                    {!detail.relatedIncidents?.length && <Text type="tertiary">暂无相关事件。</Text>}
+                    {!detail.relatedIncidents?.length && <Text type="tertiary">暂无额外关联。自动归组结果见页面上方。</Text>}
                     <Space wrap>
                       <Select
                         value={relatedCandidate}
@@ -688,12 +691,14 @@ export const IncidentCenterPage: React.FC = () => {
                   <Paragraph type="tertiary">“查询是否成功”和“结果是否说明异常”是两件事；未查询、查询失败或没有业务判定时都不会显示成正常。</Paragraph>
                   {!!detail.diagnosis.sourceStatus.length ? <Stack>{detail.diagnosis.sourceStatus.map((source) => <FactCard key={source.sourceId}><Text strong>{source.sourceName || source.sourceId}</Text><div><Tag>查询 {source.queryStatus}</Tag> <Tag>判断 {source.assessment}</Tag></div>{source.detail && <Text type="tertiary">{source.detail}</Text>}</FactCard>)}</Stack> : <Text type="tertiary">当前诊断还没有结构化的数据源查询状态。</Text>}
                 </OpsSectionCard>
-                <OpsSectionCard title="Diagnosis Runs">
-                  <Paragraph type="tertiary">Incident 关联的诊断 Run 直接在工作区展示；无需打开 Advanced Trace 才知道执行了什么。</Paragraph>
+                <OpsSectionCard title="诊断运行记录">
+                  <Paragraph type="tertiary">打开关联运行，核对实际查询、工具回执与执行结果。</Paragraph>
                   {detail.runs.length ? <Stack>{detail.runs.map((run, index) => {
-                    const runId = String(run.runId || run.analysisId || `run-${index}`);
+                    const runId = String(run.runId || run.run_id || run.analysisId || '');
                     const status = String(run.status || run.runStatus || 'UNKNOWN');
-                    return <FactCard key={runId}><Text strong>{runId}</Text><div><Tag>{status}</Tag></div>{run.summary && <Text type="tertiary">{String(run.summary)}</Text>}</FactCard>;
+                    return <FactCard key={runId || index}><Text strong>{runId || '运行标识缺失'}</Text><div><Tag>{status}</Tag>
+                      <Button theme="borderless" disabled={!runId} onClick={() => navigate(`/workbench?projectId=${encodeURIComponent(detail.incident.projectId || projectId)}&runId=${encodeURIComponent(runId)}`)}>查看运行</Button>
+                    </div>{run.summary && <Text type="tertiary">{String(run.summary)}</Text>}</FactCard>;
                   })}</Stack> : <Text type="tertiary">当前 Incident 尚未关联诊断 Run。</Text>}
                 </OpsSectionCard>
                 </>}

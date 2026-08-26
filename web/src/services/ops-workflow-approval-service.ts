@@ -45,24 +45,26 @@ class OpsWorkflowApprovalService {
     runId: string,
     projectId: string,
     decision: 'APPROVE' | 'REJECT',
+    approvalId: string,
     scope: OpsWorkflowApprovalScope = 'admin',
   ): Promise<ApiResponse<OpsWorkflowApprovalView>> {
     const params = new URLSearchParams({ projectId });
     return await opsRequest<OpsWorkflowApprovalView>(
       `${this.baseUrl(scope)}/runs/${encodeURIComponent(runId)}/workflow-approval/decision?${params.toString()}`,
-      { method: 'POST', body: JSON.stringify({ decision }) },
+      { method: 'POST', body: JSON.stringify({ decision, approvalId }) },
     );
   }
 
   async retryResume(
     runId: string,
     projectId: string,
+    approvalId: string,
     scope: OpsWorkflowApprovalScope = 'admin',
   ): Promise<ApiResponse<OpsWorkflowApprovalView>> {
     const params = new URLSearchParams({ projectId });
     return await opsRequest<OpsWorkflowApprovalView>(
       `${this.baseUrl(scope)}/runs/${encodeURIComponent(runId)}/workflow-approval/resume?${params.toString()}`,
-      { method: 'POST' },
+      { method: 'POST', body: JSON.stringify({ approvalId }) },
     );
   }
 }

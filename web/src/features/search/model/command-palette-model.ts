@@ -116,3 +116,36 @@ export const filterCommandPaletteItems = (
     .slice(0, limit)
     .map(({ item }) => item);
 };
+
+/** Rebind a queued navigation at activation; browser history can commit before
+ * React finishes rendering the palette created under the previous project. */
+export const commandPaletteTarget = (
+  path: string,
+  requestedProjectId: string,
+  currentProjectId: string,
+  projects: readonly CommandPaletteProject[],
+): string => {
+  const permitted = (id: string) => Boolean(id && projects.some((project) => project.projectId === id));
+  const projectId = permitted(requestedProjectId) ? requestedProjectId : permitted(currentProjectId) ? currentProjectId : '';
+  const target = new URL(path, 'http://orbisops.local');
+  if (projectId) target.searchParams.set('projectId', projectId);
+  else target.searchParams.delete('projectId');
+  return `${target.pathname}${target.search}${target.hash}`;
+};
+
+export const commandPaletteDestination = (
+  item: CommandPaletteItem | undefined,
+  location: { pathname: string; search: string },
+  currentProjectId: string,
+  projects: readonly CommandPaletteProject[],
+): string | undefined => {
+  if (!item) return undefined;
+  if (item.kind === 'project') {
+    if (!item.projectId || !projects.some((project) => project.projectId === item.projectId)) return undefined;
+    const target = new URL(`${location.pathname}${location.search}`, 'http://orbisops.local');
+    target.searchParams.set('projectId', item.projectId);
+    return `${target.pathname}${target.search}`;
+  }
+  return item.path ? commandPaletteTarget(item.path, new URLSearchParams(location.search).get('projectId') || '',
+    currentProjectId, projects) : undefined;
+};

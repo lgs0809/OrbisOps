@@ -1,3 +1,4 @@
+import { fulfillAccessibleProjects } from './fixtures/project-catalog';
 import { expect, test } from '@playwright/test';
 
 const response = (data: unknown) => JSON.stringify({ code: '0000', info: 'success', data });
@@ -44,6 +45,7 @@ test('Change Center loads execution list first and detail proof streams only on 
   await page.route('http://127.0.0.1:8099/**', async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname;
+    if (await fulfillAccessibleProjects(route, [{ projectId: 'demo-project', name: 'Demo Project' }])) return;
     if (path === '/api/v1/admin/ops-projects/snapshot') {
       return route.fulfill({ status: 200, contentType: 'application/json', body: response({
         projects: [{ projectId: 'demo-project', name: 'Demo Project' }],
@@ -75,7 +77,7 @@ test('Change Center loads execution list first and detail proof streams only on 
 
   await page.goto('/changes?projectId=demo-project');
   await expect(page.getByRole('heading', { name: '变更', exact: true })).toBeVisible();
-  const row = page.getByRole('row').filter({ hasText: 'Restart checkout deployment after validation' });
+  const row = page.getByRole('row').filter({ hasText: 'Restore checkout availability' });
   await expect(row).toBeVisible();
   await expect.poll(() => listRequests).toBe(1);
   expect(detailRequests).toBe(0);
@@ -86,8 +88,9 @@ test('Change Center loads execution list first and detail proof streams only on 
   await expect.poll(() => detailRequests).toBe(1);
   await expect.poll(() => eventRequests).toBe(1);
   await expect.poll(() => landingOperationRequests).toBe(1);
-  await expect(page.getByText('审批工作台')).toBeVisible();
-  await expect(page.getByText('执行审批前校验')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '变更详情', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '审批工作台', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '执行审批前校验' })).toBeVisible();
 
   await page.keyboard.press('Escape');
   await row.getByRole('button', { name: '查看' }).click();

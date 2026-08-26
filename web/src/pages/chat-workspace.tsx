@@ -28,6 +28,7 @@ import {
   IconSetting,
 } from '@douyinfe/semi-icons';
 import { clearAuthSession, isAdminUser } from '../services/auth-session';
+import { serverLocalTime } from '../utils/server-time';
 
 import { Header, Sidebar, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from '../components/layout';
 import { theme } from '../styles/theme';
@@ -45,6 +46,9 @@ import { opsChangePackageService } from '../services/ops-change-package-service'
 import type { OpsChangePackage } from '../services/ops-change-package-types';
 import { restoreRuntimeEvents } from '../features/chat/chat-history';
 import { summarizeChatRun } from '../features/chat/chat-run-summary';
+import { sanitizeVisibleAnswer } from '../features/chat/live-run-trace';
+import { AssistantAnswer } from '../features/chat/AssistantAnswer';
+import { chatPreview } from '../features/chat/chat-presentation';
 
 const { Content } = Layout;
 const { Text, Title, Paragraph } = Typography;
@@ -400,7 +404,7 @@ const messageId = () => `msg_${Date.now()}_${Math.random().toString(36).slice(2,
 const toChatMessage = (message: OpsChatMessage): ChatMessage => ({
   id: message.messageId || messageId(),
   role: message.role === 'user' ? 'user' : message.role === 'system' ? 'system' : 'assistant',
-  content: message.content || '',
+  content: sanitizeVisibleAnswer(message.content),
   createdAt: message.createdAt || nowText(),
 });
 
@@ -580,11 +584,17 @@ export const ChatWorkspacePage: React.FC = () => {
     try {
       const response = await opsAdminService.listChatSessions({
         userId: userInfo?.username || 'web-user',
+        projectId: selectedProjectId || undefined,
         keyword: sessionSearch.trim() || undefined,
         favorite: favoritesOnly ? true : undefined,
         limit: 80,
       });
-      setSessions((response.data || []).filter((session) => !selectedProjectId || session.projectId === selectedProjectId));
+      setSessions((response.data || [])
+        .filter((session) => !selectedProjectId || session.projectId === selectedProjectId)
+        .map((session) => ({
+          ...session,
+          lastMessage: sanitizeVisibleAnswer(session.lastMessage),
+        })));
       setVisibleSessionCount(20);
     } catch (error) {
       Toast.error('加载会话列表失败');
@@ -1007,7 +1017,10 @@ export const ChatWorkspacePage: React.FC = () => {
           } else if (event.eventType === 'THINKING' && event.content) {
             appendAssistant(assistantId, (message) => ({ ...message, thinking: `${message.thinking || ''}${event.content}` }));
           } else if (event.eventType === 'FINAL_OUTPUT' && event.content) {
-            appendAssistant(assistantId, { content: event.content });
+            appendAssistant(assistantId, (message) => ({
+              ...message,
+              content: sanitizeVisibleAnswer(event.content) || message.content,
+            }));
           } else if (event.eventType === 'RAG_RETRIEVE') {
             const sources = Array.isArray(event.payload?.sources) ? (event.payload?.sources as RagSource[]) : [];
             if (sources.length) {
@@ -1193,7 +1206,9 @@ export const ChatWorkspacePage: React.FC = () => {
             思考：{message.thinking}
           </Paragraph>
         )}
-        {message.content || (message.role === 'assistant' ? '正在生成...' : '')}
+        {message.role === 'assistant' && message.content
+          ? <AssistantAnswer text={message.content} />
+          : message.content || (message.role === 'assistant' ? '正在生成...' : '')}
         {!!message.sources?.length && (
           <SourceBox>
             <SourceHeader>
@@ -1357,7 +1372,7 @@ export const ChatWorkspacePage: React.FC = () => {
                             {session.lastActiveAt || session.createdAt || '-'}
                           </Text>
                           <Text type="tertiary" size="small" ellipsis={{ showTooltip: true }}>
-                            {session.lastMessage || `${session.messageCount || 0} 条消息`}
+                            {chatPreview(session.lastMessage) || `${session.messageCount || 0} 条消息`}
                           </Text>
                           <Space>
                             <Tag color={session.metadata?.executionType === 'WORKFLOW' ? 'purple' : 'blue'}>
@@ -1513,7 +1528,7 @@ export const ChatWorkspacePage: React.FC = () => {
                                   <EventPayload>{traceDetail}</EventPayload>
                                 </TraceDetails>
                               )}
-                              {event.timestamp && <Text type="tertiary" size="small">{event.timestamp}</Text>}
+                              {event.timestamp && <Text type="tertiary" size="small">{serverLocalTime(event.timestamp)}</Text>}
                             </Space>
                           </EventItem>
                         );

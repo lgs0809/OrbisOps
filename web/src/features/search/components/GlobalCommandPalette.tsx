@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { Button, Empty, Input, Modal, Tag, Typography } from '@douyinfe/semi-ui';
 import { IconSearch } from '@douyinfe/semi-icons';
 import { useNavigate } from 'react-router-dom';
@@ -6,10 +6,12 @@ import styled from 'styled-components';
 
 import { APP_ROUTES, type AppRouteRole } from '../../../app/navigation/route-metadata';
 import { useProjectScope } from '../../../hooks/use-project-scope';
-import { currentUserRole } from '../../../services/auth-session';
+import { currentUserRole, isAuthenticated } from '../../../services/auth-session';
 import { theme } from '../../../styles/theme';
+import { writeProjectContextId } from '../../../utils/project-context';
 import {
   buildCommandPaletteItems,
+  commandPaletteDestination,
   filterCommandPaletteItems,
   type CommandPaletteItem,
 } from '../model/command-palette-model';
@@ -17,30 +19,53 @@ import {
 const { Text } = Typography;
 
 const Trigger = styled(Button)<{ $compact?: boolean }>`
-  min-width: ${(props) => (props.$compact ? '38px' : '190px')};
-  width: ${(props) => (props.$compact ? '38px' : 'auto')};
-  height: ${(props) => (props.$compact ? '38px' : 'auto')};
-  padding: ${(props) => (props.$compact ? '0' : undefined)};
+  min-width: ${(props) => (props.$compact ? '64px' : '190px')};
+  width: ${(props) => (props.$compact ? '64px' : 'auto')};
+  height: ${(props) => (props.$compact ? '48px' : 'auto')};
+  padding: ${(props) => (props.$compact ? '4px 2px' : undefined)};
+  flex-direction: ${(props) => (props.$compact ? 'column' : 'row')};
+  gap: ${(props) => (props.$compact ? '3px' : '8px')};
   justify-content: ${(props) => (props.$compact ? 'center' : 'space-between')};
   border: 1px solid ${theme.colors.border.primary};
   color: ${theme.colors.text.secondary};
   background: ${(props) => (props.$compact ? 'transparent' : theme.colors.bg.secondary)};
+  border-radius: ${(props) => (props.$compact ? '11px' : undefined)};
 
-  ${(props) => props.$compact ? `
-    .command-search-label,
+  .command-search-label {
+    display: ${(props) => (props.$compact ? 'block' : 'inline')};
+    font-size: ${(props) => (props.$compact ? '10px' : undefined)};
+    line-height: ${(props) => (props.$compact ? '1' : undefined)};
+  }
+
+  .command-search-shortcut {
+    display: ${(props) => (props.$compact ? 'none' : 'inline')};
+  }
+
+  &:hover {
+    background: ${(props) => (props.$compact ? '#ecefed' : theme.colors.bg.tertiary)};
+  }
+
+  @media (max-width: ${theme.breakpoints.lg}) {
+    min-width: ${(props) => (props.$compact ? '64px' : '38px')};
+    width: ${(props) => (props.$compact ? '64px' : '38px')};
+    padding: ${(props) => (props.$compact ? '4px 2px' : '0')};
+
     .command-search-shortcut {
       display: none;
     }
-  ` : ''}
+  }
 
-  @media (max-width: ${theme.breakpoints.lg}) {
-    min-width: 38px;
-    width: 38px;
-    padding: 0;
+  @media (max-width: ${theme.breakpoints.md}) {
+    min-width: ${(props) => (props.$compact ? '0' : '38px')};
+    width: ${(props) => (props.$compact ? '100%' : '38px')};
+    height: ${(props) => (props.$compact ? '40px' : '38px')};
+    flex-direction: row;
+    gap: ${(props) => (props.$compact ? '10px' : '8px')};
+    justify-content: ${(props) => (props.$compact ? 'flex-start' : 'center')};
+    padding: ${(props) => (props.$compact ? '0 11px' : '0')};
 
-    .command-search-label,
-    .command-search-shortcut {
-      display: none;
+    .command-search-label {
+      font-size: ${(props) => (props.$compact ? '12px' : undefined)};
     }
   }
 `;
@@ -103,19 +128,18 @@ const kindLabel: Record<CommandPaletteItem['kind'], string> = {
 
 const roleForPalette = (): AppRouteRole => currentUserRole() === 'admin' ? 'admin' : 'user';
 
-const withProjectContext = (path: string, projectId: string): string => {
-  if (!projectId || path.includes('projectId=')) return path;
-  const separator = path.includes('?') ? '&' : '?';
-  return `${path}${separator}projectId=${encodeURIComponent(projectId)}`;
-};
+const CommandPaletteContext = createContext<(() => void) | null>(null);
 
-export const GlobalCommandPalette: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
+// The controller belongs above the routed page's Suspense boundary. A trigger
+// clicked during lazy navigation must not disappear with the outgoing Sidebar.
+export const GlobalCommandPaletteProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const navigate = useNavigate();
   const projectScope = useProjectScope();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const role = roleForPalette();
+  const authenticated = isAuthenticated();
 
   const items = useMemo(() => buildCommandPaletteItems(
     APP_ROUTES,
@@ -127,7 +151,12 @@ export const GlobalCommandPalette: React.FC<{ compact?: boolean }> = ({ compact 
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      const key = event.key.toLowerCase();
+      if (!authenticated) return;
+      // KeyboardEvent.key is normally a string, but browser automation and
+      // IME composition can emit a partially populated event. Normalize at
+      // this boundary so the global command palette never crashes the page
+      // while handling an otherwise unrelated key event.
+      const key = String(event.key || '').toLowerCase();
       const macShortcut = event.metaKey && !event.ctrlKey && key === 'k';
       const nonMacShortcut = event.ctrlKey && event.shiftKey && key === 'k';
       if (macShortcut || nonMacShortcut) {
@@ -137,7 +166,7 @@ export const GlobalCommandPalette: React.FC<{ compact?: boolean }> = ({ compact 
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+  }, [authenticated]);
 
   useEffect(() => {
     setActiveIndex(0);
@@ -150,33 +179,24 @@ export const GlobalCommandPalette: React.FC<{ compact?: boolean }> = ({ compact 
   };
 
   const execute = (item?: CommandPaletteItem) => {
-    if (!item) return;
-    if (item.kind === 'project' && item.projectId) {
-      projectScope.selectProject(item.projectId);
-      close();
-      return;
-    }
-    if (item.path) {
-      navigate(item.kind === 'route' ? withProjectContext(item.path, projectScope.projectId) : item.path);
-      close();
-    }
+    // BrowserRouter commits history before all React/Modal callbacks settle.
+    // Rebind every command to one activation-time URL plus the authorized catalog.
+    const target = commandPaletteDestination(item, window.location, projectScope.projectId, projectScope.projects);
+    if (!item || !target) return;
+    if (item.kind === 'project') writeProjectContextId(item.projectId);
+    navigate(target, { replace: item.kind === 'project' });
+    close();
   };
 
   return (
-    <>
-      <Trigger
-        $compact={compact}
-        icon={<IconSearch />}
-        theme="light"
-        aria-label="打开全局搜索"
-        onClick={() => setOpen(true)}
-      >
-        <span className="command-search-label">搜索</span>
-        <Text className="command-search-shortcut" type="tertiary" size="small">⌘K / Ctrl⇧K</Text>
-      </Trigger>
+    <CommandPaletteContext.Provider value={() => { if (authenticated) setOpen(true); }}>
+      {children}
       <Modal
-        title="搜索 OrbisOps"
-        visible={open}
+        title="快速查找 OrbisOps"
+        visible={authenticated && open}
+        // Dispatching navigation must remove the old mask immediately so the
+        // next page's search trigger cannot be intercepted by its exit animation.
+        motion={false}
         footer={null}
         width={680}
         style={{ maxWidth: 'calc(100vw - 24px)' }}
@@ -188,7 +208,7 @@ export const GlobalCommandPalette: React.FC<{ compact?: boolean }> = ({ compact 
           prefix={<IconSearch />}
           value={query}
           aria-label="搜索页面、操作和 Project"
-          placeholder="搜索页面、操作和 Project..."
+          placeholder="搜索页面、操作或 Project"
           onChange={setQuery}
           onKeyDown={(event) => {
             if (event.key === 'ArrowDown') {
@@ -224,10 +244,32 @@ export const GlobalCommandPalette: React.FC<{ compact?: boolean }> = ({ compact 
             </ResultButton>
           ))}
         </Results>
+        <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 10 }}>
+          用来跳转页面、切换 Project 和打开常用操作；不会搜索历史对话。
+        </Text>
         <Text type="tertiary" size="small" style={{ display: 'block', marginTop: 12 }}>
           ↑↓ 选择 · Enter 打开 · Esc 关闭
         </Text>
       </Modal>
-    </>
+    </CommandPaletteContext.Provider>
+  );
+};
+
+export const GlobalCommandPalette: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
+  const open = useContext(CommandPaletteContext);
+  if (!open) throw new Error('GlobalCommandPalette must be used inside GlobalCommandPaletteProvider');
+  return (
+    <Trigger
+      $compact={compact}
+      icon={<IconSearch />}
+      theme="light"
+      aria-label="打开全局搜索"
+      aria-keyshortcuts="Meta+K Control+Shift+K"
+      title="快速查找（⌘K / Ctrl⇧K）"
+      onClick={open}
+    >
+      <span className="command-search-label">快速查找</span>
+      <Text className="command-search-shortcut" type="tertiary" size="small">⌘K / Ctrl⇧K</Text>
+    </Trigger>
   );
 };

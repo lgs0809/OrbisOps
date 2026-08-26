@@ -1,3 +1,4 @@
+import { fulfillAccessibleProjects } from './fixtures/project-catalog';
 import { expect, test, type Page } from '@playwright/test';
 
 const response = (data: unknown) => JSON.stringify({ code: '0000', info: 'success', data });
@@ -15,6 +16,32 @@ const authenticateAdmin = async (page: Page) => {
 const mockProjectApis = async (page: Page) => {
   await page.route('http://127.0.0.1:8099/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
+    if (await fulfillAccessibleProjects(route, [{
+            projectId: 'demo-project',
+            name: 'Demo Project',
+            description: 'Phase 2 browser acceptance',
+            owner: 'e2e-admin',
+            environments: ['dev', 'prod'],
+            knowledgeBaseId: 'kb-demo',
+            defaultAgentId: 'default-react',
+            skillIds: [],
+            sharedMcpIds: [],
+            resources: [],
+            generatedMcps: [],
+            resourceCount: 0,
+            generatedMcpCount: 0,
+            executionResourceCount: 0,
+            readyForInvestigation: false,
+            defaultAgentPublished: true,
+            readinessReason: 'NO_RESOURCE_CONNECTED',
+            diagnosisReadiness: { ready: false, checks: [], missing: ['resource'], nextAction: 'CONNECT_RESOURCE' },
+            remediationReadiness: { ready: false, checks: [], missing: ['executionTarget'], nextAction: 'CONNECT_EXECUTION_TARGET' },
+            onboarding: [
+              { key: 'agent', label: '默认 Agent', completed: true },
+              { key: 'resource', label: '证据来源', completed: false },
+            ],
+            diagnosticScenarios: [],
+          }])) return;
     if (path.endsWith('/api/v1/admin/ops-projects/snapshot')) {
       return route.fulfill({
         status: 200,

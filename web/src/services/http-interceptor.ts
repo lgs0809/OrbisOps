@@ -1,5 +1,7 @@
 import { API_CONFIG } from '../config/api';
 import { clearAuthSession } from './auth-session';
+import type { OpsRequestInit } from './ops-http-client';
+import { ApiTimeoutError } from './ops-http-client';
 
 let installed = false;
 const TRACE_HEADER = 'X-Trace-Id';
@@ -24,10 +26,13 @@ export const installHttpInterceptor = () => {
   installed = true;
   installFetchFallback();
   const nativeFetch = window.fetch.bind(window);
-  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+  window.fetch = async (input: RequestInfo | URL, init?: OpsRequestInit) => {
     const controller = new AbortController();
     const isStream = acceptsEventStream(init?.headers);
-    const timeout = isStream ? 0 : API_CONFIG.TIMEOUT;
+    const { requestTimeoutMs, ...requestInit } = init || {};
+    // Respect the server's bounded operation contract; the timer's native limit is the only cap.
+    const timeout = isStream ? 0 : typeof requestTimeoutMs === 'number' && Number.isSafeInteger(requestTimeoutMs)
+      && requestTimeoutMs > 0 && requestTimeoutMs <= 2147483647 ? requestTimeoutMs : API_CONFIG.TIMEOUT;
     let timer: number | undefined;
     let abortListener: (() => void) | undefined;
     if (init?.signal) {
@@ -43,15 +48,16 @@ export const installHttpInterceptor = () => {
     }
     let response: Response;
     const headers = withTraceHeader(input, init?.headers);
+    const requestAuthorization = new Headers(headers).get('Authorization');
     try {
       response = await nativeFetch(input, {
-        ...init,
+        ...requestInit,
         headers,
         signal: controller.signal,
       });
     } catch (error) {
       if ((error as Error)?.name === 'AbortError' || (error as Error)?.name === 'TimeoutError') {
-        throw new Error('请求超时，请检查网络连接或服务状态。');
+        throw new ApiTimeoutError();
       }
       throw error;
     } finally {
@@ -63,7 +69,9 @@ export const installHttpInterceptor = () => {
       }
     }
     const url = requestUrl(input);
-    if (response.status === 401 && !url.includes('/admin-user/login')) {
+    const currentToken = localStorage.getItem('token');
+    const belongsToCurrentSession = requestAuthorization === (currentToken ? `Bearer ${currentToken}` : null);
+    if (response.status === 401 && !url.includes('/admin-user/login') && belongsToCurrentSession) {
       clearAuthSession();
       if (!window.location.pathname.includes('/login')) {
         window.location.href = '/login';

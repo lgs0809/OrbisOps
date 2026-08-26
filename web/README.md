@@ -4,7 +4,7 @@ Browser console for OrbisOps.
 
 ## Requirements
 
-- Node.js 20+
+- Node.js 24
 - npm 10+
 - an OrbisOps backend for interactive use
 

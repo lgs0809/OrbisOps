@@ -1,9 +1,9 @@
-FROM node:20-alpine AS deps
+FROM node:24-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -16,6 +16,7 @@ WORKDIR /usr/share/nginx/html
 RUN rm -rf ./*
 COPY --from=builder /app/dist ./
 COPY nginx.docker.conf /etc/nginx/templates/default.conf.template
+COPY --chmod=755 15-model-response-timeout.envsh /docker-entrypoint.d/15-model-response-timeout.envsh
 
 ENV ORBISOPS_BACKEND_UPSTREAM=http://backend:8099
 EXPOSE 3002

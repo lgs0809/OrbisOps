@@ -20,8 +20,26 @@ describe('change package summary', () => {
     expect(summary.title).toBe('Restart payment service');
     expect(summary.statusLabel).toBe('等待审批');
     expect(summary.riskLabel).toBe('高');
-    expect(summary.reasonLabel).toBe('校验通过，可以提交审批');
+    expect(summary.reasonCode).toBeUndefined();
+    expect(summary.statusHint).toContain('等待审批');
     expect(summary.incidentId).toBe('inc-1');
+  });
+
+  it('keeps the user objective as the list title and falls back when it is blank', () => {
+    const source = { packageId: 'cp-title', status: 'DRAFT', version: 1,
+      objective: '核对订单服务', summary: '完整执行报告和验证证据' };
+    expect(toChangePackageSummary(source).title).toBe('核对订单服务');
+    expect(toChangePackageSummary({ ...source, objective: '  ' }).title).toBe(source.summary);
+  });
+
+  it('shows the actual failure instead of an earlier validation success', () => {
+    const summary = toChangePackageSummary({packageId: 'failed', status: 'LANDING_FAILED', version: 1,
+      reasonCode: 'READY_FOR_REVIEW'});
+    expect(summary.reasonCode).toBeUndefined();
+    expect(summary.statusHint).toContain('Landing 失败');
+    const withFailure = toChangePackageSummary({packageId: 'failed', status: 'LANDING_FAILED', version: 1,
+      reasonCode: 'LANDING_POST_CHECK_FAILED'});
+    expect(withFailure.statusHint).toContain('Verification 失败');
   });
 
   it('supports incident change refs without inventing missing fields', () => {

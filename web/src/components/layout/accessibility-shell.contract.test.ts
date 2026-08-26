@@ -20,7 +20,7 @@ describe('global accessibility shell contract', () => {
 
   it('keeps reduced-motion fallbacks for global shell transitions', () => {
     const shell = readFileSync(resolve(process.cwd(), 'src/components/ops-layout/OpsPageShell.tsx'), 'utf8');
-    const sidebar = readFileSync(resolve(process.cwd(), 'src/components/layout/Sidebar.tsx'), 'utf8');
+    const sidebar = readFileSync(resolve(process.cwd(), 'src/components/layout/Sidebar.styles.ts'), 'utf8');
 
     expect(shell).toContain('@media (prefers-reduced-motion: reduce)');
     expect(sidebar).toContain('@media (prefers-reduced-motion: reduce)');

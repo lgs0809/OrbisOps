@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { APP_ROUTES } from '../../../app/navigation/route-metadata';
-import { buildCommandPaletteItems, filterCommandPaletteItems } from './command-palette-model';
+import { buildCommandPaletteItems, commandPaletteDestination, commandPaletteTarget, filterCommandPaletteItems } from './command-palette-model';
 
 describe('global command palette model', () => {
   it('uses route metadata as the navigation source of truth and respects roles', () => {
@@ -36,4 +36,28 @@ describe('global command palette model', () => {
     expect(filterCommandPaletteItems(items, 'mcp').some((item) => item.id === 'route:tools')).toBe(true);
     expect(filterCommandPaletteItems(items, 'channel-management')[0]?.id).toBe('route:channels');
   });
+});
+
+it('rebinds stale search actions to the current authorized browser project without losing other route parameters', () => {
+  expect(commandPaletteTarget('/projects?projectId=payments&view=runtime', 'orders', 'payments', [
+    { projectId: 'payments', name: 'Payments' }, { projectId: 'orders', name: 'Orders' },
+  ])).toBe('/projects?projectId=orders&view=runtime');
+});
+it('does not propagate an inaccessible browser or stale action project into navigation', () => {
+  expect(commandPaletteTarget('/chat?projectId=foreign', 'foreign', 'payments', [
+    { projectId: 'payments', name: 'Payments' },
+  ])).toBe('/chat?projectId=payments');
+  expect(commandPaletteTarget('/chat?projectId=foreign', 'foreign', 'payments', [])).toBe('/chat');
+});
+
+it('uses the activation surface for a project switch while retaining its deep-link parameters', () => {
+  const item = { id: 'project:orders', kind: 'project' as const, label: 'Orders', description: '', keywords: [], projectId: 'orders' };
+  expect(commandPaletteDestination(item, { pathname: '/settings/tools', search: '?projectId=payments&view=generated' },
+    'payments', [{ projectId: 'orders', name: 'Orders' }])).toBe('/settings/tools?projectId=orders&view=generated');
+});
+it('rejects a stale project command after its identity is removed from the authorized catalog', () => {
+  const item = { id: 'project:foreign', kind: 'project' as const, label: 'Foreign', description: '', keywords: [], projectId: 'foreign' };
+  expect(commandPaletteDestination(item, { pathname: '/home', search: '' }, 'payments', [
+    { projectId: 'payments', name: 'Payments' },
+  ])).toBeUndefined();
 });

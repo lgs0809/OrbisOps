@@ -55,6 +55,8 @@ export const changePackageStatusHint = (status?: string, reasonCode?: string) =>
     case 'READY_FOR_REVIEW': return '校验已通过。请提交审批，由审批人核对版本、风险、证据、回滚方案和影响边界。';
     case 'REVIEWING': return '等待审批。批准前请核对 packageHash、风险、校验证据、回滚方案和影响边界。';
     case 'APPROVED': return '已批准。只有受治理的 LandingRuntime 可以执行 approvedVersion 与 approvedPackageHash。';
+    case 'LANDING_RUNNING': return '已批准的方案正在执行，请查看实时操作记录。';
+    case 'REJECTED': return '方案已驳回；修订后需要重新校验并提交审批。';
     case 'LANDING_FAILED': return `${reason || 'Landing 失败。'}请检查操作记录和事件轨迹，再决定重试、回滚或重新规划。`;
     case 'NEEDS_REPLAN': return `${reason || '已批准快照不再适用。'}在新的或修订后的 ChangePackage 获得批准前，Landing 不能继续。`;
     case 'LANDED': return 'Landing 已完成。请检查执行结果、Verification 和清理状态。';

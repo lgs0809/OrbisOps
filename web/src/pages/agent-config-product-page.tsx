@@ -2,35 +2,12 @@ import React from 'react';
 import { Button, Card, Space, Spin, Tag, Typography } from '@douyinfe/semi-ui';
 import { IconAlertTriangle } from '@douyinfe/semi-icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import styled from 'styled-components';
 
 import { WorkflowBuilderPage } from './workflow-builder';
 import type { AgentReferenceImpact } from '../services/ops-agent-reference-impact-service';
 import { useAgentReferenceImpactQuery } from '../features/agents/api/agent-list-queries';
-import { theme } from '../styles/theme';
 
 const { Paragraph, Text } = Typography;
-
-const ImpactPanel = styled.div`
-  position: fixed;
-  z-index: 1200;
-  top: 76px;
-  right: 20px;
-  width: min(390px, calc(100vw - 40px));
-  pointer-events: none;
-
-  .semi-card {
-    pointer-events: auto;
-    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.16);
-    border: 1px solid ${theme.colors.border.secondary};
-  }
-
-  @media (max-width: ${theme.breakpoints.md}) {
-    position: static;
-    width: auto;
-    margin: ${theme.spacing.base};
-  }
-`;
 
 const emptyImpact = (agentId: string): AgentReferenceImpact => ({
   agentId,
@@ -53,9 +30,8 @@ export const AgentConfigProductPage: React.FC = () => {
   const impact = impactQuery.data || emptyImpact(agentId);
 
   return (
-    <>
-      <WorkflowBuilderPage />
-      <ImpactPanel aria-label="工作流发布影响">
+    <WorkflowBuilderPage publishImpact={
+      <section aria-label="工作流发布影响">
         <Card>
           <Spin spinning={loading}>
             <Space vertical align="start" style={{ width: '100%' }}>
@@ -94,7 +70,7 @@ export const AgentConfigProductPage: React.FC = () => {
             </Space>
           </Spin>
         </Card>
-      </ImpactPanel>
-    </>
+      </section>
+    } />
   );
 };

@@ -16,7 +16,7 @@ export const GlobalStyle = createGlobalStyle`
     min-width: 0;
     min-height: 100%;
     margin: 0;
-    background: #fbfbfa;
+    background: ${theme.colors.bg.secondary};
     overflow-x: hidden;
   }
 
@@ -29,6 +29,10 @@ export const GlobalStyle = createGlobalStyle`
   body {
     color: ${theme.colors.text.primary};
     font-family: ${theme.typography.fontFamily};
+  }
+
+  :where(h1, h2, h3, h4, p, dt, dd, li, blockquote) {
+    overflow-wrap: anywhere;
   }
 
   ::selection {
@@ -62,7 +66,7 @@ export const GlobalStyle = createGlobalStyle`
   .semi-card {
     border-color: ${theme.colors.border.secondary};
     border-radius: 12px;
-    box-shadow: none;
+    box-shadow: ${theme.shadows.sm};
   }
 
   .semi-modal-content {
@@ -71,6 +75,17 @@ export const GlobalStyle = createGlobalStyle`
     flex-direction: column;
     border-radius: 14px;
     box-shadow: ${theme.shadows.modal};
+  }
+
+  .semi-modal {
+    max-width: calc(100vw - 24px);
+  }
+
+  .semi-modal-title {
+    min-width: 0;
+    padding-right: 24px;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .semi-modal-body {
@@ -117,17 +132,33 @@ export const GlobalStyle = createGlobalStyle`
   .semi-input,
   .semi-input-wrapper {
     min-width: 0;
-    overflow-wrap: break-word;
+    overflow-wrap: anywhere;
     word-break: normal;
   }
 
   .semi-table-cell,
+  .semi-table-row-cell,
+  .semi-table-row-head {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: normal;
+  }
+
   .semi-tag,
-  .semi-tag-content,
+  .semi-tag-content {
+    min-width: 0;
+    max-width: 100%;
+    height: auto;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: normal;
+  }
+
   .semi-select-selection-text {
     min-width: 0;
-    overflow-wrap: normal;
-    word-break: normal;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .semi-input-wrapper,
@@ -137,7 +168,7 @@ export const GlobalStyle = createGlobalStyle`
   }
 
   .semi-button {
-    min-height: 32px;
+    min-height: 36px;
     border-radius: 9px;
     white-space: nowrap;
     font-weight: 500;
@@ -152,7 +183,7 @@ export const GlobalStyle = createGlobalStyle`
   }
 
   .semi-tabs-tab {
-    font-size: 13px;
+    font-size: 14px;
   }
 
   .semi-tag {
@@ -168,5 +199,23 @@ export const GlobalStyle = createGlobalStyle`
     min-width: 0;
     max-width: 100%;
     overflow-x: hidden;
+  }
+
+  button:focus-visible,
+  a:focus-visible {
+    outline: 2px solid ${theme.colors.primary};
+    outline-offset: 2px;
+  }
+
+  .semi-input-wrapper,
+  .semi-input-textarea-wrapper,
+  .semi-select {
+    border: 1px solid ${theme.colors.border.primary};
+    background: ${theme.colors.bg.primary};
+  }
+
+  .semi-table-tbody > .semi-table-row > .semi-table-row-cell {
+    font-size: 13px;
+    line-height: 1.6;
   }
 `;

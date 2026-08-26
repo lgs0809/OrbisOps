@@ -16,14 +16,18 @@ describe('Project Workspace canonical boundary', () => {
     expect(source).not.toContain('newAccountForm');
   });
 
-  it('keeps the shared project snapshot cache responsible for projects and templates', () => {
+  it('keeps shared project data and the canonical project feature boundaries', () => {
     const scopeSource = readFileSync(resolve(process.cwd(), 'src/hooks/use-project-scope.ts'), 'utf8');
     const querySource = readFileSync(resolve(process.cwd(), 'src/features/projects/api/project-workspace-queries.ts'), 'utf8');
 
     expect(scopeSource).toContain('templates: OpsProjectResourceTemplate[];');
-    expect(scopeSource).toContain('templates: response.data?.templates || []');
     expect(querySource).toContain('enabled: Boolean(projectId)');
-    expect(querySource).toContain('opsAdminService.listProjectSkills(projectId)');
+    const catalogSource = readFileSync(resolve(process.cwd(), 'src/features/projects/api/project-skill-catalog.ts'), 'utf8');
+    expect(querySource).toContain('client.fetchQuery(projectSkillCatalogOptions(projectId))');
+    expect(catalogSource).toContain('opsAdminService.listProjectSkills(projectId)');
+    expect(catalogSource).toContain("skill.scope !== 'PROJECT' || skill.projectId !== projectId");
+    expect(querySource).toContain('opsRepairService.getRepositoryCapabilities()');
+    expect(querySource).toContain('availability: {');
     expect(querySource).toContain('opsRepairService.listExecutionResources(projectId)');
   });
 });

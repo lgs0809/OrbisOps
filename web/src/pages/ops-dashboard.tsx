@@ -43,7 +43,7 @@ const Greeting = styled.div`
   h1 {
     margin: 0;
     color: ${theme.colors.text.primary};
-    font-size: clamp(30px, 4vw, 46px);
+    font-size: clamp(28px, 3vw, 34px);
     font-weight: 650;
     line-height: 1.08;
     letter-spacing: -0.045em;
@@ -102,7 +102,7 @@ const StatusItem = styled.div<{ $attention?: boolean }>`
 
   .label {
     color: ${theme.colors.text.tertiary};
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
   }
 
@@ -120,7 +120,7 @@ const StatusItem = styled.div<{ $attention?: boolean }>`
     margin-top: 6px;
     overflow: hidden;
     color: ${theme.colors.text.tertiary};
-    font-size: 11px;
+    font-size: 12px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -164,7 +164,7 @@ const PanelHeader = styled.div`
     display: block;
     margin-top: 2px;
     color: ${theme.colors.text.tertiary};
-    font-size: 11px;
+    font-size: 12px;
   }
 `;
 
@@ -198,10 +198,10 @@ const InboxItem = styled.button<{ $tone: 'danger' | 'warning' | 'info' }>`
   }
 
   .copy { min-width: 0; }
-  .kind { color: ${theme.colors.text.tertiary}; font-size: 10px; font-weight: 600; }
+  .kind { color: ${theme.colors.text.tertiary}; font-size: 12px; font-weight: 600; }
   strong { display: block; margin-top: 3px; font-size: 13px; font-weight: 600; }
-  .detail { display: block; margin-top: 3px; color: ${theme.colors.text.tertiary}; font-size: 11px; line-height: 1.45; }
-  .action { color: ${theme.colors.text.secondary}; font-size: 11px; white-space: nowrap; }
+  .detail { display: block; margin-top: 3px; color: ${theme.colors.text.tertiary}; font-size: 12px; line-height: 1.45; }
+  .action { color: ${theme.colors.text.secondary}; font-size: 12px; white-space: nowrap; }
 `;
 
 const RightStack = styled.div`
@@ -224,7 +224,7 @@ const ActivityItem = styled.button`
   &:last-child { border-bottom: 0; }
   &:hover { background: #fafbfc; }
   strong { display: block; overflow: hidden; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-  span { display: block; margin-top: 3px; color: ${theme.colors.text.tertiary}; font-size: 10px; line-height: 1.45; }
+  span { display: block; margin-top: 3px; color: ${theme.colors.text.tertiary}; font-size: 12px; line-height: 1.45; }
 `;
 
 const MetricList = styled.div`
@@ -240,7 +240,7 @@ const MetricRow = styled.div`
   border-bottom: 1px solid ${theme.colors.border.tertiary};
 
   &:last-child { border-bottom: 0; }
-  span { color: ${theme.colors.text.secondary}; font-size: 11px; }
+  span { color: ${theme.colors.text.secondary}; font-size: 12px; }
   strong { font-size: 13px; font-weight: 650; }
 `;
 
@@ -313,12 +313,17 @@ export const OpsDashboardPage: React.FC = () => {
         </Hero>
 
         <Spin spinning={loading}>
-          {error && (
+          {loading ? (
+            <Panel role="status" aria-live="polite" style={{ padding: 40 }}>
+              <strong>正在读取首页数据…</strong>
+              <p>运行、决策和健康摘要会在读取完成后显示。</p>
+            </Panel>
+          ) : error ? (
             <Panel style={{ marginBottom: 16, padding: 16 }}>
               <Text type="danger">{error}</Text>
               <Button size="small" icon={<IconRefresh />} onClick={() => void overviewQuery.refetch()} style={{ marginLeft: 12 }}>重试</Button>
             </Panel>
-          )}
+          ) : <>
 
           <StatusStrip>
             {summary.map((item) => (
@@ -408,6 +413,7 @@ export const OpsDashboardPage: React.FC = () => {
               )}
             </RightStack>
           </MainGrid>
+          </>}
         </Spin>
       </Page>
     </OpsPageShell>

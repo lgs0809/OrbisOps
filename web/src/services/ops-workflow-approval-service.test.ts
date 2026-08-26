@@ -28,25 +28,26 @@ describe('opsWorkflowApprovalService', () => {
     );
   });
 
-  it('sends only decision enum and never forwards an actor', async () => {
+  it('binds the reviewed immutable approval and never forwards an actor', async () => {
     const fetchMock = vi.fn().mockResolvedValue(okResponse({ status: 'APPROVED' }));
     vi.stubGlobal('fetch', fetchMock);
 
-    await opsWorkflowApprovalService.decide('run-1', 'project-a', 'APPROVE', 'user');
+    await opsWorkflowApprovalService.decide('run-1', 'project-a', 'APPROVE', 'approval-1', 'user');
 
     const [url, init] = fetchMock.mock.calls[0];
     expect(String(url)).toContain('/api/v1/user/chat/runs/run-1/workflow-approval/decision?projectId=project-a');
-    expect(JSON.parse(String(init.body))).toEqual({ decision: 'APPROVE' });
+    expect(JSON.parse(String(init.body))).toEqual({ decision: 'APPROVE', approvalId: 'approval-1' });
   });
 
   it('uses the explicit durable resume retry endpoint after a committed decision', async () => {
     const fetchMock = vi.fn().mockResolvedValue(okResponse({ resumeRequired: true }));
     vi.stubGlobal('fetch', fetchMock);
 
-    await opsWorkflowApprovalService.retryResume('run-1', 'project-a', 'admin');
+    await opsWorkflowApprovalService.retryResume('run-1', 'project-a', 'approval-1', 'admin');
 
     const [url, init] = fetchMock.mock.calls[0];
     expect(String(url)).toContain('/api/v1/agent/chat/runs/run-1/workflow-approval/resume?projectId=project-a');
     expect(init.method).toBe('POST');
+    expect(JSON.parse(String(init.body))).toEqual({ approvalId: 'approval-1' });
   });
 });

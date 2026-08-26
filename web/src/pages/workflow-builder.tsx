@@ -6,6 +6,7 @@ import {
   Checkbox,
   Divider,
   Input,
+  InputNumber,
   Select,
   Space,
   Spin,
@@ -17,9 +18,10 @@ import {
 import { IconArrowLeft, IconRefresh, IconSave } from '@douyinfe/semi-icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import styled from 'styled-components';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { OpsAgentCanvas } from '../components/ops-agent-canvas';
-import { OpsPageShell } from '../components/ops-layout';
+import { OpsPageShell, OpsWorkspaceFrame } from '../components/ops-layout';
 import { useProjectScope } from '../hooks/use-project-scope';
 import {
   opsAdminService,
@@ -31,6 +33,9 @@ import {
 import { theme } from '../styles/theme';
 import { userFacingError } from '../utils/user-facing-error';
 import { AgentBuilderGuide } from '../features/agents/components/AgentBuilderGuide';
+import { WorkflowManualTestButton } from '../features/agents/components/WorkflowManualTestButton';
+import { WorkflowDirectActions } from '../features/agents/components/WorkflowDirectActions';
+import { useWorkflowEditorQuery } from '../features/agents/api/workflow-editor-query';
 import { AgentBuilderModeSwitch } from '../features/agents/components/AgentBuilderModeSwitch';
 import { AgentBuilderPropertyPanel } from '../features/agents/components/AgentBuilderPropertyPanel';
 import { AgentBuilderVersionSection, type AgentVersionAction } from '../features/agents/components/AgentBuilderVersionSection';
@@ -40,7 +45,7 @@ import {
   type AgentBuilderPanel,
 } from '../features/agents/model/agent-builder-mode';
 
-const { Text, Title } = Typography;
+const { Text, Title, Paragraph } = Typography;
 const { Option } = Select;
 
 const Stack = styled.div`
@@ -110,21 +115,22 @@ const JsonBox = styled.pre`
   line-height: 1.55;
 `;
 
-const Editor = styled.div`
-  height: 100dvh;
+const Editor = styled(OpsWorkspaceFrame)`
   min-height: 0;
   display: flex;
   flex-direction: column;
   background: #f4f5f7;
   overflow: hidden;
 
-  @media (max-width: ${theme.breakpoints.md}) {
-    height: calc(100dvh - 52px);
+  @media (max-width: 1180px) {
+    overflow-y: auto;
   }
+
 `;
 
 const EditorToolbar = styled.header`
   min-height: 62px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -146,7 +152,7 @@ const EditorIdentity = styled.div`
     display: block;
     margin-bottom: 2px;
     color: ${theme.colors.text.tertiary};
-    font-size: 9px;
+    font-size: 12px;
     font-weight: 650;
     letter-spacing: 0.08em;
   }
@@ -163,6 +169,7 @@ const EditorIdentity = styled.div`
 `;
 
 const DefinitionBar = styled.section`
+  flex-shrink: 0;
   display: grid;
   grid-template-columns: minmax(180px, 0.8fr) minmax(220px, 1.2fr) auto;
   gap: 10px;
@@ -184,7 +191,8 @@ const EditorBody = styled.div`
   gap: 0;
 
   @media (max-width: 1180px) {
-    grid-template-columns: 1fr;
+    display: block;
+    flex: none;
   }
 `;
 
@@ -198,12 +206,17 @@ const CanvasColumn = styled.div`
 
 const CanvasSurface = styled.div`
   min-width: 0;
-  min-height: 520px;
+  min-height: 200px;
   flex: 1;
   overflow: hidden;
   border: 1px solid ${theme.colors.border.secondary};
   border-radius: 12px;
   background: #fff;
+
+  @media (max-width: 1180px) {
+    height: 560px;
+    flex: none;
+  }
 `;
 
 const GuideSlot = styled.div`
@@ -221,6 +234,7 @@ const InspectorRail = styled.div`
   @media (max-width: 1180px) {
     border-left: 0;
     border-top: 1px solid ${theme.colors.border.secondary};
+    overflow: visible;
   }
 `;
 
@@ -233,7 +247,7 @@ const MetadataDetails = styled.details`
 
   summary {
     color: ${theme.colors.text.secondary};
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
     cursor: pointer;
   }
@@ -254,7 +268,7 @@ const normalizeMode = (value: unknown): 'direct' | 'llm' | 'react' => {
 
 const normalizeNode = (node: OpsWorkflowNode): OpsWorkflowNode => {
   const type = String(node.type || 'AGENT').trim().toUpperCase();
-  if (['START', 'END', 'ROUTER', 'SUB_WORKFLOW'].includes(type)) {
+  if (['START', 'END', 'ROUTER', 'SUB_WORKFLOW', 'HUMAN_APPROVAL'].includes(type)) {
     return { ...node, type };
   }
   const mode = normalizeMode(node.mode || node.config?.mode || node.config?.agentMode);
@@ -416,9 +430,10 @@ const responseData = <T,>(response: { code: string; info?: string; data?: T }, f
   return response.data;
 };
 
-export const WorkflowBuilderPage: React.FC = () => {
+export const WorkflowBuilderPage: React.FC<{ publishImpact?: React.ReactNode }> = ({ publishImpact }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const queryClient = useQueryClient();
   const projectScope = useProjectScope();
   const projectId = searchParams.get('projectId') || projectScope.projectId || '';
   const agentId = searchParams.get('agentId') || '';
@@ -432,8 +447,24 @@ export const WorkflowBuilderPage: React.FC = () => {
   const [mode, setMode] = useState<AgentBuilderMode>('basic');
   const [activePanel, setActivePanel] = useState<AgentBuilderPanel>('node');
   const [rawJson, setRawJson] = useState('');
-  const [loading, setLoading] = useState(false);
+  const editorQuery = useWorkflowEditorQuery(projectId, agentId);
+  const [appliedData, setAppliedData] = useState<{ data: typeof editorQuery.data; revision: number }>();
+  const loading = editorQuery.isFetching;
+  const definitionReady = Boolean(editorQuery.data && appliedData?.data === editorQuery.data && appliedData?.revision === editorQuery.dataUpdatedAt);
   const [operating, setOperating] = useState(false);
+  const [operationError, setOperationError] = useState('');
+  useEffect(() => setOperationError(''), [projectId, agentId]);
+  const reportOperationError = (error: unknown, fallback: string) => {
+    const message = userFacingError(typeof error === 'string' ? new Error(error) : error, fallback);
+    setOperationError(message);
+    Toast.error(message);
+  };
+  const refreshEditorAfterMutation = async () => {
+    const queryKey = ['workflow-editor', projectId];
+    // A read started before save/publish cannot replace the final server version.
+    await queryClient.cancelQueries({ queryKey });
+    await queryClient.invalidateQueries({ queryKey });
+  };
 
   const loadVersions = async (id: string) => {
     if (!id) {
@@ -448,51 +479,20 @@ export const WorkflowBuilderPage: React.FC = () => {
     }
   };
 
-  const loadDefinition = async () => {
-    if (!projectId) return;
-    setLoading(true);
-    try {
-      const [capabilityResult, workflowResult] = await Promise.allSettled([
-        opsAdminService.getProjectAgentCapabilities(projectId),
-        opsAdminService.listAgents(projectId),
-      ]);
-      if (capabilityResult.status === 'fulfilled' && capabilityResult.value.code === '0000') {
-        setCapabilities(capabilityResult.value.data || null);
-      } else {
-        setCapabilities(null);
-      }
-      if (workflowResult.status === 'fulfilled' && workflowResult.value.code === '0000') {
-        setPublishedWorkflows((workflowResult.value.data || []).filter((workflow) =>
-          workflow.definitionKind === 'SPECIALIZED_WORKFLOW' && String(workflow.lifecycle || '').toUpperCase() === 'PUBLISHED',
-        ));
-      } else {
-        setPublishedWorkflows([]);
-      }
-
-      if (agentId) {
-        const response = await opsAdminService.getAgent(agentId);
-        const loaded = normalizeDefinition(responseData(response), projectId);
-        setDefinition(loaded);
-        setSelectedNodeId(loaded.nodes?.find((node) => node.type === 'AGENT')?.nodeId || loaded.nodes?.[0]?.nodeId || '');
-        setSelectedEdgeKey('');
-        await loadVersions(loaded.agentId);
-      } else {
-        const next = createDefaultDefinition(projectId);
-        setDefinition(next);
-        setSelectedNodeId('agent');
-        setSelectedEdgeKey('');
-        setVersions([]);
-      }
-    } catch (error) {
-      Toast.error(userFacingError(error, '加载 Workflow 失败，请稍后重试。'));
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loadDefinition = () => editorQuery.refetch();
 
   useEffect(() => {
-    void loadDefinition();
-  }, [projectId, agentId]);
+    const data = editorQuery.data;
+    if (!data || data.projectId !== projectId || data.agentId !== agentId) return;
+    const loaded = data.definition ? normalizeDefinition(data.definition, projectId) : createDefaultDefinition(projectId);
+    setDefinition(loaded);
+    setSelectedNodeId(loaded.nodes?.find(node => node.type === 'AGENT')?.nodeId || loaded.nodes?.[0]?.nodeId || '');
+    setSelectedEdgeKey('');
+    setCapabilities(data.capabilities);
+    setPublishedWorkflows(data.workflows);
+    setVersions(data.versions);
+    setAppliedData({ data, revision: editorQuery.dataUpdatedAt });
+  }, [editorQuery.data, editorQuery.dataUpdatedAt, projectId, agentId]);
 
   useEffect(() => {
     setRawJson(JSON.stringify(normalizeDefinition(definition, projectId), null, 2));
@@ -513,11 +513,14 @@ export const WorkflowBuilderPage: React.FC = () => {
     ['skillId', 'id', 'name', 'skillName'],
     ['skillName', 'name', 'skillId', 'id'],
   ), [capabilities]);
-  const toolOptions = useMemo(() => optionsOf(
-    [...(capabilities?.projectTools || []), ...(capabilities?.enabledSharedTools || [])],
-    ['mcpId', 'toolId', 'id', 'name'],
-    ['name', 'toolName', 'mcpId', 'toolId'],
-  ), [capabilities]);
+  const toolOptions = useMemo(() => {
+    const tools = [...(capabilities?.projectTools || []), ...(capabilities?.enabledSharedTools || [])];
+    const disabled = new Set(tools.filter((tool) => String(tool.status || '').toUpperCase() === 'DISABLED')
+      .map((tool) => valueOf(tool, ['mcpId', 'toolId', 'id', 'name'])));
+    return optionsOf(tools, ['mcpId', 'toolId', 'id', 'name'], ['name', 'toolName', 'mcpId', 'toolId'])
+      .map((option) => ({ ...option, disabled: disabled.has(option.value),
+        label: disabled.has(option.value) ? `${option.label}（已停用）` : option.label }));
+  }, [capabilities]);
   const knowledgeOptions = useMemo(() => optionsOf(
     [...(capabilities?.projectKnowledgeBases || []), ...(capabilities?.enabledGlobalKnowledgeBases || [])],
     ['kbId', 'knowledgeBaseId', 'id', 'name'],
@@ -590,6 +593,8 @@ export const WorkflowBuilderPage: React.FC = () => {
   };
 
   const saveDraft = async (): Promise<OpsAgentDefinition | null> => {
+    if (loading || operating || !definitionReady) return null;
+    setOperationError('');
     if (!projectId) {
       Toast.error('保存前请先选择 Project。');
       return null;
@@ -597,6 +602,7 @@ export const WorkflowBuilderPage: React.FC = () => {
     const payload = normalizeDefinition(definition, projectId);
     const errors = validateDefinition(payload);
     if (errors.length) {
+      setOperationError(errors.join('；'));
       Toast.error(errors[0]);
       return null;
     }
@@ -613,15 +619,17 @@ export const WorkflowBuilderPage: React.FC = () => {
       Toast.success(`草稿已保存${saved.version ? `，版本 v${saved.version}` : ''}。`);
       return saved;
     } catch (error) {
-      Toast.error(userFacingError(error, '保存 Workflow 草稿失败，请稍后重试。'));
+      reportOperationError(error, '保存 Workflow 草稿失败，请稍后重试。');
       return null;
     } finally {
+      await refreshEditorAfterMutation();
       setOperating(false);
     }
   };
 
   const validateSaved = async (saved?: OpsAgentDefinition | null) => {
     const target = saved || definition;
+    setOperationError('');
     if (!target.agentId || !target.version) {
       Toast.warning('请先保存草稿，再执行校验。');
       return false;
@@ -631,8 +639,23 @@ export const WorkflowBuilderPage: React.FC = () => {
       const bindingResponse = await opsAdminService.validateAgentBindings(target.agentId, normalizeDefinition(target, projectId));
       const binding = responseData(bindingResponse);
       if (!binding.valid) {
-        Toast.error(binding.errors?.[0] || 'Workflow 能力绑定校验失败。');
+        reportOperationError(binding.errors?.join('；'), 'Workflow 能力绑定校验失败。');
         return false;
+      }
+      // Lifecycle validation is a state transition (DRAFT -> VALIDATED), not a
+      // generic health check. Published/validated versions are immutable and
+      // must never be sent to that endpoint, which would otherwise surface a
+      // misleading server error to a user who only asked to inspect a version.
+      const lifecycle = String(target.lifecycle || '').trim().toUpperCase();
+      if (lifecycle !== 'DRAFT') {
+        if (lifecycle === 'DISABLED') {
+          Toast.warning(`Workflow v${target.version} 已停用；请保存新的草稿后再校验。`);
+          return false;
+        }
+        Toast.success(lifecycle === 'PUBLISHED'
+          ? `Workflow v${target.version} 已发布，能力绑定校验通过。`
+          : `Workflow v${target.version} 已校验，能力绑定校验通过。`);
+        return true;
       }
       const response = await opsAdminService.validateAgentVersion(target.agentId, target.version);
       const validated = normalizeDefinition(responseData(response, target), projectId);
@@ -641,9 +664,10 @@ export const WorkflowBuilderPage: React.FC = () => {
       Toast.success(`Workflow v${target.version} 校验通过。`);
       return true;
     } catch (error) {
-      Toast.error(userFacingError(error, 'Workflow 校验失败，请检查配置后重试。'));
+      reportOperationError(error, 'Workflow 校验失败，请检查配置后重试。');
       return false;
     } finally {
+      await refreshEditorAfterMutation();
       setOperating(false);
     }
   };
@@ -661,14 +685,16 @@ export const WorkflowBuilderPage: React.FC = () => {
       await loadVersions(saved.agentId);
       Toast.success(`Workflow v${saved.version} 已发布。`);
     } catch (error) {
-      Toast.error(userFacingError(error, '发布 Workflow 失败，请稍后重试。'));
+      reportOperationError(error, '发布 Workflow 失败，请稍后重试。');
     } finally {
+      await refreshEditorAfterMutation();
       setOperating(false);
     }
   };
 
   const handleVersionAction = async (action: AgentVersionAction, version?: number) => {
     if (!definition.agentId || !version) return;
+    setOperationError('');
     setOperating(true);
     try {
       if (action === 'validate') await opsAdminService.validateAgentVersion(definition.agentId, version);
@@ -682,8 +708,9 @@ export const WorkflowBuilderPage: React.FC = () => {
       Toast.success(`Workflow v${version} ${actionLabel}完成。`);
     } catch (error) {
       const actionLabel = action === 'validate' ? '校验' : action === 'publish' ? '发布' : action === 'rollback' ? '回滚' : '停用';
-      Toast.error(userFacingError(error, `${actionLabel} Workflow v${version} 失败，请稍后重试。`));
+      reportOperationError(error, `${actionLabel} Workflow v${version} 失败，请稍后重试。`);
     } finally {
+      await refreshEditorAfterMutation();
       setOperating(false);
     }
   };
@@ -736,10 +763,10 @@ export const WorkflowBuilderPage: React.FC = () => {
               <Option value="react">REACT · 有界工具循环</Option>
             </Select>
           </Field>
-          <Field>
+          {normalizeMode(selectedNode.mode || selectedNode.config?.mode) !== 'direct' && <Field>
             <Text strong>节点 Prompt</Text>
             <TextArea autosize={{ minRows: 5, maxRows: 12 }} value={selectedNode.instruction || ''} onChange={(instruction) => updateNode({ instruction })} />
-          </Field>
+          </Field>}
 
           {normalizeMode(selectedNode.mode || selectedNode.config?.mode) === 'llm' && (
             <Field>
@@ -757,22 +784,14 @@ export const WorkflowBuilderPage: React.FC = () => {
 
           {normalizeMode(selectedNode.mode || selectedNode.config?.mode) === 'direct' && (
             <Field>
-              <Text strong>DIRECT actions JSON</Text>
-              <TextArea
-                key={`${selectedNode.nodeId}:${JSON.stringify(selectedNode.config?.actions || [])}`}
-                autosize={{ minRows: 5, maxRows: 12 }}
-                defaultValue={JSON.stringify(selectedNode.config?.actions || [], null, 2)}
-                onBlur={(event) => {
-                  try {
-                    const actions = JSON.parse(event.target.value);
-                    if (!Array.isArray(actions)) throw new Error('DIRECT actions 必须是 JSON 数组。');
-                    updateNodeConfig({ actions });
-                  } catch {
-                    Toast.error('DIRECT actions JSON 无效，请检查格式。');
-                  }
-                }}
+              <WorkflowDirectActions
+                nodeId={selectedNode.nodeId}
+                actions={selectedNode.config?.actions}
+                mode={mode}
+                toolNames={new Map(toolOptions.map((tool) => [tool.value, tool.label]))}
+                onAdvanced={() => { setMode('advanced'); setActivePanel('node'); }}
+                onChange={(actions) => updateNodeConfig({ actions })}
               />
-              <Text type="tertiary" size="small">DIRECT 只调用显式配置的受治理动作，不会调用模型。</Text>
             </Field>
           )}
 
@@ -787,7 +806,7 @@ export const WorkflowBuilderPage: React.FC = () => {
           <Field>
             <Text strong>工具 / MCP</Text>
             <Select multiple filter value={selectedNode.mcpIds || []} onChange={(value) => updateNode({ mcpIds: (value || []) as string[] })} style={{ width: '100%' }}>
-              {toolOptions.map((option) => <Option key={option.value} value={option.value}>{option.label}</Option>)}
+              {toolOptions.map((option) => <Option key={option.value} value={option.value} disabled={option.disabled}>{option.label}</Option>)}
             </Select>
           </Field>
           <Field>
@@ -855,6 +874,21 @@ export const WorkflowBuilderPage: React.FC = () => {
             <Input value={String(selectedNode.config?.inputKey || '')} onChange={(inputKey) => updateNodeConfig({ inputKey })} />
           </Field>
         </FieldGrid>
+      )}
+
+      {selectedNode.type === 'HUMAN_APPROVAL' && (
+        <>
+          <Field>
+            <Text strong>审批说明</Text>
+            <TextArea value={selectedNode.instruction || ''} onChange={(instruction) => updateNode({ instruction })} autosize={{ minRows: 3, maxRows: 6 }} />
+          </Field>
+          <Field>
+            <Text strong>审批有效期（秒）</Text>
+            <InputNumber min={60} max={86400} value={Number(selectedNode.config?.timeoutSeconds || 1800)}
+              onChange={(timeoutSeconds) => updateNodeConfig({ timeoutSeconds: Number(timeoutSeconds) })} />
+            <Text type="tertiary" size="small">审批等待会持久保存；超时后需重新发起审核。</Text>
+          </Field>
+        </>
       )}
 
       {selectedNode.type === 'START' && (
@@ -945,15 +979,21 @@ export const WorkflowBuilderPage: React.FC = () => {
       {validateDefinition(normalizeDefinition(definition, projectId)).length === 0
         ? <Banner type="success" description="Graph 结构和编辑器级执行模式检查通过。" />
         : <Banner type="warning" description={validateDefinition(normalizeDefinition(definition, projectId))[0]} />}
-      <Button onClick={() => void validateSaved()} disabled={!definition.version} loading={operating}>校验已保存版本</Button>
-      <Button onClick={() => navigate(`/chat?projectId=${encodeURIComponent(projectId)}`)} disabled={!projectId}>打开对话手动执行</Button>
-      <JsonBox>{JSON.stringify({
+      <Button onClick={() => void validateSaved()} disabled={!definition.version} loading={operating}>
+        {String(definition.lifecycle || '').toUpperCase() === 'DRAFT' ? '校验已保存版本' : '检查当前版本'}
+      </Button>
+      <WorkflowManualTestButton projectId={projectId} definition={definition} disabled={operating} onNavigate={navigate} />
+      <Space wrap><Tag>{definition.nodes?.length || 0} 个节点</Tag><Tag>{definition.edges?.length || 0} 条连接</Tag>
+        {unique((definition.nodes || []).filter((node) => node.type === 'AGENT').map((node) => normalizeMode(node.mode || node.config?.mode).toUpperCase()))
+          .map((executionMode) => <Tag key={executionMode}>{executionMode}</Tag>)}
+      </Space>
+      {mode === 'advanced' && <JsonBox>{JSON.stringify({
         definitionKind: 'SPECIALIZED_WORKFLOW',
         invocation: 'MANUAL_ONLY',
         nodeExecutionModes: unique((definition.nodes || []).filter((node) => node.type === 'AGENT').map((node) => normalizeMode(node.mode || node.config?.mode).toUpperCase())),
         nodes: definition.nodes?.length || 0,
         edges: definition.edges?.length || 0,
-      }, null, 2)}</JsonBox>
+      }, null, 2)}</JsonBox>}
     </Stack>
   );
 
@@ -977,16 +1017,22 @@ export const WorkflowBuilderPage: React.FC = () => {
         <EditorToolbar>
           <EditorIdentity>
             <span className="eyebrow">WORKFLOW EDITOR</span>
-            <strong>{definition.name || '新建工作流'}</strong>
+            <strong>{definitionReady ? definition.name || '新建工作流' : editorQuery.isError ? '工作流加载失败' : '正在加载工作流…'}</strong>
           </EditorIdentity>
           <Space wrap>
             <Button icon={<IconArrowLeft />} onClick={() => navigate(`/workflows?projectId=${encodeURIComponent(projectId)}`)}>返回</Button>
             <Button icon={<IconRefresh />} onClick={() => void loadDefinition()} loading={loading}>重新加载</Button>
-            <Button icon={<IconSave />} onClick={() => void saveDraft()} loading={operating}>保存草稿</Button>
-            <Button type="primary" onClick={() => void publish()} loading={operating}>校验并发布</Button>
+            <Button icon={<IconSave />} onClick={() => void saveDraft()} loading={operating} disabled={loading || !definitionReady}>保存草稿</Button>
+            <Button type="primary" onClick={() => void publish()} loading={operating} disabled={loading || !definitionReady}>校验并发布</Button>
           </Space>
         </EditorToolbar>
 
+        {operationError && <div role="alert" style={{ padding: '14px 18px', minWidth: 0, overflowWrap: 'anywhere' }}>
+          <Banner type="danger" title="工作流操作未完成" description={operationError} closeIcon={null} />
+        </div>}
+        {editorQuery.isError ? <div style={{ padding: 24 }}><Banner type="danger" description={userFacingError(editorQuery.error, '加载工作流失败，请点击重新加载。')} /></div>
+          : !definitionReady || loading ? <div role="status" style={{ padding: 48, textAlign: 'center' }}><Spin /><Paragraph>正在读取工作流及其项目能力…</Paragraph></div>
+          : <>
         <DefinitionBar>
           <Field>
             <Text strong>工作流名称</Text>
@@ -1009,82 +1055,82 @@ export const WorkflowBuilderPage: React.FC = () => {
           </Space>
         </DefinitionBar>
 
-        <Spin spinning={loading}>
-          <EditorBody>
-            <CanvasColumn>
-              <GuideSlot><AgentBuilderGuide /></GuideSlot>
-              <CanvasSurface>
-                <OpsAgentCanvas
-                  definition={definition}
-                  selectedNodeId={selectedNodeId}
-                  selectedEdgeKey={selectedEdgeKey}
-                  height="100%"
-                  onSelectNode={(nodeId) => {
-                    setSelectedNodeId(nodeId);
-                    setSelectedEdgeKey('');
-                    setActivePanel('node');
-                  }}
-                  onSelectEdge={(key) => {
-                    setSelectedEdgeKey(key);
-                    if (mode === 'advanced') setActivePanel('edge');
-                  }}
-                  onCanvasClick={() => {
-                    setSelectedNodeId('');
-                    setSelectedEdgeKey('');
-                  }}
-                  onMoveNode={moveNode}
-                  onConnectEdge={connectEdge}
-                  onCreateNode={addNode}
-                />
-              </CanvasSurface>
-            </CanvasColumn>
+        <EditorBody>
+          <CanvasColumn>
+            <GuideSlot><AgentBuilderGuide /></GuideSlot>
+            <CanvasSurface>
+              <OpsAgentCanvas
+                definition={definition}
+                selectedNodeId={selectedNodeId}
+                selectedEdgeKey={selectedEdgeKey}
+                height="100%"
+                onSelectNode={(nodeId) => {
+                  setSelectedNodeId(nodeId);
+                  setSelectedEdgeKey('');
+                  setActivePanel('node');
+                }}
+                onSelectEdge={(key) => {
+                  setSelectedEdgeKey(key);
+                  if (mode === 'advanced') setActivePanel('edge');
+                }}
+                onCanvasClick={() => {
+                  setSelectedNodeId('');
+                  setSelectedEdgeKey('');
+                }}
+                onMoveNode={moveNode}
+                onConnectEdge={connectEdge}
+                onCreateNode={addNode}
+              />
+            </CanvasSurface>
+          </CanvasColumn>
 
-            <InspectorRail>
-              <MetadataDetails>
-                <summary>目录信息与适用范围</summary>
-                <div>
-                  <FieldGrid>
-                    <Field>
-                      <Text strong>工作流 ID</Text>
-                      <Input value={definition.agentId} disabled />
-                    </Field>
-                    <Field>
-                      <Text strong>调用方式</Text>
-                      <Input value="仅显式选择" disabled />
-                    </Field>
-                    <WideField>
-                      <Text strong>适用场景</Text>
-                      <TextArea value={listText(definition.whenToUse)} onChange={(value) => updateDefinition({ whenToUse: parseList(value) })} autosize={{ minRows: 2, maxRows: 5 }} />
-                    </WideField>
-                    <WideField>
-                      <Text strong>不适用场景</Text>
-                      <TextArea value={listText(definition.whenNotToUse)} onChange={(value) => updateDefinition({ whenNotToUse: parseList(value) })} autosize={{ minRows: 2, maxRows: 5 }} />
-                    </WideField>
-                  </FieldGrid>
-                </div>
-              </MetadataDetails>
-              <Inspector>
-                <AgentBuilderPropertyPanel
-                  mode={mode}
-                  activePanel={activePanel}
-                  onPanelChange={setActivePanel}
-                  nodePanel={nodePanel}
-                  edgePanel={edgePanel}
-                  jsonPanel={jsonPanel}
-                  testPanel={testPanel}
-                />
-                <Divider margin="16px" />
-                <AgentBuilderVersionSection
-                  versions={versions}
-                  loading={loading}
-                  operating={operating}
-                  onRefresh={() => void loadVersions(definition.agentId)}
-                  onAction={(action, version) => void handleVersionAction(action, version)}
-                />
-              </Inspector>
-            </InspectorRail>
-          </EditorBody>
-        </Spin>
+          <InspectorRail>
+            {publishImpact && <div style={{ marginBottom: 12 }}>{publishImpact}</div>}
+            <MetadataDetails>
+              <summary>目录信息与适用范围</summary>
+              <div>
+                <FieldGrid>
+                  <Field>
+                    <Text strong>工作流 ID</Text>
+                    <Input value={definition.agentId} disabled />
+                  </Field>
+                  <Field>
+                    <Text strong>调用方式</Text>
+                    <Input value="仅显式选择" disabled />
+                  </Field>
+                  <WideField>
+                    <Text strong>适用场景</Text>
+                    <TextArea value={listText(definition.whenToUse)} onChange={(value) => updateDefinition({ whenToUse: parseList(value) })} autosize={{ minRows: 2, maxRows: 5 }} />
+                  </WideField>
+                  <WideField>
+                    <Text strong>不适用场景</Text>
+                    <TextArea value={listText(definition.whenNotToUse)} onChange={(value) => updateDefinition({ whenNotToUse: parseList(value) })} autosize={{ minRows: 2, maxRows: 5 }} />
+                  </WideField>
+                </FieldGrid>
+              </div>
+            </MetadataDetails>
+            <Inspector>
+              <AgentBuilderPropertyPanel
+                mode={mode}
+                activePanel={activePanel}
+                onPanelChange={setActivePanel}
+                nodePanel={nodePanel}
+                edgePanel={edgePanel}
+                jsonPanel={jsonPanel}
+                testPanel={testPanel}
+              />
+              <Divider margin="16px" />
+              <AgentBuilderVersionSection
+                versions={versions}
+                loading={loading}
+                operating={operating}
+                onRefresh={() => void loadVersions(definition.agentId)}
+                onAction={(action, version) => void handleVersionAction(action, version)}
+              />
+            </Inspector>
+          </InspectorRail>
+        </EditorBody>
+        </>}
       </Editor>
     </OpsPageShell>
   );

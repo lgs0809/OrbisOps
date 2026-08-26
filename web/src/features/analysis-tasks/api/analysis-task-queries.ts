@@ -5,7 +5,6 @@ import {
   type OpsAnalysisTaskDetail,
   type OpsAnalysisTaskSummary,
 } from '../../../services/ops-admin-service';
-import { opsProjectService } from '../../../services/ops-project-service';
 
 export type AnalysisTaskScope = 'admin' | 'user';
 export type AnalysisTaskProjectOption = { projectId: string; name: string };
@@ -43,10 +42,8 @@ export const analysisTaskQueryKeys = {
 export const useAnalysisTaskProjectsQuery = (scope: AnalysisTaskScope) => useQuery({
   queryKey: analysisTaskQueryKeys.projects(scope),
   queryFn: async (): Promise<AnalysisTaskProjectOption[]> => {
-    const values = scope === 'admin'
-      ? dataOf(await opsProjectService.snapshot()).projects || []
-      : dataOf(await opsAdminService.listChatProjects(), []);
-    return values.map((item: any) => ({
+    const values = dataOf(await opsAdminService.listChatProjects(scope), []);
+    return values.map((item) => ({
       projectId: String(item.projectId || ''),
       name: String(item.name || item.projectId || ''),
     })).filter((item) => item.projectId);

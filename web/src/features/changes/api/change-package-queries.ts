@@ -66,6 +66,7 @@ export const useChangePackageDetailQuery = (
 ) => useQuery({
   queryKey: changePackageQueryKeys.detail(packageId, scope),
   enabled: Boolean(packageId && enabled),
+  refetchInterval: enabled ? 5000 : false,
   queryFn: async (): Promise<ChangePackageDetailData> => {
     const [detailResponse, eventsResponse, operationResponse] = await Promise.all([
       opsChangePackageService.get(packageId, scope),
@@ -85,7 +86,14 @@ export type ChangePackageAction =
   | { kind: 'submit-review'; packageId: string; summary: string }
   | { kind: 'approve'; packageId: string; version: number; packageHash: string }
   | { kind: 'reject'; packageId: string; reason: string }
-  | { kind: 'land'; packageId: string; version: number; packageHash: string; approvedPackageHash: string }
+  | {
+      kind: 'land';
+      packageId: string;
+      version: number;
+      packageHash: string;
+      approvedPackageHash: string;
+      idempotencyKey?: string;
+    }
   | { kind: 'cleanup'; packageId: string; reason: string };
 
 export const useChangePackageActionMutation = (scope: OpsExecutionScope) => {
@@ -113,11 +121,12 @@ export const useChangePackageActionMutation = (scope: OpsExecutionScope) => {
           version: action.version,
           packageHash: action.packageHash,
           approvedPackageHash: action.approvedPackageHash,
+          ...(action.idempotencyKey ? { idempotencyKey: action.idempotencyKey } : {}),
         }, scope));
       }
       return dataOf(await opsChangePackageService.cleanup(action.packageId, { reason: action.reason }, scope));
     },
-    onSuccess: async (_result, action) => {
+    onSettled: async (_result, _error, action) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: changePackageQueryKeys.lists() }),
         queryClient.invalidateQueries({ queryKey: changePackageQueryKeys.detail(action.packageId, scope) }),

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ApiRequestError } from './ops-http-client';
+import { ApiRequestError, ApiTimeoutError } from './ops-http-client';
 import { opsChangePackageService } from './ops-change-package-service';
 
 const okResponse = (data: unknown) => new Response(JSON.stringify({ code: '0000', info: 'ok', data }), {
@@ -71,7 +71,7 @@ describe('opsChangePackageService', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const assertLastCall = (path: string, method: string, body?: Record<string, unknown>) => {
-      const call = fetchMock.mock.calls.at(-1);
+      const call = fetchMock.mock.lastCall;
       expect(call).toBeDefined();
       const [url, init] = call!;
       expect(String(url)).toContain(path);
@@ -145,5 +145,47 @@ describe('opsChangePackageService', () => {
       status: 403,
       responseBody: 'capability denied',
     } satisfies Partial<ApiRequestError>);
+  });
+
+  it.each(['LANDING_RUNNING', 'LANDED'])('reconciles a lost response with the same approved %s run without replaying the write', async (status) => {
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new ApiTimeoutError())
+      .mockResolvedValueOnce(okResponse({packageId:'cp-1', version:3, approvedVersion:3,
+        approvedPackageHash:'hash-3', landingRunId:'lr-1', status}));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(opsChangePackageService.land('cp-1', {version:3, packageHash:'hash-3'}, 'user'))
+      .resolves.toMatchObject({data:{status, landingRunId:'lr-1'}});
+    expect(fetchMock.mock.calls.map(([url, init]) => [String(url).split('/change-packages/')[1], init.method]))
+      .toEqual([['cp-1/land','POST'], ['cp-1','GET']]);
+  });
+
+  it.each([
+    {status:'APPROVED'}, {status:'LANDING_FAILED'}, {landingRunId:''},
+    {version:4}, {approvedVersion:2}, {approvedPackageHash:'other-hash'}, {packageId:'cp-other'},
+  ])('keeps an uncertain or mismatched receipt unconfirmed: %j', async (difference) => {
+    const lost = new ApiTimeoutError();
+    const fetchMock = vi.fn().mockRejectedValueOnce(lost).mockResolvedValueOnce(okResponse({
+      packageId:'cp-1', version:3, approvedVersion:3, approvedPackageHash:'hash-3',
+      landingRunId:'lr-1', status:'LANDING_RUNNING', ...difference,
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(opsChangePackageService.land('cp-1', {version:3, packageHash:'hash-3'}, 'user')).rejects.toBe(lost);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.filter(([, init]) => init.method === 'POST')).toHaveLength(1);
+  });
+
+  it.each([400, 401, 403, 409])('does not hide HTTP %s or issue a reconciliation read', async (status) => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('denied', {status}));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(opsChangePackageService.land('cp-1', {version:3, packageHash:'hash-3'})).rejects.toMatchObject({status});
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('can reconcile a fetch network failure but still propagates denied read access', async () => {
+    const fetchMock = vi.fn().mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(new Response('denied', {status:403}));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(opsChangePackageService.land('cp-1', {version:3, packageHash:'hash-3'})).rejects.toMatchObject({status:403});
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

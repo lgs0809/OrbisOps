@@ -14,6 +14,7 @@ const dataOf = <T,>(response: { code: string; info?: string; data: T }, fallback
 
 export interface ToolRoutingOverview {
   summary: Record<string, any> | null;
+  remoteCatalogs: Record<string, any>[];
   decisions: Record<string, any>[];
   calls: Record<string, any>[];
   snapshots: Record<string, any>[];
@@ -30,16 +31,18 @@ export const useToolRoutingOverviewQuery = (projectId: string) => useQuery({
   queryKey: toolRoutingQueryKeys.overview(projectId),
   enabled: Boolean(projectId),
   queryFn: async (): Promise<ToolRoutingOverview> => {
-    const [summaryResponse, decisionsResponse, callsResponse, snapshotsResponse, policiesResponse, activationsResponse] = await Promise.all([
+    const [summaryResponse, decisionsResponse, callsResponse, snapshotsResponse, policiesResponse, activationsResponse, remoteCatalogsResponse] = await Promise.all([
       opsAdminService.getToolCatalogSummary(projectId),
       opsAdminService.listToolRoutingDecisions(projectId, { limit: 100 }),
       opsAdminService.listMcpToolCalls(projectId, { limit: 100 }),
       opsAdminService.listMcpToolSnapshots(projectId, { limit: 100 }),
       opsAdminService.listMcpToolPolicies(projectId, { limit: 100 }),
       opsAdminService.listMcpToolActivations(projectId, { limit: 100 }),
+      opsAdminService.getRemoteMcpCatalogStatus(projectId),
     ]);
     return {
       summary: dataOf(summaryResponse, null),
+      remoteCatalogs: dataOf(remoteCatalogsResponse, []),
       decisions: dataOf(decisionsResponse, []),
       calls: dataOf(callsResponse, []),
       snapshots: dataOf(snapshotsResponse, []),

@@ -25,7 +25,9 @@ const HeaderWrap = styled.div`
 
 const TitleBlock = styled.div`
   min-width: 0;
-  max-width: 900px;
+  max-width: min(900px, 100%);
+  flex: 1 1 280px;
+  overflow-wrap: anywhere;
 
   .semi-typography-h3 {
     letter-spacing: -0.025em;

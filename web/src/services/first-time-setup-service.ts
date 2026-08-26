@@ -3,6 +3,7 @@ import type { AdminUserResponseDTO, ApiResponse } from './admin-user-service';
 
 export interface FirstTimeSetupRequest {
   username: string;
+  phone?: string;
   password: string;
 }
 

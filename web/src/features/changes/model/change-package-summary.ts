@@ -45,15 +45,20 @@ export interface ChangePackageSummary {
   updateTime?: string;
 }
 
-export const toChangePackageSummary = (source: ChangePackageSummarySource): ChangePackageSummary => ({
+export const toChangePackageSummary = (source: ChangePackageSummarySource): ChangePackageSummary => {
+  // Validation evidence is historical after submission; it must not replace the current lifecycle status.
+  const staleValidationReason = ['READY_FOR_REVIEW', 'VALIDATION_PASSED'].includes(source.reasonCode || '')
+    && !['DRAFT', 'VALIDATING', 'VALIDATION_FAILED', 'REVISING', 'READY_FOR_REVIEW'].includes(source.status);
+  const reasonCode = staleValidationReason ? undefined : source.reasonCode;
+  return ({
   packageId: source.packageId,
   projectId: source.projectId,
   incidentId: source.incidentId,
-  title: source.summary || source.objective || source.packageId,
+  title: source.objective?.trim() || source.summary?.trim() || source.packageId,
   status: source.status,
   statusLabel: changePackageStatusLabel(source.status),
   statusColor: changePackageStatusColor(source.status),
-  statusHint: changePackageStatusHint(source.status, source.reasonCode),
+  statusHint: changePackageStatusHint(source.status, reasonCode),
   version: source.version,
   packageHash: source.packageHash || source.approvedPackageHash,
   landingRunId: source.landingRunId,
@@ -61,7 +66,8 @@ export const toChangePackageSummary = (source: ChangePackageSummarySource): Chan
   riskLabel: changePackageRiskLabel(source.riskLevel),
   riskColor: changePackageRiskColor(source.riskLevel),
   targetEnvironment: source.targetEnvironment,
-  reasonCode: source.reasonCode,
-  reasonLabel: changePackageReasonLabel(source.reasonCode),
+  reasonCode,
+  reasonLabel: changePackageReasonLabel(reasonCode),
   updateTime: source.updateTime,
-});
+  });
+};

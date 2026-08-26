@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button, Form, Toast, Typography } from '@douyinfe/semi-ui';
 import { IconEyeClosed, IconEyeOpened, IconLock, IconSafe, IconUser } from '@douyinfe/semi-icons';
 import { useNavigate } from 'react-router-dom';
@@ -7,8 +7,10 @@ import { theme } from '../styles/theme';
 import { Card } from '../components/common';
 import { AdminUserService } from '../services';
 import { FirstTimeSetupService } from '../services/first-time-setup-service';
-import { defaultRouteForCurrentUser, normalizeUserRole } from '../services/auth-session';
+import { defaultRouteForCurrentUser, normalizeUserRole, saveAuthSession } from '../services/auth-session';
 import { userFacingError } from '../utils/user-facing-error';
+import { displayNameError, newPasswordError, normalizePhone, phoneInputError } from '../features/platform/model/account-input';
+import type { AdminUserResponseDTO } from '../services/admin-user-service';
 
 const { Title, Text } = Typography;
 
@@ -172,82 +174,89 @@ const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [setupRequired, setSetupRequired] = useState<boolean | null>(null);
+  const [setupError, setSetupError] = useState('');
+  const [setupAttempt, setSetupAttempt] = useState(0);
+  const [legacyLogin, setLegacyLogin] = useState(false);
+  const [formError, setFormError] = useState('');
+  const alive = useRef(true);
+  const requestInFlight = useRef(false);
 
   useEffect(() => {
     let active = true;
+    alive.current = true;
+    setSetupRequired(null);
+    setSetupError('');
     FirstTimeSetupService.isRequired()
       .then((required) => {
         if (active) setSetupRequired(required);
       })
-      .catch(() => {
-        if (active) setSetupRequired(false);
+      .catch((error) => {
+        if (active) setSetupError(userFacingError(error, '暂时无法确认平台状态，请重试。'));
       });
     return () => {
       active = false;
+      alive.current = false;
     };
-  }, []);
+  }, [setupAttempt]);
 
-  const persistSession = (loginUser: { userId?: string; username: string; userRole?: string; token?: string }, fallbackUsername: string) => {
+  const persistSession = (loginUser: AdminUserResponseDTO, fallbackUsername: string) => {
     if (!loginUser.token) return false;
     const userInfo = {
       userId: loginUser.userId,
       username: loginUser.username || fallbackUsername,
+      phone: loginUser.phone,
       userRole: normalizeUserRole(loginUser.userRole),
       loginTime: new Date().toISOString(),
       token: loginUser.token,
+      passwordChangeRequired: Boolean(loginUser.passwordChangeRequired),
     };
-    localStorage.setItem('token', userInfo.token);
-    localStorage.setItem('userInfo', JSON.stringify(userInfo));
-    localStorage.setItem('isLoggedIn', 'true');
+    saveAuthSession(userInfo);
     return true;
   };
 
   const handleLogin = async (values: Record<string, any>) => {
+    if (requestInFlight.current || setupRequired === null) return;
+    setFormError('');
+    const reject = (message: string) => setFormError(message);
+    const phone = normalizePhone(String(values.phone || ''));
+    const username = String(values.username || '').trim();
+    const password = String(values.password || '');
+    if ((!legacyLogin || setupRequired) && phoneInputError(phone)) return reject(phoneInputError(phone)!);
+    if ((setupRequired || legacyLogin) && displayNameError(username)) return reject(setupRequired ? displayNameError(username)! : '请输入原账号。');
+    if (!password) return reject('请输入密码。');
+    if (setupRequired && newPasswordError(password)) return reject(newPasswordError(password)!);
+    if (setupRequired && password !== values.confirmPassword) return reject('两次输入的密码不一致。');
+    requestInFlight.current = true;
     setLoading(true);
     try {
-      if (!values.username || !values.password) {
-        Toast.error('请输入用户名和密码。');
-        return;
-      }
-
       if (setupRequired) {
-        if (values.password !== values.confirmPassword) {
-          Toast.error('两次输入的密码不一致。');
-          return;
-        }
-        const password = String(values.password);
-        if (!/\p{L}/u.test(password) || !/\p{N}/u.test(password)) {
-          Toast.error('管理员密码必须同时包含字母和数字。');
-          return;
-        }
         const firstAdministrator = await FirstTimeSetupService.createFirstAdministrator({
-          username: values.username,
-          password: values.password,
+          username, phone, password,
         });
-        if (!persistSession(firstAdministrator, values.username)) {
+        if (!alive.current) return;
+        if (!persistSession(firstAdministrator, username)) {
           throw new Error('初始化已完成，但未返回有效登录会话。');
         }
         Toast.success('首位管理员已创建，欢迎使用 OrbisOps。');
-        navigate('/home');
+        navigate(firstAdministrator.passwordChangeRequired ? '/account/password' : '/home');
         return;
       }
 
       const loginUser = await AdminUserService.loginAdminUser({
-        username: values.username,
-        password: values.password,
+        ...(legacyLogin ? { username } : { phone }), password,
       });
-
-      if (loginUser?.token && persistSession(loginUser, values.username)) {
+      if (!alive.current) return;
+      if (loginUser?.token && persistSession(loginUser, username)) {
         Toast.success('登录成功。');
         navigate(defaultRouteForCurrentUser());
       } else {
-        Toast.error('用户名或密码错误。');
+        reject(legacyLogin ? '原账号或密码错误。' : '手机号或密码错误。');
       }
     } catch (error) {
-      console.error('Authentication failed:', error);
-      Toast.error(userFacingError(error, '登录失败，请稍后重试。'));
+      if (alive.current) reject(userFacingError(error, '登录失败，请稍后重试。'));
     } finally {
-      setLoading(false);
+      requestInFlight.current = false;
+      if (alive.current) setLoading(false);
     }
   };
 
@@ -288,24 +297,32 @@ const LoginPage: React.FC = () => {
             <LoginSubtitle>
               {setupRequired
                 ? '创建平台首位管理员，完成后将自动登录。'
-                : '使用 OrbisOps 平台账号继续。'}
+                : '使用手机号和密码，进入团队运维工作台。'}
             </LoginSubtitle>
           </LoginHeader>
 
-          <StyledForm onSubmit={handleLogin}>
+          {setupError && <div role="alert" style={{ marginBottom: 16 }}>
+            <Text type="danger">{setupError}</Text>
+            <Button theme="borderless" onClick={() => setSetupAttempt((attempt) => attempt + 1)}>重试读取平台状态</Button>
+          </div>}
+          <StyledForm key={`${setupRequired}-${legacyLogin}`} onSubmit={handleLogin}>
+            {(setupRequired || !legacyLogin) && <Form.Input
+              field="phone" label="手机号" placeholder="请输入手机号" type="tel" inputMode="tel"
+              autoComplete={setupRequired ? 'tel' : 'username'} disabled={loading}
+              prefix={<IconUser />} size="large"
+              rules={[{ required: true, message: '请输入手机号。' },
+                { validator: (_rule, value) => !phoneInputError(String(value || '')), message: '请输入有效的中国大陆手机号。' }]}
+            />}
+            {(setupRequired || legacyLogin) && <Form.Input
+              field="username" label={setupRequired ? '姓名' : '原账号'}
+              placeholder={setupRequired ? '管理员姓名' : '原用户名'} autoComplete={setupRequired ? 'name' : 'username'}
+              maxLength={50} prefix={<IconUser />} size="large" disabled={loading}
+              rules={[{ required: true, message: setupRequired ? '请输入姓名。' : '请输入原账号。' }]}
+            />}
             <Form.Input
-              field="username"
-              placeholder="用户名"
-              prefix={<IconUser />}
-              size="large"
-              rules={[
-                { required: true, message: '请输入用户名。' },
-                { min: 3, message: '用户名至少 3 个字符。' },
-              ]}
-            />
-            <Form.Input
-              field="password"
+              field="password" label={setupRequired ? '管理员密码' : '密码'}
               type={showPassword ? 'text' : 'password'}
+              autoComplete={setupRequired ? 'new-password' : 'current-password'} disabled={loading}
               placeholder={setupRequired ? '管理员密码' : '密码'}
               prefix={<IconLock />}
               size="large"
@@ -313,6 +330,7 @@ const LoginPage: React.FC = () => {
                 <Button
                   theme="borderless"
                   htmlType="button"
+                  aria-label={showPassword ? '隐藏密码' : '显示密码'}
                   icon={showPassword ? <IconEyeClosed /> : <IconEyeOpened />}
                   onClick={() => setShowPassword(!showPassword)}
                   style={{ padding: '4px' }}
@@ -320,12 +338,12 @@ const LoginPage: React.FC = () => {
               }
               rules={[
                 { required: true, message: '请输入密码。' },
-                { min: setupRequired ? 8 : 6, message: setupRequired ? '管理员密码至少 8 个字符。' : '密码至少 6 个字符。' },
+                ...(setupRequired ? [{ min: 8, message: '管理员密码至少 8 个字符。' }] : []),
               ]}
             />
             {setupRequired && (
               <Form.Input
-                field="confirmPassword"
+                field="confirmPassword" label="确认密码" autoComplete="new-password" disabled={loading}
                 type={showPassword ? 'text' : 'password'}
                 placeholder="确认管理员密码"
                 prefix={<IconLock />}
@@ -334,21 +352,31 @@ const LoginPage: React.FC = () => {
               />
             )}
 
+            {formError && <p role="alert"><Text type="danger">{formError}</Text></p>}
             <LoginButton
               type="primary"
               htmlType="submit"
-              loading={loading || setupRequired === null}
-              disabled={setupRequired === null}
+              loading={loading || (setupRequired === null && !setupError)}
+              disabled={setupRequired === null || loading}
             >
               {setupRequired ? '创建管理员并进入系统' : '登录'}
             </LoginButton>
           </StyledForm>
 
-          {setupRequired && (
+          {setupRequired ? (
             <LoginFootnote>
               仅当平台还没有任何用户时才会显示首次初始化入口。管理员密码至少 8 位，并同时包含字母和数字。
             </LoginFootnote>
-          )}
+          ) : setupRequired === false && <>
+            <LoginFootnote>需要账号或忘记密码？请联系已有管理员添加成员或处理账号。</LoginFootnote>
+            <details style={{ marginTop: 16 }}>
+              <summary style={{ cursor: 'pointer', color: theme.colors.text.tertiary, fontSize: 12 }}>旧账号尚未绑定手机号？</summary>
+              <Text type="tertiary" size="small">迁移期间可使用原账号登录，再联系管理员绑定手机号。</Text>
+              <Button theme="borderless" disabled={loading} onClick={() => { setLegacyLogin(!legacyLogin); setFormError(''); }}>
+                {legacyLogin ? '返回手机号登录' : '使用原账号登录'}
+              </Button>
+            </details>
+          </>}
         </LoginCard>
       </LoginWrapper>
     </LoginContainer>

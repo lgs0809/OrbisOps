@@ -4,6 +4,7 @@ import { Button, Space, Tag, Typography } from '@douyinfe/semi-ui';
 
 import { theme } from '../../../styles/theme';
 import type { ChangePackageSummary } from '../model/change-package-summary';
+import { serverLocalTime } from '../../../utils/server-time';
 
 const { Text } = Typography;
 
@@ -41,7 +42,7 @@ export const ChangePackageSummaryCard: React.FC<Props> = ({ summary, actionLabel
         </Space>
       </Space>
       {summary.reasonCode && <Text type="tertiary" size="small">{summary.reasonLabel}</Text>}
-      {summary.updateTime && <Text type="tertiary" size="small">更新时间：{summary.updateTime}</Text>}
+      {summary.updateTime && <Text type="tertiary" size="small">更新时间：{serverLocalTime(summary.updateTime)}</Text>}
       {onOpen && <Button theme="borderless" onClick={onOpen}>{actionLabel}</Button>}
     </Space>
   </Card>

@@ -7,7 +7,7 @@
     "strictPropertyInitialization": false,
     "strict": true,
     "esModuleInterop": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "skipLibCheck": true,
     "noUnusedLocals": true,
     "noImplicitAny": true,

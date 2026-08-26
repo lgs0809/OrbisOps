@@ -1,5 +1,5 @@
 import { API_CONFIG } from '../config/api';
-import { ApiResponse, opsRequest } from './ops-http-client';
+import { ApiRequestError, ApiResponse, ApiTransportError, opsRequest } from './ops-http-client';
 import {
   OpsChangePackage,
   OpsChangePackageEvent,
@@ -146,16 +146,38 @@ class OpsChangePackageService {
   }
 
   async land(packageId: string, request: Record<string, any> = {}, scope: OpsExecutionScope = 'admin'): Promise<ApiResponse<OpsChangePackage>> {
-    return await opsRequest<OpsChangePackage>(`${this.baseUrl(scope)}/${encodeURIComponent(packageId)}/land`, {
-      method: 'POST',
-      body: JSON.stringify(request),
-    });
+    try {
+      return await opsRequest<OpsChangePackage>(`${this.baseUrl(scope)}/${encodeURIComponent(packageId)}/land`, {
+        method: 'POST',
+        body: JSON.stringify(request),
+      });
+    } catch (error) {
+      const responseLost = error instanceof ApiTransportError || (error instanceof ApiRequestError
+        && [502, 503, 504].includes(error.status));
+      const approvedHash = request.approvedPackageHash || request.packageHash;
+      if (!responseLost || !Number.isSafeInteger(request.version) || !approvedHash) throw error;
+      // A disconnected browser cannot cancel a durable Landing. Read its exact
+      // approved identity once; never resend the production command.
+      const receipt = await this.get(packageId, scope);
+      const current = receipt.data;
+      if (receipt.code === '0000' && current?.packageId === packageId
+        && current.version === request.version && current.approvedVersion === request.version
+        && current.approvedPackageHash === approvedHash && current.landingRunId
+        && ['LANDING_RUNNING', 'LANDED'].includes(current.status)) return receipt;
+      throw error;
+    }
   }
 
   async cleanup(packageId: string, request: Record<string, any> = {}, scope: OpsExecutionScope = 'admin'): Promise<ApiResponse<Record<string, any>>> {
     return await opsRequest<Record<string, any>>(`${this.baseUrl(scope)}/${encodeURIComponent(packageId)}/cleanup`, {
       method: 'POST',
       body: JSON.stringify(request),
+    });
+  }
+
+  async verifyLanding(packageId: string, scope: OpsExecutionScope): Promise<ApiResponse<Record<string, any>>> {
+    return await opsRequest<Record<string, any>>(`${this.baseUrl(scope)}/${encodeURIComponent(packageId)}/verify-landing`, {
+      method: 'POST', body: JSON.stringify({}),
     });
   }
 

@@ -46,6 +46,7 @@ test('Skill Evolver caches one filtered overview and refetches after explicit sc
 
   await page.goto('/platform/advanced/skill-evolver');
   await expect(page.getByText('运维对话完成后自动学习').first()).toBeVisible();
+  await page.getByRole('tab', { name: '沉淀结果' }).click();
   await expect(page.getByText('HTTP 5xx diagnosis').first()).toBeVisible();
   expect(jobRequests).toBe(1);
   expect(patchRequests).toBe(1);

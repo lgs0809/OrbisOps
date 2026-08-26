@@ -23,6 +23,7 @@ export interface OpsChangePackage {
   approvedVersion?: number;
   packageHash?: string;
   approvedPackageHash?: string;
+  landingRunId?: string;
   objective?: string;
   summary?: string;
   evidenceJson?: string;

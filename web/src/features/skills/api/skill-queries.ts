@@ -7,7 +7,7 @@ import {
   type OpsSkillReference,
   type OpsSkillSummary,
 } from '../../../services/ops-admin-service';
-import { opsProjectService, type OpsProjectWorkspace } from '../../../services/ops-project-service';
+import type { OpsProjectWorkspace } from '../../../services/ops-project-service';
 
 const dataOf = <T,>(response: { code: string; info?: string; data: T }, fallback?: T): T => {
   if (response.code !== '0000') {
@@ -134,7 +134,7 @@ export const useSkillVersionsQuery = (skillId: string, enabled = true) => useQue
 export const useSkillCopyProjectsQuery = (enabled = true) => useQuery({
   queryKey: [...skillQueryKeys.all, 'copy-projects'] as const,
   enabled,
-  queryFn: async (): Promise<OpsProjectWorkspace[]> => dataOf(await opsProjectService.snapshot(), { projects: [], templates: [] }).projects || [],
+  queryFn: async (): Promise<OpsProjectWorkspace[]> => dataOf(await opsAdminService.listChatProjects('admin'), []),
   staleTime: 30_000,
 });
 

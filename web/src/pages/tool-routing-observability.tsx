@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
-import { Button, Modal, Select, Space, Switch, Table, Tag, TextArea, Toast, Typography } from '@douyinfe/semi-ui';
+import { Button, Input, Modal, Select, Space, Switch, Table, Tag, TextArea, Toast, Typography } from '@douyinfe/semi-ui';
 import { IconRefresh } from '@douyinfe/semi-icons';
 
 import {
@@ -20,6 +20,7 @@ import {
   useSelectToolRouteMutation,
   useToolRoutingOverviewQuery,
 } from '../features/tool-routing/api/tool-routing-queries';
+import { policyArguments, policyResourceBinding, reviewArguments } from '../features/tool-routing/model/policy-review-arguments';
 import { useProjectScope } from '../hooks/use-project-scope';
 import { theme } from '../styles/theme';
 import { userFacingError } from '../utils/user-facing-error';
@@ -154,6 +155,9 @@ const runtimeCatalogTools = (summary: Record<string, any> | null) => summaryTool
 });
 
 type PolicyReviewDraft = {
+  argumentPolicy: Record<string, unknown>;
+  targetEnvironment: string;
+  resourceScope: string;
   disclosureTier: 'CORE' | 'EXTENSION';
   effectType: string;
   effectScope: string;
@@ -173,9 +177,13 @@ type PolicyReviewDraft = {
 const readLikeTool = (toolName: string) => /(^|_)(get|list|read|search|query|find|scan|show|describe|explain|health|status|inspect|logs?)(_|$)/i.test(toolName);
 
 const reviewDefaults = (record: Record<string, any>): PolicyReviewDraft => {
+  const argumentPolicy = policyArguments(record);
+  const binding = policyResourceBinding(argumentPolicy);
   const toolName = asText(record.toolName || record.tool_name, '');
   const inferredReadOnly = Boolean(record.readOnly || record.read_only) || readLikeTool(toolName);
   return {
+    argumentPolicy,
+    ...binding,
     disclosureTier: asText(record.disclosureTier || record.disclosure_tier || record.metadata?.disclosureTier, 'EXTENSION') === 'CORE' ? 'CORE' : 'EXTENSION',
     effectType: inferredReadOnly ? 'READ_EXTERNAL_STATE' : asText(record.effectType || record.effect_type, 'UNKNOWN'),
     effectScope: inferredReadOnly ? 'TARGET_RESOURCE_READ' : asText(record.effectScope || record.effect_scope, 'UNKNOWN'),
@@ -203,6 +211,7 @@ export const ToolRoutingObservabilityPage: React.FC = () => {
   const selectRouteMutation = useSelectToolRouteMutation(projectId);
   const reviewPolicyMutation = useReviewToolPolicyMutation(projectId);
   const summary = overviewQuery.data?.summary || null;
+  const remoteCatalogs = overviewQuery.data?.remoteCatalogs || [];
   const decisions = overviewQuery.data?.decisions || [];
   const calls = overviewQuery.data?.calls || [];
   const snapshots = overviewQuery.data?.snapshots || [];
@@ -253,8 +262,13 @@ export const ToolRoutingObservabilityPage: React.FC = () => {
   };
 
   const openPolicyReview = (record: Record<string, any>) => {
-    setPolicyReviewTarget(record);
-    setPolicyReviewDraft(reviewDefaults(record));
+    try {
+      const draft = reviewDefaults(record);
+      setPolicyReviewTarget(record);
+      setPolicyReviewDraft(draft);
+    } catch (error) {
+      Toast.error(userFacingError(error, '工具参数限制无法读取，请刷新后重试审核。'));
+    }
   };
 
   const submitPolicyReview = async () => {
@@ -269,18 +283,20 @@ export const ToolRoutingObservabilityPage: React.FC = () => {
     }
     try {
       const allowedAction = toolName.replace(/[^a-zA-Z0-9]+/g, '_').toUpperCase();
+      const { argumentPolicy, targetEnvironment, resourceScope, ...reviewFields } = policyReviewDraft;
+      const reviewedArguments = reviewArguments(argumentPolicy, targetEnvironment, resourceScope);
       await reviewPolicyMutation.mutateAsync({
         policyId,
         action: 'approve',
         payload: {
-          ...policyReviewDraft,
+          ...reviewFields,
           metadata: {
             ...(policyReviewTarget.metadata || {}),
             disclosureTier: policyReviewDraft.disclosureTier,
           },
           capability: policyReviewDraft.readOnly ? 'READ_ONLY' : 'MUTATING',
           allowedActions: [allowedAction],
-          argumentPolicy: policyReviewDraft.readOnly ? { maxLimit: 500 } : {},
+          argumentPolicy: reviewedArguments,
         },
       });
       Toast.success('策略已人工审核并发布');
@@ -533,6 +549,25 @@ export const ToolRoutingObservabilityPage: React.FC = () => {
         />
       </OpsSectionCard>
 
+      <OpsSectionCard title="远端工具目录同步">
+        <Text type="tertiary">首次接入保存完整目录，之后每日检查。检查失败时保留上次可用目录；项目撤权仍立即生效。更换接入配置后，旧配置的检查记录仍会保留。</Text>
+        {remoteCatalogs.length === 0 ? (
+          <OpsEmptyState title="尚未读取远端目录" description="接入工具或实际使用后，这里会显示检查时间和结果。" />
+        ) : (
+          <TableScroll><Table dataSource={remoteCatalogs} rowKey="connectionId" pagination={{ pageSize: 6 }} columns={[
+            { title: 'MCP 接入', dataIndex: 'serverId' },
+            { title: '配置记录', dataIndex: 'connectionId', render: (v) => String(v || '').slice(0, 12) },
+            { title: '目录版本', dataIndex: 'generation' },
+            { title: '远端工具数', dataIndex: 'toolCount' },
+            { title: '最后检查', dataIndex: 'checkedAt', render: (v) => v ? new Date(String(v)).toLocaleString() : '-' },
+            { title: '最后成功', dataIndex: 'succeededAt', render: (v) => v ? new Date(String(v)).toLocaleString() : '-' },
+            { title: '结果', render: (_, row) => row?.errorCode
+              ? <Tag color="orange">{row.generation > 0 ? '检查失败，保留旧目录' : '检查失败，尚无可用目录'}</Tag>
+              : <Tag color="green">目录可用</Tag> },
+          ]} /></TableScroll>
+        )}
+      </OpsSectionCard>
+
       <OpsResponsiveGrid $min="320px">
         <OpsSectionCard title="目录摘要">
           {summary ? (
@@ -760,6 +795,20 @@ export const ToolRoutingObservabilityPage: React.FC = () => {
                 <Space key={key} align="center"><Switch checked={Boolean(policyReviewDraft[key])} onChange={(checked) => setPolicyReviewDraft((current) => current ? ({ ...current, [key]: checked }) : current)} /><Text>{label}</Text></Space>
               ))}
             </OpsResponsiveGrid>
+            <Space vertical align="start" style={{ width: '100%' }}>
+              <Text strong>执行资源</Text>
+              <Text type="tertiary">原参数限制会随审核保存。目标环境和资源范围需要一起填写。</Text>
+              <OpsResponsiveGrid $min="210px">
+                <Space vertical align="start">
+                  <Text strong>目标环境</Text>
+                  <Input aria-label="目标环境" placeholder="例如 test" value={policyReviewDraft.targetEnvironment} onChange={(value) => setPolicyReviewDraft((current) => current ? ({ ...current, targetEnvironment: value }) : current)} />
+                </Space>
+                <Space vertical align="start">
+                  <Text strong>资源范围</Text>
+                  <Input aria-label="资源范围" placeholder="填写该工具被授权的资源范围" value={policyReviewDraft.resourceScope} onChange={(value) => setPolicyReviewDraft((current) => current ? ({ ...current, resourceScope: value }) : current)} />
+                </Space>
+              </OpsResponsiveGrid>
+            </Space>
             <Space vertical align="start" style={{ width: '100%' }}>
               <Text strong>审核说明</Text>
               <TextArea value={policyReviewDraft.reason} autosize rows={3} placeholder="说明为什么该权限范围是安全且必要的" onChange={(value) => setPolicyReviewDraft((current) => current ? ({ ...current, reason: value }) : current)} />

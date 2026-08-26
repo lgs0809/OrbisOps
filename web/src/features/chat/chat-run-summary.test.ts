@@ -10,6 +10,13 @@ const event = (eventType: string, status: string, summary = ''): OpsRuntimeEvent
 });
 
 describe('summarizeChatRun', () => {
+  it('does not turn an individual HTTP attempt failure into a failed task after the retry recovered', () => {
+    const recovered = [event('MODEL_REQUEST_FAILED', 'FAILED', '本次连接异常'),
+      event('MODEL_CALL_RETRYING', 'RUNNING'), event('MODEL_RESPONSE_VERIFIED', 'SUCCEEDED'),
+      event('WORKFLOW_APPROVAL_WAITING', 'WAITING')];
+    expect(summarizeChatRun(recovered, false).stage).not.toBe('blocked');
+    expect(summarizeChatRun([...recovered, event('MODEL_CALL_FAILED', 'FAILED', '本轮模型分析失败')], false).stage).toBe('blocked');
+  });
   it('keeps raw runtime events behind a human-readable investigation stage', () => {
     const summary = summarizeChatRun([
       event('MODEL_CALL_STARTED', 'RUNNING'),

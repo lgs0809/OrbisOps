@@ -31,7 +31,6 @@ import {
   Handle,
   MarkerType,
   MiniMap,
-  Panel as FlowPanel,
   Position,
   ReactFlow,
   ReactFlowProvider,
@@ -96,8 +95,10 @@ interface Props {
 }
 
 const CanvasShell = styled.div<{ $height?: string }>`
+  display: flex;
+  flex-direction: column;
   height: ${(props) => props.$height || '520px'};
-  min-height: 460px;
+  min-height: ${(props) => props.$height === '100%' ? '0' : '460px'};
   border: 1px solid ${theme.colors.border.secondary};
   background: ${theme.colors.bg.secondary};
 
@@ -114,17 +115,43 @@ const CanvasShell = styled.div<{ $height?: string }>`
     overflow: hidden;
     box-shadow: ${theme.shadows.sm};
   }
+
+  @media (max-width: 760px), (max-height: 800px) {
+    .react-flow__minimap {
+      display: none;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .react-flow__minimap {
+      width: 110px;
+      height: 70px;
+    }
+
+    .react-flow__minimap svg {
+      width: 100%;
+      height: 100%;
+    }
+  }
 `;
 
 const Palette = styled.div`
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  align-items: center;
+  flex-shrink: 0;
   gap: 6px;
   padding: 8px;
   border: 1px solid ${theme.colors.border.secondary};
-  border-radius: ${theme.borderRadius.base};
+  border-radius: 0;
   background: rgba(255, 255, 255, 0.96);
-  box-shadow: ${theme.shadows.sm};
+
+  @media (max-width: 760px) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    padding: 6px;
+  }
 `;
 
 const PaletteItem = styled.button`
@@ -149,9 +176,14 @@ const PaletteItem = styled.button`
   &:active {
     cursor: grabbing;
   }
+
+  @media (max-width: 760px) {
+    width: 100%;
+  }
 `;
 
 const PaletteGroupTitle = styled.div`
+  grid-column: 1 / -1;
   margin: 4px 2px 0;
   color: ${theme.colors.text.tertiary};
   font-size: 11px;
@@ -281,6 +313,7 @@ const nodeVisualKind = (node: OpsWorkflowNode) => {
   if (node.type === 'END') return 'END';
   if (normalized(node.type) === 'ROUTER') return 'ROUTER';
   if (normalized(node.type) === 'SUB_WORKFLOW') return 'SUB_WORKFLOW';
+  if (normalized(node.type) === 'HUMAN_APPROVAL') return 'HUMAN_APPROVAL';
   const mode = agentMode(node);
   const abilityText = normalized([
     node.nodeId,
@@ -310,6 +343,7 @@ const iconByEngine = (engine: string) => {
   if (engine === 'END') return IconStop;
   if (engine === 'ROUTER') return IconRoute;
   if (engine === 'SUB_WORKFLOW') return IconBranch;
+  if (engine === 'HUMAN_APPROVAL') return IconKey;
   if (engine === 'PLAN') return IconFlowChartStroked;
   if (engine === 'REVIEW') return IconPulse;
   if (engine === 'REACT') return IconCommand;
@@ -351,6 +385,7 @@ const paletteItems = [
   { type: 'AGENT', label: 'Agent Node', icon: IconCommand },
   { type: 'ROUTER', label: 'Router', icon: IconRoute },
   { type: 'SUB_WORKFLOW', label: '子 Workflow', icon: IconBranch },
+  { type: 'HUMAN_APPROVAL', label: '人工审批', icon: IconKey },
   { type: 'END', label: 'End', icon: IconStop },
 ];
 
@@ -410,6 +445,11 @@ const createNodeByType = (type: string, position: PositionValue): OpsWorkflowNod
       outputKey: `${nodeId}_result`,
       config: { position, versionPolicy: 'LATEST_PUBLISHED', inputKey: '' },
     };
+  }
+  if (type === 'HUMAN_APPROVAL') {
+    return { nodeId, type: 'HUMAN_APPROVAL', description: '等待人工确认后继续。',
+      instruction: '请审核当前步骤的证据和操作范围。', outputKey: `${nodeId}_result`,
+      config: { position, timeoutSeconds: 1800 } };
   }
   return {
     nodeId,
@@ -579,7 +619,7 @@ const toFlowNodes = (
   return nodes.map((node) => {
     const visualKind = nodeVisualKind(node);
     const rawType = normalized(node.type || 'AGENT');
-    const nodeType = ['START', 'END', 'ROUTER', 'SUB_WORKFLOW'].includes(rawType) ? rawType : 'AGENT';
+    const nodeType = ['START', 'END', 'ROUTER', 'SUB_WORKFLOW', 'HUMAN_APPROVAL'].includes(rawType) ? rawType : 'AGENT';
     const role = roleMeta(node);
     return {
       id: node.nodeId,
@@ -722,7 +762,28 @@ function OpsAgentFlowCanvas({
 
   return (
     <CanvasShell $height={height}>
+      <Palette aria-label="节点工具">
+        <PaletteGroupTitle>核心节点</PaletteGroupTitle>
+        {paletteItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <PaletteItem
+              key={item.type}
+              type="button"
+              draggable
+              onDragStart={(event) => {
+                event.dataTransfer.setData('application/ops-agent-node', item.type);
+                event.dataTransfer.effectAllowed = 'move';
+              }}
+            >
+              <Icon />
+              {item.label}
+            </PaletteItem>
+          );
+        })}
+      </Palette>
       <ReactFlow<OpsFlowNodeType, OpsFlowEdge>
+        style={{ height: 'auto', flex: 1, minHeight: 0 }}
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
@@ -744,34 +805,13 @@ function OpsAgentFlowCanvas({
         zoomOnScroll={false}
         panOnScroll={false}
         preventScrolling={false}
+        minZoom={0.1}
         fitView
         fitViewOptions={{ padding: 0.25 }}
         defaultEdgeOptions={{
           markerEnd: { type: MarkerType.ArrowClosed, color: '#94a3b8' },
         }}
       >
-        <FlowPanel position="top-left">
-          <Palette>
-            <PaletteGroupTitle>核心节点</PaletteGroupTitle>
-            {paletteItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <PaletteItem
-                  key={item.type}
-                  type="button"
-                  draggable
-                  onDragStart={(event) => {
-                    event.dataTransfer.setData('application/ops-agent-node', item.type);
-                    event.dataTransfer.effectAllowed = 'move';
-                  }}
-                >
-                  <Icon />
-                  {item.label}
-                </PaletteItem>
-              );
-            })}
-          </Palette>
-        </FlowPanel>
         <Background variant={BackgroundVariant.Dots} gap={18} size={1.2} color="#cbd5e1" />
         <Controls showInteractive={false} />
         <MiniMap zoomable pannable nodeStrokeWidth={3} />

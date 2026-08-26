@@ -25,3 +25,5 @@ export { OpsEvidenceCard } from './OpsEvidenceCard';
 export type { OpsEvidenceCardProps } from './OpsEvidenceCard';
 export { OpsTimeline } from './OpsTimeline';
 export type { OpsTimelineItem } from './OpsTimeline';
+
+export { OpsWorkspaceFrame } from './OpsWorkspaceFrame';

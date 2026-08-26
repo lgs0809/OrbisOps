@@ -1,3 +1,4 @@
+import { fulfillAccessibleProjects } from './fixtures/project-catalog';
 import { expect, test } from '@playwright/test';
 
 type Json = Record<string, any>;
@@ -19,6 +20,7 @@ test('Channel is transport-first and can be output-only, ReAct, or Workflow', as
     const url = new URL(request.url());
     const path = url.pathname;
 
+    if (await fulfillAccessibleProjects(route, [{ projectId: 'demo-project', name: 'Demo Project', defaultAgentId: 'default-react' }])) return;
     if (path.endsWith('/api/v1/admin/ops-projects/snapshot')) {
       return route.fulfill({
         status: 200,

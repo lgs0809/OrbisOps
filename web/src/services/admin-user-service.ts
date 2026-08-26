@@ -3,10 +3,12 @@
  */
 
 import { API_ENDPOINTS, DEFAULT_HEADERS } from '../config';
+import { readAccountResponse } from './account-response';
 
 // 定义登录请求数据类型
 export interface AdminUserLoginRequestDTO {
-  username: string;
+  phone?: string;
+  username?: string;
   password: string;
 }
 
@@ -21,14 +23,17 @@ export interface AdminUserResponseDTO {
   id?: number;
   userId?: string;
   username: string;
+  phone?: string | null;
   userRole?: 'admin' | 'user' | string;
   status?: number;
+  passwordChangeRequired?: boolean;
   token?: string;
 }
 
 export interface AdminUserCreateRequestDTO {
   userId?: string;
   username: string;
+  phone?: string;
   password: string;
   userRole?: 'admin' | 'user' | string;
   status?: number;
@@ -43,28 +48,12 @@ export class AdminUserService {
   static async loginAdminUser(
     loginData: AdminUserLoginRequestDTO
   ): Promise<AdminUserResponseDTO | null> {
-    try {
-      const response = await fetch(`${this.BASE_URL}${API_ENDPOINTS.ADMIN_USER.LOGIN}`, {
-        method: 'POST',
-        headers: DEFAULT_HEADERS,
-        body: JSON.stringify(loginData),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result: ApiResponse<AdminUserResponseDTO> = await response.json();
-      if (result.code === '0000') {
-        return result.data || null;
-      }
-
-      console.error('登录失败:', result.info);
-      return null;
-    } catch (error) {
-      console.error('登录请求失败:', error);
-      return null;
-    }
+    const response = await fetch(`${this.BASE_URL}${API_ENDPOINTS.ADMIN_USER.LOGIN}`, {
+      method: 'POST',
+      headers: DEFAULT_HEADERS,
+      body: JSON.stringify(loginData),
+    });
+    return await readAccountResponse<AdminUserResponseDTO | null>(response, '登录失败，请稍后重试。');
   }
 
   /**
@@ -138,17 +127,16 @@ export class AdminUserService {
   }
 
   static async logout(): Promise<void> {
-    try {
-      const token = localStorage.getItem('token');
-      await fetch(`${this.BASE_URL}${API_ENDPOINTS.ADMIN_USER.LOGOUT}`, {
-        method: 'POST',
-        headers: {
-          ...DEFAULT_HEADERS,
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-    } catch (error) {
-      console.warn('注销请求失败，已在前端清理登录态:', error);
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${this.BASE_URL}${API_ENDPOINTS.ADMIN_USER.LOGOUT}`, {
+      method: 'POST',
+      headers: {
+        ...DEFAULT_HEADERS,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    if (!await readAccountResponse<boolean>(response, '注销未完成，请稍后重试。')) {
+      throw new Error('注销未完成，请稍后重试。');
     }
   }
 }

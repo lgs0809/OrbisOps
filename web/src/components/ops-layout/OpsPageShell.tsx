@@ -13,7 +13,7 @@ const PageLayout = styled(Layout)`
   min-height: 0;
   min-width: 0;
   width: 100%;
-  background: #fbfbfa;
+  background: ${theme.colors.bg.secondary};
   overflow: hidden;
 `;
 
@@ -48,7 +48,7 @@ const MainContent = styled.div<{ $collapsed: boolean }>`
   display: flex;
   flex: 1;
   flex-direction: column;
-  background: #fbfbfa;
+  background: ${theme.colors.bg.secondary};
   overflow-x: hidden;
   transition:
     width ${theme.animation.duration.normal} ${theme.animation.easing.cubic},
@@ -106,7 +106,7 @@ export const OpsPageShell: React.FC<OpsPageShellProps> = ({
 }) => {
   const navigate = useNavigate();
   const { mobile, mobileOpen, collapsed, sidebarCollapsed, toggleSidebar, closeMobileSidebar } =
-    useResponsiveSidebar(defaultCollapsed ?? true);
+    useResponsiveSidebar(defaultCollapsed);
 
   useEffect(() => {
     if (!mobile || !mobileOpen) return undefined;

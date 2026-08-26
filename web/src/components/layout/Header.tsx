@@ -1,13 +1,13 @@
 import React from 'react';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
 import { Avatar, Button, Dropdown, Typography } from '@douyinfe/semi-ui';
 import { IconExit, IconMenu } from '@douyinfe/semi-icons';
 
 import { theme } from '../../styles/theme';
-import { AdminUserService } from '../../services';
+import { logoutAccount } from '../../services/account-logout';
 import { getStoredUserInfo, roleLabel } from '../../services/auth-session';
-import { routeByPath } from '../../app/navigation/route-metadata';
+import { APP_ROUTES, routeByPath } from '../../app/navigation/route-metadata';
 
 const { Text } = Typography;
 
@@ -18,23 +18,16 @@ interface HeaderProps {
 }
 
 const HeaderContainer = styled.header`
-  display: none;
-
-  @media (max-width: ${theme.breakpoints.md}) {
-    height: 52px;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 0 10px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    border-bottom: 1px solid ${theme.colors.border.secondary};
-    background: rgb(250 250 248 / 94%);
-    backdrop-filter: blur(14px);
-  }
+  height: 56px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 24px;
+  border-bottom: 1px solid ${theme.colors.border.secondary};
+  background: ${theme.colors.bg.primary};
+  @media (max-width: ${theme.breakpoints.md}) { height: 52px; padding: 0 10px; }
 `;
 
 const HeaderLeft = styled.div`
@@ -76,8 +69,9 @@ const RouteContext = styled.div`
     max-width: 420px;
     overflow: hidden;
     color: ${theme.colors.text.tertiary};
-    font-size: 12px;
+    font-size: 13px;
     line-height: 1;
+    text-decoration: none;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -91,10 +85,11 @@ const RouteContext = styled.div`
 
 const HeaderRight = styled.div`
   min-width: 0;
-  display: flex;
+  display: none;
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+  @media (max-width: ${theme.breakpoints.md}) { display: flex; }
 `;
 
 const UserDropdown = styled.button`
@@ -150,9 +145,11 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onLogout, colla
   const location = useLocation();
   const userInfo = getStoredUserInfo();
   const route = routeByPath(location.pathname);
-  const breadcrumb = route?.breadcrumbs?.length && route.breadcrumbs.join(' / ') !== route.title
-    ? route.breadcrumbs.join(' / ')
-    : '';
+  const parentRoute = APP_ROUTES.find((entry) => entry.navigation?.section === 'primary'
+    && route?.path.startsWith(`${entry.path}/`));
+
+  const parentPath = parentRoute?.path === '/settings' && route?.navigation?.subgroup
+    ? `/settings?category=${route.navigation.subgroup}` : parentRoute?.path;
 
   const userMenuItems = [
     {
@@ -160,7 +157,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onLogout, colla
       name: '退出登录',
       icon: <IconExit />,
       onClick: () => {
-        AdminUserService.logout().finally(() => onLogout?.());
+        void logoutAccount(onLogout);
       },
     },
   ];
@@ -178,7 +175,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onLogout, colla
         />
         <RouteContext>
           <Text className="title">{route?.title || 'OrbisOps'}</Text>
-          {breadcrumb && <Text className="breadcrumb">{breadcrumb}</Text>}
+          {parentRoute && <Link className="breadcrumb" to={parentPath || parentRoute.path}>返回{parentRoute.title}</Link>}
         </RouteContext>
       </HeaderLeft>
 

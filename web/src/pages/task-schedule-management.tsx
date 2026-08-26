@@ -118,10 +118,52 @@ const AgentBadge = styled.div`
   line-height: 20px;
 `;
 
-const CronValue = styled.code`
+const FrequencyValue = styled.span`
   white-space: nowrap;
   color: ${theme.colors.text.primary};
   font-family: ${theme.typography.fontFamily};
+`;
+
+const StarterSection = styled(Card)`
+  margin: ${theme.spacing.lg} 0;
+
+  .semi-card-body {
+    padding: ${theme.spacing.lg};
+  }
+`;
+
+const StarterHeader = styled.div`
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+`;
+
+const StarterGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+
+  @media (max-width: 980px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const StarterItem = styled.div`
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px;
+  border: 1px solid ${theme.colors.border.tertiary};
+  border-radius: 10px;
+  background: #fafbfc;
+
+  .starter-copy {
+    min-height: 48px;
+  }
 `;
 
 const scheduleFrequencyLabel = (cron?: string) => {
@@ -131,9 +173,11 @@ const scheduleFrequencyLabel = (cron?: string) => {
     '0 0/30 * * * ?': '每 30 分钟',
     '0 */30 * * * ?': '每 30 分钟',
     '0 0 * * * ?': '每小时',
+    '0 0 8 * * ?': '每天 08:00',
     '0 0 9 * * ?': '每天 09:00',
   };
-  return labels[String(cron || '')] || String(cron || '未配置');
+  const value = String(cron || '');
+  return labels[value] || (value ? '自定义' : '未配置');
 };
 
 const scheduleFrequencyValue = (cron?: string) => {
@@ -143,22 +187,58 @@ const scheduleFrequencyValue = (cron?: string) => {
     '0 */30 * * * ?': '0 0/30 * * * ?',
   };
   const normalized = aliases[value] || value;
-  return ['0 0/15 * * * ?', '0 0/30 * * * ?', '0 0 * * * ?', '0 0 9 * * ?'].includes(normalized)
+  return ['0 0/15 * * * ?', '0 0/30 * * * ?', '0 0 * * * ?', '0 0 8 * * ?', '0 0 9 * * ?'].includes(normalized)
     ? normalized
     : 'CUSTOM';
 };
 
 const analysisFlowName = (agent?: OpsAgentDefinition, fallbackId?: string) => agent?.name || fallbackId || '-';
 
+interface ScheduleStarter {
+  name: string;
+  description: string;
+  cronExpression: string;
+  taskParam: string;
+  rangeMinutes: number;
+  promWindow: string;
+}
+
+const SCHEDULE_STARTERS: ScheduleStarter[] = [
+  {
+    name: '服务健康巡检',
+    description: '每 15 分钟快速看看服务是否正常。',
+    cronExpression: '0 0/15 * * * ?',
+    taskParam: '看看服务是否在线、错误率有没有上升，以及最近有没有明显报错；只读检查，给我简短结论。',
+    rangeMinutes: 15,
+    promWindow: '5m',
+  },
+  {
+    name: '早间运行摘要',
+    description: '每天早上汇总昨晚的运行情况。',
+    cronExpression: '0 0 9 * * ?',
+    taskParam: '帮我看一下昨晚的服务状态、错误日志和消息队列，有明显异常再展开说明；只读，给我三点结论。',
+    rangeMinutes: 60,
+    promWindow: '15m',
+  },
+  {
+    name: '队列积压检查',
+    description: '每 30 分钟检查消息是否堆积。',
+    cronExpression: '0 0/30 * * * ?',
+    taskParam: '看看消息队列有没有积压或消费变慢，只读检查；如果发现异常，说明影响范围和还缺什么证据。',
+    rangeMinutes: 30,
+    promWindow: '5m',
+  },
+];
+
 const defaultForm: TaskScheduleRequestDTO = {
   projectId: '',
   executionType: 'DEFAULT_REACT',
   agentId: '',
   agentBindingMode: 'LATEST_PUBLISHED',
-  taskName: 'Project 健康巡检',
-  description: '按计划运行所选 Project 执行绑定',
+  taskName: '服务健康巡检',
+  description: '按频率检查当前 Project 的服务状态',
   cronExpression: '0 0/15 * * * ?',
-  taskParam: '检查服务错误率、实例健康状态、ERROR/WARN 日志以及其他相关运维风险。',
+  taskParam: '看看服务是否在线、错误率有没有上升，以及最近有没有明显报错；只读检查，给我简短结论。',
   status: 1,
   rangeMinutes: 15,
   promWindow: '5m',
@@ -222,11 +302,17 @@ export const TaskScheduleManagement: React.FC = () => {
     setExecutionModalVisible(true);
   };
 
-  const openCreate = () => {
+  const openCreate = (starter?: ScheduleStarter) => {
     setEditing(null);
     const project = projectScope.selectedProject;
     setForm({
       ...defaultForm,
+      taskName: starter?.name || defaultForm.taskName,
+      description: starter?.description || defaultForm.description,
+      cronExpression: starter?.cronExpression || defaultForm.cronExpression,
+      taskParam: starter?.taskParam || defaultForm.taskParam,
+      rangeMinutes: starter?.rangeMinutes || defaultForm.rangeMinutes,
+      promWindow: starter?.promWindow || defaultForm.promWindow,
       projectId: project?.projectId || '',
       executionType: 'DEFAULT_REACT',
       agentId: project?.defaultAgentId || '',
@@ -278,11 +364,11 @@ export const TaskScheduleManagement: React.FC = () => {
         return;
       }
       if (!form.cronExpression?.trim()) {
-        Toast.error('请输入 Cron 表达式。');
+        Toast.error('请输入运行频率。');
         return;
       }
       if (form.cronExpression.trim().split(/\s+/).length !== 6) {
-        Toast.error('Cron 必须包含 6 个字段，例如：0 0/15 * * * ?');
+        Toast.error('自定义频率格式不正确，请检查后重试。');
         return;
       }
       if (!form.projectId) {
@@ -389,10 +475,10 @@ export const TaskScheduleManagement: React.FC = () => {
       },
     },
     {
-      title: '计划',
+      title: '运行频率',
       dataIndex: 'cronExpression',
       width: 150,
-      render: (value: string) => <CronValue>{scheduleFrequencyLabel(value)}</CronValue>,
+      render: (value: string) => <FrequencyValue>{scheduleFrequencyLabel(value)}</FrequencyValue>,
     },
     {
       title: '状态',
@@ -448,7 +534,7 @@ export const TaskScheduleManagement: React.FC = () => {
       width: 90,
       render: (status: string) => {
         const color = status === 'SUCCESS' ? 'green' : status === 'FAILED' ? 'red' : 'blue';
-        const label = status === 'SUCCESS' ? '成功' : status === 'FAILED' ? '失败' : status === 'RUNNING' ? '运行中' : status;
+        const label = status === 'SUCCESS' ? '成功' : status === 'FAILED' ? '失败' : status === 'RUNNING' ? '运行中' : status === 'WAITING_APPROVAL' ? '等待审批' : status === 'CANCELED' ? '已取消' : status;
         return <Tag color={color}>{label}</Tag>;
       },
     },
@@ -480,7 +566,7 @@ export const TaskScheduleManagement: React.FC = () => {
     <OpsPageShell selectedKey="automations" maxWidth="1280px">
       <OpsPageHeader
         title="定时自动化"
-        description="按计划运行 默认助手 或已发布 Workflow；每次执行都会形成正式 Run，并进入工作台统一查看。"
+        description="选择一个中文频率运行 默认助手 或已发布 Workflow；每次执行都会形成正式 Run，并进入工作台统一查看。"
       />
 
       <ProjectScopeBar
@@ -489,7 +575,7 @@ export const TaskScheduleManagement: React.FC = () => {
         onChange={projectScope.selectProject}
         loading={projectScope.loading}
         onRefresh={() => { void schedulesQuery.refetch(); void optionsQuery.refetch(); }}
-        actions={<Button type="primary" icon={<IconPlus />} disabled={!projectScope.projectId} onClick={openCreate}>新建定时自动化</Button>}
+        actions={<Button type="primary" icon={<IconPlus />} disabled={!projectScope.projectId} onClick={() => openCreate()}>新建定时自动化</Button>}
       />
 
       <Toolbar>
@@ -498,10 +584,28 @@ export const TaskScheduleManagement: React.FC = () => {
             <Typography.Text strong>定时自动化</Typography.Text>
           </Space>
           <Typography.Text type="tertiary">
-            调度配置每 30 秒刷新一次；已启用的自动化会按各自计划执行。
+            每 30 秒刷新一次；运行频率会用中文显示，方便快速确认。
           </Typography.Text>
         </Space>
       </Toolbar>
+
+      <StarterSection>
+        <StarterHeader>
+          <Typography.Text strong>常用起步模板</Typography.Text>
+          <Typography.Text type="tertiary" size="small">先选一个常用频率，也可以按需选择“自定义”。</Typography.Text>
+        </StarterHeader>
+        <StarterGrid>
+          {SCHEDULE_STARTERS.map((starter) => (
+            <StarterItem key={starter.name}>
+              <div className="starter-copy">
+                <Typography.Text strong>{starter.name}</Typography.Text>
+                <Typography.Text type="tertiary" size="small" style={{ display: 'block', marginTop: 3 }}>{starter.description}</Typography.Text>
+              </div>
+              <Button size="small" disabled={!projectScope.projectId} onClick={() => openCreate(starter)}>使用模板</Button>
+            </StarterItem>
+          ))}
+        </StarterGrid>
+      </StarterSection>
 
       <TableContainer>
         <TableCard>
@@ -579,7 +683,7 @@ export const TaskScheduleManagement: React.FC = () => {
                 </Typography.Text>
               </Field>
               <Field>
-                <Typography.Text strong>执行计划</Typography.Text>
+                <Typography.Text strong>运行频率</Typography.Text>
                 <Select value={scheduleFrequencyValue(form.cronExpression)} onChange={(value) => {
                   const frequency = String(value || '');
                   setForm({ ...form, cronExpression: frequency === 'CUSTOM' ? '' : frequency });
@@ -587,9 +691,13 @@ export const TaskScheduleManagement: React.FC = () => {
                   <Option value="0 0/15 * * * ?">每 15 分钟</Option>
                   <Option value="0 0/30 * * * ?">每 30 分钟</Option>
                   <Option value="0 0 * * * ?">每小时</Option>
+                  <Option value="0 0 8 * * ?">每天 08:00</Option>
                   <Option value="0 0 9 * * ?">每天 09:00</Option>
                   <Option value="CUSTOM">自定义</Option>
                 </Select>
+                <Typography.Text type="tertiary" size="small">
+                  常用频率已经翻译成中文；需要特殊安排时选择“自定义”。
+                </Typography.Text>
               </Field>
               <FullField>
                 <Card title="轻量筛选" bodyStyle={{ padding: 16 }}>
@@ -632,7 +740,7 @@ export const TaskScheduleManagement: React.FC = () => {
               </FullField>
               <FullField>
                 <Collapse keepDOM>
-                  <Collapse.Panel itemKey="advanced" header="高级设置">
+                  <Collapse.Panel itemKey="advanced" header="更多设置（可选）">
                     <FormGrid>
                       {!reactSelected && <Field>
                         <Typography.Text strong>Workflow 版本策略</Typography.Text>
@@ -645,7 +753,7 @@ export const TaskScheduleManagement: React.FC = () => {
                           <Option value="PINNED_VERSION">固定当前版本</Option>
                         </Select>
                       </Field>}
-                      <Field><Typography.Text strong>Cron 表达式</Typography.Text><Input value={form.cronExpression} onChange={(value) => setForm({ ...form, cronExpression: value })} /></Field>
+                      <Field><Typography.Text strong>自定义</Typography.Text><Input value={form.cronExpression} onChange={(value) => setForm({ ...form, cronExpression: value })} placeholder="输入自定义频率" /></Field>
                       <Field><Typography.Text strong>日志窗口</Typography.Text><Select value={form.rangeMinutes} onChange={(value) => setForm({ ...form, rangeMinutes: value as number })}><Option value={5}>最近 5 分钟</Option><Option value={15}>最近 15 分钟</Option><Option value={30}>最近 30 分钟</Option><Option value={60}>最近 1 小时</Option></Select></Field>
                       <Field><Typography.Text strong>指标窗口</Typography.Text><Select value={form.promWindow} onChange={(value) => setForm({ ...form, promWindow: value as string })}><Option value="1m">1 分钟</Option><Option value="5m">5 分钟</Option><Option value="15m">15 分钟</Option><Option value="30m">30 分钟</Option><Option value="1h">1 小时</Option></Select></Field>
                       <Field><Typography.Text strong>最大分析轮数</Typography.Text><Select value={form.maxRounds} onChange={(value) => setForm({ ...form, maxRounds: value as number })}><Option value={1}>1</Option><Option value={3}>3</Option><Option value={5}>5</Option><Option value={10}>10</Option><Option value={20}>20</Option></Select></Field>

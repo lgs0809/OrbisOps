@@ -3,10 +3,12 @@ export type UserRole = 'admin' | 'user' | 'unknown';
 export interface StoredUserInfo {
   userId?: string;
   username?: string;
+  phone?: string | null;
   loginTime?: string;
   token?: string;
   userRole?: string;
   role?: string;
+  passwordChangeRequired?: boolean;
 }
 
 export const normalizeUserRole = (role?: string): UserRole => {
@@ -51,6 +53,7 @@ export const isAuthenticated = (): boolean => {
 export const isAdminUser = (): boolean => currentUserRole() === 'admin';
 
 export const defaultRouteForCurrentUser = (): string => {
+  if (getStoredUserInfo().passwordChangeRequired) return '/account/password';
   const role = currentUserRole();
   if (role === 'admin') {
     return '/chat';
@@ -59,6 +62,14 @@ export const defaultRouteForCurrentUser = (): string => {
     return '/chat';
   }
   return '/login';
+};
+
+export const saveAuthSession = (user: StoredUserInfo): void => {
+  if (!user.token || normalizeUserRole(user.userRole || user.role) === 'unknown')
+    throw new Error('未返回有效登录会话，请重新登录。');
+  localStorage.setItem('token', user.token);
+  localStorage.setItem('userInfo', JSON.stringify({ ...user, loginTime: new Date().toISOString() }));
+  localStorage.setItem('isLoggedIn', 'true');
 };
 
 export const clearAuthSession = () => {

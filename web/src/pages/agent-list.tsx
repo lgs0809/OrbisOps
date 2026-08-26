@@ -33,6 +33,7 @@ import type { OpsAgentDefinition } from '../services/ops-admin-service';
 import { theme } from '../styles/theme';
 import { generatedId } from '../utils/generated-id';
 import { userFacingError } from '../utils/user-facing-error';
+import { WorkflowManualTestButton } from '../features/agents/components/WorkflowManualTestButton';
 
 const { Text } = Typography;
 
@@ -49,7 +50,7 @@ const LibraryHeader = styled.header`
   h1 {
     margin: 0;
     color: ${theme.colors.text.primary};
-    font-size: 36px;
+    font-size: 30px;
     font-weight: 650;
     letter-spacing: -0.04em;
   }
@@ -195,7 +196,7 @@ const WorkflowName = styled.div`
     display: block;
     margin-top: 3px;
     color: ${theme.colors.text.tertiary};
-    font-size: 11px;
+    font-size: 12px;
   }
 `;
 
@@ -220,6 +221,7 @@ const Footer = styled.div`
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  flex-wrap: wrap;
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid ${theme.colors.border.tertiary};
@@ -228,7 +230,7 @@ const Footer = styled.div`
 const Scale = styled(Text)`
   && {
     color: ${theme.colors.text.tertiary};
-    font-size: 11px;
+    font-size: 12px;
   }
 `;
 
@@ -258,6 +260,7 @@ export const AgentListPage: React.FC = () => {
     configName?: string;
     pageNum?: number;
     pageSize?: number;
+    lifecycle?: string;
   }>({ pageNum: 1, pageSize: 12 });
   const listQuery = useAgentListQuery(projectScope.projectId);
   const cloneMutation = useCloneAgentMutation();
@@ -266,17 +269,18 @@ export const AgentListPage: React.FC = () => {
   const filteredWorkflows = useMemo(() => {
     const keyword = (searchParams.configName || '').trim().toLowerCase();
     return (listQuery.data?.workflows || []).filter((agent) => (
-      !keyword
+      (!searchParams.lifecycle || agent.lifecycle === searchParams.lifecycle) && (!keyword
       || displayAgentName(agent).toLowerCase().includes(keyword)
-      || displayAgentDescription(agent).toLowerCase().includes(keyword)
+      || displayAgentDescription(agent).toLowerCase().includes(keyword))
     ));
-  }, [listQuery.data?.workflows, searchParams.configName]);
-  const pageNum = searchParams.pageNum || 1;
+  }, [listQuery.data?.workflows, searchParams.configName, searchParams.lifecycle]);
   const pageSize = searchParams.pageSize || 12;
-  const dataSource = filteredWorkflows.slice((pageNum - 1) * pageSize, pageNum * pageSize);
   const total = filteredWorkflows.length;
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
-  const loading = listQuery.isLoading || cloneMutation.isPending || disableMutation.isPending;
+  const pageNum = Math.min(searchParams.pageNum || 1, pageCount);
+  const dataSource = filteredWorkflows.slice((pageNum - 1) * pageSize, pageNum * pageSize);
+  const listLoading = projectScope.loading || listQuery.isLoading;
+  const loading = listLoading || cloneMutation.isPending || disableMutation.isPending;
   const [cloneSource, setCloneSource] = useState<OpsAgentDefinition | null>(null);
   const [cloneForm, setCloneForm] = useState({ projectId: '', agentId: '', name: '' });
 
@@ -371,18 +375,24 @@ export const AgentListPage: React.FC = () => {
           <Input
             placeholder="搜索名称或说明"
             value={searchParams.configName || ''}
-            onChange={(value) => setSearchParams((current) => ({ ...current, configName: value }))}
+            onChange={(value) => setSearchParams((current) => ({ ...current, configName: value, pageNum: 1 }))}
             style={{ width: 260 }}
             prefix={<IconSearch />}
             showClear
           />
+          <Select aria-label="工作流发布状态" value={searchParams.lifecycle || ''} onChange={value => setSearchParams(current => ({ ...current, lifecycle: String(value || ''), pageNum: 1 }))} style={{ width: 150 }}>
+            <Select.Option value="">全部状态</Select.Option>
+            <Select.Option value="PUBLISHED">已发布可使用</Select.Option>
+            <Select.Option value="DRAFT">待完善草稿</Select.Option>
+            <Select.Option value="DISABLED">已停用</Select.Option>
+          </Select>
           <Button type="primary" onClick={handleSearch} loading={loading}>搜索</Button>
           <Button onClick={handleReset}>重置</Button>
         </SearchGroup>
-        <Text type="tertiary">{total} 个工作流</Text>
+        <Text type="tertiary" role={listLoading ? 'status' : undefined}>{listLoading ? '正在读取工作流…' : `${total} 个工作流`}</Text>
       </Toolbar>
 
-      {dataSource.length === 0 && !loading ? (
+      {listQuery.isError ? <EmptyGrid role="alert">工作流暂时无法读取。<Button onClick={() => void listQuery.refetch()}>重新加载工作流</Button></EmptyGrid> : dataSource.length === 0 && !loading ? (
         <EmptyGrid>当前项目还没有匹配的工作流。可以新建一个，或清除搜索条件。</EmptyGrid>
       ) : (
         <WorkflowGrid>
@@ -396,7 +406,7 @@ export const AgentListPage: React.FC = () => {
                     <WorkflowIcon><IconBranch /></WorkflowIcon>
                     <WorkflowName>
                       <strong>{displayAgentName(record)}</strong>
-                      <span>显式运行 · {record.nodes?.length || 0} 个节点 / {record.edges?.length || 0} 条连接</span>
+                      <span>v{record.version || 1} · {record.nodes?.length || 0} 个节点 / {record.edges?.length || 0} 条连接</span>
                     </WorkflowName>
                   </WorkflowIdentity>
                   <Tag color={lifecycle === 'PUBLISHED' ? 'green' : lifecycle === 'DISABLED' ? 'grey' : 'blue'}>
@@ -421,7 +431,8 @@ export const AgentListPage: React.FC = () => {
 
                 <Footer>
                   <Scale>可复用流程资产</Scale>
-                  <Space spacing={4}>
+                  <Space spacing={4} wrap>
+                    {lifecycle === 'PUBLISHED' && <WorkflowManualTestButton projectId={projectScope.projectId} definition={record} compact onNavigate={navigate} />}
                     <Button type="tertiary" size="small" icon={<IconEdit />} onClick={() => handleEdit(record)}>编辑</Button>
                     <Button type="tertiary" size="small" icon={<IconCopy />} onClick={() => openClone(record)}>复制</Button>
                     <Popconfirm

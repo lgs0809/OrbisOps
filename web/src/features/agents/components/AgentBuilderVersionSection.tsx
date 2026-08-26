@@ -38,6 +38,19 @@ const EmptyState = styled.div`
 
 export type AgentVersionAction = 'validate' | 'publish' | 'rollback' | 'disable';
 
+/**
+ * Keep the editor's action surface aligned with the immutable lifecycle.
+ * The API intentionally rejects invalid transitions; the UI should not offer
+ * them and then turn a predictable state mismatch into a user-facing error.
+ */
+export const versionActionsForLifecycle = (lifecycle?: string): AgentVersionAction[] => {
+  const normalized = String(lifecycle || 'DRAFT').trim().toUpperCase();
+  if (normalized === 'DRAFT') return ['validate', 'disable'];
+  if (normalized === 'VALIDATED') return ['publish', 'disable'];
+  if (normalized === 'PUBLISHED') return ['rollback', 'disable'];
+  return [];
+};
+
 type Props = {
   versions: OpsAgentDefinition[];
   loading: boolean;
@@ -72,10 +85,19 @@ export const AgentBuilderVersionSection: React.FC<Props> = ({
             </Space>
             <Text type="tertiary" size="small">{version.name || version.agentId}</Text>
             <Space wrap>
-              <Button size="small" loading={operating} onClick={() => onAction('validate', version.version)}>校验</Button>
-              <Button size="small" type="primary" theme="light" loading={operating} onClick={() => onAction('publish', version.version)}>发布</Button>
-              <Button size="small" loading={operating} onClick={() => onAction('rollback', version.version)}>回滚</Button>
-              <Button size="small" type="danger" theme="borderless" loading={operating} onClick={() => onAction('disable', version.version)}>停用</Button>
+              {versionActionsForLifecycle(version.lifecycle).map((action) => (
+                <Button
+                  key={action}
+                  size="small"
+                  type={action === 'publish' ? 'primary' : action === 'disable' ? 'danger' : 'tertiary'}
+                  theme={action === 'disable' ? 'borderless' : action === 'publish' ? 'light' : 'solid'}
+                  loading={operating}
+                  onClick={() => onAction(action, version.version)}
+                >
+                  {action === 'validate' ? '校验' : action === 'publish' ? '发布' : action === 'rollback' ? '回滚' : '停用'}
+                </Button>
+              ))}
+              {!versionActionsForLifecycle(version.lifecycle).length && <Text type="tertiary" size="small">无可用操作</Text>}
             </Space>
           </Space>
         </VersionItem>

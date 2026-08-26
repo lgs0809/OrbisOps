@@ -6,6 +6,20 @@ export interface ApiResponse<T> {
   data: T;
 }
 
+export class ApiTransportError extends Error {
+  constructor(message = '网络请求失败，请检查网络连接。') {
+    super(message);
+    this.name = 'ApiTransportError';
+  }
+}
+
+export class ApiTimeoutError extends ApiTransportError {
+  constructor() {
+    super('请求超时，请检查网络连接或服务状态。');
+    this.name = 'ApiTimeoutError';
+  }
+}
+
 export class ApiRequestError extends Error {
   status: number;
   statusText: string;
@@ -45,13 +59,20 @@ export const buildOpsHeaders = (): Record<string, string> => ({
   ...DEFAULT_HEADERS,
 });
 
-export const opsRequest = async <T>(url: string, init?: RequestInit): Promise<ApiResponse<T>> => {
+// Consumed locally by the fetch interceptor; never sent as an HTTP header.
+export interface OpsRequestInit extends RequestInit { requestTimeoutMs?: number }
+
+export const opsRequest = async <T>(url: string, init?: OpsRequestInit): Promise<ApiResponse<T>> => {
   const response = await fetch(url, {
     ...init,
     headers: {
       ...buildOpsHeaders(),
       ...(init?.headers || {}),
     },
+  }).catch((error: unknown) => {
+    // Fetch uses TypeError for transport failures; JSON/HTTP errors stay distinct.
+    if (error instanceof TypeError) throw new ApiTransportError(error.message);
+    throw error;
   });
   await assertOpsResponse(response);
   return await response.json();

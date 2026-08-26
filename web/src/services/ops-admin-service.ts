@@ -1,7 +1,7 @@
 import { API_CONFIG } from '../config/api';
 import { readProjectContextId } from '../utils/project-context';
 import type { OpsProjectWorkspace } from './ops-project-service';
-import { ApiResponse, assertOpsResponse as assertOk, buildOpsHeaders as buildHeaders, opsRequest } from './ops-http-client';
+import { ApiRequestError, ApiResponse, ApiTransportError, assertOpsResponse as assertOk, buildOpsHeaders as buildHeaders, opsRequest } from './ops-http-client';
 import type { OpsChangePackage } from './ops-change-package-types';
 
 export { ApiRequestError } from './ops-http-client';
@@ -443,6 +443,19 @@ export interface OpsIncidentDetail {
   suggestedUserAction?: string;
 }
 
+export interface OpsAlertCorrelationGroup {
+  groupId: string;
+  environment: string;
+  revision: number;
+  rootCauseConfirmed: boolean;
+  anchor: { incidentId: string; title: string; entityId: string };
+  members: Array<{
+    signal: { incidentId: string; title: string; entityId: string; startedAt?: string; recovery: boolean };
+    decision: { reason: string; score: number; evidenceRefs: string[]; policyVersion: string };
+    occurrenceCount: number;
+  }>;
+}
+
 export interface OpsAlertWebhookResult {
   receivedAlerts: number;
   matchedRules: number;
@@ -746,6 +759,13 @@ export interface OpsChatSession {
   metadata?: Record<string, any>;
 }
 
+export interface OpsChatSessionParticipant {
+  userId: string;
+  role: 'OWNER' | 'EDITOR' | 'OBSERVER' | string;
+  status: string;
+  stateVersion?: number;
+}
+
 export interface OpsChatMessage {
   messageId: string;
   sessionId: string;
@@ -960,6 +980,14 @@ export class OpsAdminService {
       method: 'GET',
       headers: buildHeaders(),
     });
+    await assertOk(response);
+    return await response.json();
+  }
+
+  async listAlertCorrelations(projectId: string, scope: 'admin' | 'user'): Promise<ApiResponse<OpsAlertCorrelationGroup[]>> {
+    const params = new URLSearchParams({ projectId, limit: '100' });
+    const base = this.incidentBaseUrl(scope).replace(/\/incidents$/, '');
+    const response = await fetch(`${base}/alert-correlations?${params}`, { headers: buildHeaders() });
     await assertOk(response);
     return await response.json();
   }
@@ -1260,6 +1288,7 @@ export class OpsAdminService {
 
   async listChatSessions(params: {
     userId?: string;
+    projectId?: string;
     agentId?: string;
     keyword?: string;
     favorite?: boolean;
@@ -1267,6 +1296,7 @@ export class OpsAdminService {
   } = {}): Promise<ApiResponse<OpsChatSession[]>> {
     const query = new URLSearchParams();
     if (params.userId) query.set('userId', params.userId);
+    if (params.projectId) query.set('projectId', params.projectId);
     if (params.agentId) query.set('agentId', params.agentId);
     if (params.keyword) query.set('keyword', params.keyword);
     if (params.favorite !== undefined) query.set('favorite', String(params.favorite));
@@ -1281,6 +1311,15 @@ export class OpsAdminService {
     }
 
     return await response.json();
+  }
+
+  async getChatSession(sessionId: string, projectId: string): Promise<ApiResponse<OpsChatSession>> {
+    const query = new URLSearchParams({ projectId });
+    return opsRequest<OpsChatSession>(`${this.userChatBaseUrl}/sessions/${encodeURIComponent(sessionId)}?${query}`);
+  }
+
+  async listChatSessionParticipants(sessionId: string): Promise<ApiResponse<OpsChatSessionParticipant[]>> {
+    return opsRequest<OpsChatSessionParticipant[]>(`${this.userChatBaseUrl}/sessions/${encodeURIComponent(sessionId)}/participants`);
   }
 
   async listChatMessages(sessionId: string, limit = 200): Promise<ApiResponse<OpsChatMessage[]>> {
@@ -1429,6 +1468,17 @@ export class OpsAdminService {
     }
 
     await readSseStream(response, (event) => onEvent(event as OpsRuntimeEvent));
+  }
+
+  async getUserChatRun(runId: string, projectId: string, signal?: AbortSignal): Promise<ApiResponse<{
+    status: string; error_message?: string; response?: { content?: string };
+  }>> {
+    const params = new URLSearchParams({ projectId });
+    const response = await fetch(`${this.userChatBaseUrl}/runs/${encodeURIComponent(runId)}?${params}`, {
+      method: 'GET', headers: buildHeaders(), signal,
+    });
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    return await response.json();
   }
 
   async cancelUserChatRun(runId: string): Promise<ApiResponse<boolean>> {
@@ -2007,10 +2057,44 @@ export class OpsAdminService {
     });
   }
 
+  async recoverBackgroundModelTask(family: string, taskId: string, projectId: string): Promise<ApiResponse<boolean>> {
+    return this.request(`${this.baseUrl}/background-model-retries/${encodeURIComponent(family)}/${encodeURIComponent(taskId)}/recover?projectId=${encodeURIComponent(projectId)}`, { method: 'POST' });
+  }
+
   async createSkillEvolverJob(payload: Record<string, any>): Promise<ApiResponse<Record<string, any>>> {
     return await this.request(`${this.baseUrl}/skill-evolver/jobs`, {
       method: 'POST',
       body: JSON.stringify(payload),
+    });
+  }
+
+  async listAtomicSkillPublications(projectId: string): Promise<ApiResponse<Record<string, any>[]>> {
+    return this.request(`${this.baseUrl}/skill-evolver/atomic-publications?projectId=${encodeURIComponent(projectId)}`, { method: 'GET' });
+  }
+
+  async listSkillMaintenance(projectId: string): Promise<ApiResponse<Record<string, any>[]>> {
+    return this.request(`${this.baseUrl}/skill-evolver/maintenance?projectId=${encodeURIComponent(projectId)}`, { method: 'GET' });
+  }
+
+  async keepInactiveSkill(id: string, projectId: string, reason: string): Promise<ApiResponse<Record<string, any>>> {
+    return this.request(`${this.baseUrl}/skill-evolver/maintenance/${encodeURIComponent(id)}/keep`, { method: 'POST', body: JSON.stringify({ projectId, reason }) });
+  }
+
+  async skillPublicationStatus(candidateId: string, projectId: string): Promise<ApiResponse<Record<string, any>>> {
+    return this.request(`${this.baseUrl}/skill-evolver/candidates/${encodeURIComponent(candidateId)}/publication?projectId=${encodeURIComponent(projectId)}`, { method: 'GET' });
+  }
+
+  async retrySkillPublication(candidateId: string, projectId: string): Promise<ApiResponse<Record<string, any>>> {
+    return this.request(`${this.baseUrl}/skill-evolver/candidates/${encodeURIComponent(candidateId)}/publication/retry`, { method: 'POST', body: JSON.stringify({ projectId }) });
+  }
+
+  async skillContentRevisions(candidateId: string, projectId: string): Promise<ApiResponse<Record<string, any>>> {
+    return this.request(`${this.baseUrl}/skill-evolver/candidates/${encodeURIComponent(candidateId)}/content-revisions?projectId=${encodeURIComponent(projectId)}`, { method: 'GET' });
+  }
+
+  async rollbackAtomicSkillPublication(candidateId: string, projectId: string, reason: string): Promise<ApiResponse<Record<string, any>>> {
+    return this.request(`${this.baseUrl}/skill-evolver/atomic-publications/${encodeURIComponent(candidateId)}/rollback`, {
+      method: 'POST', body: JSON.stringify({ projectId, reason }),
     });
   }
 
@@ -2031,6 +2115,10 @@ export class OpsAdminService {
       if (value !== undefined && value !== '') search.set(key, String(value));
     });
     return await this.request(`${this.baseUrl}/skill-evolver/patches?${search.toString()}`, { method: 'GET' });
+  }
+
+  async getRemoteMcpCatalogStatus(projectId: string): Promise<ApiResponse<Record<string, any>[]>> {
+    return await this.request(`${this.baseUrl}/projects/${encodeURIComponent(projectId)}/mcp-remote-catalogs`, { method: 'GET' });
   }
 
   async getToolCatalogSummary(projectId: string): Promise<ApiResponse<Record<string, any>>> {
@@ -2186,8 +2274,9 @@ export class OpsAdminService {
     return await response.json();
   }
 
-  async listChatProjects(): Promise<ApiResponse<OpsProjectWorkspace[]>> {
-    const response = await fetch(`${this.userChatBaseUrl}/catalog/projects`, {
+  async listChatProjects(scope: 'admin' | 'user' = 'user'): Promise<ApiResponse<OpsProjectWorkspace[]>> {
+    const catalogBaseUrl = scope === 'admin' ? `${API_CONFIG.BASE_DOMAIN}/api/v1/agent/chat` : this.userChatBaseUrl;
+    const response = await fetch(`${catalogBaseUrl}/catalog/projects`, {
       method: 'GET',
       headers: buildHeaders(),
     });
@@ -2340,25 +2429,36 @@ export class OpsAdminService {
   }
 
   async validateAgentVersion(agentId: string, version: number): Promise<ApiResponse<OpsAgentDefinition>> {
-    const response = await fetch(`${this.agentBaseUrl}/${encodeURIComponent(agentId)}/versions/${encodeURIComponent(version)}/validate`, {
-      method: 'POST',
-      headers: buildHeaders(),
-    });
-
-    await assertOk(response);
-
-    return await response.json();
+    return this.transitionAgentVersion(agentId, version, 'validate');
   }
 
   async publishAgentVersion(agentId: string, version: number): Promise<ApiResponse<OpsAgentDefinition>> {
-    const response = await fetch(`${this.agentBaseUrl}/${encodeURIComponent(agentId)}/versions/${encodeURIComponent(version)}/publish`, {
-      method: 'POST',
-      headers: buildHeaders(),
-    });
+    return this.transitionAgentVersion(agentId, version, 'publish');
+  }
 
-    await assertOk(response);
+  private async transitionAgentVersion(
+    agentId: string, version: number, action: 'validate' | 'publish',
+  ): Promise<ApiResponse<OpsAgentDefinition>> {
+    const endpoint = `${this.agentBaseUrl}/${encodeURIComponent(agentId)}/versions/${encodeURIComponent(version)}/${action}`;
+    try {
+      return await opsRequest<OpsAgentDefinition>(endpoint, { method: 'POST' });
+    } catch (error) {
+      const responseLost = error instanceof ApiTransportError || (error instanceof ApiRequestError
+        && [502, 503, 504].includes(error.status));
+      if (!responseLost) throw error;
 
-    return await response.json();
+      // A lost response can precede the durable transition. Read the same immutable
+      // version again after a brief grace period; never resend the mutation.
+      for (const delayMs of [0, 6000]) {
+        if (delayMs) await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+        const observed = await this.listAgentVersions(agentId).catch(() => undefined);
+        if (observed?.code !== '0000') continue;
+        const applied = observed.data?.find((entry) => entry.agentId === agentId && entry.version === version
+          && (entry.lifecycle === 'PUBLISHED' || (action === 'validate' && entry.lifecycle === 'VALIDATED')));
+        if (applied) return { ...observed, data: applied };
+      }
+      throw error;
+    }
   }
 
   async rollbackAgentVersion(agentId: string, version: number): Promise<ApiResponse<OpsAgentDefinition>> {

@@ -1,27 +1,18 @@
 import { API_ENDPOINTS, DEFAULT_HEADERS } from '../config';
-import type { AdminUserCreateRequestDTO, AdminUserResponseDTO, ApiResponse } from './admin-user-service';
+import type { AdminUserCreateRequestDTO, AdminUserResponseDTO } from './admin-user-service';
+import { readAccountResponse } from './account-response';
 
-export interface PlatformUserUpdateRequest extends AdminUserCreateRequestDTO {
+export interface PlatformUserUpdateRequest extends Omit<AdminUserCreateRequestDTO, 'password'> {
   id?: number;
+  password?: string;
 }
 
 const baseUrl = API_ENDPOINTS.ADMIN_USER.BASE;
 
-const parse = async <T>(response: Response): Promise<ApiResponse<T>> => {
-  if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
-  }
-  const result: ApiResponse<T> = await response.json();
-  if (result.code !== '0000') {
-    throw new Error(result.info || 'Platform user request failed');
-  }
-  return result;
-};
-
 export class PlatformUserService {
   static async list(): Promise<AdminUserResponseDTO[]> {
     const response = await fetch(`${baseUrl}/query-all`, { method: 'GET', headers: DEFAULT_HEADERS });
-    return (await parse<AdminUserResponseDTO[]>(response)).data || [];
+    return await readAccountResponse<AdminUserResponseDTO[]>(response, '加载成员失败，请稍后重试。') || [];
   }
 
   static async create(payload: AdminUserCreateRequestDTO): Promise<void> {
@@ -30,16 +21,16 @@ export class PlatformUserService {
       headers: DEFAULT_HEADERS,
       body: JSON.stringify(payload),
     });
-    await parse<boolean>(response);
+    if (!await readAccountResponse<boolean>(response, '添加成员失败，请稍后重试。')) throw new Error('添加成员未完成，请刷新后检查。');
   }
 
   static async update(payload: PlatformUserUpdateRequest): Promise<void> {
-    const response = await fetch(`${baseUrl}/update-by-user-id`, {
+    const response = await fetch(`${baseUrl}/update-by-id`, {
       method: 'PUT',
       headers: DEFAULT_HEADERS,
       body: JSON.stringify(payload),
     });
-    await parse<boolean>(response);
+    if (!await readAccountResponse<boolean>(response, '保存成员信息失败，请稍后重试。')) throw new Error('成员信息未保存，请刷新后检查。');
   }
 
   static async remove(userId: string): Promise<void> {
@@ -47,6 +38,6 @@ export class PlatformUserService {
       method: 'DELETE',
       headers: DEFAULT_HEADERS,
     });
-    await parse<boolean>(response);
+    if (!await readAccountResponse<boolean>(response, '删除成员失败，请稍后重试。')) throw new Error('成员未删除，请刷新后检查。');
   }
 }

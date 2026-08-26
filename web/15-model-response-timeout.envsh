@@ -1,0 +1,14 @@
+#!/bin/sh
+# Sourced by the official nginx entrypoint before template substitution.
+# Backend and proxy receive the same deployment setting; the outer proxy adds response grace.
+budget=${ORBISOPS_MODEL_CALL_TIMEOUT_SECONDS:-240}
+case "$budget" in ''|0*|*[!0-9]*) echo 'Invalid model request timeout setting' >&2; exit 1 ;; esac
+if [ "${#budget}" -gt 7 ]; then
+  echo 'Model request timeout exceeds the supported browser timer range' >&2
+  exit 1
+fi
+if [ "$budget" -le 0 ] || [ "$budget" -gt 2147453 ]; then
+  echo 'Model request timeout exceeds the supported browser timer range' >&2
+  exit 1
+fi
+export ORBISOPS_MODEL_PROXY_TIMEOUT_SECONDS=$((budget + 30))

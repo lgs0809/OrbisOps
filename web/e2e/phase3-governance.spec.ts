@@ -1,3 +1,4 @@
+import { fulfillAccessibleProjects } from './fixtures/project-catalog';
 import { expect, test } from '@playwright/test';
 
 const authenticateAdmin = async (page: import('@playwright/test').Page) => {
@@ -30,6 +31,7 @@ test('Governance loads audit details and policy only when their UI is opened', a
     const method = route.request().method();
     let data: unknown = [];
 
+    if (await fulfillAccessibleProjects(route, [{ projectId: 'project-1', name: 'Core Platform' }])) return;
     if (path.endsWith('/api/v1/admin/ops-projects/snapshot')) {
       data = {
         projects: [{ projectId: 'project-1', name: 'Core Platform' }],

@@ -1,3 +1,4 @@
+import { fulfillAccessibleProjects } from './fixtures/project-catalog';
 import { expect, test } from '@playwright/test';
 
 const authenticateAdmin = async (page: import('@playwright/test').Page) => {
@@ -24,12 +25,9 @@ test('completed Analysis Tasks stay cached until explicit refresh and detail is 
     const path = url.pathname;
     let data: unknown = [];
 
-    if (path.endsWith('/api/v1/admin/ops-projects/snapshot')) {
-      data = {
-        projects: [{ projectId: 'project-1', name: 'Core Platform' }],
-        templates: [],
-      };
-    } else if (path.endsWith('/api/v1/admin/ops/analysis-tasks')) {
+    if (await fulfillAccessibleProjects(route, [{ projectId: 'project-1', name: 'Core Platform' }])) return;
+    expect(path).not.toBe('/api/v1/admin/ops-projects/snapshot');
+    if (path.endsWith('/api/v1/admin/ops/analysis-tasks')) {
       taskListRequests += 1;
       data = [{
         projectId: 'project-1',

@@ -1,3 +1,4 @@
+import { fulfillAccessibleProjects } from './fixtures/project-catalog';
 import { expect, test } from '@playwright/test';
 
 const response = (data: unknown) => JSON.stringify({ code: '0000', info: 'success', data });
@@ -14,6 +15,7 @@ test('Channel compatibility matrix renders backend capability facts without inve
   await page.route('http://127.0.0.1:8099/**', async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname;
+    if (await fulfillAccessibleProjects(route, [{ projectId: 'demo-project', name: 'Demo Project', defaultAgentId: 'default-react' }])) return;
     if (path.endsWith('/api/v1/admin/ops-projects/snapshot')) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: response({
         projects: [{ projectId: 'demo-project', name: 'Demo Project', defaultAgentId: 'default-react' }], templates: [],

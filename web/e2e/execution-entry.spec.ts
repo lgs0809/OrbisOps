@@ -16,7 +16,7 @@ const authenticate = async (page: import('@playwright/test').Page) => {
   });
 };
 
-test('Chat binds each conversation to 默认助手 or a Published Workflow and streams the selected model', async ({ page }) => {
+test('Chat keeps the assistant model preference separate from the published Workflow model', async ({ page }) => {
   await authenticate(page);
 
   const createRequests: Json[] = [];
@@ -81,6 +81,7 @@ test('Chat binds each conversation to 默认助手 or a Published Workflow and s
       const sessionId = `session-${++sequence}`;
       sessions = [{
         sessionId,
+        userId: '20001',
         projectId: 'demo-project',
         agentId: body.agentId || 'default-react',
         title: 'New conversation',
@@ -115,6 +116,15 @@ test('Chat binds each conversation to 默认助手 or a Published Workflow and s
           '',
         ].join('\n\n'),
       });
+    }
+    if (/\/api\/v1\/user\/chat\/runs\/run-\d+$/.test(path) && method === 'GET') {
+      expect(url.searchParams.get('projectId')).toBe('demo-project');
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+        code: '0000', info: 'success', data: {
+          runId: path.split('/').pop(), projectId: 'demo-project', status: 'SUCCEEDED',
+          response: { content: 'Streaming reply' },
+        },
+      }) });
     }
     if (/\/api\/v1\/user\/chat\/sessions\/[^/]+\/(messages|events)$/.test(path) && method === 'GET') {
       return route.fulfill({
@@ -168,6 +178,8 @@ test('Chat binds each conversation to 默认助手 or a Published Workflow and s
   await expect(page.getByText('Daily Production Inspection', { exact: true }).last()).toBeVisible();
   await page.getByText('Daily Production Inspection', { exact: true }).last().click();
   await expect(executionRoot).toHaveAttribute('data-execution', 'daily-inspection');
+  await expect(modelSelect).toHaveCount(0);
+  await expect(modelRoot.getByText('按工作流配置执行', { exact: false })).toBeVisible();
   await expect.poll(() => createRequests.length).toBe(1);
   expect(createRequests[0].agentId).toBe('daily-inspection');
   expect(createRequests[0].metadata).toMatchObject({
@@ -179,7 +191,8 @@ test('Chat binds each conversation to 默认助手 or a Published Workflow and s
   await page.getByRole('button', { name: '发送' }).click();
   await expect.poll(() => streamRequests.length).toBe(1);
   expect(streamRequests[0].agentDefinitionId).toBe('daily-inspection');
-  expect(streamRequests[0].modelId).toBe('model-fast');
+  expect(streamRequests[0].modelId).toBeUndefined();
+  expect(streamRequests[0].metadata.selectedModelId).toBeUndefined();
   expect(streamRequests[0].metadata).toMatchObject({ executionType: 'WORKFLOW', triggerSource: 'CHAT' });
   await expect(page.getByRole('button', { name: '查看运行' })).toBeVisible();
 
@@ -193,11 +206,13 @@ test('Chat binds each conversation to 默认助手 or a Published Workflow and s
     executionName: '默认助手',
   });
   await expect(executionRoot).toHaveAttribute('data-execution', 'DEFAULT_REACT');
+  await expect(modelSelect).toBeVisible();
+  await expect(modelRoot).toHaveAttribute('data-model', 'model-fast');
 
   await page.getByPlaceholder('给 OrbisOps 发消息...').fill('这个先别按固定流程了，你自己看看刚才提到的问题到底怎么回事');
   await page.getByRole('button', { name: '发送' }).click();
   await expect.poll(() => streamRequests.length).toBe(2);
-  expect(streamRequests[1].agentDefinitionId).toBeUndefined();
+  expect(streamRequests[1].agentDefinitionId).toBe('default-react');
   expect(streamRequests[1].modelId).toBe('model-fast');
   expect(streamRequests[1].metadata).toMatchObject({ executionType: 'DEFAULT_REACT', triggerSource: 'CHAT' });
 });

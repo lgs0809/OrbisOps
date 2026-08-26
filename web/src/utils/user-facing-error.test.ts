@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ApiRequestError } from '../services/ops-http-client';
 
 import { userFacingDetail, userFacingError } from './user-facing-error';
 
@@ -19,5 +20,17 @@ describe('userFacingError', () => {
 
   it('normalizes raw backend detail strings', () => {
     expect(userFacingDetail('HTTP 503 service unavailable', 'Provider 当前不可用。')).toBe('Provider 当前不可用。');
+  });
+
+  it('shows actionable topology validation from a typed bad-request response', () => {
+    expect(userFacingError(new ApiRequestError(400, 'Bad Request',
+      'TOPOLOGY_INVALID:topology-validation:节点 step-a 引用了未绑定的工具，请先绑定。'), '校验失败。'))
+      .toBe('节点 step-a 引用了未绑定的工具，请先绑定。');
+  });
+
+  it('keeps other HTTP bodies and unsafe topology diagnostics private', () => {
+    expect(userFacingError(new ApiRequestError(500, 'Error', '内部服务信息'), '校验失败。')).toBe('校验失败。');
+    expect(userFacingError(new ApiRequestError(400, 'Bad Request',
+      'TOPOLOGY_INVALID:https://private.example/api/v1/secret'), '校验失败。')).toBe('校验失败。');
   });
 });

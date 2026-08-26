@@ -26,7 +26,12 @@ const containsUnsafeTechnicalDetail = (message: string) => {
  * Detailed diagnostics stay in logs/audit/technical-detail surfaces rather than toast copy.
  */
 export const userFacingError = (error: unknown, fallback: string): string => {
-  const message = error instanceof Error ? error.message.trim() : '';
+  // Topology validation is an actionable editor result carried by our typed API error.
+  // Other HTTP/provider bodies remain transport diagnostics and are never surfaced here.
+  const topologyDetail = error instanceof ApiRequestError && error.status === 400
+    && error.responseBody.startsWith('TOPOLOGY_INVALID:')
+    ? error.responseBody.replace(/^TOPOLOGY_INVALID:(?:topology-validation:)?/, '').trim() : '';
+  const message = topologyDetail || (error instanceof Error ? error.message.trim() : '');
   if (!message) return fallback;
 
   if (INTERNAL_CODE_MESSAGES[message]) return INTERNAL_CODE_MESSAGES[message];
@@ -42,3 +47,4 @@ export const userFacingDetail = (message: unknown, fallback = '操作未完成�
   if (typeof message !== 'string' || !message.trim()) return fallback;
   return userFacingError(new Error(message), fallback);
 };
+import { ApiRequestError } from '../services/ops-http-client';

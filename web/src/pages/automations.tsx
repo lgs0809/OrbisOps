@@ -124,7 +124,7 @@ export const AutomationsPage: React.FC = () => {
       <AutomationHeader>
         <div>
           <h1>自动化</h1>
-          <p>让任务按时间计划或告警事件自动启动。自动化只决定何时运行和运行什么，具体执行仍进入统一工作台。</p>
+          <p>让任务按时间计划或告警事件自动启动。先选项目和中文运行频率，具体执行仍进入统一工作台。</p>
         </div>
         <Button icon={<IconSetting />} onClick={() => navigate(`/projects${projectQuery}`)}>项目配置</Button>
       </AutomationHeader>
@@ -149,7 +149,7 @@ export const AutomationsPage: React.FC = () => {
           <CardBody>
             <Title heading={5} style={{ margin: 0 }}>定时任务</Title>
             <Paragraph type="tertiary" style={{ margin: '8px 0 0' }}>
-              按固定时间或 cron 周期启动默认助手或已发布工作流，适合巡检、日报、周期检查等任务。
+              按固定时间或周期启动默认助手或已发布 Workflow，适合巡检、日报和周期检查。
             </Paragraph>
           </CardBody>
           <Button theme="solid" type="primary" disabled={!projectScope.projectId} onClick={() => navigate(`/automations/schedules${projectQuery}`)}>
@@ -172,7 +172,7 @@ export const AutomationsPage: React.FC = () => {
       </Grid>
 
       <Note>
-        <Text type="tertiary">自动化只负责“何时启动”和“运行什么”；具体执行仍受项目权限、工作流发布状态和变更治理规则约束。</Text>
+        <Text type="tertiary">常用频率已经翻译成中文；需要特殊安排时选择“自定义”。自动化只负责“何时启动”和“运行什么”；具体执行仍受项目权限、工作流发布状态和变更治理规则约束。</Text>
       </Note>
     </OpsPageShell>
   );

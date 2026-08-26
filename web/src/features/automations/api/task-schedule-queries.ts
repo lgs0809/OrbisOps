@@ -55,6 +55,8 @@ export const useTaskExecutionsQuery = (projectId: string, scheduleId?: number, e
   queryFn: async (): Promise<TaskExecutionResponseDTO[]> => (
     dataOf(await taskScheduleAdminService.listExecutions(projectId, scheduleId as number, 30), [])
   ),
+  refetchInterval: enabled ? 1500 : false,
+  refetchIntervalInBackground: false,
 });
 
 export const useSaveTaskScheduleMutation = (projectId: string) => {

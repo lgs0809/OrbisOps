@@ -1,3 +1,4 @@
+import { fulfillAccessibleProjects } from './fixtures/project-catalog';
 import { expect, test } from '@playwright/test';
 
 const authenticate = async (page: import('@playwright/test').Page, role: 'admin' | 'user') => {
@@ -122,6 +123,7 @@ test('Workbench deep-links to a Run and continues its linked Conversation in Cha
   await page.unroute('http://127.0.0.1:8099/**');
   await page.route('http://127.0.0.1:8099/**', async (route) => {
     const url = new URL(route.request().url());
+    if (await fulfillAccessibleProjects(route, [{ projectId: 'demo-project', name: 'Demo Project', description: 'Workbench acceptance' }])) return;
     if (url.pathname === '/api/v1/admin/ops-projects/snapshot') {
       return route.fulfill({
         status: 200,
@@ -138,7 +140,7 @@ test('Workbench deep-links to a Run and continues its linked Conversation in Cha
         contentType: 'application/json',
         body: JSON.stringify({ code: '0000', info: 'success', data: [
           { runId: 'run-1', projectId: 'demo-project', sessionId: 'session-1', status: 'SUCCEEDED', source: 'CHAT', goal: 'Earlier run' },
-          { runId: 'run-2', projectId: 'demo-project', sessionId: 'session-2', status: 'BLOCKED', source: 'SCHEDULE', goal: 'Selected automation run', executionHarness: 'REACT' },
+          { runId: 'run-2', projectId: 'demo-project', sessionId: 'session-2', status: 'BLOCKED', source: 'CHAT', goal: 'Selected linked run', executionHarness: 'REACT' },
         ] }),
       });
     }
@@ -163,9 +165,9 @@ test('Workbench deep-links to a Run and continues its linked Conversation in Cha
 
   await page.goto('/workbench?projectId=demo-project&runId=run-2');
   await expect(page.getByRole('heading', { name: '工作台' })).toBeVisible();
-  await expect(page.getByText('Selected automation run', { exact: true })).toHaveCount(2);
+  await expect(page.getByText('Selected linked run', { exact: true })).toHaveCount(2);
   await expect(page.getByText('已关联，可继续对话', { exact: true })).toBeVisible();
-  await expect(page.getByText('证据摘要（1）', { exact: true })).toBeVisible();
+  await expect(page.getByText('证据记录（1）', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '继续对话' }).click();
   await expect(page).toHaveURL(/\/chat\?projectId=demo-project&sessionId=session-2&runId=run-2$/);
 });
@@ -202,12 +204,13 @@ test('fresh platform creates the first administrator and signs in automatically'
 
   await page.goto('/login');
   await expect(page.getByRole('heading', { name: '初始化 OrbisOps' })).toBeVisible();
-  await page.getByPlaceholder('用户名').fill('platform-admin');
+  await page.getByLabel('手机号', { exact: true }).fill('13800009001');
+  await page.getByPlaceholder('管理员姓名').fill('platform-admin');
   await page.getByPlaceholder('管理员密码', { exact: true }).fill(setupPassword);
   await page.getByPlaceholder('确认管理员密码', { exact: true }).fill(setupPassword);
   await page.getByRole('button', { name: '创建管理员并进入系统' }).click();
 
   await expect(page).toHaveURL(/\/home$/);
-  expect(setupRequest).toEqual({ username: 'platform-admin', password: setupPassword });
+  expect(setupRequest).toEqual({ username: 'platform-admin', phone: '13800009001', password: setupPassword });
   await expect(page.getByRole('heading', { name: '首页' })).toBeVisible();
 });

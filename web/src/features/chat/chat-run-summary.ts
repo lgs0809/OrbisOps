@@ -31,7 +31,7 @@ export const summarizeChatRun = (
   const failed = [...events].reverse().find((event) => {
     const status = normalized(event.status);
     return ['FAILED', 'ERROR', 'BLOCKED'].includes(status)
-      && !eventMatches(event, 'TOOL_CALL_FINISHED');
+      && !['TOOL_CALL_FINISHED', 'MODEL_REQUEST_FAILED'].some(type => eventMatches(event, type));
   });
   const terminal = [...events].reverse().find((event) => {
     const type = normalized(event.eventType);

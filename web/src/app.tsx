@@ -8,10 +8,12 @@ import { GlobalStyle } from './styles/global';
 import { ProjectScopeProvider } from './hooks/use-project-scope';
 import { AppQueryProvider } from './providers/app-query-provider';
 import { AppErrorBoundary } from './components/common/AppErrorBoundary';
+import { GlobalCommandPaletteProvider } from './features/search/components/GlobalCommandPalette';
 import {
   currentUserRole,
   defaultRouteForCurrentUser,
   isAuthenticated,
+  getStoredUserInfo,
   UserRole,
 } from './services/auth-session';
 import { APP_ROUTES, pageTitleForPath } from './app/navigation/route-metadata';
@@ -19,6 +21,7 @@ import { APP_ROUTES, pageTitleForPath } from './app/navigation/route-metadata';
 installHttpInterceptor();
 
 const LoginPage = React.lazy(() => import('./pages/login'));
+const AccountPasswordPage = React.lazy(() => import('./pages/account-password').then(m => ({ default: m.AccountPasswordPage })));
 const ChatPage = React.lazy(() =>
   import('./pages/chat').then((module) => ({ default: module.ChatPage })),
 );
@@ -86,15 +89,21 @@ const UsersAccessPage = React.lazy(() =>
 const WorkbenchPage = React.lazy(() =>
   import('./pages/workbench').then((module) => ({ default: module.WorkbenchPage })),
 );
+const IncidentCenterPage = React.lazy(() =>
+  import('./pages/incident-center').then((module) => ({ default: module.IncidentCenterPage })),
+);
 
 const PageLoading: React.FC = () => (
   <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', color: '#4b5563' }}>加载中...</div>
 );
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; roles?: UserRole[] }> = ({ children, roles }) => {
+  const location = useLocation();
   if (!isAuthenticated()) {
     return <Navigate to="/login" replace />;
   }
+  if (getStoredUserInfo().passwordChangeRequired && location.pathname !== '/account/password')
+    return <Navigate to="/account/password" replace />;
   if (roles?.length && !roles.includes(currentUserRole())) {
     return <Navigate to={defaultRouteForCurrentUser()} replace />;
   }
@@ -112,7 +121,7 @@ const CanonicalRouteRedirect: React.FC<{ to: string }> = ({ to }) => {
 const PageTitleSync: React.FC = () => {
   const location = useLocation();
   useEffect(() => {
-    document.title = location.pathname === '/login' ? '登录 · OrbisOps' : pageTitleForPath(location.pathname);
+    document.title = location.pathname === '/login' ? '登录 · OrbisOps' : location.pathname === '/account/password' ? '登录密码 · OrbisOps' : pageTitleForPath(location.pathname);
   }, [location.pathname]);
   return null;
 };
@@ -121,6 +130,7 @@ const pageElementByRouteId: Record<string, React.ReactNode> = {
   home: <OpsDashboardPage />,
   chat: <ChatPage />,
   workbench: <WorkbenchPage />,
+  'workbench-events': <IncidentCenterPage />,
   workflows: <AgentListPage />,
   automations: <AutomationsPage />,
   'automation-schedules': <TaskScheduleManagement />,
@@ -147,6 +157,7 @@ const pageElementByRouteId: Record<string, React.ReactNode> = {
 const AppRoutes: React.FC = () => (
   <Routes>
     <Route path="/login" element={<LoginRedirect />} />
+    <Route path="/account/password" element={<ProtectedRoute><AccountPasswordPage /></ProtectedRoute>} />
     {APP_ROUTES.map((route) => {
       const page = pageElementByRouteId[route.id];
       if (!page) {
@@ -181,9 +192,11 @@ const App: React.FC = () => (
         <PageTitleSync />
         <AppQueryProvider>
           <ProjectScopeProvider>
-            <Suspense fallback={<PageLoading />}>
-              <AppRoutes />
-            </Suspense>
+            <GlobalCommandPaletteProvider>
+              <Suspense fallback={<PageLoading />}>
+                <AppRoutes />
+              </Suspense>
+            </GlobalCommandPaletteProvider>
           </ProjectScopeProvider>
         </AppQueryProvider>
       </Router>

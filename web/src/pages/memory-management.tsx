@@ -20,6 +20,7 @@ import {
 } from '../features/memory/api/memory-queries';
 import { theme } from '../styles/theme';
 import { userFacingError } from '../utils/user-facing-error';
+import { serverLocalTime } from '../utils/server-time';
 
 const { Option } = Select;
 const { Text } = Typography;
@@ -64,7 +65,7 @@ const asText = (value: unknown, fallback = '-') => {
 };
 
 const timeText = (record: Record<string, any>) =>
-  asText(record.updateTime || record.update_time || record.createTime || record.create_time);
+  serverLocalTime(record.updateTime || record.update_time || record.createTime || record.create_time);
 
 export const MemoryManagementPage: React.FC = () => {
   const [scopeType, setScopeType] = useState('PROJECT');

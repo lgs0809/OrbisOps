@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Banner, Button, Popconfirm, Space, Tag, Toast, Typography } from '@douyinfe/semi-ui';
 
@@ -9,6 +9,7 @@ import type {
   OpsWorkflowApprovalView,
 } from '../../../services/ops-workflow-approval-service';
 import { userFacingError } from '../../../utils/user-facing-error';
+import { ApiRequestError } from '../../../services/ops-http-client';
 
 const { Text } = Typography;
 
@@ -31,6 +32,7 @@ const approvalStatusLabel = (status?: string) => ({
 
 export const WorkflowApprovalPanel: React.FC<Props> = ({ runId, projectId, scope, onChanged }) => {
   const queryClient = useQueryClient();
+  const [reviewedApprovalId, setReviewedApprovalId] = useState('');
   const approvalQuery = useQuery({
     queryKey: queryKey(scope, projectId, runId),
     enabled: Boolean(runId && projectId),
@@ -48,7 +50,7 @@ export const WorkflowApprovalPanel: React.FC<Props> = ({ runId, projectId, scope
 
   const decisionMutation = useMutation({
     mutationFn: async (decision: 'APPROVE' | 'REJECT') =>
-      (await opsWorkflowApprovalService.decide(runId, projectId, decision, scope)).data,
+      (await opsWorkflowApprovalService.decide(runId, projectId, decision, reviewedApprovalId, scope)).data,
     onSuccess: (view, decision) => {
       updateView(view);
       Toast.success(decision === 'APPROVE'
@@ -59,7 +61,7 @@ export const WorkflowApprovalPanel: React.FC<Props> = ({ runId, projectId, scope
   });
 
   const resumeMutation = useMutation({
-    mutationFn: async () => (await opsWorkflowApprovalService.retryResume(runId, projectId, scope)).data,
+    mutationFn: async () => (await opsWorkflowApprovalService.retryResume(runId, projectId, approvalQuery.data?.approvalId || '', scope)).data,
     onSuccess: (view) => {
       updateView(view);
       Toast.success('Workflow 已重新调度继续执行。');
@@ -69,6 +71,9 @@ export const WorkflowApprovalPanel: React.FC<Props> = ({ runId, projectId, scope
 
   if (approvalQuery.isLoading) return null;
   if (approvalQuery.isError) {
+    if (approvalQuery.error instanceof ApiRequestError && approvalQuery.error.status === 403) {
+      return <Banner type="info" description="当前账号无权查看此运行的 Workflow 审批记录。运行结果可按项目权限查看。" />;
+    }
     return <Banner type="warning" description="Workflow 审批状态暂时不可用，请稍后重试。" />;
   }
   const approval = approvalQuery.data;
@@ -82,7 +87,7 @@ export const WorkflowApprovalPanel: React.FC<Props> = ({ runId, projectId, scope
     <OpsSectionCard title="Workflow 人工审批">
       <Space vertical align="start" spacing="medium" style={{ width: '100%' }}>
         <Space wrap align="center">
-          <OpsAuthorityBadge authority="APPROVAL" />
+          <OpsAuthorityBadge authority={approval.canDecide || approval.resumeRequired ? 'APPROVAL' : 'OBSERVE_ONLY'} />
           <Tag color={waiting ? 'amber' : approval.status === 'APPROVED' ? 'green' : approval.status === 'REJECTED' ? 'red' : 'grey'}>
             {approvalStatusLabel(approval.status)}
           </Tag>
@@ -108,6 +113,7 @@ export const WorkflowApprovalPanel: React.FC<Props> = ({ runId, projectId, scope
             <Popconfirm
               title="批准这个 Workflow 步骤？"
               content="确认后会记录人工决策并继续执行，但不会绕过后续权限和安全控制。"
+              onVisibleChange={(visible) => { if (visible) setReviewedApprovalId(approval.approvalId || ''); }}
               onConfirm={() => decisionMutation.mutate('APPROVE')}
             >
               <Button type="primary" loading={decisionMutation.isPending} disabled={busy}>批准并继续</Button>
@@ -115,6 +121,7 @@ export const WorkflowApprovalPanel: React.FC<Props> = ({ runId, projectId, scope
             <Popconfirm
               title="驳回这个 Workflow 步骤？"
               content="确认后会记录驳回结果，Workflow 将按已配置的条件分支继续处理。"
+              onVisibleChange={(visible) => { if (visible) setReviewedApprovalId(approval.approvalId || ''); }}
               onConfirm={() => decisionMutation.mutate('REJECT')}
             >
               <Button type="danger" disabled={busy}>驳回</Button>

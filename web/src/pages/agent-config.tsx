@@ -691,7 +691,7 @@ const normalizeEdgeDraft = (edge: OpsGraphEdge, _existingEdges: OpsGraphEdge[]):
   };
 };
 
-const DEFAULT_NODE_TYPES = ['START', 'AGENT', 'ROUTER', 'SUB_WORKFLOW', 'END'];
+const DEFAULT_NODE_TYPES = ['START', 'AGENT', 'ROUTER', 'SUB_WORKFLOW', 'HUMAN_APPROVAL', 'END'];
 const AGENT_MODES = [
   { value: 'direct', label: 'DIRECT · 固定动作，不调用模型', role: 'general' },
   { value: 'llm', label: 'LLM · 单次模型调用', role: 'general' },
@@ -779,7 +779,7 @@ const inferAgentMode = (node: OpsWorkflowNode) => {
 
 const nodeNeedsExplicitResource = (node: OpsWorkflowNode) => {
   const type = normalizeNodeType(node.type);
-  if (['START', 'END', 'ROUTER', 'SUB_WORKFLOW', 'REPORT', 'NOTIFY'].includes(type)) {
+  if (['START', 'END', 'ROUTER', 'SUB_WORKFLOW', 'HUMAN_APPROVAL', 'REPORT', 'NOTIFY'].includes(type)) {
     return false;
   }
   const mode = inferAgentMode(node);
@@ -795,7 +795,7 @@ const nodeNeedsExplicitResource = (node: OpsWorkflowNode) => {
 
 const normalizeNodeForEditor = (node: OpsWorkflowNode): OpsWorkflowNode => {
   const type = normalizeNodeType(node.type);
-  if (type === 'START' || type === 'END') {
+  if (type === 'START' || type === 'END' || type === 'HUMAN_APPROVAL') {
     return { ...node, type };
   }
   if (type === 'ROUTER') {

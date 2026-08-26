@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Banner,
   Button,
   Input,
   Select,
@@ -21,14 +22,27 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import styled from 'styled-components';
 
-import { OpsPageShell } from '../components/ops-layout';
+import { OpsPageShell, OpsWorkspaceFrame } from '../components/ops-layout';
+import { AssistantAnswer } from '../features/chat/AssistantAnswer';
+import { TaskEpisodePanel } from '../features/chat/TaskEpisodePanel';
+import { ChatModelSelector } from '../features/chat/ChatModelSelector';
 import { useProjectScope } from '../hooks/use-project-scope';
 import {
   appendLiveRunStep,
+  answerAfterStreamClosed,
+  sanitizeVisibleAnswer,
   userFacingRunFailure,
   type LiveRunStep,
 } from '../features/chat/live-run-trace';
 import { getStoredUserInfo } from '../services/auth-session';
+import { ApiRequestError } from '../services/ops-http-client';
+import { chatWorkflowBinding, chatWorkflowId, latestWorkflowForNewChat } from '../features/chat/chat-workflow-binding';
+import { followChatRun } from '../features/chat/follow-chat-run';
+import { latestChatRun, mergeChatHistory, recoverableChatRun } from '../features/chat/merge-chat-history';
+import { chatPreview, chatSessionTitle, shouldSendChatKey } from '../features/chat/chat-presentation';
+import { useChatDraft } from '../features/chat/use-chat-draft';
+import { useChatSessionAccess } from '../features/chat/use-chat-session-access';
+import { chatRunIds, scopedChatLocation, scopedChatSession } from '../features/chat/chat-route';
 import {
   opsAdminService,
   type OpsAgentDefinition,
@@ -42,12 +56,12 @@ import { userFacingError } from '../utils/user-facing-error';
 const { Text, Paragraph } = Typography;
 const { Option } = Select;
 
-const ChatWorkspace = styled.div`
+const ChatWorkspace = styled(OpsWorkspaceFrame)`
   position: relative;
-  height: 100dvh;
   min-height: 0;
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   background: #fff;
   overflow: hidden;
 
@@ -55,13 +69,11 @@ const ChatWorkspace = styled.div`
     grid-template-columns: 1fr;
   }
 
-  @media (max-width: ${theme.breakpoints.md}) {
-    height: calc(100dvh - 52px);
-  }
 `;
 
 const SessionPane = styled.aside<{ $mobileOpen: boolean }>`
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: #f6f7f9;
@@ -73,6 +85,8 @@ const SessionPane = styled.aside<{ $mobileOpen: boolean }>`
     z-index: 30;
     width: min(300px, 86vw);
     transform: translateX(${(props) => (props.$mobileOpen ? '0' : '-105%')});
+    visibility: ${(props) => (props.$mobileOpen ? 'visible' : 'hidden')};
+    pointer-events: ${(props) => (props.$mobileOpen ? 'auto' : 'none')};
     box-shadow: ${(props) => (props.$mobileOpen ? '18px 0 46px rgb(15 23 42 / 18%)' : 'none')};
     transition: transform ${theme.animation.duration.normal} ${theme.animation.easing.cubic};
   }
@@ -182,6 +196,7 @@ const HistoryToggle = styled(Button)`
 
 const ConversationHeader = styled.div`
   min-height: 58px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -191,7 +206,11 @@ const ConversationHeader = styled.div`
 
   .title {
     min-width: 0;
+    flex: 1;
   }
+
+  .header-identity { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; }
+  .header-actions { flex-shrink: 0; }
 
   strong {
     display: block;
@@ -208,6 +227,13 @@ const ConversationHeader = styled.div`
     color: ${theme.colors.text.tertiary};
     font-size: 11px;
   }
+
+  @media (max-width: ${theme.breakpoints.sm}) {
+    flex-wrap: wrap;
+    gap: 6px;
+    .header-identity { flex-basis: 100%; }
+    .header-actions { margin-left: auto; max-width: 100%; }
+  }
 `;
 
 const MessageList = styled.div`
@@ -218,7 +244,6 @@ const MessageList = styled.div`
   background: #fff;
 
   @media (max-width: 820px) {
-    min-height: 420px;
     padding: 24px 16px;
   }
 `;
@@ -245,7 +270,7 @@ const Welcome = styled.div`
 
 const MessageRow = styled.div<{ $role: string }>`
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr);
+  grid-template-columns: ${(props) => props.$role === 'user' ? 'minmax(0, 1fr) 30px' : '30px minmax(0, 1fr)'};
   gap: 11px;
   max-width: 820px;
   margin: 0 auto 26px;
@@ -262,13 +287,21 @@ const MessageAvatar = styled.div<{ $role: string }>`
   color: ${(props) => (props.$role === 'user' ? '#48505d' : '#fff')};
   font-size: 11px;
   font-weight: 700;
+  grid-column: ${(props) => props.$role === 'user' ? '2' : '1'};
 `;
 
-const MessageBody = styled.div<{ $role: string }>`
+const MessageContent = styled.div<{ $role: string }>`
   min-width: 0;
+  max-width: ${(props) => props.$role === 'user' ? 'min(100%, 680px)' : 'none'};
+  justify-self: ${(props) => props.$role === 'user' ? 'end' : 'stretch'};
+  grid-column: ${(props) => props.$role === 'user' ? '1' : '2'};
+`;
+
+const MessageBubble = styled.div<{ $role: string }>`
   padding: ${(props) => (props.$role === 'user' ? '10px 12px' : '2px 0')};
   border-radius: ${(props) => (props.$role === 'user' ? '11px' : '0')};
-  background: ${(props) => (props.$role === 'user' ? '#f5f6f8' : 'transparent')};
+  border: ${(props) => (props.$role === 'user' ? '1px solid #dfe6f0' : '0')};
+  background: ${(props) => (props.$role === 'user' ? '#f4f7fb' : 'transparent')};
   color: ${theme.colors.text.primary};
   font-size: 14px;
   line-height: 1.75;
@@ -276,11 +309,12 @@ const MessageBody = styled.div<{ $role: string }>`
   word-break: break-word;
 `;
 
-const MessageMeta = styled.div`
+const MessageMeta = styled.div<{ $role: string }>`
   display: flex;
   align-items: center;
   gap: 7px;
   margin-bottom: 5px;
+  justify-content: ${(props) => props.$role === 'user' ? 'flex-end' : 'flex-start'};
   color: ${theme.colors.text.tertiary};
   font-size: 11px;
   font-weight: 600;
@@ -380,14 +414,13 @@ const ComposerContext = styled.div`
   }
 
   @media (max-width: ${theme.breakpoints.sm}) {
-    .semi-select {
-      min-width: 118px;
-      max-width: 150px;
-    }
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: visible;
 
-    .project-select {
-      min-width: 130px;
-    }
+    > div { min-width: 0; }
+    > [data-testid='model-selector'] { grid-column: 1 / -1; }
+    .semi-select, .project-select { width: 100%; min-width: 0; max-width: none; }
   }
 `;
 
@@ -410,27 +443,54 @@ export const ChatPage: React.FC = () => {
   const [workflows, setWorkflows] = useState<OpsAgentDefinition[]>([]);
   const [models, setModels] = useState<OpsSelectableModel[]>([]);
   const [sessions, setSessions] = useState<OpsChatSession[]>([]);
+  const [sessionCatalogProjectId, setSessionCatalogProjectId] = useState('');
+  const [sessionCatalogRequestedId, setSessionCatalogRequestedId] = useState('');
+  const requestedSessionId = searchParams.get('sessionId') || '';
   const [activeSessionId, setActiveSessionId] = useState(searchParams.get('sessionId') || '');
+  const activeSessionIdRef = useRef(activeSessionId);
+  activeSessionIdRef.current = activeSessionId;
+  const routeParamsRef = useRef(searchParams);
+  routeParamsRef.current = searchParams;
+  const requestedRunId = searchParams.get('runId') || '';
+  const [validatedChatRoute, setValidatedChatRoute] = useState<{
+    projectId: string; sessionId: string; requestedRunId: string; runIds: string[];
+  }>();
+  const [episodePanelOpen, setEpisodePanelOpen] = useState(false);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState('');
   const [selectedModelId, setSelectedModelId] = useState(() => localStorage.getItem(modelPreferenceKey) || '');
+  const selectedModelIdRef = useRef(selectedModelId);
   const [messages, setMessages] = useState<OpsChatMessage[]>([]);
-  const [input, setInput] = useState('');
+  const draftScope = JSON.stringify([principal.username, projectScope.projectId, activeSessionId]);
+  const { input, setInput, discardDraft } = useChatDraft(draftScope);
   const [sessionKeyword, setSessionKeyword] = useState('');
   const [sessionPanelOpen, setSessionPanelOpen] = useState(false);
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
+  const [creatingConversation, setCreatingConversation] = useState(false);
+  const creatingConversationRef = useRef(false);
   const [streamingAssistantId, setStreamingAssistantId] = useState('');
   const [liveRunSteps, setLiveRunSteps] = useState<LiveRunStep[]>([]);
   const [lastRunId, setLastRunId] = useState(searchParams.get('runId') || '');
   const abortRef = useRef<AbortController | null>(null);
   const activeRunIdRef = useRef('');
+  const activeRunScopeRef = useRef({ projectId: '', sessionId: '' });
   const messageListRef = useRef<HTMLDivElement | null>(null);
+  const stickToLatestRef = useRef(true);
+  const [showLatest, setShowLatest] = useState(false);
 
   const activeSession = useMemo(
-    () => sessions.find((session) => session.sessionId === activeSessionId),
-    [activeSessionId, sessions],
+    () => sessions.find((session) => session.sessionId === activeSessionId && session.projectId === projectScope.projectId),
+    [activeSessionId, sessions, projectScope.projectId],
   );
+  const hasActiveSession = Boolean(activeSession);
+  // An empty initial screen can still resolve to a restored conversation. Do not accept a
+  // draft until its destination and history are resolved, including after route/project changes.
+  const resolvingConversation = projectScope.loading || loadingSessions || loadingMessages
+    || sessionCatalogProjectId !== projectScope.projectId || sessionCatalogRequestedId !== requestedSessionId
+    || Boolean(activeSessionId && (validatedChatRoute?.projectId !== projectScope.projectId
+      || validatedChatRoute.sessionId !== activeSessionId));
+  const sessionAccess = useChatSessionAccess(activeSession, principal.userId || principal.username || '', activeSessionId);
   const selectedWorkflow = useMemo(
     () => workflows.find((workflow) => workflow.agentId === selectedWorkflowId),
     [selectedWorkflowId, workflows],
@@ -446,31 +506,81 @@ export const ChatPage: React.FC = () => {
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
       if (messageListRef.current) messageListRef.current.scrollTop = messageListRef.current.scrollHeight;
+      stickToLatestRef.current = true;
+      setShowLatest(false);
     });
   }, []);
 
-  useEffect(() => { scrollToBottom(); }, [messages, liveRunSteps, scrollToBottom]);
+  useEffect(() => {
+    if (stickToLatestRef.current) scrollToBottom();
+  }, [messages, liveRunSteps, scrollToBottom]);
+  useEffect(() => { scrollToBottom(); }, [activeSessionId, scrollToBottom]);
 
-  const loadSessions = useCallback(async () => {
+  const sessionRequestEpoch = useRef(0);
+  const loadSessions = useCallback(async (explicitSessionId = requestedSessionId) => {
+    const requestEpoch = ++sessionRequestEpoch.current;
+    if (projectScope.loading || projectScope.error) {
+      setLoadingSessions(false);
+      return;
+    }
+    if (!projectScope.projectId) {
+      setSessions([]);
+      setSessionCatalogProjectId('');
+      setActiveSessionId('');
+      setLoadingSessions(false);
+      return;
+    }
     setLoadingSessions(true);
     try {
-      const response = await opsAdminService.listChatSessions({ userId: principal.username, limit: 100 });
-      const next = (response.data || []).filter((session) => !projectScope.projectId || session.projectId === projectScope.projectId);
+      const response = await opsAdminService.listChatSessions({ userId: principal.username, projectId: projectScope.projectId, limit: 100 });
+      if (requestEpoch !== sessionRequestEpoch.current) return;
+      if (response.code && response.code !== '0000') throw new Error(response.info || '读取会话目录失败');
+      const next = (response.data || [])
+        .filter((session) => session.projectId === projectScope.projectId)
+        .map((session) => ({
+          ...session,
+          lastMessage: sanitizeVisibleAnswer(session.lastMessage),
+        }));
+      // A bounded catalog does not prove that an explicitly copied older session is absent.
+      // Read only that ID through the same authenticated participant boundary.
+      if (explicitSessionId && !next.some((session) => session.sessionId === explicitSessionId)) {
+        try {
+          const detail = await opsAdminService.getChatSession(explicitSessionId, projectScope.projectId);
+          if (requestEpoch !== sessionRequestEpoch.current) return;
+          if (detail.code !== '0000') throw new Error(detail.info || '核对指定会话失败');
+          if (detail.data?.sessionId === explicitSessionId && detail.data.projectId === projectScope.projectId) {
+            next.unshift({ ...detail.data, lastMessage: sanitizeVisibleAnswer(detail.data.lastMessage) });
+          } else throw new Error('核对指定会话返回的身份不一致');
+        } catch (error) {
+          if (!(error instanceof ApiRequestError) || ![403, 404].includes(error.status)) throw error;
+          // A definite permission/missing response may use the ordinary authorized fallback.
+        }
+      }
+      if (requestEpoch !== sessionRequestEpoch.current) return;
       setSessions(next);
-      setActiveSessionId((current) => current && next.some((session) => session.sessionId === current) ? current : next[0]?.sessionId || '');
+      setSessionCatalogProjectId(projectScope.projectId);
+      setSessionCatalogRequestedId(explicitSessionId);
+      setActiveSessionId(scopedChatSession(next, projectScope.projectId,
+        explicitSessionId, activeSessionIdRef.current));
     } catch (error) {
+      if (requestEpoch !== sessionRequestEpoch.current) return;
       Toast.error(userFacingError(error, '加载对话列表失败，请稍后重试。'));
     } finally {
-      setLoadingSessions(false);
+      if (requestEpoch === sessionRequestEpoch.current) setLoadingSessions(false);
     }
-  }, [principal.username, projectScope.projectId]);
+  }, [principal.username, projectScope.projectId, projectScope.loading, projectScope.error, requestedSessionId]);
 
   useEffect(() => {
     void opsAdminService.listChatModels()
       .then((response) => {
         const next = response.data || [];
         setModels(next);
-        setSelectedModelId((current) => current && next.some((model) => model.modelId === current) ? current : '');
+        const current = selectedModelIdRef.current;
+        if (current && !next.some((model) => model.modelId === current)) {
+          selectedModelIdRef.current = '';
+          setSelectedModelId('');
+          localStorage.removeItem(modelPreferenceKey);
+        }
       })
       .catch(() => setModels([]));
   }, []);
@@ -493,31 +603,140 @@ export const ChatPage: React.FC = () => {
   useEffect(() => { void loadSessions(); }, [loadSessions]);
 
   useEffect(() => {
-    if (!activeSessionId) {
+    // Do not discard copied parameters while project permissions or the session catalog are loading.
+    if (projectScope.loading || projectScope.error || loadingSessions || sessionCatalogProjectId !== projectScope.projectId
+      || sessionCatalogRequestedId !== requestedSessionId) return;
+    const selected = scopedChatSession(sessions, projectScope.projectId, searchParams.get('sessionId') || '', activeSessionId);
+    if (selected !== activeSessionId) {
+      setActiveSessionId(selected);
+      setLastRunId('');
+    }
+    const knownRunIds = validatedChatRoute?.projectId === projectScope.projectId
+      && validatedChatRoute.sessionId === selected && validatedChatRoute.requestedRunId === requestedRunId
+      ? validatedChatRoute.runIds : undefined;
+    const next = scopedChatLocation(searchParams, projectScope.projectId, selected, knownRunIds);
+    if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });
+  }, [activeSessionId, loadingSessions, projectScope.error, projectScope.loading, projectScope.projectId,
+    requestedRunId, requestedSessionId, searchParams, sessionCatalogProjectId, sessionCatalogRequestedId,
+    sessions, setSearchParams, validatedChatRoute]);
+
+  useEffect(() => {
+    if (!activeSessionId || sessionCatalogProjectId !== projectScope.projectId || !hasActiveSession) {
       setMessages([]);
+      setLastRunId('');
       return;
     }
     let active = true;
+    let recovery: AbortController | undefined;
     setLoadingMessages(true);
     opsAdminService.listChatMessages(activeSessionId)
-      .then((response) => { if (active) setMessages(response.data || []); })
+      .then(async (response) => {
+        if (!active) return;
+        const history = (response.data || []).map((message) => ({
+          ...message, content: sanitizeVisibleAnswer(message.content),
+        }));
+        setMessages((current) => mergeChatHistory(current, history, activeSessionId, true));
+        const knownRunIds = chatRunIds(history, activeSessionId);
+        // A server-accepted live stream may precede its persisted assistant message.
+        if (abortRef.current && activeRunIdRef.current
+          && activeRunScopeRef.current.projectId === projectScope.projectId
+          && activeRunScopeRef.current.sessionId === activeSessionId) knownRunIds.push(activeRunIdRef.current);
+        const selectedRunId = knownRunIds.includes(requestedRunId) ? requestedRunId : latestChatRun(history, activeSessionId);
+        const currentStream = abortRef.current && activeRunScopeRef.current.projectId === projectScope.projectId
+          && activeRunScopeRef.current.sessionId === activeSessionId;
+        if (!currentStream) setLastRunId(selectedRunId);
+        setValidatedChatRoute({ projectId: projectScope.projectId, sessionId: activeSessionId,
+          requestedRunId, runIds: knownRunIds });
+        const runId = recoverableChatRun(history, activeSessionId);
+        // An existing stream owns its turn. A reload only follows the persisted run; it never resubmits.
+        if (!runId || abortRef.current) return;
+        const controller = new AbortController();
+        recovery = controller;
+        abortRef.current = controller;
+        activeRunScopeRef.current = { projectId: projectScope.projectId, sessionId: activeSessionId };
+        activeRunIdRef.current = runId;
+        setLastRunId(knownRunIds.includes(requestedRunId) ? requestedRunId : runId);
+        setSending(true);
+        setLoadingMessages(false);
+        const messageId = `local-restored-${runId}`;
+        setStreamingAssistantId(messageId);
+        setMessages((current) => [...current.filter((item) => item.messageId !== messageId), {
+          messageId, sessionId: activeSessionId, role: 'assistant',
+          content: '正在同步后台任务，获得最终结果后会自动更新。', metadata: { runId },
+        }]);
+        try {
+          const settled = await followChatRun(async () => {
+            const result = await opsAdminService.getUserChatRun(runId, projectScope.projectId, controller.signal);
+            if (result.code !== '0000' || !result.data) throw new Error('读取运行状态失败');
+            return result.data;
+          }, (snapshot) => {
+            if (!active) return;
+            let notice = sanitizeVisibleAnswer(snapshot.response?.content);
+            if (!notice && snapshot.status === 'FAILED') notice = userFacingRunFailure({
+              eventType: 'RUN_FAILED', payload: { reasonCode: snapshot.error_message },
+            });
+            if (!notice && snapshot.status === 'CANCELED') notice = '任务已取消，请在运行详情核对已有工具回执。';
+            if (!notice && snapshot.status === 'WAITING_APPROVAL') notice = '任务正在等待审批，请打开“查看运行”处理。';
+            if (!notice && snapshot.status === 'RECOVERY_REVIEW_REQUIRED') notice = '任务需要核对已有操作结果，请打开“查看运行”。';
+            if (notice) patchAssistant(messageId, (message) => ({ ...message, content: notice }));
+          }, controller.signal);
+          if (!active || controller.signal.aborted) return;
+          if (!settled) patchAssistant(messageId, (message) => ({ ...message,
+            content: '等待时间较长，后台任务未被取消，请打开“查看运行”核对最新状态。',
+          }));
+          const persisted = await opsAdminService.listChatMessages(activeSessionId);
+          if (!active || controller.signal.aborted) return;
+          setMessages((current) => mergeChatHistory(current, (persisted.data || []).map((message) => ({
+            ...message, content: sanitizeVisibleAnswer(message.content),
+          })), activeSessionId));
+        } catch (error) {
+          if (active && !controller.signal.aborted) patchAssistant(messageId, (message) => ({ ...message,
+            content: '暂时无法同步后台任务，请打开“查看运行”核对状态；本次没有重复提交。',
+          }));
+        } finally {
+          if (abortRef.current === controller) {
+            abortRef.current = null;
+            activeRunIdRef.current = '';
+            setSending(false);
+            setStreamingAssistantId('');
+          }
+        }
+      })
       .catch((error) => { if (active) Toast.error(userFacingError(error, '加载对话内容失败，请稍后重试。')); })
       .finally(() => { if (active) setLoadingMessages(false); });
-    return () => { active = false; };
-  }, [activeSessionId]);
+    return () => {
+      active = false;
+      recovery?.abort();
+      if (recovery && abortRef.current === recovery) {
+        abortRef.current = null;
+        activeRunIdRef.current = '';
+        setSending(false);
+        setStreamingAssistantId('');
+      }
+    };
+  }, [activeSessionId, projectScope.projectId, requestedRunId, sessionCatalogProjectId, hasActiveSession]);
 
   useEffect(() => {
-    const workflowId = activeSession?.metadata?.executionType === 'WORKFLOW' ? activeSession.agentId || '' : '';
-    setSelectedWorkflowId(workflowId);
-  }, [activeSession]);
+    setSelectedWorkflowId(chatWorkflowId(activeSession, workflows));
+  }, [activeSession, workflows]);
 
   const createConversation = async (workflowId = selectedWorkflowId) => {
+    if (creatingConversationRef.current || sending) return '';
+    if (projectScope.error) {
+      Toast.warning('项目目录暂时不可用，请刷新项目列表后再开始新任务。');
+      return '';
+    }
     if (!projectScope.projectId) {
       Toast.warning('请先选择项目。');
       return '';
     }
+    creatingConversationRef.current = true;
+    setCreatingConversation(true);
     try {
-      const workflow = workflows.find((item) => item.agentId === workflowId);
+      const workflow = workflowId
+        ? await latestWorkflowForNewChat(workflowId, () => opsAdminService.listChatAgents(projectScope.projectId))
+        : undefined;
+      if (workflow) setWorkflows((items) => [...items.filter((item) => item.agentId !== workflowId), workflow]);
       const response = await opsAdminService.createChatSession({
         userId: principal.username,
         projectId: projectScope.projectId,
@@ -535,22 +754,29 @@ export const ChatPage: React.FC = () => {
       setActiveSessionId(sessionId);
       setMessages([]);
       setLastRunId('');
-      await loadSessions();
+      setSearchParams({ projectId: projectScope.projectId, sessionId }, { replace: true });
+      await loadSessions(sessionId);
       return sessionId;
     } catch (error) {
       Toast.error(userFacingError(error, '创建对话失败，请稍后重试。'));
       return '';
+    } finally {
+      creatingConversationRef.current = false;
+      setCreatingConversation(false);
     }
   };
 
   const changeExecution = async (value: unknown) => {
+    if (!sessionAccess.canWrite) return;
     const workflowId = String(value || '');
-    setSelectedWorkflowId(workflowId);
-    await createConversation(workflowId);
+    const sessionId = await createConversation(workflowId);
+    if (sessionId) setSelectedWorkflowId(workflowId);
   };
 
   const changeModel = (value: unknown) => {
+    if (!sessionAccess.canWrite) return;
     const modelId = String(value || '');
+    selectedModelIdRef.current = modelId;
     setSelectedModelId(modelId);
     if (modelId) localStorage.setItem(modelPreferenceKey, modelId);
     else localStorage.removeItem(modelPreferenceKey);
@@ -562,7 +788,8 @@ export const ChatPage: React.FC = () => {
 
   const send = async () => {
     const query = input.trim();
-    if (!query || sending || !projectScope.projectId) return;
+    if (!sessionAccess.canWrite || !query || sending || creatingConversationRef.current || resolvingConversation || !projectScope.projectId || projectScope.error) return;
+    const modelId = selectedWorkflowId ? '' : selectedModelIdRef.current;
 
     let sessionId = activeSessionId;
     if (!sessionId) sessionId = await createConversation(selectedWorkflowId);
@@ -578,62 +805,109 @@ export const ChatPage: React.FC = () => {
     ]);
     setStreamingAssistantId(localAssistantId);
     setLiveRunSteps([]);
+    discardDraft(draftScope);
     setInput('');
+    scrollToBottom();
     setSending(true);
     setLastRunId('');
     activeRunIdRef.current = '';
+    activeRunScopeRef.current = { projectId: projectScope.projectId, sessionId };
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
 
     try {
-      await opsAdminService.streamUserChat({
-        userId: principal.username,
-        sessionId,
-        projectId: projectScope.projectId,
-        query,
-        mode: 'AGENT',
-        engine: selectedWorkflow?.engine || 'GRAPH',
-        agentDefinitionId: selectedWorkflowId || undefined,
-        agentVersion: selectedWorkflow?.version,
-        modelId: selectedModelId || undefined,
-        enableThinking: true,
-        metadata: {
-          executionType: selectedWorkflowId ? 'WORKFLOW' : 'DEFAULT_REACT',
-          triggerSource: 'CHAT',
-          selectedModelId: selectedModelId || undefined,
-        },
-      }, (event) => {
-        setLiveRunSteps((current) => appendLiveRunStep(current, event));
-        const eventRunId = event.runId || (typeof event.payload?.runId === 'string' ? event.payload.runId : '');
-        if (eventRunId) {
-          activeRunIdRef.current = eventRunId;
-          setLastRunId(eventRunId);
-          setSearchParams((current) => {
-            const next = new URLSearchParams(current);
-            next.set('projectId', projectScope.projectId);
-            next.set('sessionId', sessionId);
-            next.set('runId', eventRunId);
-            return next;
-          }, { replace: true });
-        }
-        if (event.eventType === 'TEXT_DELTA' && event.content) {
-          patchAssistant(localAssistantId, (message) => ({ ...message, content: `${message.content || ''}${event.content}` }));
-        } else if (event.eventType === 'FINAL_OUTPUT' && event.content) {
-          patchAssistant(localAssistantId, (message) => ({ ...message, content: event.content || message.content }));
-        } else if (event.eventType === 'REACT_FAILED'
-          || event.eventType === 'RUN_FAILED'
-          || event.eventType === 'MAIN_AGENT_ACTION_FAILED') {
-          patchAssistant(localAssistantId, (message) => ({
-            ...message,
-            content: userFacingRunFailure(event),
+      const binding = chatWorkflowBinding(activeSession, selectedWorkflow);
+      try {
+        await opsAdminService.streamUserChat({
+          userId: principal.username,
+          sessionId,
+          projectId: projectScope.projectId,
+          query,
+          mode: 'AGENT',
+          ...binding,
+          modelId: modelId || undefined,
+          enableThinking: true,
+          metadata: {
+            executionType: selectedWorkflowId ? 'WORKFLOW' : 'DEFAULT_REACT',
+            triggerSource: 'CHAT',
+            selectedModelId: modelId || undefined,
+          },
+        }, (event) => {
+          setLiveRunSteps((current) => appendLiveRunStep(current, event));
+          const eventRunId = event.runId || (typeof event.payload?.runId === 'string' ? event.payload.runId : '');
+          if (eventRunId) {
+            activeRunIdRef.current = eventRunId;
+            if (activeSessionIdRef.current === sessionId && routeParamsRef.current.get('projectId') === projectScope.projectId
+              && routeParamsRef.current.get('sessionId') === sessionId) {
+              setLastRunId(eventRunId);
+              setSearchParams((current) => {
+                const next = new URLSearchParams(current);
+                next.set('projectId', projectScope.projectId);
+                next.set('sessionId', sessionId);
+                next.set('runId', eventRunId);
+                return next;
+              }, { replace: true });
+            }
+          }
+          if (event.eventType === 'TEXT_DELTA' && event.content) {
+            patchAssistant(localAssistantId, (message) => ({ ...message, content: `${message.content || ''}${event.content}` }));
+          } else if (event.eventType === 'FINAL_OUTPUT' && event.content) {
+            patchAssistant(localAssistantId, (message) => ({
+              ...message,
+              content: sanitizeVisibleAnswer(event.content) || message.content,
+            }));
+          } else if (event.eventType === 'REACT_FAILED'
+            || event.eventType === 'RUN_FAILED'
+            || event.eventType === 'MAIN_AGENT_ACTION_FAILED') {
+            patchAssistant(localAssistantId, (message) => ({
+              ...message,
+              content: userFacingRunFailure(event),
+            }));
+          } else if (event.eventType === 'ERROR') {
+            patchAssistant(localAssistantId, (message) => ({ ...message, content: event.summary || '对话执行失败，请检查模型或项目连接。' }));
+          }
+        }, controller.signal);
+      } catch (error) {
+        if (controller.signal.aborted || !activeRunIdRef.current) throw error;
+        // Once accepted, reconnect by reading the same run; never submit the query again.
+      }
+      const followedRunId = activeRunIdRef.current;
+      if (followedRunId && !controller.signal.aborted) {
+        const settledRun = await followChatRun(async () => {
+          const result = await opsAdminService.getUserChatRun(followedRunId, projectScope.projectId, controller.signal);
+          if (result.code !== '0000' || !result.data) throw new Error('读取运行状态失败');
+          return result.data;
+        }, (snapshot) => {
+          const answer = sanitizeVisibleAnswer(snapshot.response?.content);
+          let notice = answer;
+          if (!notice && snapshot.status === 'FAILED') notice = userFacingRunFailure({
+            eventType: 'RUN_FAILED', payload: { reasonCode: snapshot.error_message },
+          });
+          if (!notice && snapshot.status === 'CANCELED') notice = '任务已取消，请在运行详情核对已有工具回执。';
+          if (!notice && snapshot.status === 'WAITING_APPROVAL') notice = '任务正在等待审批，请打开“查看运行”处理。';
+          if (!notice && snapshot.status === 'RECOVERY_REVIEW_REQUIRED') notice = '任务需要核对已有操作结果，请打开“查看运行”。';
+          patchAssistant(localAssistantId, (message) => ({ ...message,
+            content: notice || message.content || '正在同步后台任务，获得最终结果后会自动更新。',
           }));
-        } else if (event.eventType === 'ERROR') {
-          patchAssistant(localAssistantId, (message) => ({ ...message, content: event.summary || '对话执行失败，请检查模型或项目连接。' }));
+        }, controller.signal);
+        if (!settledRun && !controller.signal.aborted) {
+          patchAssistant(localAssistantId, (message) => ({ ...message,
+            content: '等待时间较长，已停止页面自动查询。后台任务未被取消，请打开“查看运行”核对最新状态。',
+          }));
         }
-      }, controller.signal);
+      }
+      if (controller.signal.aborted || abortRef.current !== controller) return;
+      patchAssistant(localAssistantId, (message) => ({
+        ...message, content: answerAfterStreamClosed(message.content),
+      }));
       const history = await opsAdminService.listChatMessages(sessionId);
-      setMessages(history.data || []);
+      if (controller.signal.aborted || abortRef.current !== controller) return;
+      const persisted = (history.data || []).map((message) => ({
+        ...message,
+        content: sanitizeVisibleAnswer(message.content),
+      }));
+      setMessages((current) => mergeChatHistory(current, persisted, sessionId));
       await loadSessions();
     } catch (error) {
       if (!controller.signal.aborted) {
@@ -641,10 +915,12 @@ export const ChatPage: React.FC = () => {
         Toast.error(userFacingError(error, '流式连接中断，请检查服务状态。'));
       }
     } finally {
-      if (abortRef.current === controller) abortRef.current = null;
-      setSending(false);
-      setStreamingAssistantId('');
-      activeRunIdRef.current = '';
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+        setSending(false);
+        setStreamingAssistantId('');
+        activeRunIdRef.current = '';
+      }
     }
   };
 
@@ -672,7 +948,7 @@ export const ChatPage: React.FC = () => {
           <SessionHeader>
             <strong>对话</strong>
             <SessionActions>
-              <Button block icon={<IconPlus />} theme="solid" type="primary" onClick={() => void createConversation()}>
+              <Button block icon={<IconPlus />} theme="solid" type="primary" loading={creatingConversation} disabled={sending} onClick={() => void createConversation()}>
                 新对话
               </Button>
               <Button icon={<IconRefresh />} loading={loadingSessions} onClick={() => void loadSessions()} aria-label="刷新对话" />
@@ -686,52 +962,69 @@ export const ChatPage: React.FC = () => {
               <SessionItem
                 key={session.sessionId}
                 type="button"
+                disabled={sending || creatingConversation}
                 $active={session.sessionId === activeSessionId}
+                aria-current={session.sessionId === activeSessionId ? 'true' : undefined}
                 onClick={() => {
                   setActiveSessionId(session.sessionId);
+                  setLastRunId('');
+                  setSearchParams({ projectId: projectScope.projectId, sessionId: session.sessionId }, { replace: true });
                   setSessionPanelOpen(false);
                 }}
               >
                 <SessionTitle>
                   <IconComment />
-                  <Text strong ellipsis={{ showTooltip: true }}>{session.title || '新对话'}</Text>
+                  <Text strong ellipsis={{ showTooltip: true }}>{chatSessionTitle(session.title, session.lastMessage)}</Text>
                 </SessionTitle>
-                <SessionMeta>{session.metadata?.executionType === 'WORKFLOW' ? session.metadata?.executionName || '工作流' : '默认助手'}</SessionMeta>
-                <SessionMeta>{session.lastMessage || session.lastActiveAt || '暂无消息'}</SessionMeta>
+                <SessionMeta>{chatWorkflowId(session, workflows)
+                  ? workflows.find((item) => item.agentId === session.agentId)?.name || session.metadata?.executionName || '已绑定工作流'
+                  : session.agentId ? '已绑定助手' : '默认助手'}</SessionMeta>
+                <SessionMeta>{chatPreview(session.lastMessage) || session.lastActiveAt || '暂无消息'}</SessionMeta>
               </SessionItem>
             ))}
-            {!loadingSessions && filteredSessions.length === 0 && <Text type="tertiary" style={{ display: 'block', padding: 12 }}>还没有对话。</Text>}
+            {!loadingSessions && filteredSessions.length === 0 && <Text type="tertiary" style={{ display: 'block', padding: 12 }}>{sessionKeyword.trim() ? '没有匹配的对话，请调整搜索条件。' : '还没有对话，直接输入问题即可开始。'}</Text>}
           </SessionList>
         </SessionPane>
 
         <Conversation>
           <ConversationHeader>
-            <Space spacing="tight" style={{ minWidth: 0 }}>
+            <div className="header-identity">
               <HistoryToggle theme="borderless" icon={<IconMenu />} aria-label="打开会话列表" onClick={() => setSessionPanelOpen(true)} />
               <div className="title">
-                <strong>{activeSession?.title || '新对话'}</strong>
+                <strong>{chatSessionTitle(activeSession?.title, activeSession?.lastMessage)}</strong>
                 <span>{projectScope.selectedProject?.name || '未选择项目'}</span>
               </div>
-            </Space>
-            <Space spacing="tight">
+            </div>
+            <Space className="header-actions" spacing="tight" wrap>
+              {sessionAccess.access === 'readonly' && <Tag>只读协作</Tag>}
               {sending && <Tag color="blue">生成中</Tag>}
+              {activeSessionId && <Button size="small" onClick={() => setEpisodePanelOpen(true)}>任务分段</Button>}
               {lastRunId && <Button size="small" onClick={() => navigate(`/workbench?projectId=${encodeURIComponent(projectScope.projectId)}&runId=${encodeURIComponent(lastRunId)}`)}>查看运行</Button>}
             </Space>
           </ConversationHeader>
 
-          <MessageList ref={messageListRef} data-testid="chat-message-scroll">
+          <TaskEpisodePanel projectId={projectScope.projectId} sessionId={activeSessionId}
+            visible={episodePanelOpen} readOnly={!sessionAccess.canWrite} onClose={() => setEpisodePanelOpen(false)} />
+
+          <MessageList ref={messageListRef} data-testid="chat-message-scroll" onScroll={() => {
+            const area = messageListRef.current;
+            if (!area) return;
+            const atLatest = area.scrollHeight - area.clientHeight - area.scrollTop < 120;
+            stickToLatestRef.current = atLatest;
+            setShowLatest(!atLatest);
+          }}>
             {loadingMessages && <Spin />}
             {!loadingMessages && messages.length === 0 && (
               <Welcome>
-                <h2>今天需要处理什么？</h2>
-                <Paragraph>直接描述现象、问题或目标。默认助手会在当前项目边界内使用模型和工具；重复、确定性的流程可以切换到已发布工作流。</Paragraph>
+                <h2>{sessionAccess.access === 'readonly' ? '这是一个只读共享会话' : '今天需要处理什么？'}</h2>
+                <Paragraph>{sessionAccess.access === 'readonly' ? '你可以查看会话记录和运行结果。如需处理自己的任务，请新建对话。' : '直接描述现象、问题或目标。默认助手会在当前项目边界内使用模型和工具；重复、确定性的流程可以切换到已发布工作流。'}</Paragraph>
               </Welcome>
             )}
             {messages.map((message) => (
               <MessageRow key={message.messageId} $role={message.role}>
                 <MessageAvatar $role={message.role}>{message.role === 'user' ? (principal.username?.[0]?.toUpperCase() || 'U') : 'O'}</MessageAvatar>
-                <MessageBody $role={message.role}>
-                  <MessageMeta>
+                <MessageContent $role={message.role}>
+                  <MessageMeta $role={message.role}>
                     <span>{message.role === 'user' ? principal.username || '你' : 'OrbisOps'}</span>
                     {message.messageId === streamingAssistantId && <><StreamingDot />正在处理</>}
                   </MessageMeta>
@@ -746,13 +1039,18 @@ export const ChatPage: React.FC = () => {
                       ))}
                     </RunTrace>
                   )}
-                  <div>{message.content || (message.messageId === streamingAssistantId ? ' ' : '')}</div>
-                </MessageBody>
+                  <MessageBubble $role={message.role}>
+                    {message.role === 'assistant' && message.content
+                      ? <AssistantAnswer text={message.content} />
+                      : message.content || (message.messageId === streamingAssistantId ? ' ' : '')}
+                  </MessageBubble>
+                </MessageContent>
               </MessageRow>
             ))}
           </MessageList>
 
           <ComposerDock data-testid="chat-composer">
+            {showLatest && <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}><Button size="small" onClick={scrollToBottom}>回到最新消息</Button></div>}
             <Composer>
               <ComposerContext>
                 <div data-testid="project-selector" data-project={projectScope.projectId || 'NONE'}>
@@ -762,6 +1060,7 @@ export const ChatPage: React.FC = () => {
                     value={projectScope.projectId || undefined}
                     placeholder="选择项目"
                     aria-label="项目"
+                    disabled={sending || creatingConversation}
                     onChange={(value) => {
                       projectScope.selectProject(String(value || ''));
                       setActiveSessionId('');
@@ -771,28 +1070,39 @@ export const ChatPage: React.FC = () => {
                   >
                     {projectScope.projects.map((project) => <Option key={project.projectId} value={project.projectId}>{project.name}</Option>)}
                   </Select>
+                  <Button
+                    size="small"
+                    aria-label="刷新项目列表"
+                    icon={<IconRefresh />}
+                    loading={projectScope.loading}
+                    disabled={sending || creatingConversation}
+                    onClick={() => void projectScope.reloadProjects()}
+                  />
                 </div>
                 <div data-testid="execution-selector" data-execution={selectedWorkflowId || 'DEFAULT_REACT'}>
-                  <Select size="small" aria-label="执行方式" value={selectedWorkflowId} onChange={(value) => void changeExecution(value)}>
+                  <Select size="small" aria-label="执行方式" disabled={!sessionAccess.canWrite || sending || creatingConversation} value={selectedWorkflowId} onChange={(value) => void changeExecution(value)}>
                     <Option value="">默认助手</Option>
                     {workflows.map((workflow) => <Option key={workflow.agentId} value={workflow.agentId}>{executionName(workflow)}</Option>)}
                   </Select>
                 </div>
                 <div data-testid="model-selector" data-model={selectedModelId || 'DEFAULT'}>
-                  <Select size="small" aria-label="模型" value={selectedModelId} onChange={changeModel}>
-                    <Option value="">默认模型</Option>
-                    {models.map((model) => <Option key={model.modelId} value={model.modelId}>{model.modelName || model.modelId}</Option>)}
-                  </Select>
+                  {selectedWorkflowId ? <Text type="tertiary" size="small">按工作流配置执行{activeSession?.agentVersion ? ` · v${activeSession.agentVersion}` : ''}</Text>
+                    : <ChatModelSelector models={models} disabled={!sessionAccess.canWrite || sending || creatingConversation || resolvingConversation}
+                      value={selectedModelId} onChange={changeModel} />}
                 </div>
               </ComposerContext>
+              {projectScope.error && <Banner type="warning" description="项目目录暂时不可用。当前项目身份和已有运行已保留；刷新项目列表后才能开始新任务。" closeIcon={null} />}
+              {sessionAccess.access === 'readonly' && <Banner description="你在这个会话中拥有只读权限，可以查看记录；新建对话可开始自己的任务。" closeIcon={null} />}
+              {sessionAccess.access === 'unavailable' && <Banner type="warning" description={<Space>协作权限暂时无法读取，已保留会话记录。<Button size="small" onClick={sessionAccess.retry}>重试读取权限</Button></Space>} closeIcon={null} />}
               <TextArea
                 value={input}
                 autosize={{ minRows: 2, maxRows: 8 }}
                 placeholder="给 OrbisOps 发消息..."
-                disabled={!projectScope.projectId}
+                aria-label="发送给 OrbisOps 的消息"
+                disabled={!sessionAccess.canWrite || resolvingConversation || creatingConversation || !projectScope.projectId || Boolean(projectScope.error)}
                 onChange={setInput}
                 onKeyDown={(event) => {
-                  if (event.key === 'Enter' && !event.shiftKey) {
+                  if (shouldSendChatKey({ key: event.key, shiftKey: event.shiftKey, isComposing: event.nativeEvent.isComposing, keyCode: event.keyCode })) {
                     event.preventDefault();
                     void send();
                   }
@@ -801,9 +1111,9 @@ export const ChatPage: React.FC = () => {
               <ComposerFooter>
                 <Text type="tertiary" size="small">Enter 发送 · Shift + Enter 换行</Text>
                 {sending ? (
-                  <Button icon={<IconStop />} onClick={() => void stop()}>停止</Button>
+                  sessionAccess.canWrite ? <Button icon={<IconStop />} onClick={() => void stop()}>停止</Button> : <Text type="tertiary">正在同步运行记录</Text>
                 ) : (
-                  <Button theme="solid" type="primary" icon={<IconSend />} disabled={!input.trim() || !projectScope.projectId} onClick={() => void send()}>
+                  <Button theme="solid" type="primary" icon={<IconSend />} disabled={!sessionAccess.canWrite || !input.trim() || !projectScope.projectId || Boolean(projectScope.error) || creatingConversation || resolvingConversation} onClick={() => void send()}>
                     发送
                   </Button>
                 )}

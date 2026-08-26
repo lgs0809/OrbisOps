@@ -1,3 +1,4 @@
+import { fulfillAccessibleProjects } from './fixtures/project-catalog';
 import { expect, test } from '@playwright/test';
 
 const response = (data: unknown) => JSON.stringify({ code: '0000', info: 'success', data });
@@ -12,6 +13,7 @@ test('Project Workspace reuses the shared project snapshot and keeps capability/
   });
 
   let snapshotRequests = 0;
+  let catalogRequests = 0;
   let projectSkillRequests = 0;
   let memberRequests = 0;
   let repositoryRequests = 0;
@@ -19,6 +21,12 @@ test('Project Workspace reuses the shared project snapshot and keeps capability/
   await page.route('http://127.0.0.1:8099/**', async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname;
+    if (await fulfillAccessibleProjects(route, [{
+          projectId: 'demo-project', name: 'Demo Project', description: 'Project Workspace query acceptance', owner: 'e2e-admin',
+          environments: ['dev', 'prod'], resources: [], generatedMcps: [], resourceCount: 0, generatedMcpCount: 0,
+          defaultAgentId: 'default-react', skillIds: [], sharedMcpIds: [], defaultAgentPublished: true,
+          readyForInvestigation: false, readinessReason: 'NO_RESOURCE_CONNECTED',
+        }])) { catalogRequests += 1; return; }
     if (path === '/api/v1/admin/ops-projects/snapshot') {
       snapshotRequests += 1;
       return route.fulfill({ status: 200, contentType: 'application/json', body: response({
@@ -46,10 +54,12 @@ test('Project Workspace reuses the shared project snapshot and keeps capability/
 
   await page.waitForTimeout(150);
   expect(snapshotRequests).toBe(1);
+  expect(catalogRequests).toBe(1);
   expect(repositoryRequests).toBeLessThanOrEqual(1);
 
-  await page.getByRole('button', { name: '刷新' }).click();
+  await page.getByRole('button', { name: '刷新项目', exact: true }).click();
   await expect.poll(() => snapshotRequests).toBe(2);
   expect(projectSkillRequests).toBe(1);
   expect(memberRequests).toBe(1);
+  expect(catalogRequests).toBe(2);
 });

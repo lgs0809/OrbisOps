@@ -119,6 +119,13 @@ const stringList = (value: unknown): string[] => {
   return [String(value)];
 };
 
+const effectiveSkillIds = (project: OpsProjectWorkspace): string[] => {
+  const projected = [...(project.projectSkills || []), ...(project.enabledGlobalSkills || [])]
+    .map((item: any) => String(item?.skillId || item?.id || item?.name || '').trim())
+    .filter(Boolean);
+  return [...new Set(projected.length ? projected : (project.skillIds || []).map(String).filter(Boolean))];
+};
+
 export const ProjectWorkspaceOverviewSection: React.FC<Props> = ({
   project,
   projectServiceCount,
@@ -130,8 +137,10 @@ export const ProjectWorkspaceOverviewSection: React.FC<Props> = ({
   onStartScenario,
   onConfigureScenario,
   onOpenProjectSettings,
-}) => (
-  <>
+}) => {
+  const skillIds = effectiveSkillIds(project);
+  return (
+    <>
     <Section>
       <ResourceTitle>
         <div>
@@ -195,7 +204,7 @@ export const ProjectWorkspaceOverviewSection: React.FC<Props> = ({
       <SummaryGrid>
         <SummaryItem><Text type="tertiary" size="small">数据连接</Text><Title heading={4} style={{ margin: '4px 0 0' }}>{project.resourceCount}</Title></SummaryItem>
         <SummaryItem><Text type="tertiary" size="small">已生成工具</Text><Title heading={4} style={{ margin: '4px 0 0' }}>{project.generatedMcpCount}</Title></SummaryItem>
-        <SummaryItem><Text type="tertiary" size="small">项目 Skill</Text><Title heading={4} style={{ margin: '4px 0 0' }}>{project.skillIds?.length || 0}</Title></SummaryItem>
+        <SummaryItem><Text type="tertiary" size="small">项目 Skill</Text><Title heading={4} style={{ margin: '4px 0 0' }}>{skillIds.length}</Title></SummaryItem>
         <SummaryItem><Text type="tertiary" size="small">代码服务</Text><Title heading={4} style={{ margin: '4px 0 0' }}>{projectServiceCount}</Title></SummaryItem>
       </SummaryGrid>
     </Section>
@@ -249,9 +258,10 @@ export const ProjectWorkspaceOverviewSection: React.FC<Props> = ({
       <SummaryGrid>
         <SummaryItem><Text type="tertiary" size="small">默认 Agent</Text><Paragraph style={{ margin: '6px 0 0' }}>{project.defaultAgentId || '未设置'}</Paragraph></SummaryItem>
         <SummaryItem><Text type="tertiary" size="small">默认知识库</Text><Paragraph style={{ margin: '6px 0 0' }}>{project.knowledgeBaseId || '未绑定'}</Paragraph></SummaryItem>
-        <SummaryItem><Text type="tertiary" size="small">项目 Skill</Text><Paragraph style={{ margin: '6px 0 0' }}>{project.skillIds?.join(', ') || '未选择'}</Paragraph></SummaryItem>
+        <SummaryItem><Text type="tertiary" size="small">项目 Skill</Text><Paragraph style={{ margin: '6px 0 0' }}>{skillIds.join(', ') || '未选择'}</Paragraph></SummaryItem>
         <SummaryItem><Text type="tertiary" size="small">通用 MCP</Text><Paragraph style={{ margin: '6px 0 0' }}>{project.sharedMcpIds?.join(', ') || '未绑定'}</Paragraph></SummaryItem>
       </SummaryGrid>
     </Section>
   </>
-);
+  );
+};

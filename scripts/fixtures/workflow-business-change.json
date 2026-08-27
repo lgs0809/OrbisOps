@@ -1,0 +1,572 @@
+{
+  "agentId": "ops-business-change-c",
+  "schemaVersion": 1,
+  "name": "C · 变更后只读验收",
+  "projectId": "ops-acceptance-a",
+  "engine": "HYBRID",
+  "description": "从批准版本和实际 Landing 凭据冻结前后十五分钟，各至少一百请求。查询实际版本及兼容直方图，按绝对 SLO 和正常发布相对变化判断；恢复性变更遵循预先批准目标。同版本同条件仅扩窗至三十分钟一次，含重试最多十二次真实派发。",
+  "instruction": "用户用自然语言指定要验收的服务或变更。内部查询权威变更目录并唯一匹配；审批、执行事实及标准仍从权威仓储读取。执行完成不等于验收通过，缺少可比基线或真实版本时保留无法判定。",
+  "definitionKind": "SPECIALIZED_WORKFLOW",
+  "workflowInvocationMode": "MANUAL_ONLY",
+  "workflowAutoSelectEnabled": false,
+  "queryRewriteEnabled": false,
+  "ragEnabled": false,
+  "startNodeId": "start",
+  "nodes": [
+    {
+      "nodeId": "start",
+      "type": "START",
+      "config": {
+        "inputKeys": [
+          "query"
+        ],
+        "maxRealToolCalls": 12,
+        "position": {
+          "x": 40,
+          "y": 40
+        }
+      }
+    },
+    {
+      "nodeId": "select_change",
+      "type": "ROUTER",
+      "agent": "ops-observability-rules",
+      "description": "核对当前项目中已选中的变更方案",
+      "config": {
+        "changeVerification": {
+          "operation": "SELECT_CHANGE_REQUEST",
+          "outputKey": "selection"
+        },
+        "routeMode": "single",
+        "position": {
+          "x": 40,
+          "y": -520
+        }
+      }
+    },
+    {
+      "nodeId": "selected_request",
+      "type": "ROUTER",
+      "agent": "ops-observability-rules",
+      "outputKey": "resolvedRequest",
+      "description": "按已选方案进入业务验收",
+      "config": {
+        "inputKey": "workflowData_selection",
+        "inputFormat": "JSON",
+        "routeMode": "single",
+        "position": {
+          "x": 390,
+          "y": -520
+        }
+      }
+    },
+    {
+      "nodeId": "resolve_request",
+      "type": "AGENT",
+      "mode": "REACT",
+      "agent": "ops-request-resolver",
+      "modelId": "ops-acceptance-luna",
+      "outputKey": "resolvedRequest",
+      "mcpIds": [],
+      "instruction": "你是变更后只读验收的输入解析节点。用户只需要用自然语言描述要验收的变更。必须调用 QueryChangePackageStatus 查询当前项目真实变更目录，根据用户所说的服务、方案标题、明确的变更引用和状态匹配；不得臆造 packageId，不得把其他方案当成本次方案。唯一匹配时输出 READY 与权威目录中的 projectId、packageId。如果有多个无法区分的候选，输出 NEED_INFO 并用简短自然语言询问具体变更名称或服务；不要索要 JSON 或内部 ID。即使所选方案尚未落地也交给后续确定性校验报告真实原因，不可伪造成功。不执行创建、审批、生产操作或改写验收标准。只输出下列 Schema 对应的 JSON；这是内部契约，不展示为用户需要填写的内容：{\"type\": \"object\", \"properties\": {\"status\": {\"type\": \"string\", \"enum\": [\"READY\", \"NEED_INFO\"]}, \"projectId\": {\"type\": \"string\"}, \"packageId\": {\"type\": \"string\"}, \"question\": {\"type\": \"string\"}}, \"additionalProperties\": false, \"oneOf\": [{\"properties\": {\"status\": {\"const\": \"READY\"}}, \"required\": [\"status\", \"projectId\", \"packageId\"]}, {\"properties\": {\"status\": {\"const\": \"NEED_INFO\"}}, \"required\": [\"status\", \"question\"]}]}",
+      "description": "理解自然语言，查询当前项目真实变更并匹配验收对象",
+      "config": {
+        "inheritProjectCapabilities": false,
+        "outputContract": {
+          "format": "JSON",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "READY",
+                  "NEED_INFO"
+                ]
+              },
+              "projectId": {
+                "type": "string"
+              },
+              "packageId": {
+                "type": "string"
+              },
+              "question": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "oneOf": [
+              {
+                "properties": {
+                  "status": {
+                    "const": "READY"
+                  }
+                },
+                "required": [
+                  "status",
+                  "projectId",
+                  "packageId"
+                ]
+              },
+              {
+                "properties": {
+                  "status": {
+                    "const": "NEED_INFO"
+                  }
+                },
+                "required": [
+                  "status",
+                  "question"
+                ]
+              }
+            ]
+          }
+        },
+        "position": {
+          "x": 40,
+          "y": -280
+        },
+        "changePackageStatusEnabled": true,
+        "role": "DATA_AGENT",
+        "allowedToolNames": [
+          "QueryChangePackageStatus"
+        ]
+      },
+      "changePackageEnabled": false
+    },
+    {
+      "nodeId": "route_request",
+      "type": "ROUTER",
+      "config": {
+        "inputKey": "resolvedRequest",
+        "inputFormat": "JSON",
+        "routeMode": "single",
+        "position": {
+          "x": 390,
+          "y": -280
+        }
+      },
+      "agent": "ops-observability-rules"
+    },
+    {
+      "nodeId": "clarify_request",
+      "type": "ROUTER",
+      "description": "向用户显示自然语言追问",
+      "config": {
+        "inputKey": "question",
+        "routeMode": "single",
+        "position": {
+          "x": 740,
+          "y": -280
+        }
+      },
+      "agent": "ops-observability-rules"
+    },
+    {
+      "nodeId": "context",
+      "type": "ROUTER",
+      "agent": "ops-observability-rules",
+      "description": "读取批准快照与执行凭据，冻结前后十五分钟窗口",
+      "config": {
+        "changeVerification": {
+          "operation": "CONTEXT_CHANGE",
+          "outputKey": "context"
+        },
+        "routeMode": "single",
+        "position": {
+          "x": 740,
+          "y": 210
+        },
+        "requestInputKey": "resolvedRequest"
+      }
+    },
+    {
+      "nodeId": "version",
+      "type": "AGENT",
+      "mode": "DIRECT",
+      "agent": "ops-observability-reader",
+      "mcpIds": [
+        "$observabilityMcpId"
+      ],
+      "description": "实际资源版本接口 · afterWindow",
+      "config": {
+        "actions": [
+          {
+            "mcpId": "$observabilityMcpId",
+            "remoteToolName": "target_version",
+            "argumentBindings": {
+              "window": "nodeOutput.workflowData_context.afterWindow.queryScope"
+            },
+            "structuredOutputKey": "version",
+            "outputMode": "MCP_EVIDENCE_REFERENCE"
+          }
+        ],
+        "position": {
+          "x": 390,
+          "y": 380
+        }
+      }
+    },
+    {
+      "nodeId": "before",
+      "type": "AGENT",
+      "mode": "DIRECT",
+      "agent": "ops-observability-reader",
+      "mcpIds": [
+        "$observabilityMcpId"
+      ],
+      "description": "真实 Prometheus 原始抓取样本 · beforeWindow",
+      "config": {
+        "actions": [
+          {
+            "mcpId": "$observabilityMcpId",
+            "remoteToolName": "metrics_window",
+            "argumentBindings": {
+              "window": "nodeOutput.workflowData_context.beforeWindow.queryScope"
+            },
+            "structuredOutputKey": "before",
+            "outputMode": "MCP_EVIDENCE_REFERENCE"
+          }
+        ],
+        "position": {
+          "x": 740,
+          "y": 550
+        }
+      }
+    },
+    {
+      "nodeId": "after",
+      "type": "AGENT",
+      "mode": "DIRECT",
+      "agent": "ops-observability-reader",
+      "mcpIds": [
+        "$observabilityMcpId"
+      ],
+      "description": "真实 Prometheus 原始抓取样本 · afterWindow",
+      "config": {
+        "actions": [
+          {
+            "mcpId": "$observabilityMcpId",
+            "remoteToolName": "metrics_window",
+            "argumentBindings": {
+              "window": "nodeOutput.workflowData_context.afterWindow.queryScope"
+            },
+            "structuredOutputKey": "after",
+            "outputMode": "MCP_EVIDENCE_REFERENCE"
+          }
+        ],
+        "position": {
+          "x": 390,
+          "y": 720
+        }
+      }
+    },
+    {
+      "nodeId": "review",
+      "type": "ROUTER",
+      "agent": "ops-observability-rules",
+      "description": "按批准标准、实际版本、绝对 SLO 和可比较基线验收",
+      "config": {
+        "changeVerification": {
+          "operation": "REVIEW_CHANGE",
+          "outputKey": "report",
+          "contextKey": "context",
+          "beforeKey": "before",
+          "afterKey": "after",
+          "versionKey": "version"
+        },
+        "routeMode": "single",
+        "position": {
+          "x": 740,
+          "y": 890
+        }
+      }
+    },
+    {
+      "nodeId": "version-extended",
+      "type": "AGENT",
+      "mode": "DIRECT",
+      "agent": "ops-observability-reader",
+      "mcpIds": [
+        "$observabilityMcpId"
+      ],
+      "description": "实际资源版本接口 · afterWindow",
+      "config": {
+        "actions": [
+          {
+            "mcpId": "$observabilityMcpId",
+            "remoteToolName": "target_version",
+            "argumentBindings": {
+              "window": "nodeOutput.workflowData_context.afterWindow.queryScope"
+            },
+            "structuredOutputKey": "version",
+            "outputMode": "MCP_EVIDENCE_REFERENCE"
+          }
+        ],
+        "position": {
+          "x": 390,
+          "y": 1060
+        }
+      }
+    },
+    {
+      "nodeId": "before-extended",
+      "type": "AGENT",
+      "mode": "DIRECT",
+      "agent": "ops-observability-reader",
+      "mcpIds": [
+        "$observabilityMcpId"
+      ],
+      "description": "真实 Prometheus 原始抓取样本 · beforeWindow",
+      "config": {
+        "actions": [
+          {
+            "mcpId": "$observabilityMcpId",
+            "remoteToolName": "metrics_window",
+            "argumentBindings": {
+              "window": "nodeOutput.workflowData_context.beforeWindow.queryScope"
+            },
+            "structuredOutputKey": "before",
+            "outputMode": "MCP_EVIDENCE_REFERENCE"
+          }
+        ],
+        "position": {
+          "x": 740,
+          "y": 1230
+        }
+      }
+    },
+    {
+      "nodeId": "after-extended",
+      "type": "AGENT",
+      "mode": "DIRECT",
+      "agent": "ops-observability-reader",
+      "mcpIds": [
+        "$observabilityMcpId"
+      ],
+      "description": "真实 Prometheus 原始抓取样本 · afterWindow",
+      "config": {
+        "actions": [
+          {
+            "mcpId": "$observabilityMcpId",
+            "remoteToolName": "metrics_window",
+            "argumentBindings": {
+              "window": "nodeOutput.workflowData_context.afterWindow.queryScope"
+            },
+            "structuredOutputKey": "after",
+            "outputMode": "MCP_EVIDENCE_REFERENCE"
+          }
+        ],
+        "position": {
+          "x": 390,
+          "y": 1400
+        }
+      }
+    },
+    {
+      "nodeId": "review-extended",
+      "type": "ROUTER",
+      "agent": "ops-observability-rules",
+      "description": "按批准标准、实际版本、绝对 SLO 和可比较基线验收",
+      "config": {
+        "changeVerification": {
+          "operation": "REVIEW_CHANGE",
+          "outputKey": "report",
+          "contextKey": "context",
+          "beforeKey": "before",
+          "afterKey": "after",
+          "versionKey": "version"
+        },
+        "routeMode": "single",
+        "position": {
+          "x": 740,
+          "y": 1570
+        }
+      }
+    },
+    {
+      "nodeId": "extend",
+      "type": "ROUTER",
+      "agent": "ops-observability-rules",
+      "description": "只有样本不足且条件相同才扩窗一次；等待完整三十分钟",
+      "config": {
+        "changeVerification": {
+          "operation": "EXTEND_CHANGE",
+          "outputKey": "context",
+          "contextKey": "context",
+          "reportKey": "report"
+        },
+        "routeMode": "single",
+        "position": {
+          "x": 390,
+          "y": 1740
+        }
+      }
+    },
+    {
+      "nodeId": "unavailable",
+      "type": "ROUTER",
+      "agent": "ops-observability-rules",
+      "description": "保存权威记录或观察窗口缺口，不制造通过结论",
+      "config": {
+        "changeVerification": {
+          "operation": "REPORT_CHANGE",
+          "outputKey": "report",
+          "contextKey": "context"
+        },
+        "routeMode": "single",
+        "position": {
+          "x": 740,
+          "y": 1910
+        }
+      }
+    },
+    {
+      "nodeId": "end",
+      "type": "END",
+      "config": {
+        "outputKeys": [
+          "workflowData_report"
+        ],
+        "position": {
+          "x": 40,
+          "y": 2400
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "to": "select_change",
+      "conditionType": "always",
+      "condition": "always",
+      "from": "start"
+    },
+    {
+      "to": "before",
+      "conditionType": "always",
+      "condition": "always",
+      "from": "version"
+    },
+    {
+      "to": "after",
+      "conditionType": "always",
+      "condition": "always",
+      "from": "before"
+    },
+    {
+      "to": "review",
+      "conditionType": "always",
+      "condition": "always",
+      "from": "after"
+    },
+    {
+      "to": "before-extended",
+      "conditionType": "always",
+      "condition": "always",
+      "from": "version-extended"
+    },
+    {
+      "to": "after-extended",
+      "conditionType": "always",
+      "condition": "always",
+      "from": "before-extended"
+    },
+    {
+      "to": "review-extended",
+      "conditionType": "always",
+      "condition": "always",
+      "from": "after-extended"
+    },
+    {
+      "to": "version",
+      "conditionType": "expression",
+      "condition": "nodeOutput.workflowData_context.readyToCollect == true",
+      "from": "context"
+    },
+    {
+      "to": "unavailable",
+      "conditionType": "default",
+      "condition": "default",
+      "from": "context"
+    },
+    {
+      "to": "extend",
+      "conditionType": "expression",
+      "condition": "nodeOutput.workflowData_report.needsExtension == true",
+      "from": "review"
+    },
+    {
+      "to": "end",
+      "conditionType": "default",
+      "condition": "default",
+      "from": "review"
+    },
+    {
+      "to": "version-extended",
+      "conditionType": "expression",
+      "condition": "nodeOutput.workflowData_context.readyToCollect == true",
+      "from": "extend"
+    },
+    {
+      "to": "unavailable",
+      "conditionType": "default",
+      "condition": "default",
+      "from": "extend"
+    },
+    {
+      "to": "end",
+      "conditionType": "always",
+      "condition": "always",
+      "from": "review-extended"
+    },
+    {
+      "to": "end",
+      "conditionType": "always",
+      "condition": "always",
+      "from": "unavailable"
+    },
+    {
+      "from": "resolve_request",
+      "to": "route_request",
+      "conditionType": "always",
+      "condition": "always"
+    },
+    {
+      "from": "route_request",
+      "to": "context",
+      "conditionType": "expression",
+      "condition": "nodeOutput.status == \"READY\""
+    },
+    {
+      "from": "route_request",
+      "to": "clarify_request",
+      "conditionType": "default",
+      "condition": "default"
+    },
+    {
+      "from": "clarify_request",
+      "to": "end",
+      "conditionType": "always",
+      "condition": "always"
+    },
+    {
+      "from": "select_change",
+      "to": "selected_request",
+      "conditionType": "expression",
+      "condition": "nodeOutput.workflowData_selection.status == 'READY'"
+    },
+    {
+      "from": "select_change",
+      "to": "resolve_request",
+      "conditionType": "default",
+      "condition": "default"
+    },
+    {
+      "from": "selected_request",
+      "to": "context",
+      "conditionType": "always",
+      "condition": "always"
+    }
+  ]
+}

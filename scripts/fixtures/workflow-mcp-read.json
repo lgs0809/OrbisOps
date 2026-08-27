@@ -1,0 +1,116 @@
+{
+  "agentId": "ops-acceptance-mcp-read",
+  "schemaVersion": 1,
+  "name": "OPS-03 MCP 只读链路验收",
+  "projectId": "ops-acceptance-a",
+  "engine": "GRAPH",
+  "description": "合成协议验收：真实 HTTP MCP 与专用 SQLite，验证审批后的只读工具及完整输出，不代表模型或业务运维验收。",
+  "instruction": "执行发布定义中的只读 MCP 查询并保留协议输出。",
+  "definitionKind": "SPECIALIZED_WORKFLOW",
+  "workflowInvocationMode": "MANUAL_ONLY",
+  "workflowAutoSelectEnabled": false,
+  "queryRewriteEnabled": false,
+  "ragEnabled": false,
+  "startNodeId": "start",
+  "nodes": [
+    {
+      "nodeId": "start",
+      "type": "START",
+      "description": "接收合成测试请求",
+      "config": {
+        "inputKeys": [
+          "query"
+        ]
+      }
+    },
+    {
+      "nodeId": "mcp-read",
+      "type": "AGENT",
+      "mode": "DIRECT",
+      "description": "按已审核的当前契约查询实际 MCP 进程",
+      "mcpIds": [
+        "$acceptanceMcpId"
+      ],
+      "outputKey": "mcpResult",
+      "config": {
+        "actions": [
+          {
+            "mcpId": "$acceptanceMcpId",
+            "remoteToolName": "probe",
+            "arguments": {
+              "testId": "browser-ops03-structured",
+              "mode": "structured",
+              "service": "normal"
+            },
+            "outputKey": "probeResult"
+          }
+        ],
+        "outputContract": {
+          "format": "JSON",
+          "schema": {
+            "type": "object",
+            "required": [
+              "allowed",
+              "mcpEnvelope",
+              "normalizedContent",
+              "decision"
+            ],
+            "properties": {
+              "allowed": {
+                "const": true
+              },
+              "normalizedContent": {
+                "type": "object",
+                "required": [
+                  "count"
+                ]
+              },
+              "mcpEnvelope": {
+                "type": "object",
+                "required": [
+                  "orbisopsResultVersion",
+                  "isError"
+                ],
+                "properties": {
+                  "orbisopsResultVersion": {
+                    "const": 1
+                  },
+                  "isError": {
+                    "const": false
+                  }
+                }
+              },
+              "decision": {
+                "const": "ALLOWED"
+              }
+            }
+          }
+        }
+      },
+      "agent": "ops-acceptance-reader"
+    },
+    {
+      "nodeId": "end",
+      "type": "END",
+      "config": {
+        "outputKeys": [
+          "mcpResult"
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "start",
+      "to": "mcp-read",
+      "conditionType": "always",
+      "condition": "always"
+    },
+    {
+      "from": "mcp-read",
+      "to": "end",
+      "conditionType": "always",
+      "condition": "always"
+    }
+  ]
+}

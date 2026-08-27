@@ -1,0 +1,76 @@
+{
+  "agentId": "ops-acceptance-approval",
+  "schemaVersion": 1,
+  "name": "OPS-02 审批恢复验收",
+  "projectId": "ops-acceptance-a",
+  "engine": "HYBRID",
+  "description": "合成引擎回归：两个独立审批节点；无模型调用、无业务写入，不代表业务运维图。",
+  "instruction": "只验证审批等待、旧审批拒绝和冻结定义恢复。",
+  "definitionKind": "SPECIALIZED_WORKFLOW",
+  "workflowInvocationMode": "MANUAL_ONLY",
+  "workflowAutoSelectEnabled": false,
+  "queryRewriteEnabled": false,
+  "ragEnabled": false,
+  "startNodeId": "start",
+  "nodes": [
+    {
+      "nodeId": "start",
+      "type": "START",
+      "description": "接收合成测试请求",
+      "config": {
+        "inputKeys": [
+          "query"
+        ]
+      }
+    },
+    {
+      "nodeId": "review-one",
+      "type": "HUMAN_APPROVAL",
+      "description": "第一项验收：确认等待状态在重启后保留。",
+      "outputKey": "approvalOne",
+      "config": {
+        "timeoutSeconds": 1800
+      }
+    },
+    {
+      "nodeId": "review-two",
+      "type": "HUMAN_APPROVAL",
+      "description": "第二项验收：独立确认；第一项的审批标识不可复用。",
+      "outputKey": "approvalTwo",
+      "config": {
+        "timeoutSeconds": 1800
+      }
+    },
+    {
+      "nodeId": "end",
+      "type": "END",
+      "description": "结束合成引擎回归，无业务资源写入",
+      "config": {
+        "outputKeys": [
+          "approvalOne",
+          "approvalTwo"
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "start",
+      "to": "review-one",
+      "conditionType": "always",
+      "condition": "always"
+    },
+    {
+      "from": "review-one",
+      "to": "review-two",
+      "conditionType": "always",
+      "condition": "always"
+    },
+    {
+      "from": "review-two",
+      "to": "end",
+      "conditionType": "always",
+      "condition": "always"
+    }
+  ]
+}

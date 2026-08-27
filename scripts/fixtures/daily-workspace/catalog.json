@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 2,
+  "seedId": "orbisops-daily-workspace-v2",
+  "provenance": "本机独立日常展示空间：业务观察、文档与过往历史为人工编写的合成场景，真实使用、模型、审批与执行验收另行记录。",
+  "projects": [
+    {
+      "key": "orders",
+      "projectId": "daily-commerce-orders",
+      "name": "交易中台",
+      "description": "统一下单、订单查询与库存预占；关注下单可用性、重复请求、库存一致性和慢查询。",
+      "services": [
+        {
+          "serviceId": "orders-api",
+          "name": "订单 API",
+          "purpose": "创建与查询订单",
+          "dependency": "orders-store"
+        },
+        {
+          "serviceId": "inventory-reservation",
+          "name": "库存预占",
+          "purpose": "校验库存并记录预占结果",
+          "dependency": "orders-store"
+        },
+        {
+          "serviceId": "order-query",
+          "name": "订单查询",
+          "purpose": "按订单号与时间范围查询",
+          "dependency": "orders-store"
+        }
+      ],
+      "inspectionQuestion": "检查交易中台最近的请求状态和库存预占异常，先核对只读业务台账；说明样本量、错误分布、重复请求及证据限制。不要变更配置。",
+      "conversationQuestions": [
+        "帮我梳理一下交易中台的服务依赖和当前可用的只读资源，给我一个值班接手摘要。",
+        "订单 API 最近出现偶发超时，库存预占也有失败。请基于已经接入的证据调查二者是否有关，缺少实时指标就明确说明，不要推断已确认根因。"
+      ],
+      "reviewObjective": "交易中台：复核订单超时与库存预占异常的处理建议",
+      "skills": [
+        "request-idempotency",
+        "database-latency"
+      ],
+      "documents": [
+        "orders-service-map.md",
+        "orders-oncall.md"
+      ]
+    },
+    {
+      "key": "payments",
+      "projectId": "daily-commerce-payments",
+      "name": "支付清结算",
+      "description": "支付结果接收、回调去重与对账；关注重复通知、交易状态一致性、补偿边界和敏感数据保护。",
+      "services": [
+        {
+          "serviceId": "payment-gateway",
+          "name": "支付网关",
+          "purpose": "受理支付状态查询",
+          "dependency": "payments-store"
+        },
+        {
+          "serviceId": "payment-callback",
+          "name": "支付回调",
+          "purpose": "按渠道流水进行幂等接收",
+          "dependency": "payments-store"
+        },
+        {
+          "serviceId": "reconciliation-job",
+          "name": "对账任务",
+          "purpose": "比对支付状态与订单状态",
+          "dependency": "payments-store"
+        }
+      ],
+      "inspectionQuestion": "检查支付清结算的合成业务台账，重点看回调重复、失败和待确认状态。区分渠道通知已收到与本地状态已确认，不执行补扣或退款。",
+      "conversationQuestions": [
+        "支付清结算今天交接需要关注哪些内容？请先查项目资源与值班资料，整理可核对的检查项。",
+        "渠道回调偶尔重复，而且对账任务也报状态不一致。请核对关联证据，给出只读调查步骤；不要把回调重试当作新的支付。"
+      ],
+      "reviewObjective": "支付清结算：复核回调幂等与对账差异处理建议",
+      "skills": [
+        "payment-callback",
+        "reconciliation"
+      ],
+      "documents": [
+        "payments-service-map.md",
+        "payments-oncall.md"
+      ]
+    },
+    {
+      "key": "fulfilment",
+      "projectId": "daily-commerce-fulfilment",
+      "name": "仓配履约",
+      "description": "出库任务、物流事件与履约进度；关注任务积压、事件乱序、重放去重和上游状态变化。",
+      "services": [
+        {
+          "serviceId": "warehouse-dispatch",
+          "name": "仓库出库",
+          "purpose": "创建与查询出库任务",
+          "dependency": "fulfilment-store"
+        },
+        {
+          "serviceId": "logistics-events",
+          "name": "物流事件",
+          "purpose": "按运单接收与整理事件",
+          "dependency": "fulfilment-store"
+        },
+        {
+          "serviceId": "fulfilment-tracker",
+          "name": "履约追踪",
+          "purpose": "合并订单与履约进度",
+          "dependency": "fulfilment-store"
+        }
+      ],
+      "inspectionQuestion": "查看仓配履约的业务观察台账，核对出库失败、物流事件重复和履约追踪超时。说明时间范围与样本不足，不自动推进订单状态。",
+      "conversationQuestions": [
+        "帮我准备仓配履约的日常巡检摘要，先核对有哪些服务、依赖和只读数据源。",
+        "出库任务开始积压，物流事件接收也偶发超时。请核对同时间窗和共享依赖，判断是否应归到同一事件；归组不能当作根因已确认。"
+      ],
+      "reviewObjective": "仓配履约：复核积压与物流事件重放的处理建议",
+      "skills": [
+        "queue-backlog",
+        "event-ordering"
+      ],
+      "documents": [
+        "fulfilment-service-map.md",
+        "fulfilment-oncall.md"
+      ]
+    }
+  ]
+}

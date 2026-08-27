@@ -1,0 +1,158 @@
+# Standalone local workspace. Do not combine with compose.acceptance.yml.
+# Synthetic history lives only in this project's own volumes and databases.
+name: orbisops-showcase-v2
+services:
+  mysql:
+    image: mysql:8.4
+    pull_policy: never
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: orbisops_showcase
+      MYSQL_USER: showcase_app
+      MYSQL_PASSWORD: ${SHOWCASE_MYSQL_PASSWORD:?run showcase-workspace.py init}
+      MYSQL_ROOT_PASSWORD: ${SHOWCASE_MYSQL_ROOT_PASSWORD:?run showcase-workspace.py init}
+    ports: ["127.0.0.1:13319:3306"]
+    volumes: ["mysql-data:/var/lib/mysql"]
+    mem_limit: 512m
+    cpus: 1
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_ROOT_PASSWORD mysqladmin ping -h 127.0.0.1 -uroot --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  pgvector:
+    image: pgvector/pgvector:pg16
+    pull_policy: never
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: orbisops_showcase
+      POSTGRES_USER: showcase_app
+      POSTGRES_PASSWORD: ${SHOWCASE_POSTGRES_PASSWORD:?run showcase-workspace.py init}
+    ports: ["127.0.0.1:15449:5432"]
+    volumes: ["pgvector-data:/var/lib/postgresql/data", "./acceptance/showcase-vector-init.sql:/docker-entrypoint-initdb.d/010-showcase-vector.sql:ro"]
+    mem_limit: 256m
+    cpus: 1
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U showcase_app -d orbisops_showcase"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:7.4-alpine
+    pull_policy: never
+    restart: unless-stopped
+    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
+    environment:
+      REDIS_PASSWORD: ${SHOWCASE_REDIS_PASSWORD:?run showcase-workspace.py init}
+    ports: ["127.0.0.1:16399:6379"]
+    volumes: ["redis-data:/data"]
+    mem_limit: 96m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=$$REDIS_PASSWORD redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  migrate:
+    image: ${SHOWCASE_SERVER_IMAGE:?provide a tested local image}
+    pull_policy: never
+    entrypoint: ["bash", "/opt/orbisops/scripts/db-migrate.sh"]
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_DATABASE: orbisops_showcase
+      MYSQL_USERNAME: showcase_app
+      MYSQL_PWD: ${SHOWCASE_MYSQL_PASSWORD:?run showcase-workspace.py init}
+    depends_on:
+      mysql: {condition: service_healthy}
+    restart: "no"
+    mem_limit: 128m
+  backend:
+    image: ${SHOWCASE_SERVER_IMAGE:?provide a tested local image}
+    pull_policy: never
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      ORBISOPS_SERVER_PORT: "8099"
+      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx768m -XX:ActiveProcessorCount=2"
+      ORBISOPS_MYSQL_URL: jdbc:mysql://mysql:3306/orbisops_showcase?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true
+      ORBISOPS_MYSQL_USERNAME: showcase_app
+      ORBISOPS_MYSQL_PASSWORD: ${SHOWCASE_MYSQL_PASSWORD:?run showcase-workspace.py init}
+      ORBISOPS_PGVECTOR_URL: jdbc:postgresql://pgvector:5432/orbisops_showcase
+      ORBISOPS_PGVECTOR_USERNAME: showcase_app
+      ORBISOPS_PGVECTOR_PASSWORD: ${SHOWCASE_POSTGRES_PASSWORD:?run showcase-workspace.py init}
+      ORBISOPS_REDIS_HOST: redis
+      ORBISOPS_REDIS_PORT: "6379"
+      ORBISOPS_REDIS_PASSWORD: ${SHOWCASE_REDIS_PASSWORD:?run showcase-workspace.py init}
+      ORBISOPS_ADMIN_JWT_SECRET: ${SHOWCASE_JWT_SECRET:?run showcase-workspace.py init}
+      ORBISOPS_BOOTSTRAP_ADMIN_ENABLED: "false"
+      ORBISOPS_ES_URL: http://127.0.0.1:1/unconfigured
+      ORBISOPS_PROMETHEUS_URL: http://127.0.0.1:1/unconfigured
+      ORBISOPS_WORK_SESSION_RECOVERY_ENABLED: "false"
+      ORBISOPS_APPROVED_LANDING_RUN_STATE_RECOVERY_ENABLED: "false"
+      ORBISOPS_ALLOWED_ORIGIN_PATTERNS: http://127.0.0.1:3304,http://localhost:3304
+      ORBISOPS_AI_MODEL_CALLS_ENABLED: ${SHOWCASE_MODEL_CALLS_ENABLED:-false}
+      ORBISOPS_MODEL_BASE_URL: ${SHOWCASE_MODEL_BASE_URL:-https://model-provider.invalid}
+      ORBISOPS_MODEL_API_KEY: ${SHOWCASE_MODEL_API_KEY:-placeholder}
+      SHOWCASE_ORDERS_RO_PASSWORD: ${SHOWCASE_ORDERS_RO_PASSWORD:?run showcase-workspace.py init}
+      SHOWCASE_PAYMENTS_RO_PASSWORD: ${SHOWCASE_PAYMENTS_RO_PASSWORD:?run showcase-workspace.py init}
+      SHOWCASE_FULFILMENT_RO_PASSWORD: ${SHOWCASE_FULFILMENT_RO_PASSWORD:?run showcase-workspace.py init}
+      ORBISOPS_CHAT_MODEL: gpt-6-luna
+      ORBISOPS_MODEL_CALL_TIMEOUT_SECONDS: "240"
+      ORBISOPS_EMBEDDING_BASE_URL: ${SHOWCASE_EMBEDDING_BASE_URL:-http://host.docker.internal:8110}
+      ORBISOPS_EMBEDDING_API_KEY: ${SHOWCASE_EMBEDDING_API_KEY:-placeholder}
+      ORBISOPS_EMBEDDING_MODEL: Qwen/Qwen3-Embedding-2B
+      ORBISOPS_EMBEDDING_DIMENSIONS: "1024"
+      ORBISOPS_RAG_VECTOR_TABLE_NAME: orbisops_vector_store
+      ORBISOPS_RAG_QUERY_REWRITE_LLM_ENABLED: "false"
+      ORBISOPS_RAG_MULTIMODAL_ENABLED: "false"
+      ORBISOPS_RAG_VISUAL_ENABLED: "false"
+      ORBISOPS_TASK_JOB_ENABLED: "false"
+      ORBISOPS_SKILL_EVOLVER_WORKER_ENABLED: "false"
+      ORBISOPS_SKILL_EVOLVER_TRIGGER_ENABLED: "false"
+      ORBISOPS_SKILL_EVOLUTION_ENABLED: "false"
+      ORBISOPS_CHAT_MEMORY_SEMANTIC_ENABLED: "false"
+      ORBISOPS_CHAT_MEMORY_LLM_EXTRACTION_ENABLED: "false"
+      ORBISOPS_CHAT_MEMORY_COMPRESSION_LLM_ENABLED: "false"
+      ORBISOPS_APPROVED_LANDING_ENABLED: "false"
+      ORBISOPS_LANDING_RECOVERY_ENABLED: "false"
+      ORBISOPS_THREAD_POOL_CORE_SIZE: "2"
+      ORBISOPS_THREAD_POOL_MAX_SIZE: "4"
+      ORBISOPS_THREAD_POOL_QUEUE_SIZE: "100"
+    ports: ["127.0.0.1:18099:8099"]
+    volumes: ["repair-data:/var/lib/orbisops/repair", "app-data:/opt/orbisops/data"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      pgvector: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    mem_limit: 1536m
+    cpus: 2
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8099/actuator/health/liveness"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+  web:
+    image: ${SHOWCASE_WEB_IMAGE:?provide a tested local image}
+    pull_policy: never
+    restart: unless-stopped
+    environment:
+      ORBISOPS_BACKEND_UPSTREAM: http://backend:8099
+      ORBISOPS_MODEL_CALL_TIMEOUT_SECONDS: "240"
+    ports: ["127.0.0.1:3304:3002"]
+    depends_on:
+      backend: {condition: service_healthy}
+    mem_limit: 128m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3002/"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+volumes:
+  mysql-data:
+  pgvector-data:
+  redis-data:
+  repair-data:
+  app-data:

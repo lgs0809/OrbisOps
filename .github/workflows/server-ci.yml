@@ -1,33 +1,61 @@
 name: Server CI
 
 on:
+  workflow_dispatch:
   push:
-    paths:
-      - "server/**"
-      - "Makefile"
-      - ".github/workflows/server-ci.yml"
+    branches: [master]
   pull_request:
     paths:
       - "server/**"
       - "Makefile"
+      - "scripts/test-java-landing-runtime.py"
       - ".github/workflows/server-ci.yml"
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    services:
+      mysql:
+        image: mysql:8.0.36
+        env:
+          MYSQL_DATABASE: orbisops_memory_regression_ci
+          MYSQL_USER: fixture
+          MYSQL_PASSWORD: ci-fixture-only
+          MYSQL_ROOT_PASSWORD: ci-fixture-root-only
+          MYSQL_ROOT_HOST: "%"
+        ports:
+          - 3306/tcp
+        options: >-
+          --health-cmd="mysql --protocol=tcp -h 127.0.0.1 -u fixture -pci-fixture-only -Nse 'SELECT 1' orbisops_memory_regression_ci"
+          --health-interval=4s --health-timeout=4s --health-retries=25
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: orbisops_ci
+          POSTGRES_USER: fixture
+          POSTGRES_PASSWORD: ci-fixture-postgres-only
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd="pg_isready -h 127.0.0.1 -U fixture -d orbisops_ci"
+          --health-interval=4s --health-timeout=4s --health-retries=25
     defaults:
       run:
         working-directory: server
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "17"
@@ -35,9 +63,17 @@ jobs:
           cache-dependency-path: server/pom.xml
 
       - name: Set up Node 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "20"
+
+      - name: Set up Java 21 for JDT LS
+        id: jdtls-java
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "21"
+          set-default: false
 
       - name: Repository release hygiene
         working-directory: ${{ github.workspace }}
@@ -52,8 +88,59 @@ jobs:
             node --check "$file"
           done
 
+      - name: Migrate isolated databases
+        env:
+          CI_MYSQL_CONTAINER: ${{ job.services.mysql.id }}
+        run: |
+          docker exec "$CI_MYSQL_CONTAINER" mkdir -p /tmp/orbisops-ci/scripts
+          docker cp db "$CI_MYSQL_CONTAINER:/tmp/orbisops-ci/"
+          docker cp scripts/db-migrate.sh "$CI_MYSQL_CONTAINER:/tmp/orbisops-ci/scripts/"
+          for schema in orbisops_memory_regression_ci orbisops_workflow_regression_ci; do
+            docker exec -e MYSQL_DATABASE="$schema" "$CI_MYSQL_CONTAINER" bash -ec '
+              export MYSQL_PWD="$MYSQL_ROOT_PASSWORD" MYSQL_USERNAME=root
+              exec bash /tmp/orbisops-ci/scripts/db-migrate.sh
+            '
+          done
+          docker exec -i "$CI_MYSQL_CONTAINER" sh -ec 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot' <<'SQL'
+          GRANT ALL ON orbisops_workflow_regression_ci.* TO 'fixture'@'%';
+          SQL
+
       - name: Test
-        run: mvn -B test
+        env:
+          ORBISOPS_MEMORY_TEST_URL: jdbc:mysql://127.0.0.1:${{ job.services.mysql.ports['3306'] }}/orbisops_memory_regression_ci?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+          ORBISOPS_MEMORY_TEST_USER: fixture
+          ORBISOPS_MEMORY_TEST_PASSWORD: ci-fixture-only
+          ORBISOPS_MEMORY_TEST_PG_URL: jdbc:postgresql://127.0.0.1:${{ job.services.postgres.ports['5432'] }}/orbisops_ci
+          ORBISOPS_MEMORY_TEST_PG_USER: fixture
+          ORBISOPS_MEMORY_TEST_PG_PASSWORD: ci-fixture-postgres-only
+          ORBISOPS_WORKFLOW_TEST_URL: jdbc:mysql://127.0.0.1:${{ job.services.mysql.ports['3306'] }}/orbisops_workflow_regression_ci?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+          ORBISOPS_WORKFLOW_TEST_USER: fixture
+          ORBISOPS_WORKFLOW_TEST_PASSWORD: ci-fixture-only
+          ORBISOPS_WORKFLOW_TEST_ADMIN_USER: root
+          ORBISOPS_WORKFLOW_TEST_ADMIN_PASSWORD: ci-fixture-root-only
+          CODE_WORKSPACE_REAL_MANAGED_JDTLS: "true"
+          CODE_WORKSPACE_REAL_MANAGED_PYRIGHT: "true"
+          CODE_WORKSPACE_REAL_MANAGED_DUAL_LSP: "true"
+          CODE_WORKSPACE_REAL_JDTLS_JAVA_HOME: ${{ steps.jdtls-java.outputs.path }}
+        run: python3 ../scripts/test-java-landing-runtime.py --full-suite --output "$RUNNER_TEMP/orbisops-ci-result.json"
+
+      - name: Retain integration counts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: server-integration-counts
+          path: ${{ runner.temp }}/orbisops-ci-result.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Retain failed test reports
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: server-test-reports-${{ github.run_id }}
+          path: server/**/target/surefire-reports/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Package
         run: mvn -B -DskipTests package

@@ -1,0 +1,1628 @@
+{
+  "scope": "SYNTHETIC_CAPACITY_AND_CURATED_ROUTING_CASES",
+  "source": "Manually authored operations cases; distractors are explicit template expansions, not independent task families.",
+  "catalog": [
+    {
+      "id": "redis-pool",
+      "name": "Redis 连接池耗尽",
+      "description": "Redis 连接池等待、借用超时。核对活跃连接、等待队列和调用链，区别网络拒绝。",
+      "use": [
+        "Redis 连接池"
+      ],
+      "exclude": [
+        "Redis 缓存命中率"
+      ],
+      "tags": [
+        "redis"
+      ]
+    },
+    {
+      "id": "redis-hit",
+      "name": "Redis 缓存命中率下降",
+      "description": "Redis 命中率下降。比较 key 过期、淘汰和热点读取，检查回源压力。",
+      "use": [
+        "Redis 命中率"
+      ],
+      "exclude": [
+        "Redis 连接池"
+      ],
+      "tags": [
+        "redis"
+      ]
+    },
+    {
+      "id": "mysql-deadlock",
+      "name": "MySQL 事务死锁",
+      "description": "MySQL 死锁与相互持锁。读取死锁图、事务和锁顺序，定位环形等待。",
+      "use": [
+        "MySQL 死锁"
+      ],
+      "exclude": [
+        "MySQL 复制延迟"
+      ],
+      "tags": [
+        "mysql"
+      ]
+    },
+    {
+      "id": "mysql-replica",
+      "name": "MySQL 主从复制延迟",
+      "description": "MySQL 从库追赶慢。核对复制线程、主从位点和长事务，不混同连接锁竞争。",
+      "use": [
+        "MySQL 复制延迟"
+      ],
+      "exclude": [
+        "MySQL 死锁"
+      ],
+      "tags": [
+        "mysql"
+      ]
+    },
+    {
+      "id": "pg-vacuum",
+      "name": "PostgreSQL 表膨胀",
+      "description": "PostgreSQL 表膨胀与死元组。检查 vacuum 进度、长快照和统计量。",
+      "use": [
+        "PostgreSQL 膨胀"
+      ],
+      "exclude": [
+        "PostgreSQL 备份"
+      ],
+      "tags": [
+        "pg"
+      ]
+    },
+    {
+      "id": "pg-backup",
+      "name": "PostgreSQL 备份恢复核验",
+      "description": "PostgreSQL 备份完整性与恢复验证。核对备份校验、WAL 连续性和隔离恢复。",
+      "use": [
+        "PostgreSQL 备份"
+      ],
+      "exclude": [
+        "PostgreSQL 膨胀"
+      ],
+      "tags": [
+        "pg"
+      ]
+    },
+    {
+      "id": "kafka-lag",
+      "name": "Kafka 消费积压",
+      "description": "Kafka 消费者追不上生产。检查分区偏斜、处理耗时、重平衡和 lag。",
+      "use": [
+        "Kafka 消费积压"
+      ],
+      "exclude": [
+        "Kafka 磁盘容量"
+      ],
+      "tags": [
+        "kafka"
+      ]
+    },
+    {
+      "id": "kafka-disk",
+      "name": "Kafka 日志磁盘容量",
+      "description": "Kafka broker 磁盘逼近上限。分析分区占用、保留时间和副本分布。",
+      "use": [
+        "Kafka 磁盘容量"
+      ],
+      "exclude": [
+        "Kafka 消费积压"
+      ],
+      "tags": [
+        "kafka"
+      ]
+    },
+    {
+      "id": "k8s-oom",
+      "name": "Kubernetes 内存超限",
+      "description": "Kubernetes 容器 OOMKilled。比较内存峰值、limits、退出事件及工作负载变化。",
+      "use": [
+        "Kubernetes OOMKilled"
+      ],
+      "exclude": [
+        "Kubernetes 镜像拉取"
+      ],
+      "tags": [
+        "k8s"
+      ]
+    },
+    {
+      "id": "k8s-image",
+      "name": "Kubernetes 镜像拉取失败",
+      "description": "Kubernetes ImagePullBackOff。检查镜像标签、仓库可达性和拉取授权。",
+      "use": [
+        "Kubernetes 镜像拉取"
+      ],
+      "exclude": [
+        "Kubernetes OOMKilled"
+      ],
+      "tags": [
+        "k8s"
+      ]
+    },
+    {
+      "id": "tls-expiry",
+      "name": "TLS 证书到期",
+      "description": "HTTPS TLS 证书失效。核对证书有效期、主机名、证书链和终端时间。",
+      "use": [
+        "TLS 证书到期"
+      ],
+      "exclude": [
+        "DNS 解析"
+      ],
+      "tags": [
+        "tls"
+      ]
+    },
+    {
+      "id": "dns-resolution",
+      "name": "DNS 域名解析失败",
+      "description": "DNS 无法解析。检查权威记录、递归缓存、TTL 和查询返回码。",
+      "use": [
+        "DNS 解析"
+      ],
+      "exclude": [
+        "TLS 证书到期"
+      ],
+      "tags": [
+        "dns"
+      ]
+    },
+    {
+      "id": "jvm-gc",
+      "name": "JVM 垃圾回收停顿",
+      "description": "JVM 请求周期性暂停。分析 GC 日志、堆分配、暂停时长和 safepoint。",
+      "use": [
+        "JVM GC"
+      ],
+      "exclude": [
+        "JVM 线程死锁"
+      ],
+      "tags": [
+        "jvm"
+      ]
+    },
+    {
+      "id": "jvm-deadlock",
+      "name": "JVM 线程死锁",
+      "description": "JVM 线程互相等待。读取线程转储、监视器持有者和锁循环。",
+      "use": [
+        "JVM 线程死锁"
+      ],
+      "exclude": [
+        "JVM GC"
+      ],
+      "tags": [
+        "jvm"
+      ]
+    },
+    {
+      "id": "nginx-upstream",
+      "name": "Nginx 上游连接失败",
+      "description": "Nginx 502。检查 upstream 连接拒绝、目标端口和后端就绪状态。",
+      "use": [
+        "Nginx 502"
+      ],
+      "exclude": [
+        "Nginx 访问限流"
+      ],
+      "tags": [
+        "nginx"
+      ]
+    },
+    {
+      "id": "nginx-limit",
+      "name": "Nginx 请求限流",
+      "description": "Nginx 429。核对限流规则、突发额度、请求速率与客户端重试。",
+      "use": [
+        "Nginx 429"
+      ],
+      "exclude": [
+        "Nginx 502"
+      ],
+      "tags": [
+        "nginx"
+      ]
+    },
+    {
+      "id": "rabbit-unrouted",
+      "name": "RabbitMQ 消息无路由",
+      "description": "RabbitMQ mandatory return。核对交换机、routing key 和绑定，不把 confirm 当消费完成。",
+      "use": [
+        "RabbitMQ 无路由"
+      ],
+      "exclude": [
+        "RabbitMQ 消费积压"
+      ],
+      "tags": [
+        "rabbit"
+      ]
+    },
+    {
+      "id": "rabbit-backlog",
+      "name": "RabbitMQ 队列积压",
+      "description": "RabbitMQ ready/unacked 增加。检查消费者数量、prefetch、处理耗时与确认。",
+      "use": [
+        "RabbitMQ 消费积压"
+      ],
+      "exclude": [
+        "RabbitMQ 无路由"
+      ],
+      "tags": [
+        "rabbit"
+      ]
+    },
+    {
+      "id": "disk-inode",
+      "name": "Linux inode 耗尽",
+      "description": "Linux 磁盘仍有容量却不能建文件。核对 inode 使用量和小文件分布。",
+      "use": [
+        "Linux inode"
+      ],
+      "exclude": [
+        "Linux CPU"
+      ],
+      "tags": [
+        "disk"
+      ]
+    },
+    {
+      "id": "cpu-throttle",
+      "name": "Linux CPU 配额限速",
+      "description": "Linux 容器 CPU 节流。检查 cgroup 配额、throttled 时间和运行队列。",
+      "use": [
+        "Linux CPU"
+      ],
+      "exclude": [
+        "Linux inode"
+      ],
+      "tags": [
+        "cpu"
+      ]
+    },
+    {
+      "id": "distractor-020",
+      "name": "S3 对象存储配置审计",
+      "description": "S3 对象存储的配置审计：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "S3 对象存储 配置审计"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "S3 对象存储"
+      ]
+    },
+    {
+      "id": "distractor-021",
+      "name": "S3 对象存储配额核对",
+      "description": "S3 对象存储的配额核对：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "S3 对象存储 配额核对"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "S3 对象存储"
+      ]
+    },
+    {
+      "id": "distractor-022",
+      "name": "S3 对象存储数据归档",
+      "description": "S3 对象存储的数据归档：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "S3 对象存储 数据归档"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "S3 对象存储"
+      ]
+    },
+    {
+      "id": "distractor-023",
+      "name": "S3 对象存储只读连通检查",
+      "description": "S3 对象存储的只读连通检查：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "S3 对象存储 只读连通检查"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "S3 对象存储"
+      ]
+    },
+    {
+      "id": "distractor-024",
+      "name": "S3 对象存储任务排队分析",
+      "description": "S3 对象存储的任务排队分析：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "S3 对象存储 任务排队分析"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "S3 对象存储"
+      ]
+    },
+    {
+      "id": "distractor-025",
+      "name": "S3 对象存储索引状态检查",
+      "description": "S3 对象存储的索引状态检查：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "S3 对象存储 索引状态检查"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "S3 对象存储"
+      ]
+    },
+    {
+      "id": "distractor-026",
+      "name": "S3 对象存储文件校验",
+      "description": "S3 对象存储的文件校验：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "S3 对象存储 文件校验"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "S3 对象存储"
+      ]
+    },
+    {
+      "id": "distractor-027",
+      "name": "S3 对象存储版本清点",
+      "description": "S3 对象存储的版本清点：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "S3 对象存储 版本清点"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "S3 对象存储"
+      ]
+    },
+    {
+      "id": "distractor-028",
+      "name": "S3 对象存储日志保留检查",
+      "description": "S3 对象存储的日志保留检查：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "S3 对象存储 日志保留检查"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "S3 对象存储"
+      ]
+    },
+    {
+      "id": "distractor-029",
+      "name": "S3 对象存储访问统计",
+      "description": "S3 对象存储的访问统计：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "S3 对象存储 访问统计"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "S3 对象存储"
+      ]
+    },
+    {
+      "id": "distractor-030",
+      "name": "Git 仓库配置审计",
+      "description": "Git 仓库的配置审计：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "Git 仓库 配置审计"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "Git 仓库"
+      ]
+    },
+    {
+      "id": "distractor-031",
+      "name": "Git 仓库配额核对",
+      "description": "Git 仓库的配额核对：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "Git 仓库 配额核对"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "Git 仓库"
+      ]
+    },
+    {
+      "id": "distractor-032",
+      "name": "Git 仓库数据归档",
+      "description": "Git 仓库的数据归档：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "Git 仓库 数据归档"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "Git 仓库"
+      ]
+    },
+    {
+      "id": "distractor-033",
+      "name": "Git 仓库只读连通检查",
+      "description": "Git 仓库的只读连通检查：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "Git 仓库 只读连通检查"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "Git 仓库"
+      ]
+    },
+    {
+      "id": "distractor-034",
+      "name": "Git 仓库任务排队分析",
+      "description": "Git 仓库的任务排队分析：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "Git 仓库 任务排队分析"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "Git 仓库"
+      ]
+    },
+    {
+      "id": "distractor-035",
+      "name": "Git 仓库索引状态检查",
+      "description": "Git 仓库的索引状态检查：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "Git 仓库 索引状态检查"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "Git 仓库"
+      ]
+    },
+    {
+      "id": "distractor-036",
+      "name": "Git 仓库文件校验",
+      "description": "Git 仓库的文件校验：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "Git 仓库 文件校验"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "Git 仓库"
+      ]
+    },
+    {
+      "id": "distractor-037",
+      "name": "Git 仓库版本清点",
+      "description": "Git 仓库的版本清点：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "Git 仓库 版本清点"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "Git 仓库"
+      ]
+    },
+    {
+      "id": "distractor-038",
+      "name": "Git 仓库日志保留检查",
+      "description": "Git 仓库的日志保留检查：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "Git 仓库 日志保留检查"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "Git 仓库"
+      ]
+    },
+    {
+      "id": "distractor-039",
+      "name": "Git 仓库访问统计",
+      "description": "Git 仓库的访问统计：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "Git 仓库 访问统计"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "Git 仓库"
+      ]
+    },
+    {
+      "id": "distractor-040",
+      "name": "邮件网关配置审计",
+      "description": "邮件网关的配置审计：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "邮件网关 配置审计"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "邮件网关"
+      ]
+    },
+    {
+      "id": "distractor-041",
+      "name": "邮件网关配额核对",
+      "description": "邮件网关的配额核对：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "邮件网关 配额核对"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "邮件网关"
+      ]
+    },
+    {
+      "id": "distractor-042",
+      "name": "邮件网关数据归档",
+      "description": "邮件网关的数据归档：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "邮件网关 数据归档"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "邮件网关"
+      ]
+    },
+    {
+      "id": "distractor-043",
+      "name": "邮件网关只读连通检查",
+      "description": "邮件网关的只读连通检查：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "邮件网关 只读连通检查"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "邮件网关"
+      ]
+    },
+    {
+      "id": "distractor-044",
+      "name": "邮件网关任务排队分析",
+      "description": "邮件网关的任务排队分析：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "邮件网关 任务排队分析"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "邮件网关"
+      ]
+    },
+    {
+      "id": "distractor-045",
+      "name": "邮件网关索引状态检查",
+      "description": "邮件网关的索引状态检查：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "邮件网关 索引状态检查"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "邮件网关"
+      ]
+    },
+    {
+      "id": "distractor-046",
+      "name": "邮件网关文件校验",
+      "description": "邮件网关的文件校验：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "邮件网关 文件校验"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "邮件网关"
+      ]
+    },
+    {
+      "id": "distractor-047",
+      "name": "邮件网关版本清点",
+      "description": "邮件网关的版本清点：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "邮件网关 版本清点"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "邮件网关"
+      ]
+    },
+    {
+      "id": "distractor-048",
+      "name": "邮件网关日志保留检查",
+      "description": "邮件网关的日志保留检查：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "邮件网关 日志保留检查"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "邮件网关"
+      ]
+    },
+    {
+      "id": "distractor-049",
+      "name": "邮件网关访问统计",
+      "description": "邮件网关的访问统计：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "邮件网关 访问统计"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "邮件网关"
+      ]
+    },
+    {
+      "id": "distractor-050",
+      "name": "图像转码配置审计",
+      "description": "图像转码的配置审计：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "图像转码 配置审计"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "图像转码"
+      ]
+    },
+    {
+      "id": "distractor-051",
+      "name": "图像转码配额核对",
+      "description": "图像转码的配额核对：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "图像转码 配额核对"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "图像转码"
+      ]
+    },
+    {
+      "id": "distractor-052",
+      "name": "图像转码数据归档",
+      "description": "图像转码的数据归档：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "图像转码 数据归档"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "图像转码"
+      ]
+    },
+    {
+      "id": "distractor-053",
+      "name": "图像转码只读连通检查",
+      "description": "图像转码的只读连通检查：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "图像转码 只读连通检查"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "图像转码"
+      ]
+    },
+    {
+      "id": "distractor-054",
+      "name": "图像转码任务排队分析",
+      "description": "图像转码的任务排队分析：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "图像转码 任务排队分析"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "图像转码"
+      ]
+    },
+    {
+      "id": "distractor-055",
+      "name": "图像转码索引状态检查",
+      "description": "图像转码的索引状态检查：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "图像转码 索引状态检查"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "图像转码"
+      ]
+    },
+    {
+      "id": "distractor-056",
+      "name": "图像转码文件校验",
+      "description": "图像转码的文件校验：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "图像转码 文件校验"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "图像转码"
+      ]
+    },
+    {
+      "id": "distractor-057",
+      "name": "图像转码版本清点",
+      "description": "图像转码的版本清点：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "图像转码 版本清点"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "图像转码"
+      ]
+    },
+    {
+      "id": "distractor-058",
+      "name": "图像转码日志保留检查",
+      "description": "图像转码的日志保留检查：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "图像转码 日志保留检查"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "图像转码"
+      ]
+    },
+    {
+      "id": "distractor-059",
+      "name": "图像转码访问统计",
+      "description": "图像转码的访问统计：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "图像转码 访问统计"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "图像转码"
+      ]
+    },
+    {
+      "id": "distractor-060",
+      "name": "定时报表配置审计",
+      "description": "定时报表的配置审计：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "定时报表 配置审计"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "定时报表"
+      ]
+    },
+    {
+      "id": "distractor-061",
+      "name": "定时报表配额核对",
+      "description": "定时报表的配额核对：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "定时报表 配额核对"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "定时报表"
+      ]
+    },
+    {
+      "id": "distractor-062",
+      "name": "定时报表数据归档",
+      "description": "定时报表的数据归档：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "定时报表 数据归档"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "定时报表"
+      ]
+    },
+    {
+      "id": "distractor-063",
+      "name": "定时报表只读连通检查",
+      "description": "定时报表的只读连通检查：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "定时报表 只读连通检查"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "定时报表"
+      ]
+    },
+    {
+      "id": "distractor-064",
+      "name": "定时报表任务排队分析",
+      "description": "定时报表的任务排队分析：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "定时报表 任务排队分析"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "定时报表"
+      ]
+    },
+    {
+      "id": "distractor-065",
+      "name": "定时报表索引状态检查",
+      "description": "定时报表的索引状态检查：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "定时报表 索引状态检查"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "定时报表"
+      ]
+    },
+    {
+      "id": "distractor-066",
+      "name": "定时报表文件校验",
+      "description": "定时报表的文件校验：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "定时报表 文件校验"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "定时报表"
+      ]
+    },
+    {
+      "id": "distractor-067",
+      "name": "定时报表版本清点",
+      "description": "定时报表的版本清点：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "定时报表 版本清点"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "定时报表"
+      ]
+    },
+    {
+      "id": "distractor-068",
+      "name": "定时报表日志保留检查",
+      "description": "定时报表的日志保留检查：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "定时报表 日志保留检查"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "定时报表"
+      ]
+    },
+    {
+      "id": "distractor-069",
+      "name": "定时报表访问统计",
+      "description": "定时报表的访问统计：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "定时报表 访问统计"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "定时报表"
+      ]
+    },
+    {
+      "id": "distractor-070",
+      "name": "支付沙箱配置审计",
+      "description": "支付沙箱的配置审计：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "支付沙箱 配置审计"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "支付沙箱"
+      ]
+    },
+    {
+      "id": "distractor-071",
+      "name": "支付沙箱配额核对",
+      "description": "支付沙箱的配额核对：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "支付沙箱 配额核对"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "支付沙箱"
+      ]
+    },
+    {
+      "id": "distractor-072",
+      "name": "支付沙箱数据归档",
+      "description": "支付沙箱的数据归档：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "支付沙箱 数据归档"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "支付沙箱"
+      ]
+    },
+    {
+      "id": "distractor-073",
+      "name": "支付沙箱只读连通检查",
+      "description": "支付沙箱的只读连通检查：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "支付沙箱 只读连通检查"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "支付沙箱"
+      ]
+    },
+    {
+      "id": "distractor-074",
+      "name": "支付沙箱任务排队分析",
+      "description": "支付沙箱的任务排队分析：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "支付沙箱 任务排队分析"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "支付沙箱"
+      ]
+    },
+    {
+      "id": "distractor-075",
+      "name": "支付沙箱索引状态检查",
+      "description": "支付沙箱的索引状态检查：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "支付沙箱 索引状态检查"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "支付沙箱"
+      ]
+    },
+    {
+      "id": "distractor-076",
+      "name": "支付沙箱文件校验",
+      "description": "支付沙箱的文件校验：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "支付沙箱 文件校验"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "支付沙箱"
+      ]
+    },
+    {
+      "id": "distractor-077",
+      "name": "支付沙箱版本清点",
+      "description": "支付沙箱的版本清点：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "支付沙箱 版本清点"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "支付沙箱"
+      ]
+    },
+    {
+      "id": "distractor-078",
+      "name": "支付沙箱日志保留检查",
+      "description": "支付沙箱的日志保留检查：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "支付沙箱 日志保留检查"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "支付沙箱"
+      ]
+    },
+    {
+      "id": "distractor-079",
+      "name": "支付沙箱访问统计",
+      "description": "支付沙箱的访问统计：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "支付沙箱 访问统计"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "支付沙箱"
+      ]
+    },
+    {
+      "id": "distractor-080",
+      "name": "静态页面配置审计",
+      "description": "静态页面的配置审计：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "静态页面 配置审计"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "静态页面"
+      ]
+    },
+    {
+      "id": "distractor-081",
+      "name": "静态页面配额核对",
+      "description": "静态页面的配额核对：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "静态页面 配额核对"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "静态页面"
+      ]
+    },
+    {
+      "id": "distractor-082",
+      "name": "静态页面数据归档",
+      "description": "静态页面的数据归档：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "静态页面 数据归档"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "静态页面"
+      ]
+    },
+    {
+      "id": "distractor-083",
+      "name": "静态页面只读连通检查",
+      "description": "静态页面的只读连通检查：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "静态页面 只读连通检查"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "静态页面"
+      ]
+    },
+    {
+      "id": "distractor-084",
+      "name": "静态页面任务排队分析",
+      "description": "静态页面的任务排队分析：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "静态页面 任务排队分析"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "静态页面"
+      ]
+    },
+    {
+      "id": "distractor-085",
+      "name": "静态页面索引状态检查",
+      "description": "静态页面的索引状态检查：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "静态页面 索引状态检查"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "静态页面"
+      ]
+    },
+    {
+      "id": "distractor-086",
+      "name": "静态页面文件校验",
+      "description": "静态页面的文件校验：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "静态页面 文件校验"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "静态页面"
+      ]
+    },
+    {
+      "id": "distractor-087",
+      "name": "静态页面版本清点",
+      "description": "静态页面的版本清点：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "静态页面 版本清点"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "静态页面"
+      ]
+    },
+    {
+      "id": "distractor-088",
+      "name": "静态页面日志保留检查",
+      "description": "静态页面的日志保留检查：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "静态页面 日志保留检查"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "静态页面"
+      ]
+    },
+    {
+      "id": "distractor-089",
+      "name": "静态页面访问统计",
+      "description": "静态页面的访问统计：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "静态页面 访问统计"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "静态页面"
+      ]
+    },
+    {
+      "id": "distractor-090",
+      "name": "身份目录配置审计",
+      "description": "身份目录的配置审计：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "身份目录 配置审计"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "身份目录"
+      ]
+    },
+    {
+      "id": "distractor-091",
+      "name": "身份目录配额核对",
+      "description": "身份目录的配额核对：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "身份目录 配额核对"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "身份目录"
+      ]
+    },
+    {
+      "id": "distractor-092",
+      "name": "身份目录数据归档",
+      "description": "身份目录的数据归档：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "身份目录 数据归档"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "身份目录"
+      ]
+    },
+    {
+      "id": "distractor-093",
+      "name": "身份目录只读连通检查",
+      "description": "身份目录的只读连通检查：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "身份目录 只读连通检查"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "身份目录"
+      ]
+    },
+    {
+      "id": "distractor-094",
+      "name": "身份目录任务排队分析",
+      "description": "身份目录的任务排队分析：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "身份目录 任务排队分析"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "身份目录"
+      ]
+    },
+    {
+      "id": "distractor-095",
+      "name": "身份目录索引状态检查",
+      "description": "身份目录的索引状态检查：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "身份目录 索引状态检查"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "身份目录"
+      ]
+    },
+    {
+      "id": "distractor-096",
+      "name": "身份目录文件校验",
+      "description": "身份目录的文件校验：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "身份目录 文件校验"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "身份目录"
+      ]
+    },
+    {
+      "id": "distractor-097",
+      "name": "身份目录版本清点",
+      "description": "身份目录的版本清点：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "身份目录 版本清点"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "身份目录"
+      ]
+    },
+    {
+      "id": "distractor-098",
+      "name": "身份目录日志保留检查",
+      "description": "身份目录的日志保留检查：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "身份目录 日志保留检查"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "身份目录"
+      ]
+    },
+    {
+      "id": "distractor-099",
+      "name": "身份目录访问统计",
+      "description": "身份目录的访问统计：核对对应测试资源的配置和只读状态，仅适用于该组件。",
+      "use": [
+        "身份目录 访问统计"
+      ],
+      "exclude": [
+        "Redis",
+        "MySQL",
+        "Kubernetes"
+      ],
+      "tags": [
+        "身份目录"
+      ]
+    }
+  ],
+  "queries": [
+    {
+      "id": "cn-redis",
+      "text": "Redis 连接池拿不到空闲连接，业务线程都在等，该看哪些证据？",
+      "expected": "redis-pool"
+    },
+    {
+      "id": "cn-lock",
+      "text": "MySQL 死锁，两个事务各自占着对方需要的锁。",
+      "expected": "mysql-deadlock"
+    },
+    {
+      "id": "cn-replica",
+      "text": "MySQL 复制延迟，主库已提交但从库还追不上。",
+      "expected": "mysql-replica"
+    },
+    {
+      "id": "cn-kafka",
+      "text": "Kafka 消费积压越来越多，消息处理速度不及写入。",
+      "expected": "kafka-lag"
+    },
+    {
+      "id": "exact-k8s",
+      "text": "Kubernetes OOMKilled 之后容器反复退出，先查什么？",
+      "expected": "k8s-oom"
+    },
+    {
+      "id": "hard-k8s",
+      "text": "Kubernetes 镜像拉取一直失败，显示 ImagePullBackOff。",
+      "expected": "k8s-image"
+    },
+    {
+      "id": "cn-tls",
+      "text": "TLS 证书到期后，客户端提示服务器证书已过有效期。",
+      "expected": "tls-expiry"
+    },
+    {
+      "id": "cn-jvm",
+      "text": "JVM GC 暂停时接口一起停顿，之后又恢复。",
+      "expected": "jvm-gc"
+    },
+    {
+      "id": "cn-rabbit",
+      "text": "RabbitMQ 无路由，消息被 mandatory return 退回。",
+      "expected": "rabbit-unrouted"
+    },
+    {
+      "id": "cn-inode",
+      "text": "Linux inode 用完，磁盘有空余字节却创建不了文件。",
+      "expected": "disk-inode"
+    },
+    {
+      "id": "negative",
+      "text": "帮我写一首关于秋天的诗。",
+      "expected": null
+    },
+    {
+      "id": "negative-near",
+      "text": "只调整静态页面字体颜色，不调查任何服务器。",
+      "expected": null
+    }
+  ]
+}

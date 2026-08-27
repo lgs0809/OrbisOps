@@ -78,6 +78,9 @@ services:
       context: ./server
       dockerfile: orbisops-app/Dockerfile
     restart: unless-stopped
+    env_file:
+      - path: ./deploy/orbisops.runtime-secrets.env
+        required: false
     environment:
       SPRING_PROFILES_ACTIVE: prod
       ORBISOPS_SERVER_PORT: "8099"
@@ -93,6 +96,7 @@ services:
       ORBISOPS_MODEL_BASE_URL: ${ORBISOPS_MODEL_BASE_URL:-https://model-provider.invalid}
       ORBISOPS_MODEL_API_KEY: ${ORBISOPS_MODEL_API_KEY:-placeholder}
       ORBISOPS_CHAT_MODEL: ${ORBISOPS_CHAT_MODEL:-unconfigured}
+      ORBISOPS_MODEL_CALL_TIMEOUT_SECONDS: ${ORBISOPS_MODEL_CALL_TIMEOUT_SECONDS:-240}
       ORBISOPS_EMBEDDING_BASE_URL: ${ORBISOPS_EMBEDDING_BASE_URL:-https://embedding-provider.invalid}
       ORBISOPS_EMBEDDING_API_KEY: ${ORBISOPS_EMBEDDING_API_KEY:-placeholder}
       ORBISOPS_EMBEDDING_MODEL: ${ORBISOPS_EMBEDDING_MODEL:-unconfigured}
@@ -129,7 +133,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8099/actuator/health"]
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8099/actuator/health/liveness"]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -145,6 +149,7 @@ services:
     restart: unless-stopped
     environment:
       ORBISOPS_BACKEND_UPSTREAM: http://backend:8099
+      ORBISOPS_MODEL_CALL_TIMEOUT_SECONDS: ${ORBISOPS_MODEL_CALL_TIMEOUT_SECONDS:-240}
     ports:
       - "${ORBISOPS_WEB_PORT:-3002}:3002"
     depends_on:

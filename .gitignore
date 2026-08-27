@@ -12,6 +12,10 @@
 !.env.example
 !*.env.example
 deploy/orbisops.env
+deploy/orbisops.runtime-secrets.env
+deploy/.acceptance-private/
+deploy/.showcase-private/
+deploy/.showcase-private-v2/
 
 # Java / Maven
 **/target/
@@ -36,6 +40,8 @@ deploy/orbisops.env
 *.tmp
 *.swp
 *.swo
+**/__pycache__/
+*.pyc
 
 # Local AI handoff state
 .ai-bridge/

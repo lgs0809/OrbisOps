@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
-"""Scan every reachable Git blob and commit message for public-release leaks."""
+"""Scan the selected publication history for public-release leaks."""
 
 from __future__ import annotations
 
 from pathlib import Path
+import argparse
 import re
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
+parser = argparse.ArgumentParser(description=__doc__)
+scope = parser.add_mutually_exclusive_group()
+scope.add_argument("--ref", default="HEAD", help="Publication tip to audit (default: HEAD)")
+scope.add_argument("--all", action="store_true", help="Include local backup and remote refs explicitly")
+args = parser.parse_args()
+REF_ARGS = ["--all"] if args.all else [args.ref]
 
 FORBIDDEN_TEXT = [
     "ai-agent" + "-station",
@@ -31,7 +38,7 @@ PATTERNS = [
 
 def reachable_blobs() -> list[tuple[str, str]]:
     objects = subprocess.run(
-        ["git", "rev-list", "--objects", "--all"],
+        ["git", "rev-list", "--objects", *REF_ARGS],
         cwd=ROOT,
         check=True,
         text=True,
@@ -102,7 +109,7 @@ def scan_blobs(blobs: list[tuple[str, str]], violations: list[str]) -> int:
 
 def scan_commit_messages(violations: list[str]) -> int:
     output = subprocess.run(
-        ["git", "log", "--all", "--format=%H%x1f%B%x1e"],
+        ["git", "log", *REF_ARGS, "--format=%H%x1f%B%x1e"],
         cwd=ROOT,
         check=True,
         text=True,

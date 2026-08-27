@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @EnabledIfEnvironmentVariable(named = "ORBISOPS_WORKFLOW_TEST_URL", matches = ".+orbisops_workflow_regression.*")
 class WorkflowMySqlTest {
     private JdbcTemplate jdbc;
+    private DriverManagerDataSource dataSource;
     private IWorkSessionRunRepository repository;
     private String run;
     private static final String PROJECT = "ops02-synthetic-project";
@@ -36,7 +37,7 @@ class WorkflowMySqlTest {
 
     @BeforeEach
     void setup() {
-        var dataSource = new DriverManagerDataSource(System.getenv("ORBISOPS_WORKFLOW_TEST_URL"),
+        dataSource = new DriverManagerDataSource(System.getenv("ORBISOPS_WORKFLOW_TEST_URL"),
                 System.getenv("ORBISOPS_WORKFLOW_TEST_USER"), System.getenv("ORBISOPS_WORKFLOW_TEST_PASSWORD"));
         jdbc = new JdbcTemplate(dataSource);
         var factory = new ProxyFactory(new JdbcWorkSessionRunRepository(jdbc));
@@ -361,22 +362,21 @@ class WorkflowMySqlTest {
     }
 
     private void faultSql(String sql) {
-        // Bind fault injection to the same isolated schema as the tested repository.
-        // Root is used only because MySQL binary logging requires elevated trigger creation.
-        // The tested application repository still uses its own schema-scoped user.
-        try {
-            String database = jdbc.queryForObject("SELECT DATABASE()", String.class);
-            assertNotNull(database);
-            assertTrue(database.matches("orbisops_workflow_regression(?:_[a-z0-9_]+)?"),
-                    "Fault injection must stay in the explicitly isolated regression schema");
-            var process = new ProcessBuilder("docker", "exec", "-i", "orbisops-acceptance-mysql-1", "sh", "-c",
-                    "MYSQL_PWD=\"$MYSQL_ROOT_PASSWORD\" exec mysql -uroot \"$1\"", "workflow-fault", database)
-                    .redirectErrorStream(true).start();
-            String input = sql.startsWith("CREATE") ? "DELIMITER //\n" + sql + "//\n" : sql + ";\n";
-            try (var stream = process.getOutputStream()) { stream.write(input.getBytes(java.nio.charset.StandardCharsets.UTF_8)); }
-            String output = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-            assertEquals(0, process.waitFor(), output);
-        } catch (Exception error) { throw new IllegalStateException("fault injection failed", error); }
+        String database = jdbc.queryForObject("SELECT DATABASE()", String.class);
+        assertNotNull(database);
+        assertTrue(database.matches("orbisops_workflow_regression(?:_[a-z0-9_]+)?"),
+                "Fault injection must stay in the explicitly isolated regression schema");
+        // MySQL instances with binary logging may require a separate trigger-creation account.
+        String adminUser = System.getenv("ORBISOPS_WORKFLOW_TEST_ADMIN_USER");
+        String adminPassword = System.getenv("ORBISOPS_WORKFLOW_TEST_ADMIN_PASSWORD");
+        JdbcTemplate triggerJdbc = jdbc;
+        if (adminUser != null || adminPassword != null) {
+            assertTrue(adminUser != null && !adminUser.isBlank() && adminPassword != null && !adminPassword.isBlank(),
+                    "Configure both workflow fixture administration credentials");
+            triggerJdbc = new JdbcTemplate(new DriverManagerDataSource(dataSource.getUrl(), adminUser, adminPassword));
+            assertEquals(database, triggerJdbc.queryForObject("SELECT DATABASE()", String.class));
+        }
+        triggerJdbc.execute(sql);
     }
 
     private WorkSessionCheckpoint checkpoint(String type, Map<String, Object> payload) {

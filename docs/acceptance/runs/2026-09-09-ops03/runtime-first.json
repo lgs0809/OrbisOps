@@ -1,0 +1,607 @@
+{
+  "fixture": "OPS-03-protocol-real-peer-model-disabled",
+  "runTag": "cd49d392ed",
+  "results": [
+    {
+      "case": "project-permissions",
+      "result": "PASS",
+      "checks": {
+        "viewerCannotApprove": {
+          "httpStatus": 403,
+          "code": "0005"
+        },
+        "otherProjectCannotReadCalls": {
+          "httpStatus": 403,
+          "code": "0005"
+        }
+      }
+    },
+    {
+      "case": "structured",
+      "result": "PASS",
+      "run": {
+        "hash": "8a3c2d48eb6c94a316df6116e4497b04ca356ae0ef9fa82250000f8a15086501",
+        "epoch": 1,
+        "error": "",
+        "runId": "chat-chat-session-a90c9922-6d9d-41d1-8de5-b6d9f455b4c7-feaa1f3e",
+        "status": "SUCCEEDED",
+        "version": 1
+      },
+      "actualRemoteCalls": 1,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "b258b181-2",
+          "attempt": 1,
+          "logicalId": "dc3a51dc-59e0-4925-8133-9805aa680d0f"
+        }
+      ],
+      "callStatuses": [
+        "SUCCEEDED"
+      ],
+      "resultIds": [
+        "tool-result-db4a39e8-ce09-4d12-965e-336de0523a15"
+      ],
+      "testIds": [
+        "ops03-cd49d392ed-structured-0"
+      ]
+    },
+    {
+      "case": "multi",
+      "result": "PASS",
+      "run": {
+        "hash": "bf960b8058114850dd65a5c7fb11fcd93ee1a6c34bdea624e970b90a6fce0c95",
+        "epoch": 1,
+        "error": "",
+        "runId": "chat-chat-session-f1c9e47e-4675-44b7-a456-0ecef266d2c2-3512083e",
+        "status": "SUCCEEDED",
+        "version": 1
+      },
+      "actualRemoteCalls": 1,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "b258b181-4",
+          "attempt": 1,
+          "logicalId": "7d1fc28b-0bc6-4bf5-a5dd-23748896b8f9"
+        }
+      ],
+      "callStatuses": [
+        "SUCCEEDED"
+      ],
+      "resultIds": [
+        "tool-result-6fe635a4-d442-48a1-80c3-0797c3adf3d3"
+      ],
+      "testIds": [
+        "ops03-cd49d392ed-multi-0"
+      ]
+    },
+    {
+      "case": "reconnect",
+      "result": "PASS",
+      "run": {
+        "hash": "17480a0ba2f079f8cff0a2bd513a139663d0f6bf34869f15b7e001e9f8ba4753",
+        "epoch": 1,
+        "error": "",
+        "runId": "chat-chat-session-1b2dc06a-ddb6-46f1-9672-f13252b080d0-383d7bda",
+        "status": "SUCCEEDED",
+        "version": 1
+      },
+      "actualRemoteCalls": 2,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "b258b181-6",
+          "attempt": 1,
+          "logicalId": "568ca994-51e4-43be-9a0d-1ac50d402f5f"
+        },
+        {
+          "limit": 12,
+          "rpcId": "208f1773-2",
+          "attempt": 2,
+          "logicalId": "568ca994-51e4-43be-9a0d-1ac50d402f5f"
+        }
+      ],
+      "callStatuses": [
+        "SUCCEEDED",
+        "FAILED"
+      ],
+      "resultIds": [
+        "tool-result-40cf8291-b1a9-4300-8e04-995aa1bf3cc7"
+      ],
+      "testIds": [
+        "ops03-cd49d392ed-reconnect-0"
+      ]
+    },
+    {
+      "case": "empty",
+      "result": "PASS",
+      "run": {
+        "hash": "c7b364c16f330be8d2f477c678d8c991ec0a939fc6eed9e7324acb7443bf995d",
+        "epoch": 1,
+        "error": "AGENT_RUN_FAILED",
+        "runId": "chat-chat-session-934ff7eb-9315-4afb-97b6-7e1367c459ff-3394ec2f",
+        "status": "FAILED",
+        "version": 1
+      },
+      "actualRemoteCalls": 2,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "208f1773-4",
+          "attempt": 1,
+          "logicalId": "08b8ad51-d27c-4ff4-a8b1-624875b2a775"
+        },
+        {
+          "limit": 12,
+          "rpcId": "208f1773-6",
+          "attempt": 2,
+          "logicalId": "08b8ad51-d27c-4ff4-a8b1-624875b2a775"
+        }
+      ],
+      "callStatuses": [
+        "FAILED",
+        "FAILED"
+      ],
+      "resultIds": [],
+      "testIds": [
+        "ops03-cd49d392ed-empty-0"
+      ]
+    },
+    {
+      "case": "shared-retry",
+      "result": "PASS",
+      "run": {
+        "hash": "85ecafbc567d2a1920c6d1c4fd3282f5057209f07479a460554679790650659b",
+        "epoch": 1,
+        "error": "MODEL_PROVIDER_UNAVAILABLE",
+        "runId": "chat-chat-session-025b3dcc-1af5-48e3-8945-e2f6897d4e5d-369ab45e",
+        "status": "FAILED",
+        "version": 1
+      },
+      "actualRemoteCalls": 2,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "208f1773-8",
+          "attempt": 1,
+          "logicalId": "6703c3e3-12ee-4e86-9ad4-5e1dac2e737e"
+        },
+        {
+          "limit": 12,
+          "rpcId": "208f1773-10",
+          "attempt": 2,
+          "logicalId": "6703c3e3-12ee-4e86-9ad4-5e1dac2e737e"
+        }
+      ],
+      "callStatuses": [
+        "FAILED",
+        "FAILED"
+      ],
+      "resultIds": [],
+      "testIds": [
+        "ops03-cd49d392ed-shared-retry-0"
+      ]
+    },
+    {
+      "case": "budget-twelve",
+      "result": "PASS",
+      "run": {
+        "hash": "491af5e1fbc14aa56c69685bab0af9392166ad7423675bc94d5d4039277d939c",
+        "epoch": 1,
+        "error": "AGENT_RUN_FAILED",
+        "runId": "chat-chat-session-65c863e1-8886-4cfa-930e-4353de17a413-0772f793",
+        "status": "FAILED",
+        "version": 1
+      },
+      "actualRemoteCalls": 12,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "319358c9-2",
+          "attempt": 1,
+          "logicalId": "d4a84188-7148-4ce7-88cf-e230ceb3c8a7"
+        },
+        {
+          "limit": 12,
+          "rpcId": "319358c9-4",
+          "attempt": 1,
+          "logicalId": "f9db2057-f269-48a9-88db-07da523db9f4"
+        },
+        {
+          "limit": 12,
+          "rpcId": "319358c9-6",
+          "attempt": 1,
+          "logicalId": "2bb2bcb6-629f-46af-bdbd-cb03e440f6c3"
+        },
+        {
+          "limit": 12,
+          "rpcId": "319358c9-8",
+          "attempt": 1,
+          "logicalId": "8d3b4d39-15c1-479d-bedd-95639b011a3e"
+        },
+        {
+          "limit": 12,
+          "rpcId": "319358c9-10",
+          "attempt": 1,
+          "logicalId": "b0858391-bc1d-43af-a33d-582e66f03937"
+        },
+        {
+          "limit": 12,
+          "rpcId": "319358c9-12",
+          "attempt": 1,
+          "logicalId": "fd97665e-deaa-4fa8-abad-b604796afca7"
+        },
+        {
+          "limit": 12,
+          "rpcId": "319358c9-14",
+          "attempt": 1,
+          "logicalId": "f9dde1b5-1189-4a53-9eda-efc143b3798f"
+        },
+        {
+          "limit": 12,
+          "rpcId": "319358c9-16",
+          "attempt": 1,
+          "logicalId": "2c45de9d-09bf-4ce5-9665-28b2fc5c19ae"
+        },
+        {
+          "limit": 12,
+          "rpcId": "319358c9-18",
+          "attempt": 1,
+          "logicalId": "8c0c8038-9dcd-49d8-aa73-6e2bf43c3343"
+        },
+        {
+          "limit": 12,
+          "rpcId": "319358c9-20",
+          "attempt": 1,
+          "logicalId": "6fb139a8-43dc-42f7-811e-3e654e876015"
+        },
+        {
+          "limit": 12,
+          "rpcId": "319358c9-22",
+          "attempt": 1,
+          "logicalId": "6e404603-6bd6-43ee-87e7-4419d4c9a853"
+        },
+        {
+          "limit": 12,
+          "rpcId": "319358c9-24",
+          "attempt": 1,
+          "logicalId": "e519c0e2-bc19-4196-b856-4d7b005ecc57"
+        }
+      ],
+      "callStatuses": [
+        "FAILED",
+        "FAILED",
+        "SUCCEEDED",
+        "SUCCEEDED",
+        "SUCCEEDED",
+        "SUCCEEDED",
+        "SUCCEEDED",
+        "SUCCEEDED",
+        "SUCCEEDED",
+        "SUCCEEDED",
+        "SUCCEEDED",
+        "SUCCEEDED",
+        "SUCCEEDED"
+      ],
+      "resultIds": [
+        "tool-result-4d2ad9e6-9f20-433d-aca6-c3e15ed9b533",
+        "tool-result-01cf4738-4408-41e2-bb42-5529f6d4af9d",
+        "tool-result-fcadd85a-7087-4009-81d7-5e22ff101266",
+        "tool-result-0a88e551-7e76-4764-b84c-5436c14e349e",
+        "tool-result-fadaafeb-1dfc-402d-8627-8ca691d11268",
+        "tool-result-02da1477-b321-452c-b8b9-d4ec1642e98a",
+        "tool-result-5fbaeece-c3b5-412c-8ec7-4a12dc1d9288",
+        "tool-result-d9b05ffe-fa33-4ee2-afd1-9ff21aba9a56",
+        "tool-result-e1d02062-4e55-4ace-b0df-8c8bd583a43b",
+        "tool-result-577a400b-1bb4-440e-8123-760009baeb58",
+        "tool-result-fc6e7793-fd23-4cd8-be7a-e80aea58655f"
+      ],
+      "testIds": [
+        "ops03-cd49d392ed-budget-twelve-0",
+        "ops03-cd49d392ed-budget-twelve-1",
+        "ops03-cd49d392ed-budget-twelve-2",
+        "ops03-cd49d392ed-budget-twelve-3",
+        "ops03-cd49d392ed-budget-twelve-4",
+        "ops03-cd49d392ed-budget-twelve-5",
+        "ops03-cd49d392ed-budget-twelve-6",
+        "ops03-cd49d392ed-budget-twelve-7",
+        "ops03-cd49d392ed-budget-twelve-8",
+        "ops03-cd49d392ed-budget-twelve-9",
+        "ops03-cd49d392ed-budget-twelve-10",
+        "ops03-cd49d392ed-budget-twelve-11"
+      ]
+    },
+    {
+      "case": "business-error-0",
+      "result": "PASS",
+      "run": {
+        "hash": "36257c4473ff4dcf2640836d9d903946ddf09efd298b496417da782d2e0ea0af",
+        "epoch": 1,
+        "error": "AGENT_RUN_FAILED",
+        "runId": "chat-chat-session-017b76b8-b24d-4a56-9f93-0ac01e0fa743-cfe52104",
+        "status": "FAILED",
+        "version": 1
+      },
+      "actualRemoteCalls": 1,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "93d5a77b-4",
+          "attempt": 1,
+          "logicalId": "cf25c12e-7f11-4163-869a-2d60e6ed081a"
+        }
+      ],
+      "callStatuses": [
+        "FAILED"
+      ],
+      "resultIds": [],
+      "testIds": [
+        "ops03-cd49d392ed-business-error-0-0"
+      ]
+    },
+    {
+      "case": "business-error-1",
+      "result": "PASS",
+      "run": {
+        "hash": "7762d7babf6616fb5015502fccb09c9ca6ba2b50f7fcfe4c3b0f797ba2e5929c",
+        "epoch": 1,
+        "error": "AGENT_RUN_FAILED",
+        "runId": "chat-chat-session-253e3ed2-fde6-4577-92e4-5d604bb4942c-74d86428",
+        "status": "FAILED",
+        "version": 1
+      },
+      "actualRemoteCalls": 1,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "93d5a77b-6",
+          "attempt": 1,
+          "logicalId": "4198f519-c51e-4ceb-ba08-fe71fe95f252"
+        }
+      ],
+      "callStatuses": [
+        "FAILED"
+      ],
+      "resultIds": [],
+      "testIds": [
+        "ops03-cd49d392ed-business-error-1-0"
+      ]
+    },
+    {
+      "case": "business-error-2",
+      "result": "PASS",
+      "run": {
+        "hash": "b8a6ad3710c6729588b27552cc4840a09091583b90bcfd2ed8cb4cc4bb5129cc",
+        "epoch": 1,
+        "error": "AGENT_RUN_FAILED",
+        "runId": "chat-chat-session-928bea7c-9e1e-4e77-806e-5960f5c5606b-9daad124",
+        "status": "FAILED",
+        "version": 1
+      },
+      "actualRemoteCalls": 1,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "93d5a77b-8",
+          "attempt": 1,
+          "logicalId": "82ab3e2a-d8d0-4798-bd40-88c2f8b40b55"
+        }
+      ],
+      "callStatuses": [
+        "FAILED"
+      ],
+      "resultIds": [],
+      "testIds": [
+        "ops03-cd49d392ed-business-error-2-0"
+      ]
+    },
+    {
+      "case": "business-error-3",
+      "result": "PASS",
+      "run": {
+        "hash": "b40fa12f2335b597db10a58109cb36322d4d0196e1e4275153d44d7798ec8e6c",
+        "epoch": 1,
+        "error": "AGENT_RUN_FAILED",
+        "runId": "chat-chat-session-a426b654-226f-473e-8e90-595b30ec1bf1-c3764d0c",
+        "status": "FAILED",
+        "version": 1
+      },
+      "actualRemoteCalls": 1,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "93d5a77b-10",
+          "attempt": 1,
+          "logicalId": "64f98d6c-7cdb-4c7f-aa06-715e9482a032"
+        }
+      ],
+      "callStatuses": [
+        "FAILED"
+      ],
+      "resultIds": [],
+      "testIds": [
+        "ops03-cd49d392ed-business-error-3-0"
+      ]
+    },
+    {
+      "case": "after-business-errors",
+      "result": "PASS",
+      "run": {
+        "hash": "e2a26d18b6bf1ec900c6c872020ac653d1e1fb22c0def025e94d5b61832c5c25",
+        "epoch": 1,
+        "error": "",
+        "runId": "chat-chat-session-12b9f9c8-d371-404d-91cc-9e211ff165fe-39eaa794",
+        "status": "SUCCEEDED",
+        "version": 1
+      },
+      "actualRemoteCalls": 1,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "93d5a77b-12",
+          "attempt": 1,
+          "logicalId": "e4cb944b-deec-4d50-a124-e04952bc53c1"
+        }
+      ],
+      "callStatuses": [
+        "SUCCEEDED"
+      ],
+      "resultIds": [
+        "tool-result-9c4c5f3f-0ab1-4b79-8090-7dd724e7baf9"
+      ],
+      "testIds": [
+        "ops03-cd49d392ed-after-business-errors-0"
+      ]
+    },
+    {
+      "case": "parallel-0",
+      "result": "PASS",
+      "run": {
+        "hash": "0d0563c0c2eea2aceac7cdaffb885640cbcc5c151a4eb8c1f45a389987362d53",
+        "epoch": 1,
+        "error": "",
+        "runId": "chat-chat-session-b9ff3eaa-a4a3-4da1-b031-0b5cb616793c-f55f648e",
+        "status": "SUCCEEDED",
+        "version": 1
+      },
+      "actualRemoteCalls": 1,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "93d5a77b-17",
+          "attempt": 1,
+          "logicalId": "c0b6043d-1391-47a8-ba9f-3246ce3ec19e"
+        }
+      ],
+      "callStatuses": [
+        "SUCCEEDED"
+      ],
+      "resultIds": [
+        "tool-result-73d30160-f458-4552-a6b7-eaa2a5d69bfc"
+      ],
+      "testIds": [
+        "ops03-cd49d392ed-parallel-0-0"
+      ]
+    },
+    {
+      "case": "parallel-1",
+      "result": "PASS",
+      "run": {
+        "hash": "03e0edb63a6310e13911c4d2d0c068e83f4e013ac7fa36ad72e98f1c1b426e15",
+        "epoch": 1,
+        "error": "",
+        "runId": "chat-chat-session-2d70da8b-04d4-480c-8382-663e36c48b08-206153ed",
+        "status": "SUCCEEDED",
+        "version": 1
+      },
+      "actualRemoteCalls": 1,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "93d5a77b-18",
+          "attempt": 1,
+          "logicalId": "c9d35f0d-ef13-43b0-81bb-bca9b29defec"
+        }
+      ],
+      "callStatuses": [
+        "SUCCEEDED"
+      ],
+      "resultIds": [
+        "tool-result-77b09234-d417-43aa-a4ba-b5d6d192476a"
+      ],
+      "testIds": [
+        "ops03-cd49d392ed-parallel-1-0"
+      ]
+    },
+    {
+      "case": "parallel-2",
+      "result": "PASS",
+      "run": {
+        "hash": "e5f6a174e10d090b990af61f73dcbb77e6c04c2df3086185fdee24d32fe41ed3",
+        "epoch": 1,
+        "error": "",
+        "runId": "chat-chat-session-a56cc765-1401-4077-a987-d2a193851f2b-4c7d6f5c",
+        "status": "SUCCEEDED",
+        "version": 1
+      },
+      "actualRemoteCalls": 1,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "93d5a77b-14",
+          "attempt": 1,
+          "logicalId": "107ea327-f0f7-4505-b604-4c888af5e07a"
+        }
+      ],
+      "callStatuses": [
+        "SUCCEEDED"
+      ],
+      "resultIds": [
+        "tool-result-e1728294-5c8b-461e-aa8f-b8a1c93e140a"
+      ],
+      "testIds": [
+        "ops03-cd49d392ed-parallel-2-0"
+      ]
+    },
+    {
+      "case": "restart-wait",
+      "result": "PASS",
+      "run": {
+        "hash": "360b87e587d5e36d8405845c826b2f4b6511e08ff75661ccf0b21d1bbe70b377",
+        "epoch": 2,
+        "error": "",
+        "runId": "chat-chat-session-a4950bf3-7aa1-4935-8f7b-7713cfec2aa0-77fb1e47",
+        "status": "SUCCEEDED",
+        "version": 1
+      },
+      "actualRemoteCalls": 3,
+      "physicalReservations": [
+        {
+          "limit": 3,
+          "rpcId": "93d5a77b-20",
+          "attempt": 1,
+          "logicalId": "8abb6cbd-e199-447a-9f91-c8c892ec957c"
+        },
+        {
+          "limit": 3,
+          "rpcId": "ce86f71c-2",
+          "attempt": 2,
+          "logicalId": "8abb6cbd-e199-447a-9f91-c8c892ec957c"
+        },
+        {
+          "limit": 3,
+          "rpcId": "42e79f9e-2",
+          "attempt": 1,
+          "logicalId": "e3fbb3b7-027b-4d15-92cb-910fe13bfd37"
+        }
+      ],
+      "callStatuses": [
+        "SUCCEEDED",
+        "SUCCEEDED",
+        "FAILED"
+      ],
+      "resultIds": [
+        "tool-result-800b1b8e-9d1b-46bc-b9b5-92270cbb1aaa",
+        "tool-result-74d161c0-cce8-4cf1-bc79-264a0189894d"
+      ],
+      "testIds": [
+        "ops03-cd49d392ed-restart-wait-0",
+        "ops03-cd49d392ed-restart-wait-1"
+      ],
+      "approvals": [
+        {
+          "id": "workflow-approval-a28fa05c-a2dd-4d51-9857-0eabe450c545",
+          "node": "review",
+          "status": "APPROVED"
+        }
+      ]
+    }
+  ],
+  "servicesUnchanged": true,
+  "writeReceiptsUnchanged": true,
+  "limitations": [
+    "Not a model evaluation or OPS-04 business graph",
+    "Approved Landing write workflow remains separate acceptance"
+  ]
+}

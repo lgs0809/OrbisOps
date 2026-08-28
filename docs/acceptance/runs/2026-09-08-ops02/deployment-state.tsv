@@ -1,0 +1,5 @@
+orbisops-acceptance-web-1	orbisops/web:2.0.0-acceptance	Up 4 minutes (healthy)	127.0.0.1:3302->3002/tcp
+orbisops-acceptance-backend-1	orbisops/server:2.0.0-acceptance	Up 4 minutes (healthy)	127.0.0.1:18089->8099/tcp
+orbisops-acceptance-redis-1	redis:7.4-alpine	Up 2 hours (healthy)	127.0.0.1:16362->6379/tcp
+orbisops-acceptance-pgvector-1	pgvector/pgvector:pg16	Up 2 hours (healthy)	127.0.0.1:15462->5432/tcp
+orbisops-acceptance-mysql-1	mysql:8.4	Up 2 hours (healthy)	127.0.0.1:13362->3306/tcp

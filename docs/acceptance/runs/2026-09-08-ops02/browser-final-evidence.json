@@ -1,0 +1,16 @@
+{
+  "browserRun": "chat-chat-session-cf00aa44-7f89-437d-91eb-74d87f5a5714-2e977569",
+  "facts": {
+    "epoch": 3,
+    "error": "",
+    "status": "SUCCEEDED",
+    "version": 1,
+    "definitionHash": "74850eeb85721a1636c2519601e1e93a5b7ad166bdb28e2247d0336d0b4f1b96",
+    "cancelRequested": 0
+  },
+  "planHash": "341aea9878f1ef34086d51173dfa279eedb59ad33fd229a00854ee8d80e8df61",
+  "contextBundleHash": "e0215c5f063951a403366955bc1ca6b41bda4548a84896c77bb7235dbffcd9ff",
+  "checkpointCount": 18,
+  "approvalDecisions": "review-one\tAPPROVED\tworkflow-approval-003815d6-29aa-4bd7-9c82-7edde9e67e57\tuser-42114b44-8690-47fc-9bd6-85ebfedfbf87\nreview-two\tAPPROVED\tworkflow-approval-3c3cef71-4f0f-40b0-aeb1-8e279e0ee703\tuser-42114b44-8690-47fc-9bd6-85ebfedfbf87",
+  "newPublishedVersion": 3
+}

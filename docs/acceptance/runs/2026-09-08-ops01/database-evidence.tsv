@@ -1,0 +1,17 @@
+migration	077	ops-memory-durability
+migration	076	ops-agent-edge-schema-convergence
+migration	075	ops-source-repository-access-mode
+messages	chat-session-202519b9-0b3b-49fb-b4c5-b9c88e8e865f	ops-acceptance-a	4	0	0
+messages	chat-session-5430d19f-4525-43aa-9e6b-df758f7e76c6	ops-acceptance-a	2	0	0
+messages	chat-session-5d64865a-5494-45b1-a2f9-34cd5293335c	ops-acceptance-a	2	0	0
+messages	chat-session-f16a3a16-40b8-46ca-870c-09dd9b9c691b	ops-acceptance-a	46	34	3
+jobs	SEMANTIC	COMPLETED	DISABLED	54
+jobs	EXTRACTION	COMPLETED	NO_FACTS	51
+jobs	COMPRESSION	COMPLETED	CHECKED	54
+jobs	EXTRACTION	COMPLETED	EXTRACTED	3
+fault_triggers_remaining	0
+summary_versions	chat-session-f16a3a16-40b8-46ca-870c-09dd9b9c691b	1	12	context_compressor
+summary_versions	chat-session-f16a3a16-40b8-46ca-870c-09dd9b9c691b	2	23	context_compressor
+summary_versions	chat-session-f16a3a16-40b8-46ca-870c-09dd9b9c691b	3	34	context_compressor
+business_a	3	6	12
+business_b	3	6	12

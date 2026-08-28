@@ -1,0 +1,24 @@
+run_id	agent_id	agent_version	agent_definition_hash	status	error_message	fencing_token	context_hash
+chat-chat-session-22105c29-5d03-4d36-af1e-f24ffbfd9f74-79078ee0	ops-acceptance-approval	1	163e2fd33e6a6b6601888897c906db372e9df5411d575b2b3ecd07d8a5de6a6c	FAILED	AGENT_RUN_FAILED	3	900dba0a87e99c8f592aaf15128300729a9fe055d91e7bbc589e8916825e905b
+attempt_id	fencing_token	status
+attempt-91e14257-f975-452f-a9a6-67913b47fb5c	1	WAITING_APPROVAL
+attempt-59264e20-f014-484a-9cf8-59df931b02a8	2	WAITING_APPROVAL
+attempt-2706878d-f10a-4a17-8f3b-5fe9f5213417	3	FAILED
+approval_id	node_id	status	decided_by
+workflow-approval-19ceb10b-1fa9-4293-bd86-924361eb7b3a	review-one	APPROVED	user-42114b44-8690-47fc-9bd6-85ebfedfbf87
+workflow-approval-b56e39ea-d305-4a40-bae2-4dc2c9f0ab25	review-two	APPROVED	user-42114b44-8690-47fc-9bd6-85ebfedfbf87
+checkpoint_seq	checkpoint_type
+7	WORKFLOW_RUN_STARTED
+8	WORKFLOW_NODE_BEFORE
+9	WORKFLOW_NODE_AFTER
+10	WORKFLOW_NODE_BEFORE
+11	WORKFLOW_APPROVAL_WAITING
+19	WORKFLOW_RECOVERED
+20	WORKFLOW_APPROVAL_RESUMED
+21	WORKFLOW_NODE_BEFORE
+22	WORKFLOW_NODE_AFTER
+23	WORKFLOW_NODE_BEFORE
+24	WORKFLOW_APPROVAL_WAITING
+32	WORKFLOW_RECOVERED
+
+

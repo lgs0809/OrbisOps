@@ -1,0 +1,88 @@
+[
+  {
+    "name": "/orbisops-acceptance-backend-1",
+    "image": "sha256:3c631e124e76559d1c86b47ea1808be40c73fe2059734e2bc55494874ba576bb",
+    "status": "running",
+    "startedAt": "2026-09-08T17:42:36.505224086Z",
+    "health": "healthy",
+    "ports": {
+      "8099/tcp": [
+        {
+          "HostIp": "127.0.0.1",
+          "HostPort": "18089"
+        }
+      ],
+      "8181/tcp": [
+        {
+          "HostIp": "127.0.0.1",
+          "HostPort": "18861"
+        }
+      ]
+    },
+    "mounts": [
+      {
+        "type": "volume",
+        "name": "orbisops-acceptance_app-data",
+        "destination": "/opt/orbisops/data"
+      },
+      {
+        "type": "volume",
+        "name": "orbisops-acceptance_repair-data",
+        "destination": "/var/lib/orbisops/repair"
+      }
+    ]
+  },
+  {
+    "name": "/orbisops-acceptance-mcp-acceptance-1",
+    "image": "sha256:2f71ddd6daed7f9023aa0036c5ca4f108872af8e482b4c3ab0cb11b69d26a795",
+    "status": "running",
+    "startedAt": "2026-09-08T17:42:37.679779711Z",
+    "health": "healthy",
+    "ports": {},
+    "mounts": [
+      {
+        "type": "volume",
+        "name": "orbisops-acceptance_mcp-acceptance-data",
+        "destination": "/state"
+      }
+    ]
+  },
+  {
+    "name": "/orbisops-acceptance-mysql-1",
+    "image": "sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb",
+    "status": "running",
+    "startedAt": "2026-09-08T13:41:10.988205297Z",
+    "health": "healthy",
+    "ports": {
+      "3306/tcp": [
+        {
+          "HostIp": "127.0.0.1",
+          "HostPort": "13362"
+        }
+      ]
+    },
+    "mounts": [
+      {
+        "type": "volume",
+        "name": "orbisops-acceptance_mysql-data",
+        "destination": "/var/lib/mysql"
+      }
+    ]
+  },
+  {
+    "name": "/orbisops-acceptance-web-1",
+    "image": "sha256:a9e0240778fa6756a4e57bd620e7b3659ff97928bc78070b7bd110796c3d1221",
+    "status": "running",
+    "startedAt": "2026-09-08T15:47:47.344704591Z",
+    "health": "healthy",
+    "ports": {
+      "3002/tcp": [
+        {
+          "HostIp": "127.0.0.1",
+          "HostPort": "3302"
+        }
+      ]
+    },
+    "mounts": []
+  }
+]

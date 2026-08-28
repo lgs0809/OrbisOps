@@ -1,0 +1,6 @@
+orbisops-acceptance-backend-1	Up 3 minutes (healthy)	127.0.0.1:18089->8099/tcp	orbisops/server:2.0.0-acceptance
+orbisops-acceptance-migrate-1	Exited (0) 15 minutes ago		orbisops/server:2.0.0-acceptance
+orbisops-acceptance-web-1	Up 21 minutes (healthy)	127.0.0.1:3302->3002/tcp	orbisops/web:2.0.0-acceptance
+orbisops-acceptance-redis-1	Up 57 minutes (healthy)	127.0.0.1:16362->6379/tcp	redis:7.4-alpine
+orbisops-acceptance-pgvector-1	Up 57 minutes (healthy)	127.0.0.1:15462->5432/tcp	pgvector/pgvector:pg16
+orbisops-acceptance-mysql-1	Up 57 minutes (healthy)	127.0.0.1:13362->3306/tcp	mysql:8.4

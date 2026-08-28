@@ -1,0 +1,1198 @@
+{
+  "recordedAt": "2026-10-03T14:51:01.394243+00:00",
+  "scope": "UX release candidate; functional/model acceptance paused",
+  "ui": {
+    "sourceDigest": "3e127b01751e990de099f1a491efe793005fe35e98c1eb15ae876082fa7f4965",
+    "testFiles": 79,
+    "tests": 270,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "command": "NODE_OPTIONS=--max-old-space-size=1536 npm run verify",
+    "testLogSha256": "86d1c18a84a126a7183125ff7eca8cd69a197d98d64c9b938f1277a61c6931ad",
+    "image": "sha256:1babd2bd797e8df90b0c050a4b853089e3a2134f0d6118daab0aa03caa3eb88f",
+    "deployedBytesMatch": true,
+    "backendRestarted": false
+  },
+  "desktopRoutes": [
+    {
+      "id": "home",
+      "path": "/home",
+      "activeNavigation": "首页",
+      "contentBounds": {
+        "bottom": 710,
+        "height": 654,
+        "top": 56
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/home",
+      "viewport": {
+        "height": 710,
+        "width": 1442
+      }
+    },
+    {
+      "id": "chat",
+      "path": "/chat",
+      "activeNavigation": "对话",
+      "contentBounds": {
+        "bottom": 710,
+        "height": 654,
+        "top": 56
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/chat",
+      "viewport": {
+        "height": 710,
+        "width": 1442
+      }
+    },
+    {
+      "id": "workbench",
+      "path": "/workbench",
+      "activeNavigation": "工作台",
+      "contentBounds": {
+        "bottom": 710,
+        "height": 654,
+        "top": 56
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/workbench",
+      "viewport": {
+        "height": 710,
+        "width": 1442
+      }
+    },
+    {
+      "id": "workbench-events",
+      "path": "/workbench/events",
+      "activeNavigation": "工作台",
+      "contentBounds": {
+        "bottom": 710,
+        "height": 654,
+        "top": 56
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/workbench/events",
+      "viewport": {
+        "height": 710,
+        "width": 1442
+      }
+    },
+    {
+      "id": "workflows",
+      "path": "/workflows",
+      "activeNavigation": "工作流",
+      "contentBounds": {
+        "bottom": 710,
+        "height": 654,
+        "top": 56
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/workflows",
+      "viewport": {
+        "height": 710,
+        "width": 1442
+      }
+    },
+    {
+      "id": "automations",
+      "path": "/automations",
+      "activeNavigation": "自动化",
+      "contentBounds": {
+        "bottom": 710,
+        "height": 654,
+        "top": 56
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/automations",
+      "viewport": {
+        "height": 710,
+        "width": 1442
+      }
+    },
+    {
+      "id": "projects",
+      "path": "/projects",
+      "activeNavigation": "项目",
+      "contentBounds": {
+        "bottom": 710,
+        "height": 654,
+        "top": 56
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/projects",
+      "viewport": {
+        "height": 710,
+        "width": 1442
+      }
+    },
+    {
+      "id": "changes",
+      "path": "/changes",
+      "activeNavigation": "变更",
+      "contentBounds": {
+        "bottom": 710,
+        "height": 654,
+        "top": 56
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/changes",
+      "viewport": {
+        "height": 710,
+        "width": 1442
+      }
+    },
+    {
+      "id": "settings",
+      "path": "/settings",
+      "activeNavigation": "设置",
+      "contentBounds": {
+        "bottom": 710,
+        "height": 654,
+        "top": 56
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/settings",
+      "viewport": {
+        "height": 710,
+        "width": 1442
+      }
+    },
+    {
+      "id": "workflow-editor",
+      "path": "/workflows/config",
+      "activeNavigation": "工作流",
+      "contentBounds": {
+        "bottom": 710,
+        "height": 654,
+        "top": 56
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/workflows/config",
+      "viewport": {
+        "height": 710,
+        "width": 1442
+      }
+    },
+    {
+      "id": "automation-schedules",
+      "path": "/automations/schedules",
+      "activeNavigation": "自动化",
+      "contentBounds": {
+        "bottom": 710,
+        "height": 654,
+        "top": 56
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/automations/schedules",
+      "viewport": {
+        "height": 710,
+        "width": 1442
+      }
+    },
+    {
+      "id": "alert-triggers",
+      "path": "/automations/alert-triggers",
+      "activeNavigation": "自动化",
+      "contentBounds": {
+        "bottom": 710,
+        "height": 654,
+        "top": 56
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/automations/alert-triggers",
+      "viewport": {
+        "height": 710,
+        "width": 1442
+      }
+    },
+    {
+      "id": "project-advanced",
+      "path": "/projects/advanced",
+      "activeNavigation": "项目",
+      "contentBounds": {
+        "bottom": 710,
+        "height": 654,
+        "top": 56
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/projects/advanced",
+      "viewport": {
+        "height": 710,
+        "width": 1442
+      }
+    },
+    {
+      "id": "settings-users",
+      "path": "/settings/users-access",
+      "activeNavigation": "设置",
+      "contentBounds": {
+        "bottom": 710,
+        "height": 654,
+        "top": 56
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/settings/users-access",
+      "viewport": {
+        "height": 710,
+        "width": 1442
+      }
+    },
+    {
+      "id": "channels",
+      "path": "/settings/channels",
+      "activeNavigation": "设置",
+      "contentBounds": {
+        "bottom": 710,
+        "height": 654,
+        "top": 56
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/settings/channels",
+      "viewport": {
+        "height": 710,
+        "width": 1442
+      }
+    },
+    {
+      "id": "models",
+      "path": "/settings/models",
+      "activeNavigation": "设置",
+      "contentBounds": {
+        "bottom": 710,
+        "height": 654,
+        "top": 56
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/settings/models",
+      "viewport": {
+        "height": 710,
+        "width": 1442
+      }
+    },
+    {
+      "id": "tools",
+      "path": "/settings/tools",
+      "activeNavigation": "设置",
+      "contentBounds": {
+        "bottom": 710,
+        "height": 654,
+        "top": 56
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/settings/tools",
+      "viewport": {
+        "height": 710,
+        "width": 1442
+      }
+    },
+    {
+      "id": "knowledge",
+      "path": "/settings/knowledge",
+      "activeNavigation": "设置",
+      "contentBounds": {
+        "bottom": 710,
+        "height": 654,
+        "top": 56
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/settings/knowledge",
+      "viewport": {
+        "height": 710,
+        "width": 1442
+      }
+    },
+    {
+      "id": "skills",
+      "path": "/settings/skills",
+      "activeNavigation": "设置",
+      "contentBounds": {
+        "bottom": 710,
+        "height": 654,
+        "top": 56
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/settings/skills",
+      "viewport": {
+        "height": 710,
+        "width": 1442
+      }
+    },
+    {
+      "id": "execution-targets",
+      "path": "/settings/execution-targets",
+      "activeNavigation": "设置",
+      "contentBounds": {
+        "bottom": 710,
+        "height": 654,
+        "top": 56
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/settings/execution-targets",
+      "viewport": {
+        "height": 710,
+        "width": 1442
+      }
+    },
+    {
+      "id": "governance",
+      "path": "/settings/governance",
+      "activeNavigation": "设置",
+      "contentBounds": {
+        "bottom": 710,
+        "height": 654,
+        "top": 56
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/settings/governance",
+      "viewport": {
+        "height": 710,
+        "width": 1442
+      }
+    },
+    {
+      "id": "model-catalog",
+      "path": "/settings/advanced/model-catalog",
+      "activeNavigation": "设置",
+      "contentBounds": {
+        "bottom": 710,
+        "height": 654,
+        "top": 56
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/settings/models",
+      "viewport": {
+        "height": 710,
+        "width": 1442
+      },
+      "expectedRedirect": "/settings/models"
+    },
+    {
+      "id": "memory",
+      "path": "/settings/advanced/memory",
+      "activeNavigation": "设置",
+      "contentBounds": {
+        "bottom": 710,
+        "height": 654,
+        "top": 56
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/settings/advanced/memory",
+      "viewport": {
+        "height": 710,
+        "width": 1442
+      }
+    },
+    {
+      "id": "skill-evolver",
+      "path": "/settings/advanced/skill-evolver",
+      "activeNavigation": "设置",
+      "contentBounds": {
+        "bottom": 710,
+        "height": 654,
+        "top": 56
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/settings/advanced/skill-evolver",
+      "viewport": {
+        "height": 710,
+        "width": 1442
+      }
+    },
+    {
+      "id": "tool-routing",
+      "path": "/settings/advanced/tool-routing",
+      "activeNavigation": "设置",
+      "contentBounds": {
+        "bottom": 710,
+        "height": 654,
+        "top": 56
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/settings/advanced/tool-routing",
+      "viewport": {
+        "height": 710,
+        "width": 1442
+      }
+    }
+  ],
+  "mobileRoutes": [
+    {
+      "id": "home",
+      "path": "/home",
+      "activeNavigation": "首页",
+      "contentBounds": {
+        "bottom": 812,
+        "height": 760,
+        "top": 52
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/home",
+      "viewport": {
+        "height": 812,
+        "width": 375
+      }
+    },
+    {
+      "id": "chat",
+      "path": "/chat",
+      "activeNavigation": "对话",
+      "contentBounds": {
+        "bottom": 812,
+        "height": 760,
+        "top": 52
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/chat",
+      "viewport": {
+        "height": 812,
+        "width": 375
+      }
+    },
+    {
+      "id": "workbench",
+      "path": "/workbench",
+      "activeNavigation": "工作台",
+      "contentBounds": {
+        "bottom": 812,
+        "height": 760,
+        "top": 52
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/workbench",
+      "viewport": {
+        "height": 812,
+        "width": 375
+      }
+    },
+    {
+      "id": "workbench-events",
+      "path": "/workbench/events",
+      "activeNavigation": "工作台",
+      "contentBounds": {
+        "bottom": 812,
+        "height": 760,
+        "top": 52
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/workbench/events",
+      "viewport": {
+        "height": 812,
+        "width": 375
+      }
+    },
+    {
+      "id": "workflows",
+      "path": "/workflows",
+      "activeNavigation": "工作流",
+      "contentBounds": {
+        "bottom": 812,
+        "height": 760,
+        "top": 52
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/workflows",
+      "viewport": {
+        "height": 812,
+        "width": 375
+      }
+    },
+    {
+      "id": "automations",
+      "path": "/automations",
+      "activeNavigation": "自动化",
+      "contentBounds": {
+        "bottom": 812,
+        "height": 760,
+        "top": 52
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/automations",
+      "viewport": {
+        "height": 812,
+        "width": 375
+      }
+    },
+    {
+      "id": "projects",
+      "path": "/projects",
+      "activeNavigation": "项目",
+      "contentBounds": {
+        "bottom": 812,
+        "height": 760,
+        "top": 52
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/projects",
+      "viewport": {
+        "height": 812,
+        "width": 375
+      }
+    },
+    {
+      "id": "changes",
+      "path": "/changes",
+      "activeNavigation": "变更",
+      "contentBounds": {
+        "bottom": 812,
+        "height": 760,
+        "top": 52
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/changes",
+      "viewport": {
+        "height": 812,
+        "width": 375
+      }
+    },
+    {
+      "id": "settings",
+      "path": "/settings",
+      "activeNavigation": "设置",
+      "contentBounds": {
+        "bottom": 812,
+        "height": 760,
+        "top": 52
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/settings",
+      "viewport": {
+        "height": 812,
+        "width": 375
+      }
+    },
+    {
+      "id": "workflow-editor",
+      "path": "/workflows/config",
+      "activeNavigation": "工作流",
+      "contentBounds": {
+        "bottom": 812,
+        "height": 760,
+        "top": 52
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/workflows/config",
+      "viewport": {
+        "height": 812,
+        "width": 375
+      }
+    },
+    {
+      "id": "automation-schedules",
+      "path": "/automations/schedules",
+      "activeNavigation": "自动化",
+      "contentBounds": {
+        "bottom": 812,
+        "height": 760,
+        "top": 52
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/automations/schedules",
+      "viewport": {
+        "height": 812,
+        "width": 375
+      }
+    },
+    {
+      "id": "alert-triggers",
+      "path": "/automations/alert-triggers",
+      "activeNavigation": "自动化",
+      "contentBounds": {
+        "bottom": 812,
+        "height": 760,
+        "top": 52
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/automations/alert-triggers",
+      "viewport": {
+        "height": 812,
+        "width": 375
+      }
+    },
+    {
+      "id": "project-advanced",
+      "path": "/projects/advanced",
+      "activeNavigation": "项目",
+      "contentBounds": {
+        "bottom": 812,
+        "height": 760,
+        "top": 52
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/projects/advanced",
+      "viewport": {
+        "height": 812,
+        "width": 375
+      }
+    },
+    {
+      "id": "settings-users",
+      "path": "/settings/users-access",
+      "activeNavigation": "设置",
+      "contentBounds": {
+        "bottom": 812,
+        "height": 760,
+        "top": 52
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/settings/users-access",
+      "viewport": {
+        "height": 812,
+        "width": 375
+      }
+    },
+    {
+      "id": "channels",
+      "path": "/settings/channels",
+      "activeNavigation": "设置",
+      "contentBounds": {
+        "bottom": 812,
+        "height": 760,
+        "top": 52
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/settings/channels",
+      "viewport": {
+        "height": 812,
+        "width": 375
+      }
+    },
+    {
+      "id": "models",
+      "path": "/settings/models",
+      "activeNavigation": "设置",
+      "contentBounds": {
+        "bottom": 812,
+        "height": 760,
+        "top": 52
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/settings/models",
+      "viewport": {
+        "height": 812,
+        "width": 375
+      }
+    },
+    {
+      "id": "tools",
+      "path": "/settings/tools",
+      "activeNavigation": "设置",
+      "contentBounds": {
+        "bottom": 812,
+        "height": 760,
+        "top": 52
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/settings/tools",
+      "viewport": {
+        "height": 812,
+        "width": 375
+      }
+    },
+    {
+      "id": "knowledge",
+      "path": "/settings/knowledge",
+      "activeNavigation": "设置",
+      "contentBounds": {
+        "bottom": 812,
+        "height": 760,
+        "top": 52
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/settings/knowledge",
+      "viewport": {
+        "height": 812,
+        "width": 375
+      }
+    },
+    {
+      "id": "skills",
+      "path": "/settings/skills",
+      "activeNavigation": "设置",
+      "contentBounds": {
+        "bottom": 812,
+        "height": 760,
+        "top": 52
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/settings/skills",
+      "viewport": {
+        "height": 812,
+        "width": 375
+      }
+    },
+    {
+      "id": "execution-targets",
+      "path": "/settings/execution-targets",
+      "activeNavigation": "设置",
+      "contentBounds": {
+        "bottom": 812,
+        "height": 760,
+        "top": 52
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/settings/execution-targets",
+      "viewport": {
+        "height": 812,
+        "width": 375
+      }
+    },
+    {
+      "id": "governance",
+      "path": "/settings/governance",
+      "activeNavigation": "设置",
+      "contentBounds": {
+        "bottom": 812,
+        "height": 760,
+        "top": 52
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/settings/governance",
+      "viewport": {
+        "height": 812,
+        "width": 375
+      }
+    },
+    {
+      "id": "model-catalog",
+      "path": "/settings/advanced/model-catalog",
+      "activeNavigation": "设置",
+      "contentBounds": {
+        "bottom": 812,
+        "height": 760,
+        "top": 52
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/settings/models",
+      "viewport": {
+        "height": 812,
+        "width": 375
+      },
+      "expectedRedirect": "/settings/models"
+    },
+    {
+      "id": "memory",
+      "path": "/settings/advanced/memory",
+      "activeNavigation": "设置",
+      "contentBounds": {
+        "bottom": 812,
+        "height": 760,
+        "top": 52
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/settings/advanced/memory",
+      "viewport": {
+        "height": 812,
+        "width": 375
+      }
+    },
+    {
+      "id": "skill-evolver",
+      "path": "/settings/advanced/skill-evolver",
+      "activeNavigation": "设置",
+      "contentBounds": {
+        "bottom": 812,
+        "height": 760,
+        "top": 52
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/settings/advanced/skill-evolver",
+      "viewport": {
+        "height": 812,
+        "width": 375
+      }
+    },
+    {
+      "id": "tool-routing",
+      "path": "/settings/advanced/tool-routing",
+      "activeNavigation": "设置",
+      "contentBounds": {
+        "bottom": 812,
+        "height": 760,
+        "top": 52
+      },
+      "loadingVisible": false,
+      "mainCount": 1,
+      "pageOverflow": false,
+      "url": "/settings/advanced/tool-routing",
+      "viewport": {
+        "height": 812,
+        "width": 375
+      }
+    }
+  ],
+  "canvas": {
+    "desktop": {
+      "canvas": {
+        "bottom": 696,
+        "height": 269,
+        "left": 230,
+        "right": 1068,
+        "top": 427,
+        "width": 838
+      },
+      "controls": 681,
+      "executedAt": "2026-10-03T14:44:46.509Z",
+      "miniMapVisible": false,
+      "nodes": [
+        {
+          "bottom": 612.2361450195312,
+          "insideCanvas": true,
+          "left": 268,
+          "name": "start",
+          "right": 485.0198059082031,
+          "top": 493.53265380859375,
+          "unoccludedCenter": true
+        },
+        {
+          "bottom": 629.4673461914062,
+          "insideCanvas": true,
+          "left": 555.1859130859375,
+          "name": "agent",
+          "right": 775.36181640625,
+          "top": 493.53265380859375,
+          "unoccludedCenter": true
+        },
+        {
+          "bottom": 612.2361450195312,
+          "insideCanvas": true,
+          "left": 861.517578125,
+          "name": "end",
+          "right": 1030,
+          "top": 493.53265380859375,
+          "unoccludedCenter": true
+        }
+      ],
+      "pageOverflow": false,
+      "viewport": {
+        "height": 710,
+        "width": 1442
+      }
+    },
+    "mobile": {
+      "canvas": {
+        "bottom": 461,
+        "height": 415,
+        "left": 14,
+        "right": 361,
+        "top": 46,
+        "width": 347
+      },
+      "controls": 446,
+      "executedAt": "2026-10-03T14:44:47.074Z",
+      "miniMapVisible": false,
+      "nodes": [
+        {
+          "bottom": 274.6067810058594,
+          "insideCanvas": true,
+          "left": 28.999998092651367,
+          "name": "start",
+          "right": 119.28251457214355,
+          "top": 225.2248687744141,
+          "unoccludedCenter": true
+        },
+        {
+          "bottom": 281.7751159667969,
+          "insideCanvas": true,
+          "left": 148.47235107421875,
+          "name": "agent",
+          "right": 240.0678253173828,
+          "top": 225.2248687744141,
+          "unoccludedCenter": true
+        },
+        {
+          "bottom": 274.6067810058594,
+          "insideCanvas": true,
+          "left": 275.9095458984375,
+          "name": "end",
+          "right": 346,
+          "top": 225.2248687744141,
+          "unoccludedCenter": true
+        }
+      ],
+      "pageOverflow": false,
+      "viewport": {
+        "height": 812,
+        "width": 375
+      }
+    }
+  },
+  "manualInteractionEvidence": {
+    "observedUnderWebImage": "sha256:726980f18ee79dcbfb933d52e34d6b68af5e324563e1e036d47165b13fd4d6fc",
+    "record": {
+      "navEscape": true,
+      "navRouteClosed": true,
+      "url": "http://127.0.0.1:3302/settings",
+      "at": "2026-10-03T14:15:28.926Z",
+      "categoryReturnUrl": "http://127.0.0.1:3302/settings?category=intelligence",
+      "categoryPreserved": "true",
+      "workflowLocalNameEditable": true,
+      "workflowNameRestored": "订单服务发布准备 · 十五分钟验收合同",
+      "workflowEditorUrl": "http://127.0.0.1:3302/workflows/config?projectId=ops-acceptance-a&agentId=workflow-muscjv3f",
+      "workflowUseUrl": "http://127.0.0.1:3302/chat?projectId=ops-acceptance-a&sessionId=chat-session-5484e4fe-2564-4fa2-997c-e24d5c34214e",
+      "workflowUseStableUrl": "http://127.0.0.1:3302/chat?projectId=ops-acceptance-a&sessionId=chat-session-5484e4fe-2564-4fa2-997c-e24d5c34214e",
+      "workflowBoundVisible": false,
+      "naturalInputSendEnabled": true,
+      "packageIdVisible": true,
+      "packageStatusVisible": true
+    },
+    "limit": "Final route and canvas checks rerun under final image; other interaction files preserved under their actual earlier image. No messages sent."
+  },
+  "workflowNative": {
+    "observedAt": "2026-10-03T14:23:11.288091+00:00",
+    "sessions": [
+      {
+        "hash": "912e765b53234f792a7d35126753a07fa98b08cb88886a93a2aedb59b3857911",
+        "title": "订单服务发布准备 · 十五分钟验收合同 · v2 手动测试",
+        "agentId": "workflow-muscjv3f",
+        "version": 2,
+        "messages": 0,
+        "projectId": "ops-acceptance-a",
+        "sessionId": "chat-session-5484e4fe-2564-4fa2-997c-e24d5c34214e",
+        "bindingMode": "PINNED_VERSION"
+      }
+    ],
+    "sql": [
+      "SELECT JSON_OBJECT('sessionId',s.session_id,'projectId',s.project_id,'agentId',s.agent_id,'version',s.agent_version,'bindingMode',s.agent_binding_mode,'hash',s.agent_definition_hash,'title',s.title,'messages',(SELECT COUNT(*) FROM ai_ops_chat_message m WHERE m.session_id=s.session_id)) FROM ai_ops_chat_session s WHERE s.session_id='chat-session-5484e4fe-2564-4fa2-997c-e24d5c34214e';"
+    ],
+    "scope": "Normal UI created one empty bound manual-test chat; no message sent, no model or tool execution"
+  },
+  "packageNative": {
+    "packageId": "cp-95c2088c-3383-447d-a11d-4176b2417f07",
+    "version": 1,
+    "status": "LANDING_FAILED",
+    "approvedVersion": 1,
+    "packageHash": "4c9a4700020dbea1fe9458710897f0836db6f87eff2d623cc57ecc3c3b6dcf74",
+    "approvedPackageHash": "4c9a4700020dbea1fe9458710897f0836db6f87eff2d623cc57ecc3c3b6dcf74",
+    "landingRunId": "lr-b82551a7-0038-4a81-94b0-ad1d2015c6d6"
+  },
+  "approvalEvents": [
+    {
+      "event_type": "PACKAGE_APPROVED",
+      "actor": "user-42114b44-8690-47fc-9bd6-85ebfedfbf87",
+      "create_time": "2026-10-03T12:43:31"
+    },
+    {
+      "event_type": "PACKAGE_APPROVAL_RECORDED",
+      "actor": "ops_acceptance_reviewer",
+      "create_time": "2026-10-03T12:41:10"
+    }
+  ],
+  "backend": {
+    "deployment": 17,
+    "jarSha256": "f1ee57819e256b7053862170064eb78f11ff2aa017115a9d9083ccc7a0118fc5",
+    "startedAt": "2026-10-03T11:09:46.28218155Z",
+    "currentJavaCandidateFocused": {
+      "status": "PASS",
+      "startedAt": "2026-10-03T14:21:37.718925+00:00",
+      "completedAt": "2026-10-03T14:22:02.751349+00:00",
+      "exitCode": 0,
+      "scope": "Compile current reactor dependencies and run only Landing orchestration unit contracts; no database/model/SLO/traffic/deployment",
+      "command": [
+        "mvn",
+        "-pl",
+        "orbisops-app",
+        "-am",
+        "test",
+        "-Dtest=ChangePackageLandingProcessManagerTest",
+        "-Dsurefire.failIfNoSpecifiedTests=false",
+        "-Dsurefire.excludeJUnit5Engines=archunit",
+        "-DargLine=-Xmx512m -XX:ActiveProcessorCount=2"
+      ],
+      "sourceStable": true,
+      "suite": {
+        "name": "cn.lgs.orbisops.application.changepackage.ChangePackageLandingProcessManagerTest",
+        "tests": "27",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "0.727"
+      },
+      "logSha256": "8c5823311b39d9dffdadc6d6cb4aaeb315a2d05d21b9fa1b162207e6db60e189",
+      "reportsSha256": "737ee7c628e1a344343c2c4e936d97bc51a4d5ee94a5b3781cec4d9f7eee5b67"
+    },
+    "candidateSourceHash": "ff20f173cda8a4c41342b02e7c8ff65702db422ad8e384aebe3e9399f7d15385",
+    "completeCandidateRegression": "FAIL retained: full19 PostgreSQL authorization-10000 query deadline; native ArchUnit not executed; not deployed"
+  },
+  "assetHashes": {
+    "desktop-settings.png": "c32406ed3815a133f33820d9b106e503d593afc8f51483f83fc3a3fd3da9be35",
+    "desktop-workflow-use.png": "c24aabe53bb139399150f29c57bee9c7e070d8699cdb1f63b66e77d680c8bff0",
+    "desktop-workflow-editor.png": "b5e7a04be54ea9657448bc6bdda5b9bf87367b0bfb3264944f7561e6af9e53ae",
+    "mobile-workflow-editor.png": "3c1bc12e8c74e6565d10dd3554b143514150b0e41b41fe8e2c53cef260b2d35a",
+    "mobile-change-detail.png": "df315f432decd90cf4d83d35703ddd9018a2d3a598fbc319d300560258843b04",
+    "mobile-settings.png": "d1ecba47320fa030013394615d66b4de70cc7f838d2a161916a67497f1a737af",
+    "mobile-navigation.png": "f35ddef90d7fdde61926c73bebe7a6bbf6b1e3a1df25c082e5e2f9554a4ac647",
+    "desktop-home.png": "aa1393ea5956234994d665de53120a629c0090f398dbd9f7819436d0f27d44c2",
+    "desktop-changes.png": "df1aa9d9414c4141f7fe55209a27e1b060350870a9300a40a8e7a07bce89c8b2",
+    "mobile-home.png": "1a243699537a74d2eaec064d96cea13181a21b71c6820eb9a012614b4d779837"
+  },
+  "retainedFailures": [
+    "verify1 old module mock missed exported workspace component; corrected partial mock, no weakened business assertion",
+    "verify3 wrong working directory, 0 tests",
+    "verify4 two unused imports, 0 tests",
+    "Initial skill-evolver mobile query not loaded; preserved original and later stable read",
+    "Desktop existing editor screenshot first used wrong query parameter; no save or run, corrected using observed agentId/projectId URL",
+    "Pre-fix desktop canvas escaped viewport; height/spinner fixed then revalidated",
+    "Pre-fix mobile FitView default minZoom cropped nodes; minZoom/palette/minimap fixed then revalidated",
+    "Backend full18 two assertion failures, full19 one Pg error, focused2 one Pg error; unchanged by UI pass",
+    "Canvas geometry initially inside bounds but palette/minimap occluded nodes; toolbar moved outside graph and final DOM hit-testing now confirms all three unoccluded centers",
+    "Candidate @container minimap hiding rule omitted by existing style compiler; preserved candidate DOM failure, replaced with viewport width/height rule and actual style/readback tested",
+    "Final route harness hidden wait reported deadline/no_matches on home; actual page data loaded; retained warning without counting page failure",
+    "Final chat initial asynchronous binding load retained; actual empty state waited then stable desktop/mobile reread; empty chat not functional execution PASS"
+  ],
+  "assetProvenance": {
+    "desktop-home.png": {
+      "evidence": "ops-finish-20261003-ux-release-desktop-2-home.png",
+      "webImage": "sha256:1babd2bd797e8df90b0c050a4b853089e3a2134f0d6118daab0aa03caa3eb88f"
+    },
+    "desktop-workflow-editor.png": {
+      "evidence": "ops-finish-20261003-ux-desktop-canvas-release-1.png",
+      "webImage": "sha256:1babd2bd797e8df90b0c050a4b853089e3a2134f0d6118daab0aa03caa3eb88f"
+    },
+    "desktop-workflow-use.png": {
+      "evidence": "ops-finish-20261003-ux-release-final-workflow-use.png",
+      "webImage": "sha256:1babd2bd797e8df90b0c050a4b853089e3a2134f0d6118daab0aa03caa3eb88f"
+    },
+    "desktop-settings.png": {
+      "evidence": "ops-finish-20261003-ux-release-final-settings.png",
+      "webImage": "sha256:1babd2bd797e8df90b0c050a4b853089e3a2134f0d6118daab0aa03caa3eb88f"
+    },
+    "desktop-changes.png": {
+      "evidence": "ops-finish-20261003-ux-release-final-change-detail.png",
+      "webImage": "sha256:1babd2bd797e8df90b0c050a4b853089e3a2134f0d6118daab0aa03caa3eb88f"
+    },
+    "mobile-home.png": {
+      "evidence": "ops-finish-20261003-ux-release-mobile-2-home.png",
+      "webImage": "sha256:1babd2bd797e8df90b0c050a4b853089e3a2134f0d6118daab0aa03caa3eb88f"
+    },
+    "mobile-workflow-editor.png": {
+      "evidence": "ops-finish-20261003-ux-mobile-canvas-release-1.png",
+      "webImage": "sha256:1babd2bd797e8df90b0c050a4b853089e3a2134f0d6118daab0aa03caa3eb88f"
+    },
+    "mobile-navigation.png": {
+      "webImage": "sha256:726980f18ee79dcbfb933d52e34d6b68af5e324563e1e036d47165b13fd4d6fc",
+      "note": "Actual earlier unchanged nav/settings/detail interaction screenshot retained, not latest-image rerun"
+    },
+    "mobile-settings.png": {
+      "webImage": "sha256:726980f18ee79dcbfb933d52e34d6b68af5e324563e1e036d47165b13fd4d6fc",
+      "note": "Actual earlier unchanged nav/settings/detail interaction screenshot retained, not latest-image rerun"
+    },
+    "mobile-change-detail.png": {
+      "webImage": "sha256:726980f18ee79dcbfb933d52e34d6b68af5e324563e1e036d47165b13fd4d6fc",
+      "note": "Actual earlier unchanged nav/settings/detail interaction screenshot retained, not latest-image rerun"
+    }
+  },
+  "routeHarnessWarnings": [
+    {
+      "at": "2026-10-03T14:45:51.430Z",
+      "route": "/home",
+      "type": "HARNESS_WAIT_FAILURE",
+      "message": "selector hidden wait reported deadline/no_matches; readback actual data loaded; no page failure inferred"
+    }
+  ],
+  "limitations": [
+    "Admin all registered route layout covered; does not claim complete live behavior of every role/action",
+    "Only empty pinned manual-test conversation created; no model or tool execution in UX checks",
+    "Existing failures and paused business campaigns remain; frontend or unit PASS cannot replace native task/model acceptance",
+    "Mobile graph dragging/new-node creation not verified; existing desktop workflow creation/use execution remains prior separate evidence"
+  ]
+}

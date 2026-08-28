@@ -1,0 +1,703 @@
+{
+  "fixture": "OPS-03-protocol-real-peer-model-disabled",
+  "runTag": "3b35c44e2d",
+  "results": [
+    {
+      "case": "project-permissions",
+      "result": "PASS",
+      "checks": {
+        "viewerCannotApprove": {
+          "httpStatus": 403,
+          "code": "0005"
+        },
+        "otherProjectCannotReadCalls": {
+          "httpStatus": 403,
+          "code": "0005"
+        }
+      }
+    },
+    {
+      "case": "structured",
+      "result": "PASS",
+      "run": {
+        "hash": "ea48b9b620aac248acf66710e627169f87ac38ab7692648ab9fb629524a16e4b",
+        "epoch": 1,
+        "error": "",
+        "runId": "chat-chat-session-fc37b901-97f4-4daa-b5a7-09f6d1151587-f8c4d7be",
+        "status": "SUCCEEDED",
+        "version": 1
+      },
+      "actualRemoteCalls": 1,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "a01bd0a3-2",
+          "attempt": 1,
+          "logicalId": "2e158dbd-4e60-4b47-a463-6f766b5a0f03"
+        }
+      ],
+      "callStatuses": [
+        "SUCCEEDED"
+      ],
+      "failures": [],
+      "resultIds": [
+        "tool-result-45a50fc4-9849-4f93-be25-df222e77a99d"
+      ],
+      "testIds": [
+        "ops03-3b35c44e2d-structured-0"
+      ]
+    },
+    {
+      "case": "multi",
+      "result": "PASS",
+      "run": {
+        "hash": "b085faa29768527b06f963e4a4ab3f055095932b655ecb8aac15f1c99c89a2ca",
+        "epoch": 1,
+        "error": "",
+        "runId": "chat-chat-session-8217f0ad-250e-47f2-bf9e-b5dcade23e56-3832ec0f",
+        "status": "SUCCEEDED",
+        "version": 1
+      },
+      "actualRemoteCalls": 1,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "a01bd0a3-4",
+          "attempt": 1,
+          "logicalId": "4f4b50f3-f349-48d9-a590-04098cbb8ef8"
+        }
+      ],
+      "callStatuses": [
+        "SUCCEEDED"
+      ],
+      "failures": [],
+      "resultIds": [
+        "tool-result-10295fa3-af96-4eda-8d68-82836df0f765"
+      ],
+      "testIds": [
+        "ops03-3b35c44e2d-multi-0"
+      ]
+    },
+    {
+      "case": "reconnect",
+      "result": "PASS",
+      "run": {
+        "hash": "0e7391b438bb6357b3d50f53fe47e8a2f92d6d449f4683fa6c9850577f0f0abd",
+        "epoch": 1,
+        "error": "",
+        "runId": "chat-chat-session-5427f0d0-bbb1-4d42-a0db-3aacbe233545-39d7ef39",
+        "status": "SUCCEEDED",
+        "version": 1
+      },
+      "actualRemoteCalls": 2,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "a01bd0a3-6",
+          "attempt": 1,
+          "logicalId": "29406621-3aa8-4c2e-994b-97af1409aa37"
+        },
+        {
+          "limit": 12,
+          "rpcId": "7c8bb063-2",
+          "attempt": 2,
+          "logicalId": "29406621-3aa8-4c2e-994b-97af1409aa37"
+        }
+      ],
+      "callStatuses": [
+        "SUCCEEDED",
+        "FAILED"
+      ],
+      "failures": [
+        {
+          "rawEnvelope": "",
+          "dispatched": true,
+          "errorClass": "TRANSPORT_ERROR",
+          "message": "MCP_TRANSPORT_ERROR:REMOTE_CONNECTION_FAILURE"
+        }
+      ],
+      "resultIds": [
+        "tool-result-b12c962f-f0dd-40df-a375-2dcfee7f54d4"
+      ],
+      "testIds": [
+        "ops03-3b35c44e2d-reconnect-0"
+      ]
+    },
+    {
+      "case": "empty",
+      "result": "PASS",
+      "run": {
+        "hash": "056d087d59349de46082f328d910d5ffe2e5ba1ee6176071648379be4693b971",
+        "epoch": 1,
+        "error": "MCP_CONTRACT_INVALID",
+        "runId": "chat-chat-session-8960e6e1-5655-4cb9-81b3-72ab74a77685-78b289fc",
+        "status": "FAILED",
+        "version": 1
+      },
+      "actualRemoteCalls": 2,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "7c8bb063-4",
+          "attempt": 1,
+          "logicalId": "5bd913be-62c4-4da4-a7ce-07a13d69f8d8"
+        },
+        {
+          "limit": 12,
+          "rpcId": "7c8bb063-6",
+          "attempt": 2,
+          "logicalId": "5bd913be-62c4-4da4-a7ce-07a13d69f8d8"
+        }
+      ],
+      "callStatuses": [
+        "FAILED",
+        "FAILED"
+      ],
+      "failures": [
+        {
+          "rawEnvelope": "{\"content\":[],\"isError\":false}",
+          "dispatched": true,
+          "errorClass": "CONTRACT_INVALID",
+          "message": "MCP_CONTRACT_INVALID:EMPTY_CONTENT"
+        },
+        {
+          "rawEnvelope": "{\"content\":[],\"isError\":false}",
+          "dispatched": true,
+          "errorClass": "CONTRACT_INVALID",
+          "message": "MCP_CONTRACT_INVALID:EMPTY_CONTENT"
+        }
+      ],
+      "resultIds": [],
+      "testIds": [
+        "ops03-3b35c44e2d-empty-0"
+      ]
+    },
+    {
+      "case": "shared-retry",
+      "result": "PASS",
+      "run": {
+        "hash": "f2937ced83e3e1a4c37dfd4da8ecbf55f1e7e6410d55c8f3be6db604c24a623e",
+        "epoch": 1,
+        "error": "MCP_TRANSPORT_ERROR",
+        "runId": "chat-chat-session-b32f7b40-a05f-41aa-8b28-d88d5680654e-0b5ecf52",
+        "status": "FAILED",
+        "version": 1
+      },
+      "actualRemoteCalls": 2,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "7c8bb063-8",
+          "attempt": 1,
+          "logicalId": "0377e18d-e4d5-4ab0-b878-83bdcc6cef8b"
+        },
+        {
+          "limit": 12,
+          "rpcId": "7c8bb063-10",
+          "attempt": 2,
+          "logicalId": "0377e18d-e4d5-4ab0-b878-83bdcc6cef8b"
+        }
+      ],
+      "callStatuses": [
+        "FAILED",
+        "FAILED"
+      ],
+      "failures": [
+        {
+          "rawEnvelope": "",
+          "dispatched": true,
+          "errorClass": "TRANSPORT_ERROR",
+          "message": "MCP_TRANSPORT_ERROR:REMOTE_CONNECTION_FAILURE"
+        },
+        {
+          "rawEnvelope": "{\"content\":[],\"isError\":false,\"structuredContent\":{\"wrong\":true}}",
+          "dispatched": true,
+          "errorClass": "CONTRACT_INVALID",
+          "message": "MCP_CONTRACT_INVALID:OUTPUT_SCHEMA_MISMATCH"
+        }
+      ],
+      "resultIds": [],
+      "testIds": [
+        "ops03-3b35c44e2d-shared-retry-0"
+      ]
+    },
+    {
+      "case": "budget-twelve",
+      "result": "PASS",
+      "run": {
+        "hash": "cd132a3bb5a17a57f50510ce0de1f9e9b2658dbf9f9989062440192e8251610b",
+        "epoch": 1,
+        "error": "MCP_AUTHORITY_DENIED",
+        "runId": "chat-chat-session-b5822fa3-bbb6-4e3f-8e0b-f588dbd3ece3-0cb1a8cc",
+        "status": "FAILED",
+        "version": 1
+      },
+      "actualRemoteCalls": 12,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "907534a4-2",
+          "attempt": 1,
+          "logicalId": "e8fc41a4-f692-45c6-b8c6-502c036f95b3"
+        },
+        {
+          "limit": 12,
+          "rpcId": "907534a4-4",
+          "attempt": 1,
+          "logicalId": "7aa9f56b-7e0b-4178-98db-fb50e5c21900"
+        },
+        {
+          "limit": 12,
+          "rpcId": "907534a4-6",
+          "attempt": 1,
+          "logicalId": "6ae4c30b-90b4-40a5-8e5e-0dcd46421e48"
+        },
+        {
+          "limit": 12,
+          "rpcId": "907534a4-8",
+          "attempt": 1,
+          "logicalId": "db8bfe82-8b1c-42c9-8a1b-3db02de6ae49"
+        },
+        {
+          "limit": 12,
+          "rpcId": "907534a4-10",
+          "attempt": 1,
+          "logicalId": "6b2509b6-08f9-4028-b6ab-19aa5443be87"
+        },
+        {
+          "limit": 12,
+          "rpcId": "907534a4-12",
+          "attempt": 1,
+          "logicalId": "77ee0c17-ce62-4f26-b99e-b012f2b5d103"
+        },
+        {
+          "limit": 12,
+          "rpcId": "907534a4-14",
+          "attempt": 1,
+          "logicalId": "07489b9b-28be-42ca-87bc-ec5ab7fc531b"
+        },
+        {
+          "limit": 12,
+          "rpcId": "907534a4-16",
+          "attempt": 1,
+          "logicalId": "e026ad34-6e6d-4424-8137-a0a89e05332c"
+        },
+        {
+          "limit": 12,
+          "rpcId": "907534a4-18",
+          "attempt": 1,
+          "logicalId": "a34ad224-67c7-43f2-8e0b-f8f6369c5422"
+        },
+        {
+          "limit": 12,
+          "rpcId": "907534a4-20",
+          "attempt": 1,
+          "logicalId": "07ee1033-9438-4d47-aa47-910f7c573413"
+        },
+        {
+          "limit": 12,
+          "rpcId": "907534a4-22",
+          "attempt": 1,
+          "logicalId": "23c28ed3-2eb8-40c4-a779-43d8e2693196"
+        },
+        {
+          "limit": 12,
+          "rpcId": "907534a4-24",
+          "attempt": 1,
+          "logicalId": "0d0eb323-79f0-4d81-bc35-df80ed3beb25"
+        }
+      ],
+      "callStatuses": [
+        "FAILED",
+        "FAILED",
+        "SUCCEEDED",
+        "SUCCEEDED",
+        "SUCCEEDED",
+        "SUCCEEDED",
+        "SUCCEEDED",
+        "SUCCEEDED",
+        "SUCCEEDED",
+        "SUCCEEDED",
+        "SUCCEEDED",
+        "SUCCEEDED",
+        "SUCCEEDED"
+      ],
+      "failures": [
+        {
+          "rawEnvelope": "",
+          "dispatched": false,
+          "errorClass": "AUTHORITY_DENIED",
+          "message": "MCP_AUTHORITY_DENIED:WORKFLOW_TOOL_DISPATCH_DENIED:WORKFLOW_REAL_TOOL_CALL_BUDGET_EXHAUSTED:12"
+        },
+        {
+          "rawEnvelope": "",
+          "dispatched": true,
+          "errorClass": "TRANSPORT_ERROR",
+          "message": "MCP_TRANSPORT_ERROR:REMOTE_CONNECTION_FAILURE"
+        }
+      ],
+      "resultIds": [
+        "tool-result-00c9e23d-eda5-4cf5-b34c-b8a53ce0f6f5",
+        "tool-result-9a0b7efe-6985-4dff-93d7-e4f9c6275e94",
+        "tool-result-e874f978-f3be-47fc-baf8-aecf7b76925d",
+        "tool-result-6ea040b2-01d9-4271-b4e1-1441b377628a",
+        "tool-result-9eee5a06-966e-4782-be45-9f8e68695752",
+        "tool-result-63b9daf8-4b0a-4caf-becd-9f55f98b834f",
+        "tool-result-bcceb450-b189-46d6-9ed8-a4debb372536",
+        "tool-result-845a584a-0b6f-493b-820b-a50deac7d192",
+        "tool-result-9f78da13-4d81-4dd0-abc4-90f3b050af64",
+        "tool-result-ac801a7c-4b0e-44a3-bb51-f32c1435dc5a",
+        "tool-result-422362ad-bd33-4591-b821-a7f38734a80e"
+      ],
+      "testIds": [
+        "ops03-3b35c44e2d-budget-twelve-0",
+        "ops03-3b35c44e2d-budget-twelve-1",
+        "ops03-3b35c44e2d-budget-twelve-2",
+        "ops03-3b35c44e2d-budget-twelve-3",
+        "ops03-3b35c44e2d-budget-twelve-4",
+        "ops03-3b35c44e2d-budget-twelve-5",
+        "ops03-3b35c44e2d-budget-twelve-6",
+        "ops03-3b35c44e2d-budget-twelve-7",
+        "ops03-3b35c44e2d-budget-twelve-8",
+        "ops03-3b35c44e2d-budget-twelve-9",
+        "ops03-3b35c44e2d-budget-twelve-10",
+        "ops03-3b35c44e2d-budget-twelve-11"
+      ]
+    },
+    {
+      "case": "business-error-0",
+      "result": "PASS",
+      "run": {
+        "hash": "bdfb436ecd3031d39c2f0e0a530f4710559fb7ebad6bb5f9465b8214d91cf81e",
+        "epoch": 1,
+        "error": "MCP_TOOL_ERROR",
+        "runId": "chat-chat-session-a9622f12-ec80-4bdb-abff-2744a6bff5c2-5400b9ab",
+        "status": "FAILED",
+        "version": 1
+      },
+      "actualRemoteCalls": 1,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "c59ec43f-4",
+          "attempt": 1,
+          "logicalId": "cb4db961-96a1-478a-8af1-588b404198f6"
+        }
+      ],
+      "callStatuses": [
+        "FAILED"
+      ],
+      "failures": [
+        {
+          "rawEnvelope": "{\"content\":[{\"type\":\"text\",\"text\":\"synthetic invalid parameter or no data\"}],\"isError\":true,\"structuredContent\":{\"reason\":\"NO_DATA\"},\"_meta\":{\"fixture\":true}}",
+          "dispatched": true,
+          "errorClass": "TOOL_ERROR",
+          "message": "MCP_TOOL_ERROR:synthetic invalid parameter or no data"
+        }
+      ],
+      "resultIds": [],
+      "testIds": [
+        "ops03-3b35c44e2d-business-error-0-0"
+      ]
+    },
+    {
+      "case": "business-error-1",
+      "result": "PASS",
+      "run": {
+        "hash": "1ea257b00d78a4e9cd533e101d15947001d125cc3b1d57f94dc5d71da6b72454",
+        "epoch": 1,
+        "error": "MCP_TOOL_ERROR",
+        "runId": "chat-chat-session-5c373c65-6df4-4201-9f10-2d55b7f8d507-4a8e05bb",
+        "status": "FAILED",
+        "version": 1
+      },
+      "actualRemoteCalls": 1,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "c59ec43f-6",
+          "attempt": 1,
+          "logicalId": "6419d351-fbd0-46ef-9347-15f03d3b76dd"
+        }
+      ],
+      "callStatuses": [
+        "FAILED"
+      ],
+      "failures": [
+        {
+          "rawEnvelope": "{\"content\":[{\"type\":\"text\",\"text\":\"synthetic invalid parameter or no data\"}],\"isError\":true,\"structuredContent\":{\"reason\":\"NO_DATA\"},\"_meta\":{\"fixture\":true}}",
+          "dispatched": true,
+          "errorClass": "TOOL_ERROR",
+          "message": "MCP_TOOL_ERROR:synthetic invalid parameter or no data"
+        }
+      ],
+      "resultIds": [],
+      "testIds": [
+        "ops03-3b35c44e2d-business-error-1-0"
+      ]
+    },
+    {
+      "case": "business-error-2",
+      "result": "PASS",
+      "run": {
+        "hash": "2fefba5a27184a40e8049c271c9ad774fbab93c0d286d635388e89a41edd8fae",
+        "epoch": 1,
+        "error": "MCP_TOOL_ERROR",
+        "runId": "chat-chat-session-6e69d856-3396-43ae-9861-212371ffcb0b-b4f23120",
+        "status": "FAILED",
+        "version": 1
+      },
+      "actualRemoteCalls": 1,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "c59ec43f-8",
+          "attempt": 1,
+          "logicalId": "c85bff1b-1979-4488-8489-c8cf765d6a6c"
+        }
+      ],
+      "callStatuses": [
+        "FAILED"
+      ],
+      "failures": [
+        {
+          "rawEnvelope": "{\"content\":[{\"type\":\"text\",\"text\":\"synthetic invalid parameter or no data\"}],\"isError\":true,\"structuredContent\":{\"reason\":\"NO_DATA\"},\"_meta\":{\"fixture\":true}}",
+          "dispatched": true,
+          "errorClass": "TOOL_ERROR",
+          "message": "MCP_TOOL_ERROR:synthetic invalid parameter or no data"
+        }
+      ],
+      "resultIds": [],
+      "testIds": [
+        "ops03-3b35c44e2d-business-error-2-0"
+      ]
+    },
+    {
+      "case": "business-error-3",
+      "result": "PASS",
+      "run": {
+        "hash": "440ba1081d456da3af05bc9a5c51f3cbf0f06e4ce99a86c7c8e469cdcbe808f4",
+        "epoch": 1,
+        "error": "MCP_TOOL_ERROR",
+        "runId": "chat-chat-session-d865b334-8124-4a2e-800d-e8e076dd5b22-7e9cf1c7",
+        "status": "FAILED",
+        "version": 1
+      },
+      "actualRemoteCalls": 1,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "c59ec43f-10",
+          "attempt": 1,
+          "logicalId": "8803a298-e631-4977-af6d-04d1bc601837"
+        }
+      ],
+      "callStatuses": [
+        "FAILED"
+      ],
+      "failures": [
+        {
+          "rawEnvelope": "{\"content\":[{\"type\":\"text\",\"text\":\"synthetic invalid parameter or no data\"}],\"isError\":true,\"structuredContent\":{\"reason\":\"NO_DATA\"},\"_meta\":{\"fixture\":true}}",
+          "dispatched": true,
+          "errorClass": "TOOL_ERROR",
+          "message": "MCP_TOOL_ERROR:synthetic invalid parameter or no data"
+        }
+      ],
+      "resultIds": [],
+      "testIds": [
+        "ops03-3b35c44e2d-business-error-3-0"
+      ]
+    },
+    {
+      "case": "after-business-errors",
+      "result": "PASS",
+      "run": {
+        "hash": "077a6e24902db7ed4b642421b31a55771c9204d90b6d388e02e21596027119ff",
+        "epoch": 1,
+        "error": "",
+        "runId": "chat-chat-session-14a826b7-ef9d-4a95-a4e0-c7882b1c917b-49ed2263",
+        "status": "SUCCEEDED",
+        "version": 1
+      },
+      "actualRemoteCalls": 1,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "c59ec43f-12",
+          "attempt": 1,
+          "logicalId": "75af81d3-490c-4ba9-a982-34395030e4a7"
+        }
+      ],
+      "callStatuses": [
+        "SUCCEEDED"
+      ],
+      "failures": [],
+      "resultIds": [
+        "tool-result-caec6b0a-dfed-4274-9bea-21d9dd5b4c0a"
+      ],
+      "testIds": [
+        "ops03-3b35c44e2d-after-business-errors-0"
+      ]
+    },
+    {
+      "case": "parallel-0",
+      "result": "PASS",
+      "run": {
+        "hash": "2d9c8ab8f6f56c7864434fa19232a6efffa822a6286b6478981c6ba9cc6a5f2f",
+        "epoch": 1,
+        "error": "",
+        "runId": "chat-chat-session-6d2393e5-554f-4fc0-be95-76f68a7d29c9-7b2cc471",
+        "status": "SUCCEEDED",
+        "version": 1
+      },
+      "actualRemoteCalls": 1,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "c59ec43f-15",
+          "attempt": 1,
+          "logicalId": "1576ab32-bd94-4d68-9999-22755b17b1d7"
+        }
+      ],
+      "callStatuses": [
+        "SUCCEEDED"
+      ],
+      "failures": [],
+      "resultIds": [
+        "tool-result-778b9d88-4633-4d70-adfb-b017d0ada36f"
+      ],
+      "testIds": [
+        "ops03-3b35c44e2d-parallel-0-0"
+      ]
+    },
+    {
+      "case": "parallel-1",
+      "result": "PASS",
+      "run": {
+        "hash": "a1210d2671d8bd3229b6ea3bac44aa95461c2fcb787586925c3b9a47f8c9d615",
+        "epoch": 1,
+        "error": "",
+        "runId": "chat-chat-session-05312c2c-0507-4dc1-b6b8-b0359a6d97ec-4be54cd3",
+        "status": "SUCCEEDED",
+        "version": 1
+      },
+      "actualRemoteCalls": 1,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "c59ec43f-18",
+          "attempt": 1,
+          "logicalId": "123be34d-cd05-4316-b7a1-17bdf90794c3"
+        }
+      ],
+      "callStatuses": [
+        "SUCCEEDED"
+      ],
+      "failures": [],
+      "resultIds": [
+        "tool-result-913f6e90-e1bb-4275-b6eb-ff1ce4346e15"
+      ],
+      "testIds": [
+        "ops03-3b35c44e2d-parallel-1-0"
+      ]
+    },
+    {
+      "case": "parallel-2",
+      "result": "PASS",
+      "run": {
+        "hash": "85da82e64acfce45a724a76e0de939e73e033c425dba6d2aad270a92f4faaf80",
+        "epoch": 1,
+        "error": "",
+        "runId": "chat-chat-session-41e89158-0b2a-42d5-a352-98dd7eab51c0-ffd595b7",
+        "status": "SUCCEEDED",
+        "version": 1
+      },
+      "actualRemoteCalls": 1,
+      "physicalReservations": [
+        {
+          "limit": 12,
+          "rpcId": "c59ec43f-17",
+          "attempt": 1,
+          "logicalId": "f706bf9b-967a-42b7-83e0-91c477a6529d"
+        }
+      ],
+      "callStatuses": [
+        "SUCCEEDED"
+      ],
+      "failures": [],
+      "resultIds": [
+        "tool-result-f52216b9-e632-42d2-988e-f9236ebffed0"
+      ],
+      "testIds": [
+        "ops03-3b35c44e2d-parallel-2-0"
+      ]
+    },
+    {
+      "case": "restart-wait",
+      "result": "PASS",
+      "run": {
+        "hash": "f361020097e72cb1afcbc443f266ee56d2de31df3b2b7269d3781d8dd3f33102",
+        "epoch": 2,
+        "error": "",
+        "runId": "chat-chat-session-df71029a-951e-4b08-bf1c-3f290085cab9-cc1093c0",
+        "status": "SUCCEEDED",
+        "version": 1
+      },
+      "actualRemoteCalls": 3,
+      "physicalReservations": [
+        {
+          "limit": 3,
+          "rpcId": "c59ec43f-20",
+          "attempt": 1,
+          "logicalId": "71dafc88-7f7a-4e3b-a74f-747e1a485543"
+        },
+        {
+          "limit": 3,
+          "rpcId": "8923c445-2",
+          "attempt": 2,
+          "logicalId": "71dafc88-7f7a-4e3b-a74f-747e1a485543"
+        },
+        {
+          "limit": 3,
+          "rpcId": "317ef4b5-2",
+          "attempt": 1,
+          "logicalId": "00155b09-fc4d-44f3-af55-98754c910d20"
+        }
+      ],
+      "callStatuses": [
+        "SUCCEEDED",
+        "SUCCEEDED",
+        "FAILED"
+      ],
+      "failures": [
+        {
+          "rawEnvelope": "",
+          "dispatched": true,
+          "errorClass": "TRANSPORT_ERROR",
+          "message": "MCP_TRANSPORT_ERROR:REMOTE_CONNECTION_FAILURE"
+        }
+      ],
+      "resultIds": [
+        "tool-result-d422675f-9599-4df7-8914-50dd41738e0a",
+        "tool-result-564ed386-799c-4f4c-a478-612dd55bf330"
+      ],
+      "testIds": [
+        "ops03-3b35c44e2d-restart-wait-0",
+        "ops03-3b35c44e2d-restart-wait-1"
+      ],
+      "approvals": [
+        {
+          "id": "workflow-approval-43e6902a-b561-4754-b750-f0c67086e28e",
+          "node": "review",
+          "status": "APPROVED"
+        }
+      ]
+    }
+  ],
+  "servicesUnchanged": true,
+  "writeReceiptsUnchanged": true,
+  "limitations": [
+    "Not a model evaluation or OPS-04 business graph",
+    "Approved Landing write workflow remains separate acceptance"
+  ]
+}

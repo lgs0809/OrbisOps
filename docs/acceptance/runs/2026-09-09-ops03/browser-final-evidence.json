@@ -1,0 +1,82 @@
+{
+  "run": {
+    "hash": "3d400cf6a7e87b713a4ad7425538b19e5cc4688d955eb74252ad503025da464e",
+    "epoch": 1,
+    "error": "",
+    "runId": "chat-chat-session-5bffeb32-d688-40da-b784-2afdeb60e077-74281d41",
+    "status": "SUCCEEDED",
+    "version": 4
+  },
+  "toolResults": [
+    {
+      "output": "{\"content\":[],\"isError\":false,\"structuredContent\":{\"count\":5,\"service\":\"normal\"},\"_meta\":{\"fixture\":true},\"orbisopsResultVersion\":1,\"normalizedContent\":{\"count\":5,\"service\":\"normal\"},\"outputSchemaHash\":\"5c8473342f34fa4446a64d8d7f4f9784518d117a77f677a5d657ac032ebcfbb8\"}",
+      "source": "MCP_REMOTE_TOOL",
+      "status": "SUCCEEDED",
+      "resultId": "tool-result-2fbe9446-ac7c-4857-9460-59613b76cbde",
+      "outputHash": "6fdbef898169a1dddd619fc3ac1f5699b17d6cc757ed722cbd3285795a3ba007"
+    }
+  ],
+  "actualPeerRequests": [
+    {
+      "seq": 13,
+      "rpc_id": "0f2e2fbd-2",
+      "method": "tools/call",
+      "tool": "probe",
+      "test_id": "browser-ops03-structured",
+      "mode": "structured",
+      "received_at": 1788886777.118285
+    },
+    {
+      "seq": 15,
+      "rpc_id": "0f2e2fbd-4",
+      "method": "tools/call",
+      "tool": "probe",
+      "test_id": "browser-ops03-structured",
+      "mode": "structured",
+      "received_at": 1788886891.572716
+    },
+    {
+      "seq": 17,
+      "rpc_id": "0f2e2fbd-6",
+      "method": "tools/call",
+      "tool": "probe",
+      "test_id": "browser-ops03-structured",
+      "mode": "structured",
+      "received_at": 1788886971.4809728
+    },
+    {
+      "seq": 21,
+      "rpc_id": "700199e3-2",
+      "method": "tools/call",
+      "tool": "probe",
+      "test_id": "browser-ops03-structured",
+      "mode": "structured",
+      "received_at": 1788887834.6043046
+    },
+    {
+      "seq": 98,
+      "rpc_id": "42e79f9e-4",
+      "method": "tools/call",
+      "tool": "probe",
+      "test_id": "browser-ops03-structured",
+      "mode": "structured",
+      "received_at": 1788889233.6730974
+    }
+  ],
+  "services": [
+    {
+      "service_key": "normal",
+      "state": "HEALTHY"
+    },
+    {
+      "service_key": "fault",
+      "state": "FAILED"
+    },
+    {
+      "service_key": "boundary",
+      "state": "INSUFFICIENT_DATA"
+    }
+  ],
+  "completeResponseHasNoJsonReferences": true,
+  "scope": "Real protocol + SQLite request ledger; model disabled; not business health evidence"
+}

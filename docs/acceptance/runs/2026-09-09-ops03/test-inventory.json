@@ -1,0 +1,1334 @@
+[
+  {
+    "suite": "cn.lgs.orbisops.application.mcp.McpSummaryApplicationServiceTest",
+    "tests": "3",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "summaryUsesEnabledProjectCatalogAndPersistsDeterministicProjection",
+      "missingProjectAndUnavailableRuntimeStoreFailClosed",
+      "rebuildUsesSameAuthoritativeProjection"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsMcpRemoteCallPolicyTest",
+    "tests": "3",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "productionMutationRemainsForbiddenDuringPrepare",
+      "reviewedNonProductionDryRunMayExecuteDuringPrepareAgainstProductionResource",
+      "validationThatStillRequiresApprovedPackageCannotRunDuringPrepare"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.application.mcpexecution.OpsMcpExecutionMapperTest",
+    "tests": "6",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "shouldExposeStructuredProviderResultFromJsonRemoteOutput",
+      "trustedLandingEntryMustInjectServerOwnedCredentialsOnlyInTrigger",
+      "ordinaryEntryMustIgnoreForgedLandingFlags",
+      "shouldProjectTypedResponseToLegacyEnvelope",
+      "shouldUnwrapStandardMcpTextContentIntoStructuredProviderResult",
+      "taskDeadlineMustSurviveTypedAndRuntimeConfigBoundaries"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.architecture.McpRemoteClientInvocationArchitectureTest",
+    "tests": "4",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "providerMustRemainThinOrchestratorWithoutClientHandleOrInvocationMechanics",
+      "remoteInvocationAdapterMustOwnSerializationRedactionAndRuntimeAudit",
+      "configurationMustOwnAdapterAssemblyAndLazyAuditDependency",
+      "remoteClientAdapterMustOwnSessionCatalogAndSchemaProjection"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.application.config.McpClientCatalogUseCaseTest",
+    "tests": "5",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "runtimeInvalidationFailureStopsAuditAndPropagates",
+      "createPersistsThenInvalidatesRuntimeThenAudits",
+      "updateMissDoesNotInvalidateOrAudit",
+      "queryPreservesSelectorPriorityThenNameFilterAndProtection",
+      "updateRestoresPlaceholderFromExistingConfiguration"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsMcpTransportSecurityPolicyTest",
+    "tests": "3",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "allowsPlatformGeneratedNodeStdioWithoutOpeningGlobalStdio",
+      "platformGeneratedMarkerDoesNotAuthorizeArbitraryStdioCommand",
+      "keepsUserSuppliedStdioBlockedByProdTransportPolicy"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.application.mcp.McpDiscoveryApplicationServiceTest",
+    "tests": "13",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "schemaHashIgnoresRiskMetadataButChangesWithAuthoritativeSchema",
+      "concurrentSuggestionConflictReturnsAuthoritativeReviewedPolicyWithoutDowngrade",
+      "outputContractChangeAloneMustInvalidateReviewedPolicy",
+      "persistedAuthoritativeSchemaCanBeReused",
+      "authoritativeRemoteDefinitionPersistsSnapshotPolicyAndCache",
+      "sameSchemaUsesSameDeterministicSuggestionIdentity",
+      "transportMetadataCannotSubstituteForAuthoritativeInputSchema",
+      "snapshotStoreUnavailableFailsClosedBeforePolicyAndCacheWrites",
+      "schemaChangeProducesNewDeterministicPolicyIdentityAndStalesPriorSchema",
+      "repeatedHydrationReusesExistingPendingSuggestionWithoutSecondSave",
+      "selectRanksAuthorizedRuntimeToolsAndPersistsDecision",
+      "unknownRemoteToolFailsClosedWithoutAuthoritativeOrPersistedSchema",
+      "platformGeneratedReadonlyToolIsSystemVerifiedWithoutLlmReview"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.architecture.McpRuntimeResilienceArchitectureTest",
+    "tests": "1",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "mcpInvocationMustUseSharedResilienceRedactionAndLowCardinalityTelemetry"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.architecture.McpTransportBoundaryArchitectureTest",
+    "tests": "3",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "securityFacadeMustDelegateTypedAllowlistsAdmissionAndSecretFiltering",
+      "clientFactoryMustOwnSdkTransportConstructionAndSecretResolution",
+      "remoteClientAdapterMustOwnFactoryUseAndProviderMustNotReclaimTransportBoundary"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.application.toolexecution.dispatch.OpsMcpToolExecutionDispatchHandlerTest",
+    "tests": "6",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "mcpDenialReturnsProviderEvidenceInTypedSecurityException",
+      "approvedLandingCopiesPackageAuthorityIntoMcpRequest",
+      "missingExactProviderIdentityFailsClosed",
+      "supportsOnlyMcpProviderAndInvokesMcpApplicationWithExactRemoteIdentity",
+      "approvedLandingInjectsAndOverridesRuntimeOwnedRemoteArguments",
+      "missingRuntimeConfigFailsClosedBeforeMcpApplication"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.architecture.McpTemplateCatalogArchitectureTest",
+    "tests": "3",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "triggerUsesApplicationCatalogAndLegacyImplementationIsAbsent",
+      "domainAndApplicationOwnTypedCatalogWithoutFrameworkLeakage",
+      "infrastructureExclusivelyOwnsJdbcDdlJsonAndDefaultSeeding"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsProjectMcpRuntimeConfigServiceTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "returnsEmptyWhenDescriptorIsUnavailable",
+      "buildsInternalAndExternalRuntimeConfigsThroughDedicatedFactory"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.domain.mcpexecution.McpExecutionPolicyTest",
+    "tests": "4",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "policyMustRejectUnknownEffectsAndClassifySafeReadTarget",
+      "trustedLandingScopeMustRequireBothTrustAndApproval",
+      "systemVerifiedReadOnlyPolicyIsExecutableWithoutHumanReview",
+      "blockedToolsMustOverrideAllowedAndNotificationTools"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.architecture.McpTemplateTypedLifecycleBoundaryArchitectureTest",
+    "tests": "1",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "templateLifecycleMustRemainTypedUntilCompatibilityProjection"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.application.config.OpsMcpClientBoundaryAdaptersTest",
+    "tests": "4",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "runtimeCacheAdapterSupportsConfiguredAndMissingProvider",
+      "transportProtectionRestoresPlaceholderAndMasksNestedJson",
+      "auditAdapterPreservesCompatibilityActions",
+      "transportProtectionMasksNonJsonFallback"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.architecture.McpCapabilityImportBoundaryArchitectureTest",
+    "tests": "1",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "capabilityImportDelegatesMcpRegistrationDiscoveryAndHydration"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.application.project.ProjectMcpGenerationApplicationServiceTest",
+    "tests": "1",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "generatesTypedMcpFromPersistedProjectResource"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.application.project.ProjectMcpProjectionApplicationServiceTest",
+    "tests": "1",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "savesDerivedProjectionBeforeMaterializingWorkspaceView"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.integration.ControlledServiceControlMcpServerIntegrationTest",
+    "tests": "4",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "persistentServerProvidesFixedToolsAndIdempotentRestartAcrossProcesses",
+      "committedRestartWithLostResponseIsRecoveredByReceiptWithoutSecondRestart",
+      "emergencyStopBlocksNewRestartButPreservesReadsReceiptsAndCompletedReplay",
+      "serverFailsClosedForExpiredDeadlineVersionDriftReceiptScopeAndUnknownTools"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.architecture.McpCompositeToolDispatchArchitectureTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "mcpHandlerMustNotDuplicateTopLevelGovernance",
+      "mcpProviderMustEnterUnifiedToolMainlineThroughCompositeDispatch"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.capability.OpsMcpCapabilityImporterTest",
+    "tests": "4",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "missingRegistrationFailsBeforeWriteAndMissingDiscoveryPreservesRegistration",
+      "defaultsStreamableHttpAndNoneAuthForBlankOptionalFields",
+      "discoveryFailureIsPersistedAndReturnedWithoutUndoingRegistration",
+      "registersDiscoversHydratesAndProjectsPendingReviewResult"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.architecture.McpJsonCodecBoundaryArchitectureTest",
+    "tests": "1",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "applicationOwnsPureTolerantCodecWithoutPortOrSpringBean"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsMcpUnifiedToolExecutorTest",
+    "tests": "4",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "landingUsesFrozenExecutionBindingForMutationAndReceiptWithoutDoubleProjectingReceipt",
+      "prepareChangeNonProductionMutationStillExecutesThroughToolExecution",
+      "prepareChangeProgressiveMutationReturnsProposalWithoutToolExecution",
+      "prepareChangeDirectMutationReturnsProposalWithoutToolExecution"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.application.project.ProjectExternalMcpApplicationServiceTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "registersAndRecordsDiscoveryWithDurableGovernanceMetadata",
+      "rejectsPlaintextBearerCredentialBeforeSaving"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.application.mcp.McpPolicyCommandApplicationServiceTest",
+    "tests": "10",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "disableReportsRepositoryConflictWithoutReturningAFalseTerminalState",
+      "manualUpsertPersistsReviewedTypedPolicyAndAudits",
+      "approvalRejectsPolicyWhenLatestSchemaHashChanged",
+      "approvalPublishesLowRiskReadOnlyCorePolicyAndPreservesDoubleAudit",
+      "approvalRejectsUnsafeCoreDisclosureBeforeSnapshotLookup",
+      "rejectionPersistsReasonAndAuditsStatusTransition",
+      "approvalRejectsUnknownEffectAndActionsBeforeSnapshotLookup",
+      "missingProjectFailsBeforePolicyStoreAccess",
+      "approvalFailsFastWhenReviewedToolIdentityIsMissing",
+      "approvalFailsClosedBeforeRemoteInputSchemaIsHydrated"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.integration.ReadonlyMcpGuardIntegrationTest",
+    "tests": "4",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "redisServerExposesOnlyReadonlyToolsAndRejectsWriteCommandsAndKeyEscapeBeforeConnection",
+      "mysqlServerExposesOnlyReadonlyToolsAndRejectsDangerousOrUnauthorizedQueriesBeforeConnection",
+      "redisServerDefaultsFailClosedForDefaultUserAndMissingNamespaceAllowlist",
+      "mysqlServerDefaultsFailClosedForPrivilegedAccountAndDisabledExplain"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.application.source.OpsSourceMcpProjectionAdapterTest",
+    "tests": "1",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "publishesReadOnlyGitProjectionWithConfiguredTimeout"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.integration.ControlledAlertThresholdMcpServerIntegrationTest",
+    "tests": "7",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "completedExecutionRemainsReusableAfterOriginalDeadlineExpires",
+      "staleLookingLockOwnedByLiveProcessIsNeverStolen",
+      "persistentServerProvidesFixedToolsMultiProcessIdempotencyReconciliationAndCompensation",
+      "providerEmergencyStopBlocksNewMutationsButKeepsReadsAndCompletedReplayAvailable",
+      "serverFailsClosedForMissingAuthorityExpiredDeadlineAndUnknownTools",
+      "committedMutationWithLostResponseIsRecoveredByReceiptWithoutReplay",
+      "exactApprovalExpiryOperationScopeReceiptScopeAndStoreIntegrityFailClosed"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.application.mcp.OpsMcpAuthoritativeSchemaHydrationServiceTest",
+    "tests": "1",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "remoteSchemaComesFromProviderInspectionWithoutInvokingTool"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.architecture.McpClientRegistryArchitectureTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "registryMustDelegateTypedCacheStateHandleLifecycleAndCleanupJob",
+      "remoteClientAdapterMustBeTheOnlyRegistryLifecycleConsumer"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.application.project.ProjectMcpAuthorizationApplicationServiceTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "mergesEnabledProjectMcpsAndSharedIdsWithoutDuplicates",
+      "rejectsMissingProjectAndBlankIdentifiers"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsMcpTransportSecretFilterTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "actualSecretKeysStillRequireExplicitAllowlist",
+      "nonSecretControlKeysContainingPluralKeysAreAllowed"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.OpsMcpRuntimeHealthIndicatorTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "healthySloWithoutOpenCircuitMustBeUp",
+      "openCircuitMustBeOutOfServiceAndBreachedSloMustBeDown"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsMcpToolProviderDecompositionTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "runtimeInvokerDelegatesSessionProtocolAndInvalidationBoundaries",
+      "compatibilityFacadeDelegatesEachResponsibilityToDedicatedService"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsMcpInvocationResiliencePolicyTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "stalePermitMustBeFencedAfterCircuitGenerationChanges",
+      "failureBudgetMustOpenCircuitAndAllowOneHalfOpenProbe"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.infrastructure.adapter.repository.JdbcMcpToolPolicyRepositoryTest",
+    "tests": "5",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "savePersistsTypedPolicy",
+      "missingJdbcStoreFailsClosed",
+      "reviewStatusUpdateUsesAffectedRowAsConflictSignal",
+      "adminMapperToleratesLegacyBlankSchemaButStrictMapperStillFailsClosed",
+      "suggestionInsertIsAtomicAndDoesNotUpdateExistingPolicy"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.infrastructure.adapter.repository.JdbcProjectMcpRepositoryTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "jdbcSaveUsesIdempotentUpsertAndKeepsMemoryFallback",
+      "missingJdbcUsesInMemoryProjectMcpCatalog"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.integration.CodeWorkspaceMcpServerIntegrationTest",
+    "tests": "6",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "3",
+    "cases": [
+      "orbisOpsRuntimeDiscoversAndInvokesRealCodeWorkspaceMcpOverStdio",
+      "realGitWorkspaceSupportsPinnedReadRepairBackgroundCommitAndCleanup",
+      "realManagedPyrightSupportsReadOnlySemanticsAndRefreshesDiagnosticsAfterRepairEdit",
+      "realJdtlsSupportsReadOnlySemanticsAndRefreshesDiagnosticsAfterRepairEdit",
+      "realManagedJavaAndPythonProvidersCanCoexistInOneCodeMcp",
+      "baseRepositoryRejectsSensitivePathsAndWorktreeRejectsEscapes"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.architecture.McpExecutionArchitectureTest",
+    "tests": "3",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "domainAndApplicationMustRemainTypedAndFrameworkFree",
+      "triggerAclsMustOwnRouterTokensRemoteProviderAndJson",
+      "serviceMcpEntriesMustOnlyDelegateToTypedExecution"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.architecture.McpQueryCqrsArchitectureTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "governanceAndAdminConsumersMustUseNarrowQueryServices",
+      "runtimeSelectionQueryMustNotOwnGovernanceHistoryOrSnapshotQueries"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.application.config.AiClientToolMcpApplicationServiceTest",
+    "tests": "3",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "queryListProjectsCompatibilitySelectors",
+      "updateProjectsDtoToTypedCommand",
+      "queryProjectsTypedDefinitionToResponseDto"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.application.mcp.McpRuntimeOperationsApplicationServiceTest",
+    "tests": "10",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "activationAllowsSystemVerifiedPlatformReadonlyPolicy",
+      "activationHydratesReviewedPolicyAndPersistsRunScopedLease",
+      "runtimeCatalogAndExecutableToolsDelegateToTypedQuery",
+      "disclosureConfigurationDistinguishesCoreAndExtensionTools",
+      "activationCheckIsScopedAndFailsClosedWhenStoreUnavailable",
+      "callRecordUsesCatalogMetadataAndSanitizedPayloads",
+      "trustedLandingActivationAllowsHumanReviewedLandAllowedMutatingPolicy",
+      "externalLandingStageWithoutTrustedMarkerStillCannotActivateMutatingPolicy",
+      "activationRejectsPendingOrMutatingPolicies",
+      "routingWarningPreservesTypedContext"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.architecture.McpRuntimeConfigSourceChainArchitectureTest",
+    "tests": "4",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "resolverMustDependOnOneOrderedSourceChainInsteadOfRepositories",
+      "legacyRuntimeUsageMustBeObservableBeforeRemoval",
+      "sourceIdentityAndPriorityMustRemainStable",
+      "sourceChainMustBeFirstMatchAndBlockedMustStopFallback"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.application.mcp.ProgressiveMcpNarrowPortsTest",
+    "tests": "4",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "progressivePortsHaveApplicationOwners",
+      "policyReviewUseCaseUsesOnlyPolicyCommandPort",
+      "processManagerRoutesEachConcernToItsDedicatedPort",
+      "requiredPortsFailFast"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.architecture.ProjectMcpRuntimeConfigBoundaryArchitectureTest",
+    "tests": "7",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "endpointParserMustOwnOnlyEndpointAndDatabaseProjection",
+      "scriptLocatorMustOwnOnlyFilesystemLookup",
+      "typePolicyMustOwnCapabilitiesTimeoutDefaultsAndPermissions",
+      "configValuesMustOwnUntypedMapExtractionOnly",
+      "factoryMustKeepCredentialHandlingAndDelegateRuntimeProjection",
+      "configBuilderMustOwnRuntimeDtoAndScriptProjection",
+      "environmentProjectorMustOwnResourceSpecificEnvironmentKeys"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.application.mcpexecution.McpExecutionApplicationServiceTest",
+    "tests": "4",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "unauthorizedToolMustRecordRuntimeBlockAndUnverifiedEvidence",
+      "activationRequirementAndRouterDenialMustFailClosed",
+      "successfulRemoteExecutionMustRecordEvidenceAndAllowedAudit",
+      "discoveryAndActivationMustShareRuntimeRemoteAndEvidenceBoundaries"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.application.mcp.McpTemplateCatalogApplicationServiceTest",
+    "tests": "4",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "updatesWithoutChangingIdentityOrCreatorAndTransitionsStatus",
+      "createsTypedTemplateAndProjectsCompatibilityAliases",
+      "rejectsDuplicateImmutableIdentityAndDeletedTransition",
+      "copyUsesDeterministicSuffixAndNewCreator"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.application.project.ProjectMcpManagementApplicationServiceTest",
+    "tests": "3",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "enablesReviewedExternalMcpAndPreservesDiscoveredTools",
+      "enrichesInternalPermissionAndMetadataBeforeSaving",
+      "rejectsExternalEnableWithoutMatchingHumanReviewedPolicy"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.architecture.McpToolProviderDecompositionArchitectureTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "providerMustRemainCompatibilityFacadeOnly",
+      "extractedServicesMustOwnDistinctMcpResponsibilities"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.application.mcp.McpGovernanceApplicationServiceTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "summaryAndPolicyCommandsUseTheirDedicatedPorts",
+      "queryOperationsUseDedicatedPolicyAndHistoryQueries"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.application.project.ProjectMcpTemplateGenerationApplicationServiceTest",
+    "tests": "3",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "preparationRequestRejectsMismatchedTypedResourceBinding",
+      "generatesTemplateBackedProjectMcpThroughCatalogBoundary",
+      "rejectsTemplateResourceTypeMismatchBeforePreparation"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.WorkflowMySqlTest",
+    "tests": "9",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "9",
+    "cases": [
+      "persistedResponseMustPreserveRepeatedEvidenceObjectsForStandardJsonReaders",
+      "realHttpWriteWithLostResponseMustRemainInReconciliationAndNeverRedispatch",
+      "expiredLeaseMustRejectLateWritesAndHeartbeatEvenBeforeRecoveryClaimsIt",
+      "lostWriteResponseMustRequireReviewWhileReadOnlyInterruptionIsRecoverable",
+      "cancellationCommittedBeforeCompletionMustFenceSuccess",
+      "checkpointInsertFailureMustRollbackSequenceAndLeaveRuntimeAtPriorState",
+      "parallelCompletionsMustPersistBothOutputsAndRecoverTheirJoin",
+      "concurrentCancellationAndCompletionMustHaveOneWinner",
+      "cancellationWhileWaitingMustFinishWithoutAWorkerAndForbidReclaim"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsProjectMcpRuntimeConfigFactoryTest",
+    "tests": "5",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "buildsInternalMysqlRuntimeConfigFromDescriptor",
+      "rejectsExternalBearerCredentialThatIsNotAReference",
+      "buildsExternalBearerRuntimeConfigWithoutResolvingStoredReference",
+      "buildsOpenApiRuntimeConfigWithSingleReadOnlyTool",
+      "buildsControlledServiceRuntimeConfigWithDedicatedProvider"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.application.source.OpsSourceMcpProjectionSettingsTest",
+    "tests": "1",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "shouldBoundRequestTimeout"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.infrastructure.adapter.repository.JdbcMcpToolSnapshotRepositoryTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "missingJdbcStoreFailsClosed",
+      "savePersistsTypedSnapshot"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.application.mcp.OpsMcpProjectToolCatalogAdapterTest",
+    "tests": "1",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "onlyPlatformGeneratedResourceBackedMcpGetsTrustedRemoteMetadataProvenance"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.infrastructure.adapter.repository.WorkflowToolBudgetMySqlTest",
+    "tests": "3",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "3",
+    "cases": [
+      "retriesConsumeBudgetWhileDuplicateDispatchAndNewPublishedVersionCannotResetIt",
+      "otherProjectCanceledRunAndChangedSnapshotMustFailBeforeReservation",
+      "concurrentNodesAndReconstructedRepositoryMustShareTwelveReservations"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsMcpToolArgumentPolicyCheckerTest",
+    "tests": "1",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "regexDenylistSupportsPerFieldPatternList"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.application.project.OpsProjectMcpGenerationPreparationFactoryTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "buildsReadonlyMysqlGenerationPreparation",
+      "appliesTemplateCommandOverridesAndNormalizesStatus"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.architecture.ProjectMcpManagementTypedStateBoundaryArchitectureTest",
+    "tests": "1",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "mcpManagementMustUpdateTypedDefinitionWithoutCompatibilityRoundTrip"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.domain.mcp.service.McpToolPolicyGovernanceTest",
+    "tests": "7",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "unknownMutatingFallbackIsHighRiskAndNotPreApprovalExecutable",
+      "coreExposureOnlyAcceptsLowRiskReadOnlyInvestigationTool",
+      "fallbackReadOnlySuggestionRemainsPendingAndAutoCallableBeforeApprovalIsFalseAtPersistenceLayer",
+      "targetWriteRequiresPackageAndHumanApproval",
+      "unknownClassificationCannotBePublished",
+      "preApprovalRejectsProductionMutationAndUnknownEffect",
+      "preApprovalAllowsReviewedEvidenceAndNonProductionValidationOnly"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.architecture.RuntimeMcpResourceBoundaryArchitectureTest",
+    "tests": "4",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "resolverMustOwnSourceChainDecorationAndCallbackAssembly",
+      "configurationMustAssembleOrderedSourcesAndResolver",
+      "legacyMapperMustOwnOnlyTypedCatalogTransportConversion",
+      "pipelineMustDelegateMcpRuleAndAssemblerMustNeverReclaimMcpInfrastructure"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.architecture.McpRemoteCallPolicyArchitectureTest",
+    "tests": "3",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "remoteCallPolicyMustOwnStageEffectArgumentAndChangePackageRules",
+      "assessmentMustRemainTypedSecurityAndAuditContext",
+      "providerMustOnlyOrchestrateTypedAssessmentAndRemoteInvocation"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.architecture.ProjectMcpTemplateGenerationBoundaryArchitectureTest",
+    "tests": "1",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "templateGenerationMustUseTypedResourceFactsAndTypedCatalogSave"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.http.admin.OpsMcpTemplateAdminControllerTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "updateProjectToolUsesAuthenticatedPrincipal",
+      "createTemplateUsesAuthenticatedPrincipal"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.application.project.ProjectMcpRuntimeDescriptorApplicationServiceTest",
+    "tests": "4",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "discoveryAcceptsPendingExternalButRuntimeDoesNot",
+      "returnsEmptyWhenEnabledInternalMcpResourceIsMissing",
+      "resolvesEnabledMcpAcrossProjectsAndReportsExistence",
+      "resolvesEnabledInternalMcpWithTypedResource"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.application.mcp.McpRuntimeViewMapperTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "runtimeCatalogSurfacesSystemVerifiedPolicyTruthfully",
+      "legacyBlankSchemaPolicyIsProjectedAsNonExecutableStaleAdminHistory"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsMcpRemoteInvocationResilienceTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "thresholdFailureMustOpenCircuitAndRejectWithoutCallingRemoteAgain",
+      "successMustReturnRawResultButPersistOnlyRedactedAuditOutput"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.infrastructure.adapter.repository.AiClientToolMcpConfigRepositoryTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "persistsAndRestoresTypedMcpDefinition",
+      "degradesToEmptyCatalogWhenDaoIsUnavailable"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.architecture.McpClientCatalogBoundaryArchitectureTest",
+    "tests": "1",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "mcpClientCatalogMustRemainAHexagonalApplicationProcessManager"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.infrastructure.adapter.repository.JdbcMcpRuntimeCatalogRepositoryTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "saveActivationPersistsTypedRecord",
+      "missingJdbcStoreFailsClosed"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.architecture.McpToolDisclosureArchitectureTest",
+    "tests": "3",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "disclosureEntriesMustShareTheRemoteExecutionApplication",
+      "legacyDisclosureStackMustRemainPhysicallyDeleted",
+      "sharedApplicationMustOwnDiscoverActivateAndExecute"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.http.admin.OpsProgressiveMcpAdminControllerTest",
+    "tests": "1",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "upsertPolicyUsesAuthenticatedPrincipal"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.application.repair.McpRepairWorkspaceExecutionAdapterTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "createAndVerifyPinsBaseRunsBuildAndCommitsSameDiff",
+      "cleanupUsesRemoteWorkspaceAndNeverNeedsHostPath"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsMcpRuntimeCatalogReconcilerTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "hydratesRealRemoteDefinitionsForPlatformGeneratedMcpWhenRuntimeCatalogIsEmpty",
+      "leavesExternalOrUserManagedMcpOnExplicitReviewLifecycle"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.architecture.McpCallbackPolicyArchitectureTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "callbackPolicyAdapterMustOwnCapabilityAclDecorationAndCompatibilityPolicy",
+      "providerMustDelegateCallbackAclAndNeverReclaimCompatibilityPolicy"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.domain.agentdefinition.AgentScopeAndMcpDefinitionPolicyTest",
+    "tests": "5",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "mcpToolNamesAndCapabilitiesAreValidatedAsDomainLanguage",
+      "builtInScopeUsesFailClosedDefaultToolBoundary",
+      "scopeIdentityAndDepthAreBounded",
+      "unknownBuiltInRoleFailsClosed",
+      "stdioAndRemoteMcpRequireTheirOwnConnectionIdentity"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.architecture.McpProgressiveRuntimeArchitectureTest",
+    "tests": "4",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "configurationMustOwnLazyProgressiveRuntimeAssembly",
+      "providerMustDelegateProgressiveRuntimeAndNeverReclaimSettingsOrProcessManager",
+      "progressiveRuntimeAdapterMustOwnExposureRoutingHydrationWarningsAndPreCallAudit",
+      "settingsAndExposureMustRemainTypedAndIndependentFromRuntimeServices"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.application.mcp.SelectRuntimeMcpToolsQueryTest",
+    "tests": "7",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "optionalStoresDegradeToEmptyButRuntimeStoreFailsClosed",
+      "snapshotAndActivationViewsDecodeJsonWithoutTriggerService",
+      "policyProjectionParsesJsonAndPreservesNullableTimes",
+      "callLookupUsesTypedRuntimeRepositoryAndRejectsMissingCall",
+      "runtimeCatalogAppliesGovernanceAllowedAndBlockedFilters",
+      "landingCatalogExposesLandAllowedApprovedPackageToolsButPrepareDoesNot",
+      "projectMustExistBeforeRepositoryQuery"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.architecture.McpProgressiveCallbackArchitectureTest",
+    "tests": "3",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "callbackAdapterMustOwnProgressiveSchemasAndUnifiedExecutionCompatibility",
+      "providerMustDelegateCallbacksAndNeverReclaimToolExecutionFieldInjection",
+      "springConfigurationMustOwnLazyToolExecutionResolution"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.application.mcp.ManageMcpTemplateUseCaseTest",
+    "tests": "4",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "createOverridesUntrustedCreateByWithAuthenticatedActor",
+      "generateProjectToolUsesTypedTemplateAndMaterializesView",
+      "createRejectsMissingAuthenticatedActor",
+      "copyWithoutExplicitIdDelegatesToPortCopyAndCarriesActor"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.application.project.ProjectMcpCatalogApplicationServiceTest",
+    "tests": "1",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "mapsSavesAndQueriesTypedProjectMcpDefinitions"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsMcpRuntimeConfigSourceChainTest",
+    "tests": "5",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "telemetryMustCountLegacyRuntimeMatches",
+      "blockedSourceMustTerminateBeforeLowerPriorityFallback",
+      "chainMustSortSourcesAndStopAtFirstMatchWithoutMerging",
+      "duplicateSourceIdAndOrderMustFailClosed",
+      "missesAndUnavailableSourcesMustProduceAuditableFallbackReason"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsMcpRemoteCallPolicyTest",
+    "tests": "7",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "policyStatusReviewAndEffectClassificationMustFailClosed",
+      "systemVerifiedPlatformReadOnlyPolicyIsApprovedForInvestigate",
+      "assessmentMustNormalizePolicyMetadataAndExposeStableAuditView",
+      "investigateMustApplyArgumentPolicyBeforeRemoteCall",
+      "landingRequiresApprovedPackageThenAllowsProjectProdMutations",
+      "missingOrInvalidStageMustFailClosedInsteadOfBecomingInvestigate",
+      "callbackCompatibilityPolicyMustOnlyRunWithoutPlatformOrLandingApproval"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsMcpTransportSecurityPolicyTest",
+    "tests": "5",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "sensitiveEnvironmentAndUnknownHeadersMustFailClosed",
+      "transportAliasesAndTimeoutMustBeNormalized",
+      "unsafeArgumentsMustFailClosed",
+      "unlistedTransportAndCommandMustFailClosed",
+      "remoteAddressMustRejectUserInfoAndUnknownHost"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsMcpWireIntegrationTest",
+    "tests": "38",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "completeEnvelopeMustSurviveRealSdk(String, String)[1]",
+      "completeEnvelopeMustSurviveRealSdk(String, String)[2]",
+      "completeEnvelopeMustSurviveRealSdk(String, String)[3]",
+      "completeEnvelopeMustSurviveRealSdk(String, String)[4]",
+      "concurrentUsersMustShareReadyInitializationAndKeepEveryCall",
+      "reusedConnectionMustHonorCurrentRunDeadlineAndNotTheFirstRun",
+      "invalidInputAndFailedBudgetStoreMustNeverDispatchOrTripRemoteCircuit",
+      "processExitMustInvalidateCachedStdioHandleAndReadRetryMustRestartPeer",
+      "retryMustConsumeTheSameGraphBudgetBeforeAnyPhysicalRedispatch",
+      "stalledBudgetStoreMustRespectTaskDeadlineAndNeverDispatchLate",
+      "schemaDriftMustBlockOldReviewedWriteBeforeDispatch",
+      "dispatchedWriteMustNotReplayAndReceiptMustComeFromCommittedSqliteRow",
+      "readWaitIsFifteenSecondsPerPhysicalRequestNotPerLogicalCall",
+      "readReconnectMustUseOneRetryAndFreshInitialize(String)[1]",
+      "readReconnectMustUseOneRetryAndFreshInitialize(String)[2]",
+      "readReconnectMustUseOneRetryAndFreshInitialize(String)[3]",
+      "readReconnectMustUseOneRetryAndFreshInitialize(String)[4]",
+      "lateOldHandleInvalidationMustLeaveReplacementUsable",
+      "taskDeadlineMustCapCompleteResponseWaitAndPreventRetry",
+      "businessErrorsMustNotConsumeDependencyCircuitBudget",
+      "reconnectAndContractRefreshShareOneRetryBudget(String)[1]",
+      "reconnectAndContractRefreshShareOneRetryBudget(String)[2]",
+      "reconnectAndContractRefreshShareOneRetryBudget(String)[3]",
+      "unchangedReviewedContractMustPassRoundTripAndCredentialsMustNotCollide",
+      "queuedCallerMustHonorItsDeadlineWithoutInvalidatingAnotherUsersCall(boolean)[1]",
+      "queuedCallerMustHonorItsDeadlineWithoutInvalidatingAnotherUsersCall(boolean)[2]",
+      "invalidInputMustNotReachPeerOrOpenDependencyCircuit",
+      "errorsMustNeverBecomeSuccessfulStrings(String, String, int)[1]",
+      "errorsMustNeverBecomeSuccessfulStrings(String, String, int)[2]",
+      "errorsMustNeverBecomeSuccessfulStrings(String, String, int)[3]",
+      "errorsMustNeverBecomeSuccessfulStrings(String, String, int)[4]",
+      "errorsMustNeverBecomeSuccessfulStrings(String, String, int)[5]",
+      "errorsMustNeverBecomeSuccessfulStrings(String, String, int)[6]",
+      "errorsMustNeverBecomeSuccessfulStrings(String, String, int)[7]",
+      "errorsMustNeverBecomeSuccessfulStrings(String, String, int)[8]",
+      "errorsMustNeverBecomeSuccessfulStrings(String, String, int)[9]",
+      "errorsMustNeverBecomeSuccessfulStrings(String, String, int)[10]",
+      "approvedWriteCanWaitBeyondReadLimitAndHasSixtySecondReceiptBudget"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsMcpRemoteClientAdapterTest",
+    "tests": "5",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "sessionMustDefensivelyCopyCallbackSnapshot",
+      "inspectDefinitionsMustSkipIncompleteCallbacksAndFailWhenCatalogEmpty",
+      "invalidateMustDelegateToRegistry",
+      "openMustAcquireInitializeAndSnapshotCallbacksThroughRegistry",
+      "inspectDefinitionMustProjectRemoteSchemaAndRejectInvalidJson"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsProgressiveMcpCallbackAdapterTest",
+    "tests": "7",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "dispatcherMustDelegateToUnifiedToolExecutionFacade",
+      "missingUnifiedExecutionServiceMustFailClosedForAllProgressiveCallbacks",
+      "directDiscoveredCallbackUsesSchemaButNeverInvokesRemoteDelegateDirectly",
+      "landingWriteDispatcherUsesApprovedLandingScopeAndStableIdempotencyKey",
+      "repeatedStructuredObjectsMustSerializeAsCompleteJsonNotFastjsonReferences",
+      "blockedExecutionMustReturnCompatibilityEnvelopeWithoutRemoteCall",
+      "landingWriteIdempotencySurvivesNewRunForSameApprovedPackage"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsMcpToolProviderSecurityTest",
+    "tests": "15",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "projectAgentWithEnforceDoesNotExposeLegacyRemoteCallbacks",
+      "highRiskToolRequiresChangePackageInsteadOfRemoteCall",
+      "unauthorizedRemoteToolIsBlockedAndAudited",
+      "argumentPolicyRejectsWriteSqlForReadOnlyTool",
+      "ordinaryDispatcherCannotUseApprovedLandingContextForMutatingTool",
+      "blockedRemoteToolIsBlockedAndAudited",
+      "readOnlyLowRiskToolCanReachRemoteCallback",
+      "mutatingToolRequiresChangePackageEvenWhenAuthorized",
+      "allowedToolWithoutSafetyMetadataRequiresChangePackage",
+      "progressiveManagedMcpOnlyExposesDispatcher",
+      "preApprovalReadOnlyToolDoesNotRequirePrepareAllowedFlag",
+      "pendingReviewPolicyIsBlockedEvenIfRemoteMetadataLooksReadOnly",
+      "dryRunToolIsAllowedInPreApprovalWorkflowThroughUnifiedEntry",
+      "progressiveManagedMcpWithNoActiveRuntimePolicyDoesNotExposeDispatcher",
+      "approvedLandingContextWithoutLandAllowedPolicyStillBlocksMutatingTool"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsMcpTransportAdmissionPolicyTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "failsClosedForUnknownTransportCommandUnsafeArgsAndRemoteAddress",
+      "normalizesTransportTimeoutAndCommandBasename"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsProgressiveMcpInvocationServiceTest",
+    "tests": "1",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "concurrentReadAndWriteMustKeepTheirReviewedAuthoritySeparate"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsMcpTransportSecuritySettingsTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "separatesSpringDefaultsFromLegacyNoArgBehavior",
+      "normalizesAliasesAllowlistsAndTimeout"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsMcpTransportSecretFilterTest",
+    "tests": "3",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "rejectsUnlistedSensitiveEnvAndHeaders",
+      "allowsExplicitSensitiveEnvAndWhitelistedHeaders",
+      "disabledSecurityPreservesOriginalMapIdentity"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsMcpClientCacheStateTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "reusesLiveHandleAndReplacesExpiredClient",
+      "cleanupClosesOnlyExpiredEntries"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsMcpRemoteInvocationAdapterTest",
+    "tests": "4",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "authorityMustBeRecheckedAfterWaitingForSessionLock",
+      "inputSummaryMustRemainShapeOnlyAndAuditFailureMustNotBreakInvocationError",
+      "invokeMustSerializeRemoteCallRedactInputAndAuditSuccess",
+      "serializedCallbackMustDropLocalToolContextAndAuditFailure"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsMcpProgressiveRuntimeAdapterTest",
+    "tests": "6",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "routeMissMustFailClosedAndPreRemoteAuditMustPreserveBlockMetadata",
+      "managedExposureMustUseRuntimeCatalogAndTypedDisclosureFlags",
+      "selectAndHydrateMustUseTypedStageAndRemoteToolIdentity",
+      "settingsAndAuditMustRemainExplicitAndBestEffort",
+      "missingManagerMayFallbackToLegacyOnlyWhenEnforcementDisabled",
+      "emptyRuntimeCatalogAndLegacyProjectExposureMustFailClosedWithWarnings"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsProjectMcpEnvironmentProjectorTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "mysqlResourceMustProjectDatabaseAndTableAllowlistIntoReadonlyMcpEnvironment",
+      "redisResourceMustProjectKeyAllowlistIntoReadonlyMcpEnvironment"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsMcpCallResultNormalizerTest",
+    "tests": "1",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "rejectedOutputSchemaAfterDispatchMustKeepUnknownWriteSemanticsAndRawReceipt"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsMcpClientHandleServiceTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "initializationFailureResetsStateAndAllowsRetry",
+      "nullHandleFailsWithStableCode"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsRuntimeMcpResolverTest",
+    "tests": "11",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "landingDecoratesRuntimeConfigWithFrozenOperationBindings",
+      "agentDefinitionCannotElevateRuntimeStage",
+      "agentAuthorityControlsReadonlyTestWriteAndProductionProposalVisibility",
+      "landingMayAssembleProjectProdMcpWithoutPerToolApprovalAcl",
+      "legacyMatchMustBeObservableForRuntimeMigration",
+      "legacyConfigMustFailClosedWhenProjectAuthorizationIsUnavailable",
+      "sourceRepositoryMustRemainLastCompatibilityFallback",
+      "incompleteGovernanceMetadataAlwaysFailsClosed",
+      "projectCapabilityInheritanceMustUseSameAuthorizationCatalog",
+      "projectRuntimeDescriptorMustWinBeforeLegacyAndSourceFallbacks",
+      "legacyMapperMustPreserveStdioAndHttpTransportContracts"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsMcpClientCacheSettingsTest",
+    "tests": "1",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "normalizesBoundsAndPreservesLegacyOneSecondTtl"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.application.mcp.OpsMcpRuntimePayloadSanitizerAdapterTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "plainTextPayloadMasksProtectedAssignmentsWithoutDroppingOtherText",
+      "nestedStructuredPayloadMasksProtectedKeys"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsMcpClientRegistryTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "sameCacheKeyMustReuseClientAndInitializeOnlyOnce",
+      "invalidateAllMustCloseCachedClients"
+    ]
+  },
+  {
+    "suite": "cn.lgs.orbisops.trigger.ops.runtime.OpsMcpCallbackPolicyAdapterTest",
+    "tests": "4",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "cases": [
+      "declaredCapabilityMustRespectBlockedNotificationDirectAndWildcardPrecedence",
+      "assertAllowedMustDelegateCompatibilityPolicyAndExposeItsBlockedReason",
+      "directMcpWithoutExplicitCapabilityFailsClosedRegardlessOfToolText",
+      "decorateMustPreserveIdentitySchemaMetadataAndInvocationWhileAppendingOnce"
+    ]
+  }
+]
